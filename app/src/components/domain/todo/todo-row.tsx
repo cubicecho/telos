@@ -122,23 +122,33 @@ export function TodoRow({
             </div>
           ) : null}
 
-          <div className="-ml-2 mt-1 flex flex-wrap items-center opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
-            <LabelPicker attached={todo.labels} onToggle={toggleLabel} />
-            <DependencyPicker todo={todo} candidates={siblings} onToggle={toggleDependency} />
-          </div>
-
           {actionError ? <p className="mt-1 text-destructive text-xs">{actionError}</p> : null}
         </div>
 
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8 shrink-0 text-muted-foreground opacity-0 transition-opacity hover:text-destructive focus-visible:opacity-100 group-hover:opacity-100"
-          onClick={() => setConfirmingDelete(true)}
-          aria-label={`Delete ${todo.title}`}
-        >
-          <Trash2 className="h-4 w-4" />
-        </Button>
+        {/* Every action the row offers, in one cluster that appears together on
+            hover. `has-[[data-state=open]]` keeps it visible while a picker's
+            popover is open: Radix renders that panel in a portal, so
+            `focus-within` alone would let the cluster fade out from under the
+            panel the reader is using. */}
+        <div className="flex shrink-0 items-center opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100 has-[[data-state=open]]:opacity-100">
+          <LabelPicker attached={todo.labels} onToggle={toggleLabel} align="end" className="h-8 w-8" />
+          <DependencyPicker
+            todo={todo}
+            candidates={siblings}
+            onToggle={toggleDependency}
+            align="end"
+            className="h-8 w-8"
+          />
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 text-muted-foreground hover:text-destructive"
+            onClick={() => setConfirmingDelete(true)}
+            aria-label={`Delete ${todo.title}`}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
       <AlertDialog open={confirmingDelete} onOpenChange={setConfirmingDelete}>

@@ -57,7 +57,8 @@ export function ProjectOverview({ project }: { project: ProjectOverviewData }) {
           <h1 className="truncate font-semibold text-2xl tracking-tight">{project.name}</h1>
           {project.description ? <p className="mt-1 text-muted-foreground text-sm">{project.description}</p> : null}
         </div>
-        <div className="flex shrink-0 gap-1">
+        <div className="flex shrink-0 items-center gap-1">
+          <LabelPicker attached={project.labels} onToggle={toggleLabel} align="end" />
           <Button variant="ghost" size="icon" onClick={() => setEditing(true)} aria-label="Edit project">
             <Pencil className="h-4 w-4" />
           </Button>
@@ -88,12 +89,14 @@ export function ProjectOverview({ project }: { project: ProjectOverviewData }) {
         </div>
       </dl>
 
-      <div className="-ml-2 flex flex-wrap items-center gap-1">
-        {project.labels.map((label) => (
-          <LabelBadge key={label.id} label={label} onRemove={() => toggleLabel(label, false)} className="ml-2" />
-        ))}
-        <LabelPicker attached={project.labels} onToggle={toggleLabel} />
-      </div>
+      {/* Only the badges now, so no row is drawn for a project that has none. */}
+      {project.labels.length > 0 ? (
+        <div className="flex flex-wrap gap-1">
+          {project.labels.map((label) => (
+            <LabelBadge key={label.id} label={label} onRemove={() => toggleLabel(label, false)} />
+          ))}
+        </div>
+      ) : null}
 
       <ProjectFormDialog open={editing} onOpenChange={setEditing} project={project} />
 

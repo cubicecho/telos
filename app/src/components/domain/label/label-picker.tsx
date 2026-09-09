@@ -3,6 +3,7 @@ import * as Popover from '@radix-ui/react-popover';
 import { Check, Tag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { LabelsDocument } from '@/lib/graphql';
+import { cn } from '@/lib/utils';
 import type { LabelSummary } from './label-badge';
 
 /**
@@ -12,9 +13,15 @@ import type { LabelSummary } from './label-badge';
 export function LabelPicker({
   attached,
   onToggle,
+  // Which edge the panel hangs from. A trigger sitting at the right of its row
+  // wants `end`, or the panel opens away from the content it belongs to.
+  align = 'start',
+  className,
 }: {
   attached: readonly LabelSummary[];
   onToggle: (label: LabelSummary, attach: boolean) => void;
+  align?: 'start' | 'end';
+  className?: string;
 }) {
   const { data } = useQuery(LabelsDocument);
   const attachedIds = new Set(attached.map((label) => label.id));
@@ -23,15 +30,22 @@ export function LabelPicker({
   return (
     <Popover.Root>
       <Popover.Trigger asChild>
-        <Button variant="ghost" size="sm" className="text-muted-foreground">
-          <Tag className="mr-1 h-3.5 w-3.5" />
-          Labels
+        {/* Icon only, to sit in a row of icon actions. The name it lost is in
+            `aria-label` for a screen reader and in `title` for a pointer. */}
+        <Button
+          variant="ghost"
+          size="icon"
+          className={cn('text-muted-foreground', className)}
+          aria-label="Labels"
+          title="Labels"
+        >
+          <Tag className="h-4 w-4" />
         </Button>
       </Popover.Trigger>
       <Popover.Portal>
         <Popover.Content
           sideOffset={6}
-          align="start"
+          align={align}
           className="z-50 w-56 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
         >
           {labels.length === 0 ? (
