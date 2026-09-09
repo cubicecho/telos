@@ -1,4 +1,4 @@
-import { useMutation } from '@apollo/client';
+import { type ApolloCache, useMutation } from '@apollo/client';
 import { Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { LabelBadge, type LabelSummary } from '@/components/domain/label/label-badge';
@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { bumpProjectCounts, updateProjectTodos } from '@/lib/cache';
 import {
   AddTodoDependencyDocument,
   AttachTodoLabelDocument,
@@ -43,23 +44,40 @@ export function TodoRow({
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  // Completing or deleting a todo moves the sidebar's counts and the project
-  // header's, so those queries refetch alongside the list itself.
+  // Attaching a label or a dependency is a junction-table write whose effect on
+  // the list the client cannot name — a new dependency can block a chain of
+  // todos — so those still ask the server what happened. Completing and
+  // deleting are arithmetic the client can do itself, and do instantly.
   const refetchQueries = [
     { query: ProjectTodosDocument, variables: { projectId } },
     { query: ProjectDocument, variables: { id: projectId } },
     ProjectsDocument,
   ];
 
-  const [completeTodo] = useMutation(CompleteTodoDocument, { refetchQueries });
-  const [reopenTodo] = useMutation(ReopenTodoDocument, { refetchQueries });
-  const [deleteTodo] = useMutation(DeleteTodoDocument, { refetchQueries });
+  const [completeTodo] = useMutation(CompleteTodoDocument);
+  const [reopenTodo] = useMutation(ReopenTodoDocument);
+  const [deleteTodo] = useMutation(DeleteTodoDocument);
   const [attachLabel] = useMutation(AttachTodoLabelDocument, { refetchQueries });
   const [detachLabel] = useMutation(DetachTodoLabelDocument, { refetchQueries });
   const [addDependency] = useMutation(AddTodoDependencyDocument, { refetchQueries });
   const [removeDependency] = useMutation(RemoveTodoDependencyDocument, { refetchQueries });
 
   const done = todo.completedAt != null;
+
+  /**
+   * Write a completion — or its undo — into the cache.
+   *
+   * Runs twice per mutation: once for the optimistic response and once for the
+   * server's. Apollo discards the optimistic layer before the second, so the
+   * count delta lands exactly once, and the list rewrite is idempotent.
+   */
+  function writeCompletion(cache: ApolloCache<unknown>, completedAt: string | null) {
+    updateProjectTodos(cache, projectId, (todos) =>
+      todos.map((row) => (row.id === todo.id ? { ...row, completedAt } : row)),
+    );
+    // Blocked todos count as open, so only the tick moves the number.
+    bumpProjectCounts(cache, projectId, { total: 0, open: completedAt == null ? 1 : -1 });
+  }
 
   async function run(action: () => Promise<unknown>) {
     setActionError(null);
@@ -71,8 +89,47 @@ export function TodoRow({
   }
 
   function toggleDone(next: boolean) {
+    // The server stamps its own clock; this one only has to be a timestamp so
+    // the row reads as done, and it is replaced by the real one milliseconds
+    // later. Nothing is displayed from it.
+    const completedAt = next ? new Date().toISOString() : null;
     return run(() =>
-      next ? completeTodo({ variables: { id: todo.id } }) : reopenTodo({ variables: { id: todo.id } }),
+      next
+        ? completeTodo({
+            variables: { id: todo.id },
+            optimisticResponse: {
+              completeTodo: { __typename: 'Todo', id: todo.id, completedAt, isBlocked: todo.isBlocked },
+            },
+            update: (cache, { data }) => {
+              if (data?.completeTodo) writeCompletion(cache, data.completeTodo.completedAt);
+            },
+          })
+        : reopenTodo({
+            variables: { id: todo.id },
+            optimisticResponse: {
+              reopenTodo: { __typename: 'Todo', id: todo.id, completedAt: null, isBlocked: todo.isBlocked },
+            },
+            update: (cache, { data }) => {
+              if (data?.reopenTodo) writeCompletion(cache, data.reopenTodo.completedAt);
+            },
+          }),
+    );
+  }
+
+  function remove() {
+    return run(() =>
+      deleteTodo({
+        variables: { id: todo.id },
+        optimisticResponse: { deleteTodoSingle: { __typename: 'Todo', id: todo.id } },
+        update(cache, { data }) {
+          if (!data?.deleteTodoSingle) return;
+          updateProjectTodos(cache, projectId, (todos) => todos.filter((row) => row.id !== todo.id));
+          bumpProjectCounts(cache, projectId, { total: -1, open: done ? 0 : -1 });
+          // The row is out of every list that named it; drop the entity too,
+          // or it sits in the cache for the rest of the session.
+          cache.evict({ id: cache.identify({ __typename: 'Todo', id: todo.id }) });
+        },
+      }),
     );
   }
 
@@ -163,7 +220,7 @@ export function TodoRow({
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => run(() => deleteTodo({ variables: { id: todo.id } }))}
+              onClick={remove}
             >
               Delete
             </AlertDialogAction>

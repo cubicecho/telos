@@ -3,8 +3,8 @@ import { Plus } from 'lucide-react';
 import { type FormEvent, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { bumpProjectCounts } from '@/lib/cache';
-import { CreateTodoDocument, ProjectTodosDocument } from '@/lib/graphql';
+import { bumpProjectCounts, updateProjectTodos } from '@/lib/cache';
+import { CreateTodoDocument } from '@/lib/graphql';
 import { newId } from '@/lib/ids';
 
 /**
@@ -52,14 +52,10 @@ export function TodoComposer({ projectId, nextPosition }: { projectId: string; n
         update(cache, { data }) {
           const todo = data?.createTodo;
           if (!todo) return;
-          cache.updateQuery({ query: ProjectTodosDocument, variables: { projectId } }, (existing) =>
-            existing
-              ? // Filtered before appending: the list may already hold this id if
-                // a refetch landed first, and the query orders by position, so
-                // the end is where a todo with the highest one belongs.
-                { ...existing, todos: [...existing.todos.filter((row) => row.id !== todo.id), todo] }
-              : existing,
-          );
+          // Filtered before appending: the list may already hold this id if a
+          // refetch landed first, and the query orders by position, so the end
+          // is where a todo with the highest one belongs.
+          updateProjectTodos(cache, projectId, (todos) => [...todos.filter((row) => row.id !== todo.id), todo]);
           bumpProjectCounts(cache, projectId, { total: 1, open: 1 });
         },
       });

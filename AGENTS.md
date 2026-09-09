@@ -38,7 +38,7 @@ telos/
 │   │   │   ├── ui/          # shadcn/ui primitives — no app logic
 │   │   │   ├── domain/      # project/, todo/, label/, settings/
 │   │   │   └── layouts/     # sidebar
-│   │   └── lib/             # apollo, auth, theme, readable-text-color, graphql documents, cn()
+│   │   └── lib/             # apollo, auth, theme, cache writers, blocking, graphql documents, cn()
 │   ├── public/index.html    # HTML shell; applies the theme before first paint
 │   ├── app.json             # Expo config
 │   ├── metro.config.js
@@ -144,6 +144,23 @@ create returns exactly what its list stores, so the cache never holds a
 half-written entity. A field added to a list is a field the create must return,
 which sharing the fragment makes automatic. `newId()` does not assume
 `crypto.randomUUID`: it is secure-context-only and Telos runs on plain http.
+
+**The todo list writes itself, and rederives blocking.** Creating, completing,
+reopening and deleting a todo are optimistic: the mutation carries an
+`optimisticResponse` and an `update` that edits the cache directly, so the row
+moves on the click rather than on the round trip. Every one of those edits goes
+through `updateProjectTodos()` in `src/lib/cache.ts`, which applies the one
+change the mutation made and then hands the whole list to `resolveBlocking()` in
+`src/lib/blocking.ts`. That is deliberate: `isBlocked` and `blockedBy` are
+server-derived, and ticking one todo off can unblock several others, so a patch
+that touched only the named row would leave the rest of the list lying.
+`resolveBlocking` reapplies the server's own rule — blocked while any dependency
+is still open — and is idempotent, because Apollo runs `update` twice (once
+optimistically, once on the real result). Counts move through
+`bumpProjectCounts()`, a delta, which is safe for the same reason: the
+optimistic layer is discarded before the real pass. Attaching a label or a
+dependency still refetches — a new dependency can block a chain the client
+cannot see the far end of.
 
 **Text on a user-chosen colour picks its own ink.** A label's colour comes out of
 the database, so no Tailwind variant and no theme token can be trusted to read on
