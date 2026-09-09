@@ -1,0 +1,16 @@
+{
+  "expo": {
+    "name": "Telos",
+    "slug": "telos",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "telos",
+    "userInterfaceStyle": "automatic",
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
+    "platforms": ["web"],
+    "plugins": ["expo-router", "expo-status-bar"]
+  }
+}

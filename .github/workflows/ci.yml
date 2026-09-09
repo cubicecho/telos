@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    env:
+      # Codegen imports @telos/db, which refuses to load without one. Nothing
+      # here connects — postgres-js is lazy, and the tests build their own
+      # in-memory database.
+      DATABASE_URL: postgres://ci:ci@127.0.0.1:5432/ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run codegen
+      - run: npm run check:biome
+      - run: npm run check:types
+      - run: npm test

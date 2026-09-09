@@ -1,0 +1,45 @@
+# The deployment: the app and its database. `docker compose up --build`.
+name: telos
+
+services:
+  telos:
+    image: vantreeseba/telos:latest
+    build: .
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # Required — generate with: openssl rand -hex 32
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required — generate one with `openssl rand -hex 32`}
+      DATABASE_URL: postgres://telos:${POSTGRES_PASSWORD:-telos}@postgres:5432/telos
+      APP_URL: ${APP_URL:-http://localhost:3002}
+      # Leave magic links on unless this instance is private and has no mail
+      # relay. See "Before you expose it" in the README.
+      AUTH_MAGIC_LINK: ${AUTH_MAGIC_LINK:-true}
+      EXPOSE_MAGIC_LINK: ${EXPOSE_MAGIC_LINK:-false}
+      NODE_ENV: production
+      PORT: 3002
+    ports:
+      - "${PORT:-3002}:3002"
+
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: telos
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-telos}
+      POSTGRES_DB: telos
+    # Bound to loopback: the database is for the app next to it, not the network.
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5435}:5432"
+    volumes:
+      - telos_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U telos -d telos"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  telos_pgdata:

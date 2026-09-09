@@ -1,0 +1,33 @@
+{
+  "name": "@telos/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "scripts": {
+    "dev": "node --experimental-strip-types --env-file-if-exists=../.env --watch src/index.ts",
+    "build": "echo 'no server build needed — TypeScript runs directly'",
+    "start": "node --experimental-strip-types src/index.ts",
+    "clean": "rm -rf __generated__",
+    "codegen": "node --experimental-strip-types --import=./src/preload-env.ts src/write_schema.ts && graphql-codegen-esm"
+  },
+  "dependencies": {
+    "@apollo/server": "^5.5.1",
+    "@as-integrations/express5": "^1.1.2",
+    "@telos/db": "*",
+    "@vantreeseba/drizzle-graphql": "^9.0.0",
+    "cors": "^2.8.6",
+    "dataloader": "^2.2.3",
+    "drizzle-orm": "1.0.0-rc.4",
+    "express": "^5.2.1",
+    "graphql": "^16.10.0",
+    "graphql-parse-resolve-info": "^4.14.1",
+    "graphql-scalars": "^2.0.0",
+    "jsonwebtoken": "^9.0.3"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/jsonwebtoken": "^9.0.10"
+  }
+}

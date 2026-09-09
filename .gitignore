@@ -1,0 +1,10 @@
+node_modules
+dist
+.env
+.env.local
+pgdata/
+coverage/
+__generated__
+.expo/
+**/tsconfig.tsbuildinfo
+.DS_Store

@@ -1,0 +1,86 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 200 12% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 200 12% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 200 12% 10%;
+    --primary: 173 70% 32%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 190 20% 96%;
+    --secondary-foreground: 200 12% 16%;
+    --muted: 190 20% 96%;
+    --muted-foreground: 200 8% 45%;
+    --accent: 173 45% 94%;
+    --accent-foreground: 173 70% 22%;
+    --destructive: 0 72% 48%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 200 14% 90%;
+    --input: 200 14% 90%;
+    --ring: 173 70% 32%;
+    --radius: 0.5rem;
+    --chart-1: 173 70% 40%;
+    --chart-2: 197 37% 34%;
+    --chart-3: 43 74% 56%;
+    --chart-4: 12 76% 61%;
+    --chart-5: 280 45% 55%;
+  }
+
+  .dark {
+    --background: 200 14% 8%;
+    --foreground: 190 12% 94%;
+    --card: 200 14% 11%;
+    --card-foreground: 190 12% 94%;
+    --popover: 200 14% 11%;
+    --popover-foreground: 190 12% 94%;
+    --primary: 173 60% 48%;
+    --primary-foreground: 173 70% 8%;
+    --secondary: 200 12% 17%;
+    --secondary-foreground: 190 12% 94%;
+    --muted: 200 12% 17%;
+    --muted-foreground: 200 8% 62%;
+    --accent: 173 35% 18%;
+    --accent-foreground: 173 60% 78%;
+    --destructive: 0 62% 42%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 200 12% 20%;
+    --input: 200 12% 20%;
+    --ring: 173 60% 48%;
+    --chart-1: 173 60% 50%;
+    --chart-2: 197 45% 55%;
+    --chart-3: 43 74% 62%;
+    --chart-4: 12 70% 62%;
+    --chart-5: 280 45% 65%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+    scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
+    scrollbar-width: thin;
+  }
+  body {
+    @apply bg-background text-foreground font-sans;
+  }
+
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted-foreground) / 0.3);
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.5);
+  }
+}

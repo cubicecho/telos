@@ -1,0 +1,13 @@
+import type { LabelSummary } from '@/components/domain/label/label-badge';
+
+/** The shape the project screen reads for each todo. */
+export interface TodoSummary {
+  id: string;
+  title: string;
+  completedAt: string | null;
+  position: number | null;
+  isBlocked: boolean;
+  blockedBy: readonly { id: string; title: string }[];
+  dependencies: readonly { id: string; title: string; completedAt: string | null }[];
+  labels: readonly LabelSummary[];
+}
