@@ -1,6 +1,6 @@
 import { useQuery } from '@apollo/client';
 import { Link, usePathname } from 'expo-router';
-import { LogOut, Plus, Tag } from 'lucide-react';
+import { LogOut, Plus, Settings } from 'lucide-react';
 import { useState } from 'react';
 import { ProjectFormDialog } from '@/components/domain/project/project-form-dialog';
 import { ProjectListItem } from '@/components/domain/project/project-list-item';
@@ -63,11 +63,11 @@ export function Sidebar() {
 
       <div className="flex flex-col gap-0.5 border-t p-2">
         <Link
-          href="/labels"
+          href="/settings"
           className="flex items-center gap-2 rounded-md px-2 py-1.5 text-muted-foreground text-sm no-underline hover:bg-accent/60 hover:text-accent-foreground"
         >
-          <Tag className="h-4 w-4" />
-          Labels
+          <Settings className="h-4 w-4" />
+          Settings
         </Link>
         <button
           type="button"

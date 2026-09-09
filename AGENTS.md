@@ -31,14 +31,15 @@ telos/
 │   │   └── (app)/           # Authenticated group (redirects to /login)
 │   │       ├── index.tsx    # Redirects to the first project
 │   │       ├── projects/[id].tsx
-│   │       └── labels/index.tsx
+│   │       └── settings/index.tsx  # Theme + label management
 │   ├── src/
 │   │   ├── __generated__/   # Generated GraphQL types (do not edit, not committed)
 │   │   ├── components/
 │   │   │   ├── ui/          # shadcn/ui primitives — no app logic
-│   │   │   ├── domain/      # project/, todo/, label/
+│   │   │   ├── domain/      # project/, todo/, label/, settings/
 │   │   │   └── layouts/     # sidebar
-│   │   └── lib/             # apollo, auth, graphql documents, cn()
+│   │   └── lib/             # apollo, auth, theme, graphql documents, cn()
+│   ├── public/index.html    # HTML shell; applies the theme before first paint
 │   ├── app.json             # Expo config
 │   ├── metro.config.js
 │   └── tailwind.config.js
@@ -124,6 +125,14 @@ row exists, which is itself something the caller is not entitled to know.
 **`UNAUTHENTICATED` means the session expired.** The client drops its token on it
 and redirects to `/login`. A bad magic link is `BAD_USER_INPUT` — it must not
 sign anyone out.
+
+**The theme is applied twice, on purpose.** `app/public/index.html` sets `.dark`
+on `<html>` before the bundle loads so there is no white flash, and
+`src/lib/theme.ts` maintains it afterwards. The storage key `telos_theme` and the
+class rule are written out in both places — the script runs before any module
+exists — so a change to one is a change to both. That HTML file is also Expo's
+own template with a script added: `app/+html.tsx` is the documented place for
+this and does nothing under `web.output: "single"`.
 
 ## Code style
 

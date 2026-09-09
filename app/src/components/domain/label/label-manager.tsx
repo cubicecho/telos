@@ -17,7 +17,8 @@ import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { DeleteLabelDocument, LabelsDocument } from '@/lib/graphql';
 
-export default function LabelsScreen() {
+/** The whole label lifecycle in one block: list, create, rename, delete. */
+export function LabelManager() {
   const { data, loading } = useQuery(LabelsDocument);
   const [editing, setEditing] = useState<LabelSummary | undefined>();
   const [formOpen, setFormOpen] = useState(false);
@@ -27,10 +28,10 @@ export default function LabelsScreen() {
   const labels = data?.labels ?? [];
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-6 px-6 py-8">
-      <header className="flex items-center justify-between border-b pb-4">
+    <div className="flex flex-col gap-4">
+      <header className="flex items-center justify-between">
         <div>
-          <h1 className="font-semibold text-2xl tracking-tight">Labels</h1>
+          <h2 className="font-medium text-base">Labels</h2>
           <p className="mt-1 text-muted-foreground text-sm">Attach them to projects and todos alike.</p>
         </div>
         <Button
