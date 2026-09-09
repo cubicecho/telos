@@ -158,12 +158,13 @@ export function TodoRow({
           // still says why, and the affordance stays where the eye expects it.
           disabled={todo.isBlocked && !done}
           onCheckedChange={(checked) => toggleDone(checked === true)}
-          className="mt-0.5"
           aria-label={done ? `Reopen ${todo.title}` : `Complete ${todo.title}`}
         />
 
         <div className="min-w-0 flex-1">
-          <p className={cn('text-sm', done && 'text-muted-foreground line-through')}>{todo.title}</p>
+          {/* `leading-5` pins the first line's height to the checkbox's, so the
+              two agree even if a theme changes the base line height. */}
+          <p className={cn('text-sm leading-5', done && 'text-muted-foreground line-through')}>{todo.title}</p>
 
           {todo.isBlocked && !done ? (
             <p className="mt-1 text-muted-foreground text-xs">
@@ -187,7 +188,7 @@ export function TodoRow({
             popover is open: Radix renders that panel in a portal, so
             `focus-within` alone would let the cluster fade out from under the
             panel the reader is using. */}
-        <div className="flex shrink-0 items-center opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100 has-[[data-state=open]]:opacity-100">
+        <div className="flex h-5 shrink-0 items-center opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100 has-[[data-state=open]]:opacity-100">
           <LabelPicker attached={todo.labels} onToggle={toggleLabel} align="end" className="h-8 w-8" />
           <DependencyPicker
             todo={todo}
