@@ -28,7 +28,7 @@ export JWT_SECRET=$(openssl rand -hex 32)
 docker compose up --build
 ```
 
-Telos is now on <http://localhost:3002>. Migrations run at boot, so there is no
+Telos is now on <http://localhost:3001>. Migrations run at boot, so there is no
 setup step. Sign in with any email address: the magic link is printed to the
 server log.
 
@@ -45,8 +45,8 @@ Data lives in the `telos_pgdata` volume. Postgres is published on
 | --- | --- | --- |
 | `DATABASE_URL` | — | **Required.** Postgres connection string. There is no embedded fallback. |
 | `JWT_SECRET` | — | **Required in production.** Signs session and magic-link tokens. `openssl rand -hex 32`. |
-| `APP_URL` | `http://localhost:3002` | Public URL; magic-link URLs are built from it. |
-| `PORT` | `3002` | Port the server listens on. |
+| `APP_URL` | `http://localhost:3001` | Public URL; magic-link URLs are built from it. |
+| `PORT` | `3001` | Port the server listens on. |
 | `AUTH_MAGIC_LINK` | `true` | Set to `false` to sign in with an address alone, no link. |
 | `EXPOSE_MAGIC_LINK` | dev only | Return the magic link in the API response so the login page can show it. |
 
@@ -83,7 +83,7 @@ npm install
 npm run db:up          # Postgres on 127.0.0.1:5435
 npm run db:migrate
 npm run codegen
-npm run dev            # API on 3002, Expo dev server on 3004
+npm run dev            # API on 3001, Expo dev server on 3000
 ```
 
 `npm run check` runs codegen, Biome and `tsc --noEmit` across all three

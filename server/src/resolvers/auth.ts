@@ -20,7 +20,7 @@ function jwtSecret(): string {
  * `localhost` is useless in an inbox.
  */
 function appUrl(): string {
-  return process.env.APP_URL ?? `http://localhost:${process.env.PORT ?? 3002}`;
+  return process.env.APP_URL ?? `http://localhost:${process.env.PORT ?? 3001}`;
 }
 
 // Five sign-in attempts per address per quarter hour. requestMagicLink is

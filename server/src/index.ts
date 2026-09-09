@@ -14,7 +14,7 @@ import { createStaticHandler } from './static.ts';
 export type { Context } from './context.ts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const PORT = Number(process.env.PORT ?? 3002);
+const PORT = Number(process.env.PORT ?? 3001);
 const staticDir = join(__dirname, '../../app/dist');
 
 // Migrations run at boot so `docker compose up` on a fresh volume is the whole

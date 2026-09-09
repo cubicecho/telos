@@ -13,15 +13,15 @@ services:
       # Required — generate with: openssl rand -hex 32
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required — generate one with `openssl rand -hex 32`}
       DATABASE_URL: postgres://telos:${POSTGRES_PASSWORD:-telos}@postgres:5432/telos
-      APP_URL: ${APP_URL:-http://localhost:3002}
+      APP_URL: ${APP_URL:-http://localhost:3001}
       # Leave magic links on unless this instance is private and has no mail
       # relay. See "Before you expose it" in the README.
       AUTH_MAGIC_LINK: ${AUTH_MAGIC_LINK:-true}
       EXPOSE_MAGIC_LINK: ${EXPOSE_MAGIC_LINK:-false}
       NODE_ENV: production
-      PORT: 3002
+      PORT: 3001
     ports:
-      - "${PORT:-3002}:3002"
+      - "${PORT:-3001}:3001"
 
   postgres:
     image: postgres:17-alpine

@@ -252,3 +252,13 @@ departed from it, and why.
   `ECONNRESET` trying to speak TLS to a plaintext Postgres. `requiresSsl()` now
   parses the URL, honours an explicit `sslmode` as the operator's decision, and
   treats loopback and dotless service names as local.
+- **Ports settled at 3001 (server) and 3000 (Expo dev).** The plan picked 3002
+  and the build moved the Expo port to 3004, both chosen to dodge services that
+  turned out to be running on a *remote* Docker daemon rather than on the
+  development machine — so they were never really in the way.
+- **"Local" for the TLS decision means private, not loopback.** Treating any
+  dotted hostname as external classified `10.0.0.175` — a database on the LAN,
+  which is the ordinary self-hosting shape — as a trip across the internet, and
+  the container died on a TLS reset. `requiresSsl` moved to `db/src/ssl.ts` with
+  its own test, and now exempts RFC1918 space, link-local, and IPv6
+  unique-local alongside loopback and dotless names.

@@ -1,5 +1,6 @@
 import { relations } from './relations.ts';
 import * as schema from './schema.ts';
+import { requiresSsl } from './ssl.ts';
 
 // Telos is Postgres-only. There is no embedded fallback: a missing DATABASE_URL
 // is a misconfiguration, and silently writing to a local file instead would hide
@@ -10,31 +11,6 @@ if (!DATABASE_URL) {
 }
 
 const isProduction = process.env.NODE_ENV === 'production';
-
-/**
- * Whether to insist on TLS for this connection.
- *
- * Read from the parsed hostname, never the raw string: a URL carrying
- * credentials (`postgres://user:pass@postgres:5432/db`) puts the userinfo where
- * a naive prefix match looks for the host, and would classify a container link
- * as a trip across the internet.
- *
- * Loopback and dotless names are not remote — a bare `postgres` or `db` is a
- * service on the same private network, and Postgres there is usually plaintext.
- * Everything else in production is assumed to be somewhere a network can see.
- */
-function requiresSsl(url: string): boolean {
-  // An explicit sslmode is the operator's decision; postgres-js reads it itself.
-  if (/[?&]sslmode=/i.test(url)) return false;
-  let hostname: string;
-  try {
-    hostname = new URL(url).hostname.replace(/^\[|\]$/g, '');
-  } catch {
-    return false;
-  }
-  if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1') return false;
-  return hostname.includes('.');
-}
 
 // drizzle-orm 1.0 takes the tables through the relations config built by
 // defineRelations, and that config is also what drizzle-graphql reads.

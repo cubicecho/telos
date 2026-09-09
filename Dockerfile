@@ -39,12 +39,12 @@ COPY server/src server/src
 COPY --from=builder /app/app/dist app/dist
 
 ENV NODE_ENV=production
-ENV PORT=3002
+ENV PORT=3001
 
-EXPOSE 3002
+EXPOSE 3001
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=20s \
-  CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3002)+'/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+  CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3001)+'/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
 # No --preserve-symlinks: it would resolve @telos/db to its path inside
 # node_modules, and Node refuses to strip types from anything under there.

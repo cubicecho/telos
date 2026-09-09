@@ -42,7 +42,7 @@ telos/
 │   ├── app.json             # Expo config
 │   ├── metro.config.js
 │   └── tailwind.config.js
-├── server/                  # GraphQL API (port 3002)
+├── server/                  # GraphQL API (port 3001)
 │   ├── __generated__/       # Generated SDL + resolver types (not committed)
 │   └── src/
 │       ├── index.ts         # Entry point: migrate, mount /graphql, serve the SPA
@@ -70,7 +70,7 @@ telos/
 ## Commands
 
 ```bash
-npm run dev              # server (3002) + Expo dev server (3004)
+npm run dev              # server (3001) + Expo dev server (3000)
 npm run db:up            # Postgres on ${POSTGRES_BIND:-127.0.0.1}:5435
 npm run db:generate      # new migration from a schema change
 npm run db:migrate       # apply migrations
