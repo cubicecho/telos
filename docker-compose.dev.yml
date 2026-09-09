@@ -13,7 +13,11 @@ services:
       POSTGRES_PASSWORD: telos
       POSTGRES_DB: telos
     ports:
-      - "127.0.0.1:5435:5432"
+      # Loopback by default: an unencrypted Postgres with a throwaway password
+      # has no business on a network. Override POSTGRES_BIND to 0.0.0.0 when the
+      # Docker daemon is not this machine (`docker context ls` shows a remote
+      # endpoint) — the loopback it binds is the daemon host's, not yours.
+      - "${POSTGRES_BIND:-127.0.0.1}:${POSTGRES_PORT:-5435}:5432"
     volumes:
       - telos_dev_pgdata:/var/lib/postgresql/data
     healthcheck:

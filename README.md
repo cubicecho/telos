@@ -89,3 +89,16 @@ npm run dev            # API on 3002, Expo dev server on 3004
 `npm run check` runs codegen, Biome and `tsc --noEmit` across all three
 workspaces; `npm test` runs the suite against an in-memory Postgres. See
 [AGENTS.md](AGENTS.md) for how the pieces fit together.
+
+If the server starts with `Cannot reach Postgres`, check whether your Docker
+daemon is this machine:
+
+```bash
+docker context ls
+```
+
+A remote endpoint (`ssh://…`, `tcp://…`) means `npm run db:up` published the
+database on *that* host's `127.0.0.1`, where nothing else can reach it. Set
+`POSTGRES_BIND=0.0.0.0` in `.env`, point `DATABASE_URL` at the daemon's
+hostname, and re-run `npm run db:up`. Only on a network you trust — the dev
+database has a throwaway password and no TLS.

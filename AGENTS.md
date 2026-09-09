@@ -71,7 +71,7 @@ telos/
 
 ```bash
 npm run dev              # server (3002) + Expo dev server (3004)
-npm run db:up            # local Postgres on 127.0.0.1:5435
+npm run db:up            # Postgres on ${POSTGRES_BIND:-127.0.0.1}:5435
 npm run db:generate      # new migration from a schema change
 npm run db:migrate       # apply migrations
 npm run codegen          # GraphQL types for both server and app

@@ -19,7 +19,24 @@ const staticDir = join(__dirname, '../../app/dist');
 
 // Migrations run at boot so `docker compose up` on a fresh volume is the whole
 // install. They are idempotent; a container restart is a no-op.
-await migrate(db, { migrationsFolder: join(__dirname, '../../db/drizzle') });
+try {
+  await migrate(db, { migrationsFolder: join(__dirname, '../../db/drizzle') });
+} catch (error) {
+  // The first thing the server does is talk to Postgres, so a misconfigured
+  // DATABASE_URL surfaces here as a driver stack trace about `CREATE SCHEMA`.
+  // Name the actual problem instead: nothing is listening where we were told.
+  const cause = (error as { cause?: NodeJS.ErrnoException })?.cause;
+  if (cause && (cause.code === 'ECONNREFUSED' || cause.code === 'ENOTFOUND' || cause.code === 'ETIMEDOUT')) {
+    const { hostname, port } = new URL(process.env.DATABASE_URL ?? '');
+    console.error(`✖ Cannot reach Postgres at ${hostname}:${port || 5432} (${cause.code}).`);
+    console.error('  Check DATABASE_URL in .env, and that the database is up and reachable from here.');
+    console.error('  If your Docker daemon is remote (`docker context ls`), a container published on');
+    console.error("  127.0.0.1 is bound to the daemon host's loopback. Set POSTGRES_BIND=0.0.0.0 and");
+    console.error('  re-run `npm run db:up`.');
+    process.exit(1);
+  }
+  throw error;
+}
 
 const app = express();
 const httpServer = createServer(app);
