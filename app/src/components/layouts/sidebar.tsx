@@ -23,23 +23,29 @@ export function Sidebar() {
 
   return (
     <aside className="flex h-screen w-64 shrink-0 flex-col border-r bg-card">
-      <div className="flex items-center justify-between px-4 py-4">
+      <div className="px-4 pt-4 pb-3">
         <Link href="/" className="font-semibold text-foreground text-lg tracking-tight no-underline">
           Telos
         </Link>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8"
-          onClick={() => setCreating(true)}
-          aria-label="New project"
-        >
+      </div>
+
+      {/* The one action the sidebar offers, so it says what it does rather than
+          leaving a bare `+` next to the title for the reader to interpret. */}
+      <div className="px-3">
+        <Button variant="outline" size="sm" className="w-full gap-2 rounded-full" onClick={() => setCreating(true)}>
           <Plus className="h-4 w-4" />
+          New project
         </Button>
       </div>
 
-      <nav className="flex-1 overflow-y-auto px-2 pb-2">
-        <p className="px-2 py-1 font-medium text-muted-foreground text-xs uppercase tracking-wide">Projects</p>
+      <nav className="flex-1 overflow-y-auto px-2 pt-4 pb-2">
+        {/* `border-b` rather than a Separator element: the footer below already
+            draws its rule this way, and a divider that is part of the block it
+            labels cannot drift away from it. It is inset by the nav's own
+            padding so it lines up with the project rows, not the sidebar edge. */}
+        <p className="mb-1 border-b px-2 pb-2 font-medium text-muted-foreground text-xs uppercase tracking-wide">
+          Projects
+        </p>
         {loading && projects.length === 0 ? (
           <div className="px-2 py-2">
             <Spinner />
