@@ -24,7 +24,7 @@ export function Sidebar() {
   return (
     <aside className="flex h-screen w-64 shrink-0 flex-col border-r bg-card">
       <div className="flex items-center justify-between px-4 py-4">
-        <Link href="/" className="font-semibold text-lg no-underline">
+        <Link href="/" className="font-semibold text-foreground text-lg tracking-tight no-underline">
           Telos
         </Link>
         <Button

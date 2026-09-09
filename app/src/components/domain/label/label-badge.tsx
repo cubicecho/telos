@@ -1,5 +1,6 @@
 import { X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { readableTextColor } from '@/lib/readable-text-color';
 import { cn } from '@/lib/utils';
 
 export interface LabelSummary {
@@ -9,9 +10,12 @@ export interface LabelSummary {
 }
 
 /**
- * A label's colour is stored as a CSS colour string chosen by the user, so it
- * cannot come from a Tailwind class — it is applied inline, tinting the border
- * and text while the surface stays neutral enough to read at small sizes.
+ * A label's colour is chosen by the user, so it cannot come from a Tailwind
+ * class — it is the badge's backdrop, applied inline. The text on top is picked
+ * per colour rather than fixed: the palette runs from teal to crimson, and no
+ * single ink reads on all of it. Painting the colour as *text* instead was the
+ * previous shape and it failed in the dark theme, where a dark label sat all but
+ * invisible on a near-black surface.
  */
 export function LabelBadge({
   label,
@@ -26,7 +30,7 @@ export function LabelBadge({
     <Badge
       variant="outline"
       className={cn('gap-1', className)}
-      style={{ borderColor: label.color, color: label.color, backgroundColor: `${label.color}14` }}
+      style={{ borderColor: label.color, backgroundColor: label.color, color: readableTextColor(label.color) }}
     >
       {label.name}
       {onRemove ? (

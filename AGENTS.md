@@ -38,7 +38,7 @@ telos/
 │   │   │   ├── ui/          # shadcn/ui primitives — no app logic
 │   │   │   ├── domain/      # project/, todo/, label/, settings/
 │   │   │   └── layouts/     # sidebar
-│   │   └── lib/             # apollo, auth, theme, graphql documents, cn()
+│   │   └── lib/             # apollo, auth, theme, readable-text-color, graphql documents, cn()
 │   ├── public/index.html    # HTML shell; applies the theme before first paint
 │   ├── app.json             # Expo config
 │   ├── metro.config.js
@@ -133,6 +133,15 @@ class rule are written out in both places — the script runs before any module
 exists — so a change to one is a change to both. That HTML file is also Expo's
 own template with a script added: `app/+html.tsx` is the documented place for
 this and does nothing under `web.output: "single"`.
+
+**Text on a user-chosen colour picks its own ink.** A label's colour comes out of
+the database, so no Tailwind variant and no theme token can be trusted to read on
+it — `readableTextColor()` in `src/lib/readable-text-color.ts` compares the two
+WCAG contrast ratios and returns absolute black or white. Absolute, not
+`--foreground`: the backdrop is the user's colour and does not flip with the
+theme, so the ink must not either. It returns `undefined` for anything it cannot
+parse, which leaves the inherited colour in place rather than painting black onto
+a value it failed to read.
 
 ## Code style
 
