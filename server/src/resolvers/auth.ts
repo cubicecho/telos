@@ -13,8 +13,14 @@ function jwtSecret(): string {
   return process.env.JWT_SECRET ?? DEV_SECRET;
 }
 
+/**
+ * Where magic links point. In production the server serves the client itself,
+ * so its own origin is the right default — but only for someone browsing from
+ * this machine. Set APP_URL to the address users actually type; a link to
+ * `localhost` is useless in an inbox.
+ */
 function appUrl(): string {
-  return process.env.APP_URL ?? 'http://localhost:3002';
+  return process.env.APP_URL ?? `http://localhost:${process.env.PORT ?? 3002}`;
 }
 
 // Five sign-in attempts per address per quarter hour. requestMagicLink is

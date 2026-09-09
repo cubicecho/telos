@@ -4,10 +4,20 @@ import { onError } from '@apollo/client/link/error';
 import { Platform } from 'react-native';
 import { clearToken, getToken } from '@/lib/auth';
 
-// Empty by default: in production the client is served from the same origin as
-// /graphql, so a relative URL is correct and needs no build-time configuration.
-// `npm run dev:app` runs Expo on another port and sets EXPO_PUBLIC_API_URL.
-const API_URL = process.env.EXPO_PUBLIC_API_URL ?? '';
+// Empty means "same origin", which is what production wants: the server serves
+// the built client from the same place it serves /graphql.
+//
+// `npm run dev:app` is the exception — Expo serves the client from its own port,
+// so the API has to be named. Take the host from whatever address the page was
+// actually opened on: hardcoding localhost works only for the machine running
+// the dev server, and breaks the moment you open the app from a phone or a
+// second laptop. EXPO_PUBLIC_API_URL overrides this outright.
+function devApiUrl(): string {
+  if (process.env.NODE_ENV === 'production' || Platform.OS !== 'web') return '';
+  return `${window.location.protocol}//${window.location.hostname}:${process.env.EXPO_PUBLIC_API_PORT ?? '3002'}`;
+}
+
+const API_URL = process.env.EXPO_PUBLIC_API_URL ?? devApiUrl();
 
 const httpLink = new HttpLink({ uri: `${API_URL}/graphql` });
 
