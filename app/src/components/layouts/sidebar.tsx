@@ -30,9 +30,14 @@ export function Sidebar() {
       </div>
 
       {/* The one action the sidebar offers, so it says what it does rather than
-          leaving a bare `+` next to the title for the reader to interpret. */}
+          leaving a bare `+` next to the title for the reader to interpret, and
+          it wears `primary` — the theme's teal — rather than an outline. Nothing
+          else in the sidebar is filled, so the colour is the whole hierarchy:
+          spend it on the action and the project rows stay quiet. Taking it from
+          the token rather than a literal is what keeps it legible in both
+          themes; `--primary` is darker in light mode and brighter in dark. */}
       <div className="px-3">
-        <Button variant="outline" size="sm" className="w-full gap-2 rounded-full" onClick={() => setCreating(true)}>
+        <Button size="sm" className="w-full gap-2 rounded-lg" onClick={() => setCreating(true)}>
           <Plus className="h-4 w-4" />
           New project
         </Button>
