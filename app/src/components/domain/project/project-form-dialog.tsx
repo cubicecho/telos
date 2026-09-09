@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { CreateProjectDocument, ProjectDocument, ProjectsDocument, UpdateProjectDocument } from '@/lib/graphql';
+import { newId } from '@/lib/ids';
 
 export interface ProjectDraft {
   id: string;
@@ -26,9 +27,7 @@ export function ProjectFormDialog({
   const router = useRouter();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [createProject, { loading: creating, error: createError }] = useMutation(CreateProjectDocument, {
-    refetchQueries: [ProjectsDocument],
-  });
+  const [createProject, { loading: creating, error: createError }] = useMutation(CreateProjectDocument);
   const [updateProject, { loading: updating, error: updateError }] = useMutation(UpdateProjectDocument, {
     refetchQueries: [ProjectsDocument, ...(project ? [{ query: ProjectDocument, variables: { id: project.id } }] : [])],
   });
@@ -46,8 +45,34 @@ export function ProjectFormDialog({
     if (project) {
       await updateProject({ variables: { id: project.id, set: values } });
     } else {
-      const { data } = await createProject({ variables: { values } });
-      if (data?.createProject) router.push(`/projects/${data.createProject.id}`);
+      const id = newId();
+      await createProject({
+        variables: { values: { id, ...values } },
+        optimisticResponse: {
+          createProject: { __typename: 'Project', id, name: values.name, todoCount: 0, openTodoCount: 0 },
+        },
+        update(cache, { data }) {
+          const created = data?.createProject;
+          if (!created) return;
+          cache.updateQuery({ query: ProjectsDocument }, (existing) =>
+            existing
+              ? {
+                  ...existing,
+                  // Re-sorted rather than appended: the sidebar query orders by
+                  // name, so a project dropped at the end would jump the moment
+                  // anything refetched.
+                  projects: [...existing.projects.filter((row) => row.id !== created.id), created].sort((a, b) =>
+                    a.name.localeCompare(b.name),
+                  ),
+                }
+              : existing,
+          );
+        },
+      });
+      // Navigated only once the row exists. The id is known up front, but the
+      // project screen reads fields this mutation does not return, so arriving
+      // early would mean a query for a row Postgres has not written yet.
+      router.push(`/projects/${id}`);
     }
     onOpenChange(false);
   }

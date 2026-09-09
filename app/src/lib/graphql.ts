@@ -3,14 +3,58 @@ import { graphql } from '@/__generated__';
 // Every document the app sends, in one place. The generated CRUD is wide — most
 // of it is filters and pagination this app has no use for — so these are the
 // deliberate slice of it Telos actually reads and writes.
+//
+// The three fragments below are load-bearing rather than tidy: a create
+// mutation writes its result straight into the list query's cache entry, so the
+// two selections have to agree exactly. Sharing one fragment is what makes that
+// true by construction — a field added to a list is a field the mutation starts
+// returning, instead of a half-written entity the next read has to go and fetch.
+
+export const ProjectListFieldsFragment = graphql(`
+  fragment ProjectListFields on Project {
+    id
+    name
+    todoCount
+    openTodoCount
+  }
+`);
+
+export const TodoFieldsFragment = graphql(`
+  fragment TodoFields on Todo {
+    id
+    title
+    completedAt
+    position
+    isBlocked
+    blockedBy {
+      id
+      title
+    }
+    dependencies {
+      id
+      title
+      completedAt
+    }
+    labels(orderBy: { name: { direction: asc, priority: 1 } }) {
+      id
+      name
+      color
+    }
+  }
+`);
+
+export const LabelFieldsFragment = graphql(`
+  fragment LabelFields on Label {
+    id
+    name
+    color
+  }
+`);
 
 export const ProjectsDocument = graphql(`
   query Projects {
     projects(where: { archivedAt: { isNull: true } }, orderBy: { name: { direction: asc, priority: 1 } }) {
-      id
-      name
-      todoCount
-      openTodoCount
+      ...ProjectListFields
     }
   }
 `);
@@ -39,25 +83,7 @@ export const ProjectTodosDocument = graphql(`
       where: { projectId: { eq: $projectId } }
       orderBy: { position: { direction: asc, priority: 1 }, createdAt: { direction: asc, priority: 2 } }
     ) {
-      id
-      title
-      completedAt
-      position
-      isBlocked
-      blockedBy {
-        id
-        title
-      }
-      dependencies {
-        id
-        title
-        completedAt
-      }
-      labels(orderBy: { name: { direction: asc, priority: 1 } }) {
-        id
-        name
-        color
-      }
+      ...TodoFields
     }
   }
 `);
@@ -65,9 +91,7 @@ export const ProjectTodosDocument = graphql(`
 export const LabelsDocument = graphql(`
   query Labels {
     labels(orderBy: { name: { direction: asc, priority: 1 } }) {
-      id
-      name
-      color
+      ...LabelFields
     }
   }
 `);
@@ -85,8 +109,7 @@ export const MeDocument = graphql(`
 export const CreateProjectDocument = graphql(`
   mutation CreateProject($values: CreateProjectInput!) {
     createProject(values: $values) {
-      id
-      name
+      ...ProjectListFields
     }
   }
 `);
@@ -112,8 +135,7 @@ export const DeleteProjectDocument = graphql(`
 export const CreateTodoDocument = graphql(`
   mutation CreateTodo($values: CreateTodoInput!) {
     createTodo(values: $values) {
-      id
-      title
+      ...TodoFields
     }
   }
 `);
@@ -176,9 +198,7 @@ export const RemoveTodoDependencyDocument = graphql(`
 export const CreateLabelDocument = graphql(`
   mutation CreateLabel($values: CreateLabelInput!) {
     createLabel(values: $values) {
-      id
-      name
-      color
+      ...LabelFields
     }
   }
 `);
@@ -186,9 +206,7 @@ export const CreateLabelDocument = graphql(`
 export const UpdateLabelDocument = graphql(`
   mutation UpdateLabel($id: UUID!, $set: UpdateLabelInput!) {
     updateLabelSingle(set: $set, where: { id: { eq: $id } }) {
-      id
-      name
-      color
+      ...LabelFields
     }
   }
 `);

@@ -134,6 +134,17 @@ exists — so a change to one is a change to both. That HTML file is also Expo's
 own template with a script added: `app/+html.tsx` is the documented place for
 this and does nothing under `web.output: "single"`.
 
+**Creates carry a client-generated id.** `newId()` in `src/lib/ids.ts` mints the
+UUID, the create mutation sends it in `values`, and Postgres keeps it. That is
+what lets a new row be written to the cache before the request leaves: the
+optimistic entry and the server's are the same normalized object, so nothing
+remounts and a tick applied in between names an id the server will recognise.
+The three list fragments in `src/lib/graphql.ts` exist for the same reason — a
+create returns exactly what its list stores, so the cache never holds a
+half-written entity. A field added to a list is a field the create must return,
+which sharing the fragment makes automatic. `newId()` does not assume
+`crypto.randomUUID`: it is secure-context-only and Telos runs on plain http.
+
 **Text on a user-chosen colour picks its own ink.** A label's colour comes out of
 the database, so no Tailwind variant and no theme token can be trusted to read on
 it — `readableTextColor()` in `src/lib/readable-text-color.ts` compares the two
