@@ -4,11 +4,18 @@ import { graphql } from '@/__generated__';
 // of it is filters and pagination this app has no use for — so these are the
 // deliberate slice of it Telos actually reads and writes.
 //
-// The three fragments below are load-bearing rather than tidy: a create
-// mutation writes its result straight into the list query's cache entry, so the
-// two selections have to agree exactly. Sharing one fragment is what makes that
-// true by construction — a field added to a list is a field the mutation starts
-// returning, instead of a half-written entity the next read has to go and fetch.
+// The fragments below are load-bearing rather than tidy: a mutation writes its
+// result straight into the query's cache entry, so the two selections have to
+// agree exactly — down to a field's arguments, which are part of the key Apollo
+// stores it under. Sharing one fragment is what makes that true by construction:
+// a field added to a list is a field the mutation starts returning, instead of a
+// half-written entity the next read has to go and fetch.
+//
+// It is also why the writes that change a todo through a junction table —
+// attaching a label, adding a dependency — return the whole todo rather than the
+// row they inserted. The entity is normalized, so one full selection settles
+// every list and screen holding it, and no refetch is needed to learn what the
+// write did.
 
 export const ProjectListFieldsFragment = graphql(`
   fragment ProjectListFields on Project {
@@ -36,12 +43,19 @@ export const TodoFieldsFragment = graphql(`
       completedAt
     }
     labels(orderBy: { name: { direction: asc, priority: 1 } }) {
-      id
-      name
-      color
+      ...LabelFields
     }
     lane {
       ...LaneFields
+    }
+  }
+`);
+
+export const ProjectLabelFieldsFragment = graphql(`
+  fragment ProjectLabelFields on Project {
+    id
+    labels(orderBy: { name: { direction: asc, priority: 1 } }) {
+      ...LabelFields
     }
   }
 `);
@@ -80,11 +94,7 @@ export const ProjectDocument = graphql(`
       createdAt
       todoCount
       openTodoCount
-      labels(orderBy: { name: { direction: asc, priority: 1 } }) {
-        id
-        name
-        color
-      }
+      ...ProjectLabelFields
     }
   }
 `);
@@ -263,8 +273,7 @@ export const ReorderLanesDocument = graphql(`
 export const AddTodoDependencyDocument = graphql(`
   mutation AddTodoDependency($todoId: ID!, $dependsOnTodoId: ID!) {
     addTodoDependency(todoId: $todoId, dependsOnTodoId: $dependsOnTodoId) {
-      id
-      isBlocked
+      ...TodoFields
     }
   }
 `);
@@ -272,8 +281,7 @@ export const AddTodoDependencyDocument = graphql(`
 export const RemoveTodoDependencyDocument = graphql(`
   mutation RemoveTodoDependency($todoId: ID!, $dependsOnTodoId: ID!) {
     removeTodoDependency(todoId: $todoId, dependsOnTodoId: $dependsOnTodoId) {
-      id
-      isBlocked
+      ...TodoFields
     }
   }
 `);
@@ -306,6 +314,9 @@ export const AttachTodoLabelDocument = graphql(`
   mutation AttachTodoLabel($todoId: UUID!, $labelId: UUID!) {
     createTodoLabel(values: { todoId: $todoId, labelId: $labelId }) {
       id
+      todo {
+        ...TodoFields
+      }
     }
   }
 `);
@@ -314,6 +325,9 @@ export const DetachTodoLabelDocument = graphql(`
   mutation DetachTodoLabel($todoId: UUID!, $labelId: UUID!) {
     deleteTodoLabel(where: { todoId: { eq: $todoId }, labelId: { eq: $labelId } }) {
       id
+      todo {
+        ...TodoFields
+      }
     }
   }
 `);
@@ -322,6 +336,9 @@ export const AttachProjectLabelDocument = graphql(`
   mutation AttachProjectLabel($projectId: UUID!, $labelId: UUID!) {
     createProjectLabel(values: { projectId: $projectId, labelId: $labelId }) {
       id
+      project {
+        ...ProjectLabelFields
+      }
     }
   }
 `);
@@ -330,6 +347,9 @@ export const DetachProjectLabelDocument = graphql(`
   mutation DetachProjectLabel($projectId: UUID!, $labelId: UUID!) {
     deleteProjectLabel(where: { projectId: { eq: $projectId }, labelId: { eq: $labelId } }) {
       id
+      project {
+        ...ProjectLabelFields
+      }
     }
   }
 `);

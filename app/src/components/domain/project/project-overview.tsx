@@ -19,7 +19,6 @@ import {
   AttachProjectLabelDocument,
   DeleteProjectDocument,
   DetachProjectLabelDocument,
-  ProjectDocument,
   ProjectsDocument,
 } from '@/lib/graphql';
 import { ProjectFormDialog } from './project-form-dialog';
@@ -38,9 +37,12 @@ export function ProjectOverview({ project }: { project: ProjectOverviewData }) {
   const [editing, setEditing] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
-  const refetchQueries = [{ query: ProjectDocument, variables: { id: project.id } }, ProjectsDocument];
-  const [attachLabel] = useMutation(AttachProjectLabelDocument, { refetchQueries });
-  const [detachLabel] = useMutation(DetachProjectLabelDocument, { refetchQueries });
+  // Attaching a label returns the project with its labels selected exactly as
+  // this screen reads them, so the normalized entity updates itself. Deleting
+  // still refetches: the sidebar's list is what changes, and a removed project
+  // is not something the returned row can say.
+  const [attachLabel] = useMutation(AttachProjectLabelDocument);
+  const [detachLabel] = useMutation(DetachProjectLabelDocument);
   const [deleteProject] = useMutation(DeleteProjectDocument, { refetchQueries: [ProjectsDocument] });
 
   function toggleLabel(label: LabelSummary, attach: boolean) {

@@ -117,11 +117,19 @@ the test to make it pass.
 checked in an `onWrite` hook in `server/src/resolvers/write-guards.ts`. A new
 table with a user-facing FK needs an entry in `FOREIGN_KEYS`.
 
-**A blocked todo cannot be completed.** The rule is an invariant, not a code
-path: `assertNoBlockedCompletions` re-checks it after any write that sets
-`completedAt`, so `completeTodo`, `updateTodo` and `updateTodos` are all
-bound by it. Adding another way to write `completedAt` does not need new
-enforcement — but removing that hook silently unbinds all three.
+**A blocked todo cannot be completed, and cannot change lane.** The rule is an
+invariant, not a code path: `assertNoBlockedCompletions` re-checks it after any
+write that sets `completedAt`, so `completeTodo`, `updateTodo` and `updateTodos`
+are all bound by it. Adding another way to write `completedAt` does not need new
+enforcement — but removing that hook silently unbinds all three. `moveTodo`
+checks the same rule for a change of column, because the done lane was only the
+sharpest case of it: work waiting on something else has no business being
+advanced across the board either. Two exemptions, both about not stranding a
+card — a completed todo can always be dragged back out of the done lane, since
+that is how it gets reopened, and reordering a blocked todo inside its own column
+is free. `laneLock()` in `app/src/lib/lanes.ts` states the client's half, and it
+disables the drag and the "Move to" entries rather than letting either fail at
+the server.
 
 **The lane and the checkbox say the same thing.** In a project that has a done
 lane, a todo with a lane is completed *if and only if* that lane is the done one.
@@ -167,6 +175,15 @@ row exists, which is itself something the caller is not entitled to know.
 and redirects to `/login`. A bad magic link is `BAD_USER_INPUT` — it must not
 sign anyone out.
 
+**The palette is the other cubicecho apps'.** `app/global.css` carries the same
+tokens their `index.css` does — the neutral shadcn set, one done colour, a
+`--sidebar` group and `--radius: 0.625rem`. They are on Tailwind v4 and write it
+in oklch; NativeWind pins this app to v3, whose colour plumbing is
+`hsl(var(--token))`, so the identical colours are written here as HSL triples.
+Same values, different notation. The two exceptions are `--border` and `--input`
+in dark, which are white at 10% and 15% there and are composited over the
+background here, because these tokens carry no alpha channel.
+
 **The theme is applied twice, on purpose.** `app/public/index.html` sets `.dark`
 on `<html>` before the bundle loads so there is no white flash, and
 `src/lib/theme.ts` maintains it afterwards. The storage key `telos_theme` and the
@@ -174,6 +191,19 @@ class rule are written out in both places — the script runs before any module
 exists — so a change to one is a change to both. That HTML file is also Expo's
 own template with a script added: `app/+html.tsx` is the documented place for
 this and does nothing under `web.output: "single"`.
+
+**A write returns the entity it changed, not the row it wrote.** Attaching a
+label and adding a dependency are junction-table inserts, but what the screen
+reads is the *todo* — its `labels`, its `dependencies`, its `blockedBy` — so
+those mutations select `todo { ...TodoFields }` off the junction row (and
+`project { ...ProjectLabelFields }` for a project's labels). Apollo normalizes by
+id, so one full selection settles every list and screen already holding that
+entity and nothing has to refetch to find out what the write did. The catch is
+that a field's *arguments* are part of the key it is cached under: `labels` is
+selected with the same `orderBy` everywhere, which is why it lives in a shared
+fragment rather than being spelled out per document. A selection that omits a
+field the query reads leaves that field stale, so widen the fragment rather than
+the document.
 
 **Creates carry a client-generated id.** `newId()` in `src/lib/ids.ts` mints the
 UUID, the create mutation sends it in `values`, and Postgres keeps it. That is
@@ -199,9 +229,7 @@ that touched only the named row would leave the rest of the list lying.
 is still open — and is idempotent, because Apollo runs `update` twice (once
 optimistically, once on the real result). Counts move through
 `bumpProjectCounts()`, a delta, which is safe for the same reason: the
-optimistic layer is discarded before the real pass. Attaching a label or a
-dependency still refetches — a new dependency can block a chain the client
-cannot see the far end of.
+optimistic layer is discarded before the real pass.
 
 **Text on a user-chosen colour picks its own ink.** A label's colour comes out of
 the database, so no Tailwind variant and no theme token can be trusted to read on
