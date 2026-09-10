@@ -22,7 +22,7 @@ export function Sidebar() {
   }
 
   return (
-    <aside className="flex h-screen w-64 shrink-0 flex-col border-r bg-card">
+    <aside className="flex h-screen w-64 shrink-0 flex-col border-sidebar-border border-r bg-sidebar text-sidebar-foreground">
       <div className="px-4 pt-4 pb-3">
         <Link href="/" className="font-semibold text-foreground text-lg tracking-tight no-underline">
           Telos
