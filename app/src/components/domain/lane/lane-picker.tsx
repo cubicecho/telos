@@ -11,17 +11,24 @@ import type { LaneSummary } from './lane-badge';
  * a keyboard cannot reach at all. This is the same move stated as a list, so
  * every todo can change columns from the list view, from a keyboard, and from a
  * screen reader — not only from the board.
+ *
+ * A locked todo still opens the menu: the other columns are disabled rather
+ * than hidden, and the reason is spelled out under them, so the answer to "why
+ * can I not move this" is in the same place as the attempt.
  */
 export function LanePicker({
   lanes,
   current,
   onSelect,
+  lockedReason,
   align = 'start',
   className,
 }: {
   lanes: readonly LaneSummary[];
   current: LaneSummary | null;
   onSelect: (lane: LaneSummary) => void;
+  /** Why this todo cannot change column, when it cannot. */
+  lockedReason?: string | null;
   align?: 'start' | 'end';
   className?: string;
 }) {
@@ -50,8 +57,9 @@ export function LanePicker({
             <Popover.Close asChild key={lane.id}>
               <button
                 type="button"
+                disabled={lockedReason != null && lane.id !== current?.id}
                 onClick={() => onSelect(lane)}
-                className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
+                className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-50"
               >
                 <span className="flex-1 truncate">{lane.name}</span>
                 {lane.isDone ? <span className="text-muted-foreground text-xs">done</span> : null}
@@ -59,6 +67,7 @@ export function LanePicker({
               </button>
             </Popover.Close>
           ))}
+          {lockedReason ? <p className="px-2 py-1.5 text-muted-foreground text-xs">{lockedReason}</p> : null}
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>

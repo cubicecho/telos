@@ -13,6 +13,26 @@ function landed(todo: CachedTodo, lane: CachedLane, now: string): CachedTodo {
 }
 
 /**
+ * Why a todo cannot change lane, or null when it is free to move.
+ *
+ * Blocked work stays in the column it is in. The done lane was only the
+ * sharpest case of the dependency rule — a todo waiting on something else has
+ * no business being advanced across the board either — so the board disables
+ * the drag and the "Move to" menu rather than letting either fail at the
+ * server. A completed todo is exempt: dragging it out of the done lane is how
+ * it gets reopened, and refusing that would strand the card there.
+ */
+export function laneLock(todo: {
+  isBlocked: boolean;
+  completedAt: string | null;
+  blockedBy: readonly { title: string }[];
+}): string | null {
+  if (!todo.isBlocked || todo.completedAt != null) return null;
+  const names = todo.blockedBy.map((blocker) => blocker.title).join(', ');
+  return `Blocked by ${names || 'an incomplete dependency'}.`;
+}
+
+/**
  * Move a todo into `lane`, over the list the cache holds.
  *
  * `index` is a position *within the lane*, because that is what a drop names;

@@ -2,6 +2,7 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { LabelBadge } from '@/components/domain/label/label-badge';
 import type { TodoSummary } from '@/components/domain/todo/types';
+import { laneLock } from '@/lib/lanes';
 import { cn } from '@/lib/utils';
 import type { LaneSummary } from './lane-badge';
 import { LanePicker } from './lane-picker';
@@ -23,6 +24,7 @@ export function BoardCardBody({
   className?: string;
 }) {
   const done = todo.completedAt != null;
+  const locked = laneLock(todo);
 
   return (
     <div
@@ -44,6 +46,7 @@ export function BoardCardBody({
             lanes={lanes}
             current={todo.lane}
             onSelect={onMove}
+            lockedReason={locked}
             align="end"
             className="-mr-1 -mt-1 h-7 w-7 opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100 has-[[data-state=open]]:opacity-100"
           />
@@ -77,9 +80,14 @@ export function BoardCard({
   lanes: readonly LaneSummary[];
   onMove: (lane: LaneSummary) => void;
 }) {
+  // A blocked card is not draggable — the same choice the row's checkbox makes,
+  // disabling the affordance rather than letting it fail — but it stays a drop
+  // target, so the cards around it can still be reordered over it.
+  const locked = laneLock(todo);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: todo.id,
     data: { laneId: todo.lane?.id },
+    disabled: { draggable: locked != null, droppable: false },
   });
 
   return (
@@ -88,7 +96,7 @@ export function BoardCard({
       style={{ transform: CSS.Translate.toString(transform), transition }}
       // The original stays in place while it is dragged, faded, so the column
       // does not collapse and reflow under the card being moved.
-      className={cn('touch-none', isDragging && 'opacity-40')}
+      className={cn('touch-none', locked == null && 'cursor-grab', isDragging && 'opacity-40')}
       {...attributes}
       {...listeners}
     >

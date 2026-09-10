@@ -95,6 +95,49 @@ describe('moveTodo', () => {
     expect((await readTodo(blocked)).lane.name).toBe('To do');
   });
 
+  it('refuses to advance a blocked todo to any other lane', async () => {
+    const blocker = await newTodo('Blocker');
+    const blocked = await newTodo('Blocked');
+    await client.expectOk(`mutation ($t: ID!, $d: ID!) { addTodoDependency(todoId: $t, dependsOnTodoId: $d) { id } }`, {
+      t: blocked,
+      d: blocker,
+    });
+
+    // Not the done lane — work that is waiting on something else has no
+    // business being called "in progress" either.
+    const error = await client.expectError(MOVE, { id: blocked, laneId: lanes[1].id });
+    expect(error.code).toBe('BAD_USER_INPUT');
+    expect(error.message).toContain('Blocker');
+    expect((await readTodo(blocked)).lane.name).toBe('To do');
+
+    // Completing the blocker is what frees it.
+    await client.expectOk(`mutation ($id: ID!) { completeTodo(id: $id) { id } }`, { id: blocker });
+    await client.expectOk(MOVE, { id: blocked, laneId: lanes[1].id });
+    expect((await readTodo(blocked)).lane.name).toBe('In progress');
+  });
+
+  it('still reorders a blocked todo inside its own lane', async () => {
+    const blocker = await newTodo('Blocker');
+    const a = await newTodo('A');
+    const blocked = await newTodo('Blocked');
+    await client.expectOk(`mutation ($t: ID!, $d: ID!) { addTodoDependency(todoId: $t, dependsOnTodoId: $d) { id } }`, {
+      t: blocked,
+      d: blocker,
+    });
+
+    await client.expectOk(MOVE, { id: blocked, laneId: lanes[0].id, position: 0 });
+
+    const ordered = (
+      await client.expectOk(
+        `query ($projectId: UUID!) {
+          todos(where: { projectId: { eq: $projectId } }, orderBy: { position: { direction: asc, priority: 1 } }) { id }
+        }`,
+        { projectId },
+      )
+    ).todos;
+    expect(ordered.map((todo: { id: string }) => todo.id)).toEqual([blocked, blocker, a]);
+  });
+
   it('refuses a lane from another project', async () => {
     const id = await newTodo('Write it');
     const otherProject = (await client.expectOk(CREATE_PROJECT)).createProject.id;
@@ -177,11 +220,13 @@ describe('setDoneLane', () => {
   it('refuses to flag a lane holding blocked work', async () => {
     const blocker = await newTodo('Blocker');
     const blocked = await newTodo('Blocked');
+    // Moved first and blocked after: a todo already in the lane is how blocked
+    // work gets there at all, since a blocked todo cannot be moved into one.
+    await client.expectOk(MOVE, { id: blocked, laneId: lanes[1].id });
     await client.expectOk(`mutation ($t: ID!, $d: ID!) { addTodoDependency(todoId: $t, dependsOnTodoId: $d) { id } }`, {
       t: blocked,
       d: blocker,
     });
-    await client.expectOk(MOVE, { id: blocked, laneId: lanes[1].id });
 
     const error = await client.expectError(SET_DONE, { projectId, laneId: lanes[1].id });
     expect(error.code).toBe('BAD_USER_INPUT');

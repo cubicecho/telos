@@ -2,7 +2,7 @@ import { useMutation } from '@apollo/client';
 import type { TodoSummary } from '@/components/domain/todo/types';
 import { bumpProjectCounts, type CachedLane, updateProjectTodos } from '@/lib/cache';
 import { MoveTodoDocument } from '@/lib/graphql';
-import { moveTodoInList } from '@/lib/lanes';
+import { laneLock, moveTodoInList } from '@/lib/lanes';
 
 /**
  * The one way a todo changes lane, shared by the board's drag and the row's
@@ -19,9 +19,10 @@ export function useMoveTodo(projectId: string) {
     if (todo.lane?.id === lane.id && index == null) return;
     // Said here as well as on the server: the answer is the same either way, and
     // the card should never appear to land somewhere it will bounce out of.
-    if (lane.isDone && todo.isBlocked && todo.completedAt == null) {
-      throw new Error(`Blocked by ${todo.blockedBy.map((blocker) => blocker.title).join(', ')}.`);
-    }
+    // Blocked work does not change column — the done lane is only the sharpest
+    // case — while reordering it inside its own column is free.
+    const locked = laneLock(todo);
+    if (locked && (lane.isDone || lane.id !== todo.lane?.id)) throw new Error(locked);
 
     const completedAt = lane.isDone ? (todo.completedAt ?? new Date().toISOString()) : null;
     // Blocked todos count as open, so only crossing into or out of done moves

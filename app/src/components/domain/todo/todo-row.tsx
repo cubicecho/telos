@@ -25,12 +25,10 @@ import {
   CompleteTodoDocument,
   DeleteTodoDocument,
   DetachTodoLabelDocument,
-  ProjectDocument,
-  ProjectsDocument,
-  ProjectTodosDocument,
   RemoveTodoDependencyDocument,
   ReopenTodoDocument,
 } from '@/lib/graphql';
+import { laneLock } from '@/lib/lanes';
 import { cn } from '@/lib/utils';
 import { DependencyPicker } from './dependency-picker';
 import type { TodoSummary } from './types';
@@ -49,23 +47,17 @@ export function TodoRow({
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  // Attaching a label or a dependency is a junction-table write whose effect on
-  // the list the client cannot name — a new dependency can block a chain of
-  // todos — so those still ask the server what happened. Completing and
-  // deleting are arithmetic the client can do itself, and do instantly.
-  const refetchQueries = [
-    { query: ProjectTodosDocument, variables: { projectId } },
-    { query: ProjectDocument, variables: { id: projectId } },
-    ProjectsDocument,
-  ];
-
+  // Nothing here refetches. Completing and deleting are arithmetic the client
+  // can do itself; labels and dependencies are junction-table writes, and those
+  // mutations return the whole todo, so Apollo normalizes the answer into every
+  // list already holding it.
   const [completeTodo] = useMutation(CompleteTodoDocument);
   const [reopenTodo] = useMutation(ReopenTodoDocument);
   const [deleteTodo] = useMutation(DeleteTodoDocument);
-  const [attachLabel] = useMutation(AttachTodoLabelDocument, { refetchQueries });
-  const [detachLabel] = useMutation(DetachTodoLabelDocument, { refetchQueries });
-  const [addDependency] = useMutation(AddTodoDependencyDocument, { refetchQueries });
-  const [removeDependency] = useMutation(RemoveTodoDependencyDocument, { refetchQueries });
+  const [attachLabel] = useMutation(AttachTodoLabelDocument);
+  const [detachLabel] = useMutation(DetachTodoLabelDocument);
+  const [addDependency] = useMutation(AddTodoDependencyDocument);
+  const [removeDependency] = useMutation(RemoveTodoDependencyDocument);
   const moveTodo = useMoveTodo(projectId);
 
   const done = todo.completedAt != null;
@@ -210,7 +202,14 @@ export function TodoRow({
             `focus-within` alone would let the cluster fade out from under the
             panel the reader is using. */}
         <div className="flex h-5 shrink-0 items-center opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100 has-[[data-state=open]]:opacity-100">
-          <LanePicker lanes={lanes} current={todo.lane} onSelect={moveToLane} align="end" className="h-8 w-8" />
+          <LanePicker
+            lanes={lanes}
+            current={todo.lane}
+            onSelect={moveToLane}
+            lockedReason={laneLock(todo)}
+            align="end"
+            className="h-8 w-8"
+          />
           <LabelPicker attached={todo.labels} onToggle={toggleLabel} align="end" className="h-8 w-8" />
           <DependencyPicker
             todo={todo}

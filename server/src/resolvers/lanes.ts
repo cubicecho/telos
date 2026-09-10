@@ -11,7 +11,8 @@ import { requireAuth } from './auth.ts';
 // something true afterwards:
 //
 //   moveTodo      — a drop into the done lane completes the todo, and out of it
-//                   reopens it, so the board and the list never disagree
+//                   reopens it, so the board and the list never disagree; a
+//                   blocked todo is refused any change of column at all
 //   setDoneLane   — the flag is single per project, and moving it moves the
 //                   todos' completion with it
 //   reorderLanes  — one statement per lane, so no intermediate order is visible
@@ -121,11 +122,20 @@ export function applyLanesExtension(schema: GraphQLSchema): GraphQLSchema {
         throw new GraphQLError('That lane belongs to another project.', { extensions: { code: 'BAD_USER_INPUT' } });
       }
 
-      // Completion follows the lane. Entering the done lane is a completion and
-      // obeys the same dependency rule `completeTodo` does; leaving it reopens.
+      // Blocked work does not move. The done lane is only the sharpest case of
+      // the dependency rule — a todo waiting on something else has no business
+      // being advanced across the board either — so the check covers any change
+      // of column, and reordering within its own column stays free. A completed
+      // todo is exempt: dragging it out of the done lane is how it gets
+      // reopened, and refusing that would strand the card there.
+      if (todo.completedAt == null && (lane.isDone || lane.id !== todo.laneId)) {
+        await assertNotBlocked(tx, [args.id]);
+      }
+
+      // Completion follows the lane: entering the done lane completes the todo,
+      // and leaving it reopens.
       let completedAt: Date | null = todo.completedAt;
       if (lane.isDone && todo.completedAt == null) {
-        await assertNotBlocked(tx, [args.id]);
         completedAt = new Date();
       } else if (!lane.isDone && todo.completedAt != null) {
         completedAt = null;
