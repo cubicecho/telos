@@ -102,3 +102,7 @@ database on *that* host's `127.0.0.1`, where nothing else can reach it. Set
 `POSTGRES_BIND=0.0.0.0` in `.env`, point `DATABASE_URL` at the daemon's
 hostname, and re-run `npm run db:up`. Only on a network you trust — the dev
 database has a throwaway password and no TLS.
+
+## License
+
+[MIT](LICENSE) © Benjamin Van Treese

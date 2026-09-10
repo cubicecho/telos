@@ -2,6 +2,7 @@
   "name": "telos",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
   "description": "Telos — a self-hostable todo app. Projects, todos with dependencies, labels.",
   "type": "module",
   "workspaces": [
