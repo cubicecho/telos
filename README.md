@@ -13,33 +13,81 @@ to projects and todos alike. That is the whole product.
 - **Labels** — one colour, one name, attachable to anything.
 - **Sign-in by magic link**, or no link at all on a private instance.
 
-## Self-hosting
+## Quickstart
 
 One container plus Postgres. The app and the API are served from the same
 origin, so there is no second host to configure.
 
-```bash
-git clone https://github.com/cubicecho/telos.git
-cd telos
+Nothing to clone and nothing to build. Make a directory, and save this in it as
+`docker-compose.yml`:
 
-# The one secret you must set. Compose refuses to start without it.
-export JWT_SECRET=$(openssl rand -hex 32)
+```yaml
+name: telos
 
-docker compose up --build
+services:
+  telos:
+    image: vantreeseba/telos:latest
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      JWT_SECRET: ${JWT_SECRET:?generate one with `openssl rand -hex 32`}
+      DATABASE_URL: postgres://telos:${POSTGRES_PASSWORD:?set a database password}@postgres:5432/telos
+      # The address you actually reach Telos at. Magic-link URLs are built from
+      # it, so a link to localhost is useless in an inbox.
+      APP_URL: ${APP_URL:-http://localhost:3001}
+      NODE_ENV: production
+    ports:
+      - "${PORT:-3001}:3001"
+
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: telos
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set a database password}
+      POSTGRES_DB: telos
+    # No `ports`: the database is for the app beside it on the compose network,
+    # and nothing else needs to reach it.
+    volumes:
+      - telos_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U telos -d telos"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  telos_pgdata:
 ```
 
-Telos is now on <http://localhost:3001>. Migrations run at boot, so there is no
-setup step. Sign in with any email address: the magic link is printed to the
-server log.
+Generate the two secrets it refuses to start without, then bring it up:
+
+```bash
+printf 'JWT_SECRET=%s\nPOSTGRES_PASSWORD=%s\n' \
+  "$(openssl rand -hex 32)" "$(openssl rand -hex 24)" > .env
+
+docker compose up -d
+```
+
+Telos is on <http://localhost:3001>. Migrations run at boot, so there is no
+setup step. Sign in with any email address — Telos ships no mail provider, so
+the magic link goes to the log, and that is the delivery channel:
 
 ```bash
 docker compose logs -f telos
 ```
 
-Data lives in the `telos_pgdata` volume. Postgres is published on
-`127.0.0.1:5435` for your own tooling and is not reachable from the network.
+Keep that `.env`. `JWT_SECRET` signs sessions, so changing it signs everyone
+out, and `POSTGRES_PASSWORD` is the database's own. Your data lives in the
+`telos_pgdata` volume, which survives `docker compose down`; upgrade with
+`docker compose pull && docker compose up -d`.
 
-### Configuration
+Read [**Before you expose it**](#before-you-expose-it) before putting this on a
+domain.
+
+## Configuration
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
@@ -54,7 +102,7 @@ Telos ships no mail provider. With magic links on, the link is written to the
 server log, and that is the delivery channel — pipe the log somewhere you can
 read, or run with `AUTH_MAGIC_LINK=false`.
 
-### Before you expose it
+## Before you expose it
 
 Registration is **open**: any address that completes a sign-in gets an account.
 That is the right default for an instance only you can reach, and the wrong one
@@ -76,6 +124,9 @@ for an instance on the public internet. Before putting Telos on a domain:
 ## Development
 
 ```bash
+git clone https://github.com/cubicecho/telos.git
+cd telos
+
 cp .env.example .env
 sed -i "s/^JWT_SECRET=.*/JWT_SECRET=$(openssl rand -hex 32)/" .env
 
@@ -102,6 +153,17 @@ database on *that* host's `127.0.0.1`, where nothing else can reach it. Set
 `POSTGRES_BIND=0.0.0.0` in `.env`, point `DATABASE_URL` at the daemon's
 hostname, and re-run `npm run db:up`. Only on a network you trust — the dev
 database has a throwaway password and no TLS.
+
+### Building the image
+
+The repo ships its own `docker-compose.yml`, which builds the image rather than
+pulling it and publishes Postgres on `127.0.0.1:5435` so you can point your own
+tooling at it:
+
+```bash
+export JWT_SECRET=$(openssl rand -hex 32)
+docker compose up --build
+```
 
 ## License
 
