@@ -205,6 +205,16 @@ fragment rather than being spelled out per document. A selection that omits a
 field the query reads leaves that field stale, so widen the fragment rather than
 the document.
 
+**A relation list is replaced, never merged.** The `typePolicies` in
+`src/lib/apollo.ts` mark every relation list — `Todo.blockedBy`,
+`Todo.dependencies`, `labels`, and their siblings — `merge: false`. Apollo's
+default is to overwrite and warn that data may be lost, because it cannot tell a
+whole list from one page of it; here it is always the whole list, so a shorter
+array is the answer rather than a partial view of it. Removing the last
+dependency really does leave `blockedBy` empty, and merging would keep a blocker
+the todo no longer has. A new relation list read anywhere in the app belongs in
+that map.
+
 **Creates carry a client-generated id.** `newId()` in `src/lib/ids.ts` mints the
 UUID, the create mutation sends it in `values`, and Postgres keeps it. That is
 what lets a new row be written to the cache before the request leaves: the
