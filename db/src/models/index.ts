@@ -1,4 +1,5 @@
 export * from './labels.ts';
+export * from './lanes.ts';
 export * from './project-labels.ts';
 export * from './projects.ts';
 export * from './todo-dependencies.ts';

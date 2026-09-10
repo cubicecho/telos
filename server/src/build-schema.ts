@@ -1,6 +1,7 @@
 import { buildSchema, type GeneratedEntities } from '@vantreeseba/drizzle-graphql';
 import type { GraphQLSchema } from 'graphql';
 import { applyAuthExtension } from './resolvers/auth.ts';
+import { applyLanesExtension } from './resolvers/lanes.ts';
 import { applyTodosExtension } from './resolvers/todos.ts';
 import { onWrite } from './resolvers/write-guards.ts';
 import { contextValues, features, scope } from './tenancy.ts';
@@ -35,6 +36,7 @@ export function createSchema(db: AnyDb): { schema: GraphQLSchema; entities: Gene
 
   let schema = applyAuthExtension(drizzleSchema);
   schema = applyTodosExtension(schema);
+  schema = applyLanesExtension(schema);
 
   return { schema, entities };
 }
