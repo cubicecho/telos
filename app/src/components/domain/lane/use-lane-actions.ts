@@ -51,7 +51,7 @@ export function useLaneActions(projectId: string) {
     async renameLane(lane: CachedLane, name: string): Promise<void> {
       await rename({
         variables: { id: lane.id, name },
-        optimisticResponse: { updateLaneSingle: { ...lane, name } },
+        optimisticResponse: { updateLane: { ...lane, name } },
       });
     },
 
@@ -59,7 +59,7 @@ export function useLaneActions(projectId: string) {
       await remove({
         variables: { id: lane.id },
         update(cache, { data }) {
-          if (!data?.deleteLaneSingle) return;
+          if (!data?.deleteLane) return;
           updateProjectLanes(cache, projectId, (lanes) => lanes.filter((row) => row.id !== lane.id));
           cache.evict({ id: cache.identify({ __typename: 'Lane', id: lane.id }) });
         },

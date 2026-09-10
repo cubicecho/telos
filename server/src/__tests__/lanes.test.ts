@@ -215,7 +215,7 @@ describe('reorderLanes', () => {
 describe('generated writes', () => {
   it('reserves the done flag for setDoneLane', async () => {
     const error = await client.expectError(
-      `mutation ($id: UUID!) { updateLaneSingle(set: { isDone: true }, where: { id: { eq: $id } }) { id } }`,
+      `mutation ($id: UUID!) { updateLane(set: { isDone: true }, where: { id: { eq: $id } }) { id } }`,
       { id: lanes[0].id },
     );
     expect(error.code).toBe('BAD_USER_INPUT');
@@ -226,7 +226,7 @@ describe('generated writes', () => {
     const id = await newTodo('Write it');
     await client.expectOk(
       `mutation ($id: UUID!, $at: DateTime!) {
-        updateTodoSingle(set: { completedAt: $at }, where: { id: { eq: $id } }) { id }
+        updateTodo(set: { completedAt: $at }, where: { id: { eq: $id } }) { id }
       }`,
       { id, at: new Date().toISOString() },
     );
@@ -240,7 +240,7 @@ describe('generated writes', () => {
     const id = await newTodo('Write it');
     const error = await client.expectError(
       `mutation ($id: UUID!, $laneId: UUID!) {
-        updateTodoSingle(set: { laneId: $laneId }, where: { id: { eq: $id } }) { id }
+        updateTodo(set: { laneId: $laneId }, where: { id: { eq: $id } }) { id }
       }`,
       { id, laneId: lanes[2].id },
     );

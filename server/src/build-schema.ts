@@ -1,5 +1,4 @@
-import { buildSchema, type GeneratedEntities } from '@vantreeseba/drizzle-graphql';
-import type { GraphQLSchema } from 'graphql';
+import { buildSchema } from '@vantreeseba/drizzle-graphql';
 import { applyAuthExtension } from './resolvers/auth.ts';
 import { applyLanesExtension } from './resolvers/lanes.ts';
 import { applyTodosExtension } from './resolvers/todos.ts';
@@ -17,7 +16,10 @@ import { contextValues, features, scope } from './tenancy.ts';
 // biome-ignore lint/suspicious/noExplicitAny: db type varies by driver
 type AnyDb = any;
 
-export function createSchema(db: AnyDb): { schema: GraphQLSchema; entities: GeneratedEntities<AnyDb> } {
+// The return type is inferred rather than written out: `GeneratedEntities` is
+// keyed by the naming config, so spelling it here would mean restating
+// `typeNameMapper` in a second place that could disagree with the first.
+export function createSchema(db: AnyDb) {
   const { schema: drizzleSchema, entities } = buildSchema(db, {
     prefixes: {
       insert: 'create',

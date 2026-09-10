@@ -139,7 +139,7 @@ export const CreateProjectDocument = graphql(`
 
 export const UpdateProjectDocument = graphql(`
   mutation UpdateProject($id: UUID!, $set: UpdateProjectInput!) {
-    updateProjectSingle(set: $set, where: { id: { eq: $id } }) {
+    updateProject(set: $set, where: { id: { eq: $id } }) {
       id
       name
       description
@@ -149,7 +149,7 @@ export const UpdateProjectDocument = graphql(`
 
 export const DeleteProjectDocument = graphql(`
   mutation DeleteProject($id: UUID!) {
-    deleteProjectSingle(where: { id: { eq: $id } }) {
+    deleteProject(where: { id: { eq: $id } }) {
       id
     }
   }
@@ -165,7 +165,7 @@ export const CreateTodoDocument = graphql(`
 
 export const UpdateTodoDocument = graphql(`
   mutation UpdateTodo($id: UUID!, $set: UpdateTodoInput!) {
-    updateTodoSingle(set: $set, where: { id: { eq: $id } }) {
+    updateTodo(set: $set, where: { id: { eq: $id } }) {
       id
       title
     }
@@ -174,7 +174,7 @@ export const UpdateTodoDocument = graphql(`
 
 export const DeleteTodoDocument = graphql(`
   mutation DeleteTodo($id: UUID!) {
-    deleteTodoSingle(where: { id: { eq: $id } }) {
+    deleteTodo(where: { id: { eq: $id } }) {
       id
     }
   }
@@ -230,7 +230,7 @@ export const CreateLaneDocument = graphql(`
 
 export const RenameLaneDocument = graphql(`
   mutation RenameLane($id: UUID!, $name: String!) {
-    updateLaneSingle(set: { name: $name }, where: { id: { eq: $id } }) {
+    updateLane(set: { name: $name }, where: { id: { eq: $id } }) {
       ...LaneFields
     }
   }
@@ -238,7 +238,7 @@ export const RenameLaneDocument = graphql(`
 
 export const DeleteLaneDocument = graphql(`
   mutation DeleteLane($id: UUID!) {
-    deleteLaneSingle(where: { id: { eq: $id } }) {
+    deleteLane(where: { id: { eq: $id } }) {
       id
     }
   }
@@ -288,7 +288,7 @@ export const CreateLabelDocument = graphql(`
 
 export const UpdateLabelDocument = graphql(`
   mutation UpdateLabel($id: UUID!, $set: UpdateLabelInput!) {
-    updateLabelSingle(set: $set, where: { id: { eq: $id } }) {
+    updateLabel(set: $set, where: { id: { eq: $id } }) {
       ...LabelFields
     }
   }
@@ -296,7 +296,7 @@ export const UpdateLabelDocument = graphql(`
 
 export const DeleteLabelDocument = graphql(`
   mutation DeleteLabel($id: UUID!) {
-    deleteLabelSingle(where: { id: { eq: $id } }) {
+    deleteLabel(where: { id: { eq: $id } }) {
       id
     }
   }

@@ -65,7 +65,7 @@ describe('blocking', () => {
 
     const single = await client.expectError(
       `mutation ($id: UUID!, $at: DateTime!) {
-        updateTodoSingle(set: { completedAt: $at }, where: { id: { eq: $id } }) { id }
+        updateTodo(set: { completedAt: $at }, where: { id: { eq: $id } }) { id }
       }`,
       { id: blocked, at: new Date().toISOString() },
     );
@@ -73,7 +73,7 @@ describe('blocking', () => {
 
     const bulk = await client.expectError(
       `mutation ($id: UUID!, $at: DateTime!) {
-        updateTodo(set: { completedAt: $at }, where: { id: { eq: $id } }) { id }
+        updateTodos(set: { completedAt: $at }, where: { id: { eq: $id } }) { id }
       }`,
       { id: blocked, at: new Date().toISOString() },
     );
@@ -95,7 +95,7 @@ describe('blocking', () => {
     // The rule is an invariant over the state a write leaves behind, not an
     // order of operations: finishing both in one statement is consistent, since
     // no completed todo is left waiting on an open one.
-    await client.expectOk(`mutation ($at: DateTime!) { updateTodo(set: { completedAt: $at }, where: {}) { id } }`, {
+    await client.expectOk(`mutation ($at: DateTime!) { updateTodos(set: { completedAt: $at }, where: {}) { id } }`, {
       at: new Date().toISOString(),
     });
     const data = await client.expectOk(`query { todos { completedAt } }`);

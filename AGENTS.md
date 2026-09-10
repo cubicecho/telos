@@ -97,6 +97,13 @@ Two consequences worth internalising:
   entry there gets no relation fields.
 - **Only what CRUD cannot express gets a resolver.** Those live in
   `server/src/resolvers/` and are applied by `build-schema.ts` in order.
+- **Generated names say their arity.** `typeNameMapper: 'singularize'` maps the
+  plural table key onto a singular type, and the noun is what tells the two
+  forms of an operation apart: `todos` / `todo` for reads, `createTodos` /
+  `createTodo`, `updateTodos` / `updateTodo`, `deleteTodos` / `deleteTodo` for
+  writes. The plural form filters and returns a list; the singular takes a
+  required `where` and returns one row or null. `deleteTodo(where: …)` deletes
+  one row — reach for `deleteTodos` when you mean every match.
 
 ## Rules that carry weight
 
@@ -112,7 +119,7 @@ table with a user-facing FK needs an entry in `FOREIGN_KEYS`.
 
 **A blocked todo cannot be completed.** The rule is an invariant, not a code
 path: `assertNoBlockedCompletions` re-checks it after any write that sets
-`completedAt`, so `completeTodo`, `updateTodoSingle` and `updateTodo` are all
+`completedAt`, so `completeTodo`, `updateTodo` and `updateTodos` are all
 bound by it. Adding another way to write `completedAt` does not need new
 enforcement — but removing that hook silently unbinds all three.
 

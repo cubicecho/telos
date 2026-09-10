@@ -130,9 +130,9 @@ export function TodoRow({
     return run(() =>
       deleteTodo({
         variables: { id: todo.id },
-        optimisticResponse: { deleteTodoSingle: { __typename: 'Todo', id: todo.id } },
+        optimisticResponse: { deleteTodo: { __typename: 'Todo', id: todo.id } },
         update(cache, { data }) {
-          if (!data?.deleteTodoSingle) return;
+          if (!data?.deleteTodo) return;
           updateProjectTodos(cache, projectId, (todos) => todos.filter((row) => row.id !== todo.id));
           bumpProjectCounts(cache, projectId, { total: -1, open: done ? 0 : -1 });
           // The row is out of every list that named it; drop the entity too,
