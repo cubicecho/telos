@@ -36,7 +36,7 @@ telos/
 │   │   ├── __generated__/   # Generated GraphQL types (do not edit, not committed)
 │   │   ├── components/
 │   │   │   ├── ui/          # shadcn/ui primitives — no app logic
-│   │   │   ├── domain/      # project/, todo/, label/, settings/
+│   │   │   ├── domain/      # project/, todo/, lane/, label/, settings/
 │   │   │   └── layouts/     # sidebar
 │   │   └── lib/             # apollo, auth, theme, cache writers, blocking, graphql documents, cn()
 │   ├── public/index.html    # HTML shell; applies the theme before first paint
@@ -52,6 +52,7 @@ telos/
 │       ├── schema.ts        # Binds createSchema to the real database
 │       ├── tenancy.ts       # Row scope + server-owned columns, as buildSchema config
 │       ├── blocking.ts      # The dependency rules, in one place
+│       ├── lanes.ts         # The lane rules, in one place
 │       ├── loaders.ts       # Per-request DataLoaders
 │       ├── resolvers/       # SDL extensions for what CRUD cannot express
 │       └── __tests__/       # Server tests
@@ -114,6 +115,39 @@ path: `assertNoBlockedCompletions` re-checks it after any write that sets
 `completedAt`, so `completeTodo`, `updateTodoSingle` and `updateTodo` are all
 bound by it. Adding another way to write `completedAt` does not need new
 enforcement — but removing that hook silently unbinds all three.
+
+**The lane and the checkbox say the same thing.** In a project that has a done
+lane, a todo with a lane is completed *if and only if* that lane is the done one.
+`server/src/lanes.ts` states the biconditional and keeps it: `moveTodo`,
+`completeTodo`, `reopenTodo` and `setDoneLane` each maintain it directly, and
+`assertCompletionMatchesLane` re-asserts it after any generated write — so
+dropping a card in the done column ticks it off, ticking the box moves the card,
+and neither view can be made to disagree with the other. A generated write that
+*states completion* has its lane realigned to match (completion is the fact, the
+lane is how it is drawn); one that names only a lane is refused and pointed at
+`moveTodo`, because guessing which of the two the caller meant would silently
+undo the other. A project with no done lane is exempt: its board simply has no
+column that means done. Every project has at least one lane — `seedMissingLanes`
+runs in the transaction that creates it, and deleting the last one is refused.
+`isDone` is reserved for `setDoneLane`, and the partial unique index
+`uq_lanes_project_done` makes "at most one done lane per project" structural
+rather than a rule someone has to remember.
+
+**`position` is project-wide, not per-lane.** One sequence orders the list view
+and every column of the board, so the two tabs cannot disagree about what comes
+first. A drop names an index *within a column*; `reposition()` in
+`server/src/resolvers/lanes.ts` and `moveTodoInList()` in `app/src/lib/lanes.ts`
+translate that into the global sequence, and they translate it the same way — if
+they drift, the board reshuffles itself on the next fetch. Lane `position` has
+deliberately no unique constraint: reordering rewrites several lanes in one
+statement and a unique index would reject the intermediate state.
+
+**Dragging is never the only way.** `@dnd-kit` gives the board its pointer
+gesture, and a pointer is the only thing it gives. Every move it offers exists
+again as a menu: `LanePicker` ("Move to") on each todo row and each card, and the
+lane header's own menu for renaming, reordering, the done flag and deletion. A
+board action added without a keyboard route is a board action half the people
+using it cannot reach.
 
 **Dependency edges have no generated mutations.** `features` in `tenancy.ts`
 turns off insert/update/delete for `todoDependencies` so every edge goes through

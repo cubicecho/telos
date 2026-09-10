@@ -3,6 +3,9 @@ import { Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { LabelBadge, type LabelSummary } from '@/components/domain/label/label-badge';
 import { LabelPicker } from '@/components/domain/label/label-picker';
+import { LaneBadge } from '@/components/domain/lane/lane-badge';
+import { LanePicker } from '@/components/domain/lane/lane-picker';
+import { useMoveTodo } from '@/components/domain/lane/use-move-todo';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -15,7 +18,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { bumpProjectCounts, updateProjectTodos } from '@/lib/cache';
+import { bumpProjectCounts, type CachedLane, laneForCompletion, updateProjectTodos } from '@/lib/cache';
 import {
   AddTodoDependencyDocument,
   AttachTodoLabelDocument,
@@ -36,10 +39,12 @@ export function TodoRow({
   todo,
   projectId,
   siblings,
+  lanes,
 }: {
   todo: TodoSummary;
   projectId: string;
   siblings: readonly TodoSummary[];
+  lanes: readonly CachedLane[];
 }) {
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -61,6 +66,7 @@ export function TodoRow({
   const [detachLabel] = useMutation(DetachTodoLabelDocument, { refetchQueries });
   const [addDependency] = useMutation(AddTodoDependencyDocument, { refetchQueries });
   const [removeDependency] = useMutation(RemoveTodoDependencyDocument, { refetchQueries });
+  const moveTodo = useMoveTodo(projectId);
 
   const done = todo.completedAt != null;
 
@@ -71,9 +77,9 @@ export function TodoRow({
    * server's. Apollo discards the optimistic layer before the second, so the
    * count delta lands exactly once, and the list rewrite is idempotent.
    */
-  function writeCompletion(cache: ApolloCache<unknown>, completedAt: string | null) {
+  function writeCompletion(cache: ApolloCache<unknown>, completedAt: string | null, lane: CachedLane | null) {
     updateProjectTodos(cache, projectId, (todos) =>
-      todos.map((row) => (row.id === todo.id ? { ...row, completedAt } : row)),
+      todos.map((row) => (row.id === todo.id ? { ...row, completedAt, lane: lane ?? row.lane } : row)),
     );
     // Blocked todos count as open, so only the tick moves the number.
     bumpProjectCounts(cache, projectId, { total: 0, open: completedAt == null ? 1 : -1 });
@@ -93,24 +99,28 @@ export function TodoRow({
     // the row reads as done, and it is replaced by the real one milliseconds
     // later. Nothing is displayed from it.
     const completedAt = next ? new Date().toISOString() : null;
+    // Ticking the box is also a move on the board: the server sends the todo to
+    // the done lane, or back to the first open one, and the optimistic row has
+    // to name the same column or the card would jump when the answer lands.
+    const lane = laneForCompletion(lanes, completedAt);
     return run(() =>
       next
         ? completeTodo({
             variables: { id: todo.id },
             optimisticResponse: {
-              completeTodo: { __typename: 'Todo', id: todo.id, completedAt, isBlocked: todo.isBlocked },
+              completeTodo: { __typename: 'Todo', id: todo.id, completedAt, isBlocked: todo.isBlocked, lane },
             },
             update: (cache, { data }) => {
-              if (data?.completeTodo) writeCompletion(cache, data.completeTodo.completedAt);
+              if (data?.completeTodo) writeCompletion(cache, data.completeTodo.completedAt, data.completeTodo.lane);
             },
           })
         : reopenTodo({
             variables: { id: todo.id },
             optimisticResponse: {
-              reopenTodo: { __typename: 'Todo', id: todo.id, completedAt: null, isBlocked: todo.isBlocked },
+              reopenTodo: { __typename: 'Todo', id: todo.id, completedAt: null, isBlocked: todo.isBlocked, lane },
             },
             update: (cache, { data }) => {
-              if (data?.reopenTodo) writeCompletion(cache, data.reopenTodo.completedAt);
+              if (data?.reopenTodo) writeCompletion(cache, data.reopenTodo.completedAt, data.reopenTodo.lane);
             },
           }),
     );
@@ -141,6 +151,10 @@ export function TodoRow({
     );
   }
 
+  function moveToLane(lane: CachedLane) {
+    return run(() => moveTodo(todo, lane));
+  }
+
   function toggleDependency(dependsOnTodoId: string, add: boolean) {
     return run(() =>
       add
@@ -164,7 +178,14 @@ export function TodoRow({
         <div className="min-w-0 flex-1">
           {/* `leading-5` pins the first line's height to the checkbox's, so the
               two agree even if a theme changes the base line height. */}
-          <p className={cn('text-sm leading-5', done && 'text-muted-foreground line-through')}>{todo.title}</p>
+          {/* The lane sits with the title rather than below it, so the list
+              reads as one line per todo and still says which column it is in. */}
+          <div className="flex items-start gap-2">
+            <p className={cn('min-w-0 flex-1 text-sm leading-5', done && 'text-muted-foreground line-through')}>
+              {todo.title}
+            </p>
+            {todo.lane && !todo.lane.isDone ? <LaneBadge lane={todo.lane} className="mt-px" /> : null}
+          </div>
 
           {todo.isBlocked && !done ? (
             <p className="mt-1 text-muted-foreground text-xs">
@@ -189,6 +210,7 @@ export function TodoRow({
             `focus-within` alone would let the cluster fade out from under the
             panel the reader is using. */}
         <div className="flex h-5 shrink-0 items-center opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100 has-[[data-state=open]]:opacity-100">
+          <LanePicker lanes={lanes} current={todo.lane} onSelect={moveToLane} align="end" className="h-8 w-8" />
           <LabelPicker attached={todo.labels} onToggle={toggleLabel} align="end" className="h-8 w-8" />
           <DependencyPicker
             todo={todo}

@@ -13,6 +13,7 @@ function todo(id: string, fields: Partial<CachedTodo> = {}): CachedTodo {
     blockedBy: [],
     dependencies: [],
     labels: [],
+    lane: null,
     ...fields,
   };
 }

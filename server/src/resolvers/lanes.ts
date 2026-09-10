@@ -85,7 +85,12 @@ function reposition(
   // Landing after the last of the lane's todos means landing where that lane
   // ends, not where the project does.
   const anchor = inLane[clamped];
-  const at = anchor ? others.findIndex((row) => row.id === anchor.id) : others.length;
+  const last = inLane[inLane.length - 1];
+  const at = anchor
+    ? others.findIndex((row) => row.id === anchor.id)
+    : last
+      ? others.findIndex((row) => row.id === last.id) + 1
+      : others.length;
   const ids = others.map((row) => row.id);
   ids.splice(at, 0, id);
   return ids;

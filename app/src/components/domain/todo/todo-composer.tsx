@@ -3,7 +3,7 @@ import { Plus } from 'lucide-react';
 import { type FormEvent, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { bumpProjectCounts, updateProjectTodos } from '@/lib/cache';
+import { bumpProjectCounts, type CachedLane, laneForCompletion, updateProjectTodos } from '@/lib/cache';
 import { CreateTodoDocument } from '@/lib/graphql';
 import { newId } from '@/lib/ids';
 
@@ -16,7 +16,15 @@ import { newId } from '@/lib/ids';
  * the server's when it answers and rolls it back if the write fails, so the
  * only state this has to undo by hand is the emptied field.
  */
-export function TodoComposer({ projectId, nextPosition }: { projectId: string; nextPosition: number }) {
+export function TodoComposer({
+  projectId,
+  nextPosition,
+  lanes,
+}: {
+  projectId: string;
+  nextPosition: number;
+  lanes: readonly CachedLane[];
+}) {
   const [title, setTitle] = useState('');
   const [createTodo, { error }] = useMutation(CreateTodoDocument);
 
@@ -47,6 +55,9 @@ export function TodoComposer({ projectId, nextPosition }: { projectId: string; n
             blockedBy: [],
             dependencies: [],
             labels: [],
+            // A new todo is open, so it belongs in the first open column —
+            // the same lane the server's realignment will put it in.
+            lane: laneForCompletion(lanes, null),
           },
         },
         update(cache, { data }) {

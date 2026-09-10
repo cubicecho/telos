@@ -40,6 +40,18 @@ export const TodoFieldsFragment = graphql(`
       name
       color
     }
+    lane {
+      ...LaneFields
+    }
+  }
+`);
+
+export const LaneFieldsFragment = graphql(`
+  fragment LaneFields on Lane {
+    id
+    name
+    position
+    isDone
   }
 `);
 
@@ -84,6 +96,17 @@ export const ProjectTodosDocument = graphql(`
       orderBy: { position: { direction: asc, priority: 1 }, createdAt: { direction: asc, priority: 2 } }
     ) {
       ...TodoFields
+    }
+  }
+`);
+
+export const ProjectLanesDocument = graphql(`
+  query ProjectLanes($projectId: UUID!) {
+    lanes(
+      where: { projectId: { eq: $projectId } }
+      orderBy: { position: { direction: asc, priority: 1 }, createdAt: { direction: asc, priority: 2 } }
+    ) {
+      ...LaneFields
     }
   }
 `);
@@ -163,6 +186,9 @@ export const CompleteTodoDocument = graphql(`
       id
       completedAt
       isBlocked
+      lane {
+        ...LaneFields
+      }
     }
   }
 `);
@@ -173,6 +199,63 @@ export const ReopenTodoDocument = graphql(`
       id
       completedAt
       isBlocked
+      lane {
+        ...LaneFields
+      }
+    }
+  }
+`);
+
+export const MoveTodoDocument = graphql(`
+  mutation MoveTodo($id: ID!, $laneId: ID!, $position: Int) {
+    moveTodo(id: $id, laneId: $laneId, position: $position) {
+      id
+      completedAt
+      position
+      isBlocked
+      lane {
+        ...LaneFields
+      }
+    }
+  }
+`);
+
+export const CreateLaneDocument = graphql(`
+  mutation CreateLane($values: CreateLaneInput!) {
+    createLane(values: $values) {
+      ...LaneFields
+    }
+  }
+`);
+
+export const RenameLaneDocument = graphql(`
+  mutation RenameLane($id: UUID!, $name: String!) {
+    updateLaneSingle(set: { name: $name }, where: { id: { eq: $id } }) {
+      ...LaneFields
+    }
+  }
+`);
+
+export const DeleteLaneDocument = graphql(`
+  mutation DeleteLane($id: UUID!) {
+    deleteLaneSingle(where: { id: { eq: $id } }) {
+      id
+    }
+  }
+`);
+
+export const SetDoneLaneDocument = graphql(`
+  mutation SetDoneLane($projectId: ID!, $laneId: ID) {
+    setDoneLane(projectId: $projectId, laneId: $laneId) {
+      ...LaneFields
+    }
+  }
+`);
+
+export const ReorderLanesDocument = graphql(`
+  mutation ReorderLanes($projectId: ID!, $laneIds: [ID!]!) {
+    reorderLanes(projectId: $projectId, laneIds: $laneIds) {
+      ...LaneFields
     }
   }
 `);
