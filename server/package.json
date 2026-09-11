@@ -15,7 +15,7 @@
     "@apollo/server": "^5.5.1",
     "@as-integrations/express5": "^1.1.2",
     "@telos/db": "*",
-    "@vantreeseba/drizzle-graphql": "^9.0.0",
+    "@vantreeseba/drizzle-graphql": "^13.0.0",
     "cors": "^2.8.6",
     "dataloader": "^2.2.3",
     "drizzle-orm": "1.0.0-rc.4",

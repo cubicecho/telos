@@ -43,7 +43,31 @@ const errorLink = onError(({ graphQLErrors }) => {
   }
 });
 
+// A relation list is replaced, never merged.
+//
+// Apollo's default for a list field is to overwrite it and warn that data may be
+// lost, because it cannot know whether the incoming array is the whole list or a
+// page of it. Here it is always the whole list: every one of these fields is
+// derived by the server from the rows it owns, and the client rederives the
+// blocking pair the same way, so a shorter array is the answer rather than a
+// partial view of it. Removing the last dependency really does leave `blockedBy`
+// empty, and merging that into what was there would keep a blocker the todo no
+// longer has.
+//
+// `merge: false` says exactly that, and silences the warning it was right to
+// raise about a cache that had not decided.
+const replace = { merge: false } as const;
+
+const cache = new InMemoryCache({
+  typePolicies: {
+    Todo: { fields: { blockedBy: replace, dependencies: replace, dependents: replace, labels: replace } },
+    Project: { fields: { labels: replace, todos: replace, lanes: replace } },
+    Lane: { fields: { todos: replace } },
+    Label: { fields: { todos: replace, projects: replace } },
+  },
+});
+
 export const client = new ApolloClient({
-  cache: new InMemoryCache(),
+  cache,
   link: from([errorLink, authLink, httpLink]),
 });

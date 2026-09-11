@@ -14,16 +14,19 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
+import { LoadFailure } from '@/components/ui/load-failure';
 import { Spinner } from '@/components/ui/spinner';
+import { describeError } from '@/lib/errors';
 import { DeleteLabelDocument, LabelsDocument } from '@/lib/graphql';
 
 /** The whole label lifecycle in one block: list, create, rename, delete. */
 export function LabelManager() {
-  const { data, loading } = useQuery(LabelsDocument);
+  const { data, loading, error, refetch } = useQuery(LabelsDocument);
   const [editing, setEditing] = useState<LabelSummary | undefined>();
   const [formOpen, setFormOpen] = useState(false);
   const [deleting, setDeleting] = useState<LabelSummary | null>(null);
   const [deleteLabel] = useMutation(DeleteLabelDocument, { refetchQueries: [LabelsDocument] });
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const labels = data?.labels ?? [];
 
@@ -45,8 +48,18 @@ export function LabelManager() {
         </Button>
       </header>
 
+      {/* Kept outside the dialog: the dialog closes on the failure, and an
+          error that vanishes with the thing that caused it was never read. */}
+      {deleteError ? (
+        <p className="text-destructive text-sm" aria-live="polite">
+          {deleteError}
+        </p>
+      ) : null}
+
       {loading && labels.length === 0 ? (
         <Spinner />
+      ) : error && labels.length === 0 ? (
+        <LoadFailure error={error} onRetry={refetch} />
       ) : labels.length === 0 ? (
         <p className="text-muted-foreground text-sm">No labels yet.</p>
       ) : (
@@ -96,7 +109,12 @@ export function LabelManager() {
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={async () => {
-                if (deleting) await deleteLabel({ variables: { id: deleting.id } });
+                setDeleteError(null);
+                try {
+                  if (deleting) await deleteLabel({ variables: { id: deleting.id } });
+                } catch (cause) {
+                  setDeleteError(describeError(cause));
+                }
                 setDeleting(null);
               }}
             >

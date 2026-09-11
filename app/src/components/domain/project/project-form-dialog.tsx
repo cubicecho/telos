@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { describeError } from '@/lib/errors';
 import { CreateProjectDocument, ProjectDocument, ProjectsDocument, UpdateProjectDocument } from '@/lib/graphql';
 import { newId } from '@/lib/ids';
 
@@ -42,37 +43,45 @@ export function ProjectFormDialog({
     event.preventDefault();
     const values = { name: name.trim(), description: description.trim() === '' ? null : description.trim() };
     if (values.name === '') return;
-    if (project) {
-      await updateProject({ variables: { id: project.id, set: values } });
-    } else {
-      const id = newId();
-      await createProject({
-        variables: { values: { id, ...values } },
-        optimisticResponse: {
-          createProject: { __typename: 'Project', id, name: values.name, todoCount: 0, openTodoCount: 0 },
-        },
-        update(cache, { data }) {
-          const created = data?.createProject;
-          if (!created) return;
-          cache.updateQuery({ query: ProjectsDocument }, (existing) =>
-            existing
-              ? {
-                  ...existing,
-                  // Re-sorted rather than appended: the sidebar query orders by
-                  // name, so a project dropped at the end would jump the moment
-                  // anything refetched.
-                  projects: [...existing.projects.filter((row) => row.id !== created.id), created].sort((a, b) =>
-                    a.name.localeCompare(b.name),
-                  ),
-                }
-              : existing,
-          );
-        },
-      });
-      // Navigated only once the row exists. The id is known up front, but the
-      // project screen reads fields this mutation does not return, so arriving
-      // early would mean a query for a row Postgres has not written yet.
-      router.push(`/projects/${id}`);
+    try {
+      if (project) {
+        await updateProject({ variables: { id: project.id, set: values } });
+      } else {
+        const id = newId();
+        await createProject({
+          variables: { values: { id, ...values } },
+          optimisticResponse: {
+            createProject: { __typename: 'Project', id, name: values.name, todoCount: 0, openTodoCount: 0 },
+          },
+          update(cache, { data }) {
+            const created = data?.createProject;
+            if (!created) return;
+            cache.updateQuery({ query: ProjectsDocument }, (existing) =>
+              existing
+                ? {
+                    ...existing,
+                    // Re-sorted rather than appended: the sidebar query orders by
+                    // name, so a project dropped at the end would jump the moment
+                    // anything refetched.
+                    projects: [...existing.projects.filter((row) => row.id !== created.id), created].sort((a, b) =>
+                      a.name.localeCompare(b.name),
+                    ),
+                  }
+                : existing,
+            );
+          },
+        });
+        // Navigated only once the row exists. The id is known up front, but the
+        // project screen reads fields this mutation does not return, so arriving
+        // early would mean a query for a row Postgres has not written yet.
+        router.push(`/projects/${id}`);
+      }
+    } catch {
+      // The mutation rejects as well as setting `error`, so an uncaught await
+      // here is both an unhandled rejection and a dialog that stays open with
+      // no explanation of why. Stay open — deliberately — but say so: what was
+      // typed is still in the fields, ready to send again.
+      return;
     }
     onOpenChange(false);
   }
@@ -106,7 +115,7 @@ export function ProjectFormDialog({
               onChange={(event) => setDescription(event.target.value)}
             />
           </div>
-          {error ? <p className="text-destructive text-sm">{error.message}</p> : null}
+          {error ? <p className="text-destructive text-sm">{describeError(error)}</p> : null}
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel

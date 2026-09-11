@@ -109,20 +109,20 @@ describe('row scope', () => {
 
   it('refuses to update a row belonging to someone else', async () => {
     const data = await mine.expectOk(
-      `mutation ($id: UUID!) { updateTodoSingle(set: { title: "Taken" }, where: { id: { eq: $id } }) { id } }`,
+      `mutation ($id: UUID!) { updateTodo(set: { title: "Taken" }, where: { id: { eq: $id } }) { id } }`,
       { id: theirTodoId },
     );
-    expect(data.updateTodoSingle).toBeNull();
+    expect(data.updateTodo).toBeNull();
 
     const [row] = await db.select().from(dbSchema.todos);
     expect(row.title).toBe('Theirs');
   });
 
   it('refuses to delete a row belonging to someone else', async () => {
-    const data = await mine.expectOk(`mutation ($id: UUID!) { deleteTodo(where: { id: { eq: $id } }) { id } }`, {
+    const data = await mine.expectOk(`mutation ($id: UUID!) { deleteTodos(where: { id: { eq: $id } }) { id } }`, {
       id: theirTodoId,
     });
-    expect(data.deleteTodo).toEqual([]);
+    expect(data.deleteTodos).toEqual([]);
     expect(await db.select().from(dbSchema.todos)).toHaveLength(1);
   });
 

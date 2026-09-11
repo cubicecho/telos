@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { ProjectFormDialog } from '@/components/domain/project/project-form-dialog';
 import { ProjectListItem } from '@/components/domain/project/project-list-item';
 import { Button } from '@/components/ui/button';
+import { LoadFailure } from '@/components/ui/load-failure';
 import { Spinner } from '@/components/ui/spinner';
 import { clearToken } from '@/lib/auth';
 import { ProjectsDocument } from '@/lib/graphql';
@@ -12,7 +13,7 @@ import { ProjectsDocument } from '@/lib/graphql';
 /** The persistent shell: every project, always one click away. */
 export function Sidebar() {
   const pathname = usePathname();
-  const { data, loading } = useQuery(ProjectsDocument);
+  const { data, loading, error, refetch } = useQuery(ProjectsDocument);
   const [creating, setCreating] = useState(false);
   const projects = data?.projects ?? [];
 
@@ -22,7 +23,7 @@ export function Sidebar() {
   }
 
   return (
-    <aside className="flex h-screen w-64 shrink-0 flex-col border-r bg-card">
+    <aside className="flex h-screen w-64 shrink-0 flex-col border-sidebar-border border-r bg-sidebar text-sidebar-foreground">
       <div className="px-4 pt-4 pb-3">
         <Link href="/" className="font-semibold text-foreground text-lg tracking-tight no-underline">
           Telos
@@ -55,6 +56,12 @@ export function Sidebar() {
           <div className="px-2 py-2">
             <Spinner />
           </div>
+        ) : error && projects.length === 0 ? (
+          /* Only when there is nothing to show. A refetch that fails while the
+             last good list is still on screen should leave it there — the rail
+             is how you get anywhere, and replacing it with an apology would
+             strand the reader on whatever page they are already on. */
+          <LoadFailure error={error} onRetry={refetch} className="px-2 py-2" />
         ) : projects.length === 0 ? (
           <p className="px-2 py-2 text-muted-foreground text-sm">No projects yet.</p>
         ) : (
