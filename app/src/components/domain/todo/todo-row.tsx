@@ -28,6 +28,7 @@ import {
   RemoveTodoDependencyDocument,
   ReopenTodoDocument,
 } from '@/lib/graphql';
+import { isTyping } from '@/lib/hotkeys';
 import { laneLock } from '@/lib/lanes';
 import { cn } from '@/lib/utils';
 import { DependencyPicker } from './dependency-picker';
@@ -159,7 +160,28 @@ export function TodoRow({
   }
 
   return (
-    <div className={cn('group rounded-lg border bg-card px-3 py-2.5', todo.isBlocked && !done && 'opacity-70')}>
+    // `e` edits, scoped to the row rather than the document, because "the
+    // focused todo" is a fact only the row knows. Any focused child counts —
+    // the checkbox, the title, an action — since all of them are unambiguously
+    // *this* todo. Radix portals its popovers out of here, so an open picker
+    // never sees it.
+    // `role="group"` because that is what the row is — a named cluster of
+    // controls acting on one todo — and it is what lets the key handler sit
+    // here without pretending the div is a control of its own. Not the
+    // `<fieldset>` the linter suggests: that groups form inputs under a legend,
+    // and this is a row of a list.
+    // biome-ignore lint/a11y/useSemanticElements: see above
+    <div
+      role="group"
+      aria-label={todo.title}
+      onKeyDown={(event) => {
+        if (event.key !== 'e' || event.metaKey || event.ctrlKey || event.altKey) return;
+        if (isTyping(event.target)) return;
+        event.preventDefault();
+        setEditing(true);
+      }}
+      className={cn('group rounded-lg border bg-card px-3 py-2.5', todo.isBlocked && !done && 'opacity-70')}
+    >
       <div className="flex items-start gap-3">
         <Checkbox
           checked={done}
