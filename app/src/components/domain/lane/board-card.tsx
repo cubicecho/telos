@@ -1,6 +1,7 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { LabelBadge } from '@/components/domain/label/label-badge';
+import { DueBadge } from '@/components/domain/todo/due-badge';
 import type { TodoSummary } from '@/components/domain/todo/types';
 import { laneLock } from '@/lib/lanes';
 import { cn } from '@/lib/utils';
@@ -16,11 +17,13 @@ export function BoardCardBody({
   todo,
   lanes,
   onMove,
+  onEdit,
   className,
 }: {
   todo: TodoSummary;
   lanes: readonly LaneSummary[];
   onMove?: (lane: LaneSummary) => void;
+  onEdit?: () => void;
   className?: string;
 }) {
   const done = todo.completedAt != null;
@@ -35,9 +38,27 @@ export function BoardCardBody({
       )}
     >
       <div className="flex items-start gap-2">
-        <p className={cn('min-w-0 flex-1 text-sm leading-5', done && 'text-muted-foreground line-through')}>
-          {todo.title}
-        </p>
+        {/* A button on the board too, so both views open a todo the same way.
+            Safe inside the draggable because the pointer sensor waits for five
+            pixels of travel — a click that does not move is a click. The drag
+            overlay passes no handler and so renders plain text, which is right:
+            a card in flight is not something to click. */}
+        {onEdit ? (
+          <button
+            type="button"
+            onClick={onEdit}
+            className={cn(
+              'min-w-0 flex-1 rounded-sm text-left text-sm leading-5 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1',
+              done && 'text-muted-foreground line-through',
+            )}
+          >
+            {todo.title}
+          </button>
+        ) : (
+          <p className={cn('min-w-0 flex-1 text-sm leading-5', done && 'text-muted-foreground line-through')}>
+            {todo.title}
+          </p>
+        )}
         {/* The keyboard's way to do what the pointer does by dragging. Kept in
             the card rather than the column so the two routes name the same
             todo. */}
@@ -52,6 +73,13 @@ export function BoardCardBody({
           />
         ) : null}
       </div>
+
+      {todo.dueAt || todo.notes ? (
+        <div className="mt-1.5 flex min-w-0 items-center gap-2">
+          <DueBadge dueAt={todo.dueAt} done={done} />
+          {todo.notes ? <p className="min-w-0 truncate text-muted-foreground text-xs">{todo.notes}</p> : null}
+        </div>
+      ) : null}
 
       {todo.isBlocked && !done ? (
         <p className="mt-1 text-muted-foreground text-xs">
@@ -75,10 +103,12 @@ export function BoardCard({
   todo,
   lanes,
   onMove,
+  onEdit,
 }: {
   todo: TodoSummary;
   lanes: readonly LaneSummary[];
   onMove: (lane: LaneSummary) => void;
+  onEdit: () => void;
 }) {
   // A blocked card is not draggable — the same choice the row's checkbox makes,
   // disabling the affordance rather than letting it fail — but it stays a drop
@@ -100,7 +130,7 @@ export function BoardCard({
       {...attributes}
       {...listeners}
     >
-      <BoardCardBody todo={todo} lanes={lanes} onMove={onMove} />
+      <BoardCardBody todo={todo} lanes={lanes} onMove={onMove} onEdit={onEdit} />
     </div>
   );
 }

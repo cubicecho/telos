@@ -11,6 +11,7 @@ import {
 } from '@dnd-kit/core';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { useState } from 'react';
+import { TodoFormDialog } from '@/components/domain/todo/todo-form-dialog';
 import type { TodoSummary } from '@/components/domain/todo/types';
 import type { CachedLane } from '@/lib/cache';
 import { todosInLane } from '@/lib/lanes';
@@ -43,6 +44,10 @@ export function Board({
 }) {
   const [dragging, setDragging] = useState<TodoSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // One dialog for the whole board rather than one per card: it is modal, so
+  // only ever one can be open, and mounting dozens would cost a Radix portal
+  // each for a surface nobody has asked for yet.
+  const [editing, setEditing] = useState<TodoSummary | null>(null);
 
   const actions = useLaneActions(projectId);
   const moveTodo = useMoveTodo(projectId);
@@ -107,6 +112,7 @@ export function Board({
               lanes={lanes}
               todos={todosInLane(todos, lane.id)}
               onMove={move}
+              onEdit={setEditing}
               onRename={(name) => run(() => actions.renameLane(lane, name))}
               onReorder={(delta) => run(() => actions.moveLane(lanes, lane, delta))}
               onToggleDone={() => run(() => actions.toggleDoneLane(lane))}
@@ -125,6 +131,13 @@ export function Board({
           the refetch that rehomes them, but saying so beats them vanishing. */}
       {todos.some((todo) => todo.lane == null) ? (
         <p className="text-muted-foreground text-xs">Some todos are not in a lane yet. Reload to place them.</p>
+      ) : null}
+
+      {/* Keyed by id so reopening on a different card resets the form, and
+          unmounted while closed so a stale todo cannot be edited after the
+          board has moved on from it. */}
+      {editing ? (
+        <TodoFormDialog key={editing.id} open onOpenChange={(next) => !next && setEditing(null)} todo={editing} />
       ) : null}
     </div>
   );

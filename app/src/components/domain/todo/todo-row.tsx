@@ -1,5 +1,5 @@
 import { type ApolloCache, useMutation } from '@apollo/client';
-import { Trash2 } from 'lucide-react';
+import { Pencil, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { LabelBadge, type LabelSummary } from '@/components/domain/label/label-badge';
 import { LabelPicker } from '@/components/domain/label/label-picker';
@@ -31,6 +31,8 @@ import {
 import { laneLock } from '@/lib/lanes';
 import { cn } from '@/lib/utils';
 import { DependencyPicker } from './dependency-picker';
+import { DueBadge } from './due-badge';
+import { TodoFormDialog } from './todo-form-dialog';
 import type { TodoSummary } from './types';
 
 export function TodoRow({
@@ -45,6 +47,7 @@ export function TodoRow({
   lanes: readonly CachedLane[];
 }) {
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
   // Nothing here refetches. Completing and deleting are arithmetic the client
@@ -173,11 +176,28 @@ export function TodoRow({
           {/* The lane sits with the title rather than below it, so the list
               reads as one line per todo and still says which column it is in. */}
           <div className="flex items-start gap-2">
-            <p className={cn('min-w-0 flex-1 text-sm leading-5', done && 'text-muted-foreground line-through')}>
+            {/* A button rather than a <p>: the title is how a todo is opened,
+                and until it was one it was not reachable by keyboard at all.
+                Styled flat so the row still reads as text — the affordance is
+                the hover underline and the focus ring, not a control. */}
+            <button
+              type="button"
+              onClick={() => setEditing(true)}
+              className={cn(
+                'min-w-0 flex-1 rounded-sm text-left text-sm leading-5 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1',
+                done && 'text-muted-foreground line-through',
+              )}
+            >
               {todo.title}
-            </p>
+            </button>
+            <DueBadge dueAt={todo.dueAt} done={done} className="mt-px" />
             {todo.lane && !todo.lane.isDone ? <LaneBadge lane={todo.lane} className="mt-px" /> : null}
           </div>
+
+          {/* One line of the notes, because their presence is otherwise
+              invisible — a todo with a paragraph behind it looks exactly like
+              one without. */}
+          {todo.notes ? <p className="mt-1 truncate text-muted-foreground text-xs">{todo.notes}</p> : null}
 
           {todo.isBlocked && !done ? (
             <p className="mt-1 text-muted-foreground text-xs">
@@ -193,7 +213,11 @@ export function TodoRow({
             </div>
           ) : null}
 
-          {actionError ? <p className="mt-1 text-destructive text-xs">{actionError}</p> : null}
+          {actionError ? (
+            <p className="mt-1 text-destructive text-xs" aria-live="polite">
+              {actionError}
+            </p>
+          ) : null}
         </div>
 
         {/* Every action the row offers, in one cluster that appears together on
@@ -202,6 +226,15 @@ export function TodoRow({
             `focus-within` alone would let the cluster fade out from under the
             panel the reader is using. */}
         <div className="flex h-5 shrink-0 items-center opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100 has-[[data-state=open]]:opacity-100">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 text-muted-foreground"
+            onClick={() => setEditing(true)}
+            aria-label={`Edit ${todo.title}`}
+          >
+            <Pencil className="h-4 w-4" />
+          </Button>
           <LanePicker
             lanes={lanes}
             current={todo.lane}
@@ -229,6 +262,8 @@ export function TodoRow({
           </Button>
         </div>
       </div>
+
+      <TodoFormDialog open={editing} onOpenChange={setEditing} todo={todo} />
 
       <AlertDialog open={confirmingDelete} onOpenChange={setConfirmingDelete}>
         <AlertDialogContent>

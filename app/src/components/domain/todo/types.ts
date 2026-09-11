@@ -5,6 +5,8 @@ import type { LaneSummary } from '@/components/domain/lane/lane-badge';
 export interface TodoSummary {
   id: string;
   title: string;
+  notes: string | null;
+  dueAt: string | null;
   completedAt: string | null;
   position: number | null;
   isBlocked: boolean;

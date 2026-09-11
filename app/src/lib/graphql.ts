@@ -30,6 +30,8 @@ export const TodoFieldsFragment = graphql(`
   fragment TodoFields on Todo {
     id
     title
+    notes
+    dueAt
     completedAt
     position
     isBlocked
@@ -178,6 +180,8 @@ export const UpdateTodoDocument = graphql(`
     updateTodo(set: $set, where: { id: { eq: $id } }) {
       id
       title
+      notes
+      dueAt
     }
   }
 `);

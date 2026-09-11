@@ -49,6 +49,10 @@ export function TodoComposer({
             __typename: 'Todo',
             id,
             title: trimmed,
+            // The composer takes a title and nothing else; both are set from
+            // the edit dialog, never from here.
+            notes: null,
+            dueAt: null,
             completedAt: null,
             position: nextPosition,
             isBlocked: false,

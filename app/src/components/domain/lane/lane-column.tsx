@@ -63,6 +63,7 @@ export function LaneColumn({
   lanes,
   todos,
   onMove,
+  onEdit,
   onRename,
   onReorder,
   onToggleDone,
@@ -72,6 +73,7 @@ export function LaneColumn({
   lanes: readonly CachedLane[];
   todos: readonly TodoSummary[];
   onMove: (todo: TodoSummary, lane: LaneSummary) => void;
+  onEdit: (todo: TodoSummary) => void;
   onRename: (name: string) => void;
   onReorder: (delta: number) => void;
   onToggleDone: () => void;
@@ -177,7 +179,13 @@ export function LaneColumn({
       >
         <SortableContext id={lane.id} items={todos.map((todo) => todo.id)} strategy={verticalListSortingStrategy}>
           {todos.map((todo) => (
-            <BoardCard key={todo.id} todo={todo} lanes={lanes} onMove={(target) => onMove(todo, target)} />
+            <BoardCard
+              key={todo.id}
+              todo={todo}
+              lanes={lanes}
+              onMove={(target) => onMove(todo, target)}
+              onEdit={() => onEdit(todo)}
+            />
           ))}
         </SortableContext>
         {todos.length === 0 ? <p className="px-1 py-2 text-muted-foreground text-xs">Drop a todo here.</p> : null}

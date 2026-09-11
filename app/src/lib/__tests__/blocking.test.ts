@@ -7,6 +7,8 @@ function todo(id: string, fields: Partial<CachedTodo> = {}): CachedTodo {
     __typename: 'Todo',
     id,
     title: id,
+    notes: null,
+    dueAt: null,
     completedAt: null,
     position: 0,
     isBlocked: false,

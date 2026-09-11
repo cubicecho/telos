@@ -17,6 +17,8 @@ function todo(id: string, position: number, at: CachedLane | null, fields: Parti
     __typename: 'Todo',
     id,
     title: id,
+    notes: null,
+    dueAt: null,
     completedAt: null,
     position,
     isBlocked: false,
