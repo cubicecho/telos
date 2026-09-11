@@ -56,7 +56,11 @@ export function SegmentedControl<T extends string>({
             type="button"
             role="tab"
             id={`${idPrefix}-${segment.value}`}
-            aria-controls={`${idPrefix}-${segment.value}-panel`}
+            // Only when the panel exists. The caller renders the selected one
+            // and nothing else, so pointing the other tab at an id that is not
+            // in the document is a promise to a screen reader that the app
+            // cannot keep — better to say nothing than to say where it isn't.
+            aria-controls={selected ? `${idPrefix}-${segment.value}-panel` : undefined}
             aria-selected={selected}
             // Only the selected tab is in the tab order; the arrows move between
             // them, which is the other half of the same contract.

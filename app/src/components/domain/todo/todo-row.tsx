@@ -19,6 +19,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { bumpProjectCounts, type CachedLane, laneForCompletion, updateProjectTodos } from '@/lib/cache';
+import { describeError } from '@/lib/errors';
 import {
   AddTodoDependencyDocument,
   AttachTodoLabelDocument,
@@ -86,7 +87,7 @@ export function TodoRow({
     try {
       await action();
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : 'Something went wrong.');
+      setActionError(describeError(error));
     }
   }
 

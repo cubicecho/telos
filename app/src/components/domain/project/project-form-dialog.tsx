@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { describeError } from '@/lib/errors';
 import { CreateProjectDocument, ProjectDocument, ProjectsDocument, UpdateProjectDocument } from '@/lib/graphql';
 import { newId } from '@/lib/ids';
 
@@ -106,7 +107,7 @@ export function ProjectFormDialog({
               onChange={(event) => setDescription(event.target.value)}
             />
           </div>
-          {error ? <p className="text-destructive text-sm">{error.message}</p> : null}
+          {error ? <p className="text-destructive text-sm">{describeError(error)}</p> : null}
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel

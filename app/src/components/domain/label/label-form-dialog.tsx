@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { describeError } from '@/lib/errors';
 import { CreateLabelDocument, LabelsDocument, UpdateLabelDocument } from '@/lib/graphql';
 import { newId } from '@/lib/ids';
 import type { LabelSummary } from './label-badge';
@@ -113,7 +114,7 @@ export function LabelFormDialog({
               ))}
             </div>
           </div>
-          {error ? <p className="text-destructive text-sm">{error.message}</p> : null}
+          {error ? <p className="text-destructive text-sm">{describeError(error)}</p> : null}
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel

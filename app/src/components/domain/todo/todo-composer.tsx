@@ -4,6 +4,7 @@ import { type FormEvent, forwardRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { bumpProjectCounts, type CachedLane, laneForCompletion, updateProjectTodos } from '@/lib/cache';
+import { describeError } from '@/lib/errors';
 import { CreateTodoDocument } from '@/lib/graphql';
 import { newId } from '@/lib/ids';
 
@@ -103,7 +104,7 @@ export const TodoComposer = forwardRef<
       </div>
       {error ? (
         <p className="text-destructive text-sm" aria-live="polite">
-          {error.message}
+          {describeError(error)}
         </p>
       ) : null}
     </form>

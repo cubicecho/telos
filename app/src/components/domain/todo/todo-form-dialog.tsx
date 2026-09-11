@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { fromDateInputValue, toDateInputValue } from '@/lib/dates';
+import { describeError } from '@/lib/errors';
 import { UpdateTodoDocument } from '@/lib/graphql';
 import type { TodoSummary } from './types';
 
@@ -113,7 +114,7 @@ export function TodoFormDialog({
           </div>
           {error ? (
             <p className="text-destructive text-sm" aria-live="polite">
-              {error.message}
+              {describeError(error)}
             </p>
           ) : null}
           <div className="flex justify-end gap-2">

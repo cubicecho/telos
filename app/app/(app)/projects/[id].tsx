@@ -9,6 +9,7 @@ import { TodoFilterBar } from '@/components/domain/todo/todo-filter-bar';
 import { TodoRow } from '@/components/domain/todo/todo-row';
 import type { TodoSummary } from '@/components/domain/todo/types';
 import { Button } from '@/components/ui/button';
+import { LoadFailure } from '@/components/ui/load-failure';
 import { type Segment, SegmentedControl, segmentPanelProps } from '@/components/ui/segmented-control';
 import { Spinner } from '@/components/ui/spinner';
 import { filterTodos, isFiltering, NO_FILTER, type TodoFilter } from '@/lib/filter-todos';
@@ -75,15 +76,33 @@ export default function ProjectScreen() {
     if (document.activeElement === filterRef.current) filterRef.current?.blur();
   });
 
-  const { data: projectData, loading: projectLoading } = useQuery(ProjectDocument, {
+  // Three queries, three failures, and they are not the same failure: the
+  // project not loading means there is no screen, while the todos or the lanes
+  // not loading means the header is still right and only one panel is empty.
+  // Each is reported where its own data would have gone.
+  const {
+    data: projectData,
+    loading: projectLoading,
+    error: projectError,
+    refetch: refetchProject,
+  } = useQuery(ProjectDocument, {
     variables: { id: id as string },
     skip: !id,
   });
-  const { data: todosData, loading: todosLoading } = useQuery(ProjectTodosDocument, {
+  const {
+    data: todosData,
+    loading: todosLoading,
+    error: todosError,
+    refetch: refetchTodos,
+  } = useQuery(ProjectTodosDocument, {
     variables: { projectId: id as string },
     skip: !id,
   });
-  const { data: lanesData } = useQuery(ProjectLanesDocument, {
+  const {
+    data: lanesData,
+    error: lanesError,
+    refetch: refetchLanes,
+  } = useQuery(ProjectLanesDocument, {
     variables: { projectId: id as string },
     skip: !id,
   });
@@ -92,6 +111,18 @@ export default function ProjectScreen() {
     return (
       <div className="flex h-full items-center justify-center">
         <Spinner />
+      </div>
+    );
+  }
+
+  // Ahead of the not-found message, which is a claim about the caller's own
+  // data: with the API unreachable the app has no idea whose the project is,
+  // and telling someone their project is gone when it is not is worse than
+  // telling them nothing.
+  if (projectError && !projectData) {
+    return (
+      <div className="flex h-full items-center justify-center px-6">
+        <LoadFailure error={projectError} onRetry={refetchProject} />
       </div>
     );
   }
@@ -141,9 +172,17 @@ export default function ProjectScreen() {
 
       {todosLoading && all.length === 0 ? (
         <Spinner />
+      ) : todosError && all.length === 0 ? (
+        <LoadFailure error={todosError} onRetry={refetchTodos} />
       ) : current === 'board' ? (
         <div {...segmentPanelProps(tabs, 'board')}>
-          <Board projectId={project.id} lanes={lanes} todos={todos} />
+          {/* A board with no columns is not a board, and the todos being fine
+              does not make it one. */}
+          {lanesError && lanes.length === 0 ? (
+            <LoadFailure error={lanesError} onRetry={refetchLanes} />
+          ) : (
+            <Board projectId={project.id} lanes={lanes} todos={todos} />
+          )}
         </div>
       ) : (
         <div {...segmentPanelProps(tabs, 'list')} className="flex flex-col gap-6">

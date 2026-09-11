@@ -14,6 +14,7 @@ import { useState } from 'react';
 import { TodoFormDialog } from '@/components/domain/todo/todo-form-dialog';
 import type { TodoSummary } from '@/components/domain/todo/types';
 import type { CachedLane } from '@/lib/cache';
+import { describeError } from '@/lib/errors';
 import { todosInLane } from '@/lib/lanes';
 import { BoardCardBody } from './board-card';
 import type { LaneSummary } from './lane-badge';
@@ -59,9 +60,15 @@ export function Board({
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
-  function run(action: () => Promise<unknown>) {
+  // Returns the promise so a caller that awaits — LaneComposer does — is
+  // awaiting something that cannot reject. Every lane action goes through
+  // here; one that does not is a silent failure by construction.
+  function run(action: () => Promise<unknown>): Promise<void> {
     setError(null);
-    action().catch((reason) => setError(reason instanceof Error ? reason.message : 'Something went wrong.'));
+    return action().then(
+      () => undefined,
+      (reason) => setError(describeError(reason)),
+    );
   }
 
   function onDragStart({ active }: DragStartEvent) {
@@ -95,7 +102,11 @@ export function Board({
 
   return (
     <div className="flex flex-col gap-2">
-      {error ? <p className="text-destructive text-sm">{error}</p> : null}
+      {error ? (
+        <p className="text-destructive text-sm" aria-live="polite">
+          {error}
+        </p>
+      ) : null}
 
       <DndContext
         sensors={sensors}
@@ -119,7 +130,7 @@ export function Board({
               onDelete={() => run(() => actions.deleteLane(lane))}
             />
           ))}
-          <LaneComposer onCreate={(name) => actions.createLane(name, lanes.length)} />
+          <LaneComposer onCreate={(name) => run(() => actions.createLane(name, lanes.length))} />
         </div>
 
         {/* The card follows the pointer at full opacity while its original stays

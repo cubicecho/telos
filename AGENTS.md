@@ -205,6 +205,21 @@ fragment rather than being spelled out per document. A selection that omits a
 field the query reads leaves that field stale, so widen the fragment rather than
 the document.
 
+**An empty state means the server said "none", never that we failed to ask.**
+Every `useQuery` destructures `error` and renders `ui/load-failure.tsx` in place
+of its empty state while it has nothing else to show. The app used to answer a
+stopped API with "No projects yet." and "That project doesn't exist, or isn't
+yours." — confident claims about the reader's own data, made by code that had
+not heard back. The ordering is the rule: the failure branch comes *before* the
+empty one, and both come after "we have rows, show them", so a refetch that
+fails while good data is on screen leaves the good data alone. Mutations follow
+the same rule from the other side — every one is awaited inside a `run()` that
+catches, because a rejected mutation with no `catch` is a click that did nothing
+and said nothing. All of it goes through `describeError()` in `src/lib/errors.ts`
+so the app has one vocabulary for going wrong; a raw `error.message` in a JSX
+tree is a call site that got missed. `app/_layout.tsx` exports an `ErrorBoundary`
+for what escapes all of that, and there is deliberately no toast system.
+
 **A relation list is replaced, never merged.** The `typePolicies` in
 `src/lib/apollo.ts` mark every relation list — `Todo.blockedBy`,
 `Todo.dependencies`, `labels`, and their siblings — `merge: false`. Apollo's

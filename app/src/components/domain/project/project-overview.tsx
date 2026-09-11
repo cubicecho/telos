@@ -15,6 +15,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
+import { describeError } from '@/lib/errors';
 import {
   AttachProjectLabelDocument,
   DeleteProjectDocument,
@@ -36,6 +37,7 @@ export function ProjectOverview({ project }: { project: ProjectOverviewData }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   // Attaching a label returns the project with its labels selected exactly as
   // this screen reads them, so the normalized entity updates itself. Deleting
@@ -45,9 +47,21 @@ export function ProjectOverview({ project }: { project: ProjectOverviewData }) {
   const [detachLabel] = useMutation(DetachProjectLabelDocument);
   const [deleteProject] = useMutation(DeleteProjectDocument, { refetchQueries: [ProjectsDocument] });
 
+  // Both of these used to reject into nothing: the badge would simply not
+  // appear, or not disappear, and the reader was left to guess whether they
+  // had missed the click. Same shape as the todo row's — the failure belongs
+  // beside the control that caused it, not in a corner of the window.
+  function run(action: () => Promise<unknown>) {
+    setActionError(null);
+    return action().then(
+      () => undefined,
+      (reason) => setActionError(describeError(reason)),
+    );
+  }
+
   function toggleLabel(label: LabelSummary, attach: boolean) {
     const variables = { projectId: project.id, labelId: label.id };
-    return attach ? attachLabel({ variables }) : detachLabel({ variables });
+    return run(() => (attach ? attachLabel({ variables }) : detachLabel({ variables })));
   }
 
   const done = project.todoCount - project.openTodoCount;
@@ -91,6 +105,12 @@ export function ProjectOverview({ project }: { project: ProjectOverviewData }) {
         </div>
       </dl>
 
+      {actionError ? (
+        <p className="text-destructive text-sm" aria-live="polite">
+          {actionError}
+        </p>
+      ) : null}
+
       {/* Only the badges now, so no row is drawn for a project that has none. */}
       {project.labels.length > 0 ? (
         <div className="flex flex-wrap gap-1">
@@ -115,7 +135,16 @@ export function ProjectOverview({ project }: { project: ProjectOverviewData }) {
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={async () => {
-                await deleteProject({ variables: { id: project.id } });
+                setActionError(null);
+                try {
+                  await deleteProject({ variables: { id: project.id } });
+                } catch (cause) {
+                  // Stay put. Navigating away from a project that is still
+                  // there would look like the delete worked.
+                  setActionError(describeError(cause));
+                  setConfirmingDelete(false);
+                  return;
+                }
                 router.replace('/');
               }}
             >
