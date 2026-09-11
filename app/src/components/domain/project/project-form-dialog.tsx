@@ -43,37 +43,45 @@ export function ProjectFormDialog({
     event.preventDefault();
     const values = { name: name.trim(), description: description.trim() === '' ? null : description.trim() };
     if (values.name === '') return;
-    if (project) {
-      await updateProject({ variables: { id: project.id, set: values } });
-    } else {
-      const id = newId();
-      await createProject({
-        variables: { values: { id, ...values } },
-        optimisticResponse: {
-          createProject: { __typename: 'Project', id, name: values.name, todoCount: 0, openTodoCount: 0 },
-        },
-        update(cache, { data }) {
-          const created = data?.createProject;
-          if (!created) return;
-          cache.updateQuery({ query: ProjectsDocument }, (existing) =>
-            existing
-              ? {
-                  ...existing,
-                  // Re-sorted rather than appended: the sidebar query orders by
-                  // name, so a project dropped at the end would jump the moment
-                  // anything refetched.
-                  projects: [...existing.projects.filter((row) => row.id !== created.id), created].sort((a, b) =>
-                    a.name.localeCompare(b.name),
-                  ),
-                }
-              : existing,
-          );
-        },
-      });
-      // Navigated only once the row exists. The id is known up front, but the
-      // project screen reads fields this mutation does not return, so arriving
-      // early would mean a query for a row Postgres has not written yet.
-      router.push(`/projects/${id}`);
+    try {
+      if (project) {
+        await updateProject({ variables: { id: project.id, set: values } });
+      } else {
+        const id = newId();
+        await createProject({
+          variables: { values: { id, ...values } },
+          optimisticResponse: {
+            createProject: { __typename: 'Project', id, name: values.name, todoCount: 0, openTodoCount: 0 },
+          },
+          update(cache, { data }) {
+            const created = data?.createProject;
+            if (!created) return;
+            cache.updateQuery({ query: ProjectsDocument }, (existing) =>
+              existing
+                ? {
+                    ...existing,
+                    // Re-sorted rather than appended: the sidebar query orders by
+                    // name, so a project dropped at the end would jump the moment
+                    // anything refetched.
+                    projects: [...existing.projects.filter((row) => row.id !== created.id), created].sort((a, b) =>
+                      a.name.localeCompare(b.name),
+                    ),
+                  }
+                : existing,
+            );
+          },
+        });
+        // Navigated only once the row exists. The id is known up front, but the
+        // project screen reads fields this mutation does not return, so arriving
+        // early would mean a query for a row Postgres has not written yet.
+        router.push(`/projects/${id}`);
+      }
+    } catch {
+      // The mutation rejects as well as setting `error`, so an uncaught await
+      // here is both an unhandled rejection and a dialog that stays open with
+      // no explanation of why. Stay open — deliberately — but say so: what was
+      // typed is still in the fields, ready to send again.
+      return;
     }
     onOpenChange(false);
   }

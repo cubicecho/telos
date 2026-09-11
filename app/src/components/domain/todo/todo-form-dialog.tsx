@@ -62,10 +62,18 @@ export function TodoFormDialog({
       dueAt: fromDateInputValue(dueAt),
     };
 
-    await updateTodo({
-      variables: { id: todo.id, set },
-      optimisticResponse: { updateTodo: { __typename: 'Todo', id: todo.id, ...set } },
-    });
+    try {
+      await updateTodo({
+        variables: { id: todo.id, set },
+        optimisticResponse: { updateTodo: { __typename: 'Todo', id: todo.id, ...set } },
+      });
+    } catch {
+      // The mutation rejects as well as setting `error`, so an uncaught await
+      // here is both an unhandled rejection and a dialog that stays open with
+      // no explanation of why. Stay open — deliberately — but say so: what was
+      // typed is still in the fields, ready to send again.
+      return;
+    }
     onOpenChange(false);
   }
 

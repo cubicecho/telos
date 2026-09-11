@@ -44,32 +44,40 @@ export function LabelFormDialog({
     event.preventDefault();
     const values = { name: name.trim(), color };
     if (values.name === '') return;
-    if (label) {
-      // A rename needs no cache work of its own: `Label` is normalized, so the
-      // mutation's own result updates every badge showing it. Only the list's
-      // order is the query's to decide, hence the re-sort below.
-      await updateLabel({ variables: { id: label.id, set: values } });
-      sortLabels();
-    } else {
-      const id = newId();
-      await createLabel({
-        variables: { values: { id, ...values } },
-        optimisticResponse: { createLabel: { __typename: 'Label', id, name: values.name, color: values.color } },
-        update(cache, { data }) {
-          const created = data?.createLabel;
-          if (!created) return;
-          cache.updateQuery({ query: LabelsDocument }, (existing) =>
-            existing
-              ? {
-                  ...existing,
-                  labels: [...existing.labels.filter((row) => row.id !== created.id), created].sort((a, b) =>
-                    a.name.localeCompare(b.name),
-                  ),
-                }
-              : existing,
-          );
-        },
-      });
+    try {
+      if (label) {
+        // A rename needs no cache work of its own: `Label` is normalized, so the
+        // mutation's own result updates every badge showing it. Only the list's
+        // order is the query's to decide, hence the re-sort below.
+        await updateLabel({ variables: { id: label.id, set: values } });
+        sortLabels();
+      } else {
+        const id = newId();
+        await createLabel({
+          variables: { values: { id, ...values } },
+          optimisticResponse: { createLabel: { __typename: 'Label', id, name: values.name, color: values.color } },
+          update(cache, { data }) {
+            const created = data?.createLabel;
+            if (!created) return;
+            cache.updateQuery({ query: LabelsDocument }, (existing) =>
+              existing
+                ? {
+                    ...existing,
+                    labels: [...existing.labels.filter((row) => row.id !== created.id), created].sort((a, b) =>
+                      a.name.localeCompare(b.name),
+                    ),
+                  }
+                : existing,
+            );
+          },
+        });
+      }
+    } catch {
+      // The mutation rejects as well as setting `error`, so an uncaught await
+      // here is both an unhandled rejection and a dialog that stays open with
+      // no explanation of why. Stay open — deliberately — but say so: what was
+      // typed is still in the fields, ready to send again.
+      return;
     }
     onOpenChange(false);
   }
