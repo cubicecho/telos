@@ -46,6 +46,12 @@ export const todos = pgTable(
     index('idx_todos_project_id').on(t.projectId),
     index('idx_todos_completed_at').on(t.completedAt),
     index('idx_todos_lane_id').on(t.laneId),
+    // Not yet load-bearing: the due-date sort runs in the client over the
+    // project's already-fetched rows. It is here because the column is the
+    // obvious thing to order or filter on server-side the moment a project
+    // outgrows one query, and because an index added later is a migration on
+    // a table that by then has rows.
+    index('idx_todos_due_at').on(t.dueAt),
   ],
 );
 
