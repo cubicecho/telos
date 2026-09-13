@@ -8,11 +8,13 @@ export const relations = defineRelations(schema, (r) => ({
     projects: r.many.projects({ from: r.users.id, to: r.projects.userId }),
     todos: r.many.todos({ from: r.users.id, to: r.todos.userId }),
     labels: r.many.labels({ from: r.users.id, to: r.labels.userId }),
+    lanes: r.many.lanes({ from: r.users.id, to: r.lanes.userId }),
   },
 
   projects: {
     user: r.one.users({ from: r.projects.userId, to: r.users.id }),
     todos: r.many.todos({ from: r.projects.id, to: r.todos.projectId }),
+    lanes: r.many.lanes({ from: r.projects.id, to: r.lanes.projectId }),
     labels: r.many.labels({
       from: r.projects.id.through(r.projectLabels.projectId),
       to: r.labels.id.through(r.projectLabels.labelId),
@@ -22,6 +24,7 @@ export const relations = defineRelations(schema, (r) => ({
   todos: {
     user: r.one.users({ from: r.todos.userId, to: r.users.id }),
     project: r.one.projects({ from: r.todos.projectId, to: r.projects.id }),
+    lane: r.one.lanes({ from: r.todos.laneId, to: r.lanes.id }),
     labels: r.many.labels({
       from: r.todos.id.through(r.todoLabels.todoId),
       to: r.labels.id.through(r.todoLabels.labelId),
@@ -38,6 +41,12 @@ export const relations = defineRelations(schema, (r) => ({
       to: r.todos.id.through(r.todoDependencies.todoId),
       alias: 'todoDependentEdge',
     }),
+  },
+
+  lanes: {
+    user: r.one.users({ from: r.lanes.userId, to: r.users.id }),
+    project: r.one.projects({ from: r.lanes.projectId, to: r.projects.id }),
+    todos: r.many.todos({ from: r.lanes.id, to: r.todos.laneId }),
   },
 
   labels: {

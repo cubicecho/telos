@@ -1,0 +1,1 @@
+CREATE INDEX "idx_todos_due_at" ON "todos" ("due_at");

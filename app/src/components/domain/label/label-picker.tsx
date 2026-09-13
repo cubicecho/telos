@@ -2,6 +2,7 @@ import { useQuery } from '@apollo/client';
 import * as Popover from '@radix-ui/react-popover';
 import { Check, Tag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { LoadFailure } from '@/components/ui/load-failure';
 import { LabelsDocument } from '@/lib/graphql';
 import { cn } from '@/lib/utils';
 import type { LabelSummary } from './label-badge';
@@ -23,7 +24,7 @@ export function LabelPicker({
   align?: 'start' | 'end';
   className?: string;
 }) {
-  const { data } = useQuery(LabelsDocument);
+  const { data, error, refetch } = useQuery(LabelsDocument);
   const attachedIds = new Set(attached.map((label) => label.id));
   const labels = data?.labels ?? [];
 
@@ -48,7 +49,12 @@ export function LabelPicker({
           align={align}
           className="z-50 w-56 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
         >
-          {labels.length === 0 ? (
+          {error && labels.length === 0 ? (
+            /* "No labels yet." here would read as an invitation to go and make
+               one, which is the wrong errand when the list simply did not
+               load. */
+            <LoadFailure error={error} onRetry={refetch} className="px-2 py-3" />
+          ) : labels.length === 0 ? (
             <p className="px-2 py-3 text-center text-muted-foreground text-sm">No labels yet.</p>
           ) : (
             labels.map((label) => {

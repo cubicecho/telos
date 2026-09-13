@@ -3,6 +3,7 @@ import { and, eq } from 'drizzle-orm';
 import { extendSchema, GraphQLError, type GraphQLObjectType, type GraphQLSchema, parse } from 'graphql';
 import { assertNoCycle, assertNotBlocked } from '../blocking.ts';
 import type { Context } from '../context.ts';
+import { findDoneLaneId, findFirstOpenLaneId } from '../lanes.ts';
 import { requireAuth } from './auth.ts';
 
 // What generated CRUD cannot express: the derived fields the project screen
@@ -54,11 +55,23 @@ async function loadOwnedTodo(context: Context, id: string): Promise<AnyRow> {
   return rows[0];
 }
 
-async function setCompletedAt(context: Context, id: string, completedAt: Date | null): Promise<AnyRow> {
-  const [updated] = await (context.db as AnyRow)
+/**
+ * Flips a todo's completion and moves it to the column that agrees — into the
+ * project's done lane, or back out to its first open one. The list's checkbox
+ * and the board are two renderings of the same fact, so one never moves without
+ * the other; see lanes.ts for the invariant.
+ *
+ * A project with no done lane (or no open one) leaves `laneId` alone: there is
+ * no column to move to, and dropping the todo off the board would be a larger
+ * change than ticking a checkbox asked for.
+ */
+async function setCompletedAt(context: Context, todo: AnyRow, completedAt: Date | null): Promise<AnyRow> {
+  const db = context.db as AnyRow;
+  const laneId = completedAt ? await findDoneLaneId(db, todo.projectId) : await findFirstOpenLaneId(db, todo.projectId);
+  const [updated] = await db
     .update(dbSchema.todos)
-    .set({ completedAt, updatedAt: new Date() })
-    .where(and(eq(dbSchema.todos.id, id), eq(dbSchema.todos.userId, requireAuth(context))))
+    .set({ completedAt, updatedAt: new Date(), ...(laneId ? { laneId } : {}) })
+    .where(and(eq(dbSchema.todos.id, todo.id), eq(dbSchema.todos.userId, requireAuth(context))))
     .returning();
   if (!updated) throw new GraphQLError('Todo not found', { extensions: { code: 'NOT_FOUND' } });
   return updated;
@@ -85,13 +98,13 @@ export function applyTodosExtension(schema: GraphQLSchema): GraphQLSchema {
     const todo = await loadOwnedTodo(context, args.id);
     if (todo.completedAt != null) return todo;
     await assertNotBlocked(context.db, [args.id]);
-    return setCompletedAt(context, args.id, new Date());
+    return setCompletedAt(context, todo, new Date());
   };
 
   mutations.reopenTodo.resolve = async (_parent: unknown, args: { id: string }, context: Context) => {
     const todo = await loadOwnedTodo(context, args.id);
     if (todo.completedAt == null) return todo;
-    return setCompletedAt(context, args.id, null);
+    return setCompletedAt(context, todo, null);
   };
 
   mutations.addTodoDependency.resolve = async (

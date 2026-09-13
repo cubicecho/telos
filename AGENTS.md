@@ -36,7 +36,7 @@ telos/
 │   │   ├── __generated__/   # Generated GraphQL types (do not edit, not committed)
 │   │   ├── components/
 │   │   │   ├── ui/          # shadcn/ui primitives — no app logic
-│   │   │   ├── domain/      # project/, todo/, label/, settings/
+│   │   │   ├── domain/      # project/, todo/, lane/, label/, settings/
 │   │   │   └── layouts/     # sidebar
 │   │   └── lib/             # apollo, auth, theme, cache writers, blocking, graphql documents, cn()
 │   ├── public/index.html    # HTML shell; applies the theme before first paint
@@ -52,6 +52,7 @@ telos/
 │       ├── schema.ts        # Binds createSchema to the real database
 │       ├── tenancy.ts       # Row scope + server-owned columns, as buildSchema config
 │       ├── blocking.ts      # The dependency rules, in one place
+│       ├── lanes.ts         # The lane rules, in one place
 │       ├── loaders.ts       # Per-request DataLoaders
 │       ├── resolvers/       # SDL extensions for what CRUD cannot express
 │       └── __tests__/       # Server tests
@@ -96,6 +97,13 @@ Two consequences worth internalising:
   entry there gets no relation fields.
 - **Only what CRUD cannot express gets a resolver.** Those live in
   `server/src/resolvers/` and are applied by `build-schema.ts` in order.
+- **Generated names say their arity.** `typeNameMapper: 'singularize'` maps the
+  plural table key onto a singular type, and the noun is what tells the two
+  forms of an operation apart: `todos` / `todo` for reads, `createTodos` /
+  `createTodo`, `updateTodos` / `updateTodo`, `deleteTodos` / `deleteTodo` for
+  writes. The plural form filters and returns a list; the singular takes a
+  required `where` and returns one row or null. `deleteTodo(where: …)` deletes
+  one row — reach for `deleteTodos` when you mean every match.
 
 ## Rules that carry weight
 
@@ -109,11 +117,52 @@ the test to make it pass.
 checked in an `onWrite` hook in `server/src/resolvers/write-guards.ts`. A new
 table with a user-facing FK needs an entry in `FOREIGN_KEYS`.
 
-**A blocked todo cannot be completed.** The rule is an invariant, not a code
-path: `assertNoBlockedCompletions` re-checks it after any write that sets
-`completedAt`, so `completeTodo`, `updateTodoSingle` and `updateTodo` are all
-bound by it. Adding another way to write `completedAt` does not need new
-enforcement — but removing that hook silently unbinds all three.
+**A blocked todo cannot be completed, and cannot change lane.** The rule is an
+invariant, not a code path: `assertNoBlockedCompletions` re-checks it after any
+write that sets `completedAt`, so `completeTodo`, `updateTodo` and `updateTodos`
+are all bound by it. Adding another way to write `completedAt` does not need new
+enforcement — but removing that hook silently unbinds all three. `moveTodo`
+checks the same rule for a change of column, because the done lane was only the
+sharpest case of it: work waiting on something else has no business being
+advanced across the board either. Two exemptions, both about not stranding a
+card — a completed todo can always be dragged back out of the done lane, since
+that is how it gets reopened, and reordering a blocked todo inside its own column
+is free. `laneLock()` in `app/src/lib/lanes.ts` states the client's half, and it
+disables the drag and the "Move to" entries rather than letting either fail at
+the server.
+
+**The lane and the checkbox say the same thing.** In a project that has a done
+lane, a todo with a lane is completed *if and only if* that lane is the done one.
+`server/src/lanes.ts` states the biconditional and keeps it: `moveTodo`,
+`completeTodo`, `reopenTodo` and `setDoneLane` each maintain it directly, and
+`assertCompletionMatchesLane` re-asserts it after any generated write — so
+dropping a card in the done column ticks it off, ticking the box moves the card,
+and neither view can be made to disagree with the other. A generated write that
+*states completion* has its lane realigned to match (completion is the fact, the
+lane is how it is drawn); one that names only a lane is refused and pointed at
+`moveTodo`, because guessing which of the two the caller meant would silently
+undo the other. A project with no done lane is exempt: its board simply has no
+column that means done. Every project has at least one lane — `seedMissingLanes`
+runs in the transaction that creates it, and deleting the last one is refused.
+`isDone` is reserved for `setDoneLane`, and the partial unique index
+`uq_lanes_project_done` makes "at most one done lane per project" structural
+rather than a rule someone has to remember.
+
+**`position` is project-wide, not per-lane.** One sequence orders the list view
+and every column of the board, so the two tabs cannot disagree about what comes
+first. A drop names an index *within a column*; `reposition()` in
+`server/src/resolvers/lanes.ts` and `moveTodoInList()` in `app/src/lib/lanes.ts`
+translate that into the global sequence, and they translate it the same way — if
+they drift, the board reshuffles itself on the next fetch. Lane `position` has
+deliberately no unique constraint: reordering rewrites several lanes in one
+statement and a unique index would reject the intermediate state.
+
+**Dragging is never the only way.** `@dnd-kit` gives the board its pointer
+gesture, and a pointer is the only thing it gives. Every move it offers exists
+again as a menu: `LanePicker` ("Move to") on each todo row and each card, and the
+lane header's own menu for renaming, reordering, the done flag and deletion. A
+board action added without a keyboard route is a board action half the people
+using it cannot reach.
 
 **Dependency edges have no generated mutations.** `features` in `tenancy.ts`
 turns off insert/update/delete for `todoDependencies` so every edge goes through
@@ -126,6 +175,15 @@ row exists, which is itself something the caller is not entitled to know.
 and redirects to `/login`. A bad magic link is `BAD_USER_INPUT` — it must not
 sign anyone out.
 
+**The palette is the other cubicecho apps'.** `app/global.css` carries the same
+tokens their `index.css` does — the neutral shadcn set, one done colour, a
+`--sidebar` group and `--radius: 0.625rem`. They are on Tailwind v4 and write it
+in oklch; NativeWind pins this app to v3, whose colour plumbing is
+`hsl(var(--token))`, so the identical colours are written here as HSL triples.
+Same values, different notation. The two exceptions are `--border` and `--input`
+in dark, which are white at 10% and 15% there and are composited over the
+background here, because these tokens carry no alpha channel.
+
 **The theme is applied twice, on purpose.** `app/public/index.html` sets `.dark`
 on `<html>` before the bundle loads so there is no white flash, and
 `src/lib/theme.ts` maintains it afterwards. The storage key `telos_theme` and the
@@ -133,6 +191,44 @@ class rule are written out in both places — the script runs before any module
 exists — so a change to one is a change to both. That HTML file is also Expo's
 own template with a script added: `app/+html.tsx` is the documented place for
 this and does nothing under `web.output: "single"`.
+
+**A write returns the entity it changed, not the row it wrote.** Attaching a
+label and adding a dependency are junction-table inserts, but what the screen
+reads is the *todo* — its `labels`, its `dependencies`, its `blockedBy` — so
+those mutations select `todo { ...TodoFields }` off the junction row (and
+`project { ...ProjectLabelFields }` for a project's labels). Apollo normalizes by
+id, so one full selection settles every list and screen already holding that
+entity and nothing has to refetch to find out what the write did. The catch is
+that a field's *arguments* are part of the key it is cached under: `labels` is
+selected with the same `orderBy` everywhere, which is why it lives in a shared
+fragment rather than being spelled out per document. A selection that omits a
+field the query reads leaves that field stale, so widen the fragment rather than
+the document.
+
+**An empty state means the server said "none", never that we failed to ask.**
+Every `useQuery` destructures `error` and renders `ui/load-failure.tsx` in place
+of its empty state while it has nothing else to show. The app used to answer a
+stopped API with "No projects yet." and "That project doesn't exist, or isn't
+yours." — confident claims about the reader's own data, made by code that had
+not heard back. The ordering is the rule: the failure branch comes *before* the
+empty one, and both come after "we have rows, show them", so a refetch that
+fails while good data is on screen leaves the good data alone. Mutations follow
+the same rule from the other side — every one is awaited inside a `run()` that
+catches, because a rejected mutation with no `catch` is a click that did nothing
+and said nothing. All of it goes through `describeError()` in `src/lib/errors.ts`
+so the app has one vocabulary for going wrong; a raw `error.message` in a JSX
+tree is a call site that got missed. `app/_layout.tsx` exports an `ErrorBoundary`
+for what escapes all of that, and there is deliberately no toast system.
+
+**A relation list is replaced, never merged.** The `typePolicies` in
+`src/lib/apollo.ts` mark every relation list — `Todo.blockedBy`,
+`Todo.dependencies`, `labels`, and their siblings — `merge: false`. Apollo's
+default is to overwrite and warn that data may be lost, because it cannot tell a
+whole list from one page of it; here it is always the whole list, so a shorter
+array is the answer rather than a partial view of it. Removing the last
+dependency really does leave `blockedBy` empty, and merging would keep a blocker
+the todo no longer has. A new relation list read anywhere in the app belongs in
+that map.
 
 **Creates carry a client-generated id.** `newId()` in `src/lib/ids.ts` mints the
 UUID, the create mutation sends it in `values`, and Postgres keeps it. That is
@@ -158,9 +254,7 @@ that touched only the named row would leave the rest of the list lying.
 is still open — and is idempotent, because Apollo runs `update` twice (once
 optimistically, once on the real result). Counts move through
 `bumpProjectCounts()`, a delta, which is safe for the same reason: the
-optimistic layer is discarded before the real pass. Attaching a label or a
-dependency still refetches — a new dependency can block a chain the client
-cannot see the far end of.
+optimistic layer is discarded before the real pass.
 
 **Text on a user-chosen colour picks its own ink.** A label's colour comes out of
 the database, so no Tailwind variant and no theme token can be trusted to read on

@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import { setToken } from '@/lib/auth';
+import { describeError } from '@/lib/errors';
 import { RequestMagicLinkDocument } from '@/lib/graphql';
 
 export default function LoginScreen() {
@@ -60,7 +61,7 @@ export default function LoginScreen() {
           </Button>
         </form>
 
-        {error ? <p className="mt-4 text-destructive text-sm">{error.message}</p> : null}
+        {error ? <p className="mt-4 text-destructive text-sm">{describeError(error)}</p> : null}
 
         {sent ? (
           <div className="mt-6 rounded-lg border bg-card p-4">
@@ -78,7 +79,15 @@ export default function LoginScreen() {
                 </Link>
               </>
             ) : (
-              <p className="mt-2 text-muted-foreground text-sm">Check your inbox to finish signing in.</p>
+              /* Not "check your inbox": Telos ships no mail relay, so nothing
+                 was ever sent anywhere. The link is in the server log, and
+                 saying so is the difference between a reader waiting for an
+                 email that will not come and one who knows where to look. */
+              <p className="mt-2 text-muted-foreground text-sm">
+                This instance sends no mail — the link was written to the server log. Whoever runs it can read it from
+                there, or set <code className="rounded bg-muted px-1 py-0.5 text-xs">EXPOSE_MAGIC_LINK=true</code> to
+                show it on this page.
+              </p>
             )}
           </div>
         ) : null}

@@ -7,9 +7,9 @@ import { Platform } from 'react-native';
  *
  * Tailwind is configured `darkMode: ['class']`, so applying a theme means
  * putting `.dark` on <html> and letting the CSS variables in global.css do the
- * rest. `+html.tsx` runs the same rule before first paint, so a dark-theme user
- * never sees a white flash on load; the key below is duplicated there and the
- * two must agree.
+ * rest. `app/public/index.html` runs the same rule in a blocking script before
+ * first paint, so a dark-theme user never sees a white flash on load; the key
+ * below is duplicated there and the two must agree.
  */
 export type ThemePreference = 'system' | 'light' | 'dark';
 

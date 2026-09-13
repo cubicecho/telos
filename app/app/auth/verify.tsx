@@ -3,6 +3,7 @@ import { Link, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef } from 'react';
 import { Spinner } from '@/components/ui/spinner';
 import { setToken } from '@/lib/auth';
+import { describeError } from '@/lib/errors';
 import { VerifyMagicLinkDocument } from '@/lib/graphql';
 
 export default function VerifyScreen() {
@@ -34,7 +35,7 @@ export default function VerifyScreen() {
           <>
             <h1 className="font-semibold text-xl">That link didn't work</h1>
             <p className="mt-2 text-muted-foreground text-sm">
-              {error?.message ?? 'The link is missing its token.'} Sign-in links expire after 15 minutes.
+              {error ? describeError(error) : 'The link is missing its token.'} Sign-in links expire after 15 minutes.
             </p>
             <Link href="/login" className="mt-4 inline-block text-primary text-sm underline">
               Request a new one

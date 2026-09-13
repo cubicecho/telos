@@ -4,6 +4,7 @@ import { and, eq, inArray } from 'drizzle-orm';
 import { GraphQLError } from 'graphql';
 import { assertNoBlockedCompletions } from '../blocking.ts';
 import type { Context } from '../context.ts';
+import { assertCompletionMatchesLane, assertEveryProjectHasLanes, realignLanes, seedMissingLanes } from '../lanes.ts';
 import { requireAuth } from './auth.ts';
 
 // A row scope confines reads, updates and deletes, but it cannot reach a plain
@@ -34,9 +35,11 @@ interface ForeignKey {
 const project: ForeignKey = { key: 'projectId', entity: 'Project', parent: dbSchema.projects };
 const todo: ForeignKey = { key: 'todoId', entity: 'Todo', parent: dbSchema.todos };
 const label: ForeignKey = { key: 'labelId', entity: 'Label', parent: dbSchema.labels };
+const lane: ForeignKey = { key: 'laneId', entity: 'Lane', parent: dbSchema.lanes };
 
 const FOREIGN_KEYS: Record<string, ForeignKey[]> = {
-  todos: [project],
+  lanes: [project],
+  todos: [project, lane],
   todoLabels: [todo, label],
   projectLabels: [project, label],
 };
@@ -81,6 +84,28 @@ function marksComplete(args: Parameters<typeof writtenRows>[0]): boolean {
   return writtenRows(args).some((row) => 'completedAt' in row && row.completedAt != null);
 }
 
+/** Whether this write states a todo's completion, either way. */
+function statesCompletion(args: Parameters<typeof writtenRows>[0]): boolean {
+  return writtenRows(args).some((row) => 'completedAt' in row);
+}
+
+/** Whether this write states a todo's lane. */
+function statesLane(args: Parameters<typeof writtenRows>[0]): boolean {
+  return writtenRows(args).some((row) => 'laneId' in row);
+}
+
+/**
+ * Which lane means done is `setDoneLane`'s to decide: moving the flag has to
+ * move the todos with it, and a generated write would leave the board saying one
+ * thing and the list another.
+ */
+function assertDoneFlagUntouched(args: Parameters<typeof writtenRows>[0]): void {
+  if (!writtenRows(args).some((row) => 'isDone' in row)) return;
+  throw new GraphQLError('Use setDoneLane to choose which lane marks a todo done.', {
+    extensions: { code: 'BAD_USER_INPUT' },
+  });
+}
+
 export const onWrite: NonNullable<BuildSchemaConfig['onWrite']> = {
   ...Object.fromEntries(
     Object.entries(FOREIGN_KEYS).map(([table, foreignKeys]) => [
@@ -91,6 +116,31 @@ export const onWrite: NonNullable<BuildSchemaConfig['onWrite']> = {
       },
     ]),
   ),
+  lanes: {
+    before: async ({ args, context, tx }: WriteHookPayload) => {
+      assertDoneFlagUntouched(args);
+      await assertForeignKeysOwned(tx, requireAuth(context as Context), writtenRows(args), FOREIGN_KEYS.lanes);
+    },
+    // Deleting a lane sets its todos' `lane_id` to null, which can strand a
+    // completed todo outside the done lane, and can empty a project's board
+    // entirely. Re-asserted here for the same reason it is on todos: the
+    // invariant, not the statement, is what must hold.
+    after: async ({ context, tx }: WriteHookPayload) => {
+      const userId = requireAuth(context as Context);
+      await assertEveryProjectHasLanes(tx, userId);
+      await realignLanes(tx, userId);
+      await assertCompletionMatchesLane(tx, userId);
+    },
+  },
+  projects: {
+    // A project without lanes has an empty board, so every project gets one at
+    // the moment it is created — inside the creating transaction, so a project
+    // never exists without it.
+    after: async ({ context, operation, tx }: WriteHookPayload) => {
+      if (operation !== 'insert') return;
+      await seedMissingLanes(tx, requireAuth(context as Context));
+    },
+  },
   todos: {
     before: async ({ args, context, tx }: WriteHookPayload) =>
       assertForeignKeysOwned(tx, requireAuth(context as Context), writtenRows(args), FOREIGN_KEYS.todos),
@@ -102,8 +152,15 @@ export const onWrite: NonNullable<BuildSchemaConfig['onWrite']> = {
     // transaction back, statement included.
     after: async ({ args, context, operation, tx }: WriteHookPayload) => {
       if (operation === 'delete' || operation === 'restore') return;
-      if (!marksComplete(args)) return;
-      await assertNoBlockedCompletions(tx, requireAuth(context as Context));
+      const created = operation === 'insert' || operation === 'upsert';
+      if (!created && !statesCompletion(args) && !statesLane(args)) return;
+      const userId = requireAuth(context as Context);
+      if (marksComplete(args)) await assertNoBlockedCompletions(tx, userId);
+      // A write that says what is done gets its lanes fixed to match; a write
+      // that only names a lane is refused, because guessing which of the two the
+      // caller meant would silently undo one of them.
+      if (created || statesCompletion(args)) await realignLanes(tx, userId);
+      await assertCompletionMatchesLane(tx, userId);
     },
   },
 };

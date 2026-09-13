@@ -28,6 +28,7 @@ type AnyTable = any;
  */
 export const USER_OWNED_TABLES = [
   'projects',
+  'lanes',
   'todos',
   'todoDependencies',
   'labels',

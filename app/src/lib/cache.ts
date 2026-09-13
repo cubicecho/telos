@@ -1,6 +1,10 @@
 import type { ApolloCache } from '@apollo/client';
+import type { ProjectLanesQuery } from '@/__generated__/graphql';
 import { type CachedTodo, resolveBlocking } from './blocking';
-import { ProjectTodosDocument } from './graphql';
+import { ProjectLanesDocument, ProjectTodosDocument } from './graphql';
+
+/** A lane exactly as the board holds it in the cache. */
+export type CachedLane = ProjectLanesQuery['lanes'][number];
 
 /**
  * Move a project's todo counts without asking the server for them.
@@ -49,4 +53,33 @@ export function updateProjectTodos(
   cache.updateQuery({ query: ProjectTodosDocument, variables: { projectId } }, (existing) =>
     existing ? { ...existing, todos: resolveBlocking(change(existing.todos)) } : existing,
   );
+}
+
+/**
+ * Rewrite a project's board in place.
+ *
+ * The board is a plain ordered list — nothing derives from it the way blocking
+ * derives from the todo list — so this is `updateProjectTodos` without the
+ * settling step, and exists for the same reason: one place that knows which
+ * query holds the lanes.
+ */
+export function updateProjectLanes(
+  cache: ApolloCache<unknown>,
+  projectId: string,
+  change: (lanes: readonly CachedLane[]) => CachedLane[],
+): void {
+  cache.updateQuery({ query: ProjectLanesDocument, variables: { projectId } }, (existing) =>
+    existing ? { ...existing, lanes: change(existing.lanes) } : existing,
+  );
+}
+
+/**
+ * Where a todo lands when its completion changes — the same choice the server
+ * makes, so an optimistic tick puts the card in the column the refresh will.
+ *
+ * Null when the project has no lane of the kind needed, which is also what the
+ * server does: there is nowhere better to put the todo than where it is.
+ */
+export function laneForCompletion(lanes: readonly CachedLane[], completedAt: string | null): CachedLane | null {
+  return lanes.find((lane) => lane.isDone === (completedAt != null)) ?? null;
 }

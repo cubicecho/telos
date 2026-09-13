@@ -1,9 +1,10 @@
 import { useMutation } from '@apollo/client';
 import { Plus } from 'lucide-react';
-import { type FormEvent, useState } from 'react';
+import { type FormEvent, forwardRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { bumpProjectCounts, updateProjectTodos } from '@/lib/cache';
+import { bumpProjectCounts, type CachedLane, laneForCompletion, updateProjectTodos } from '@/lib/cache';
+import { describeError } from '@/lib/errors';
 import { CreateTodoDocument } from '@/lib/graphql';
 import { newId } from '@/lib/ids';
 
@@ -15,8 +16,17 @@ import { newId } from '@/lib/ids';
  * the request leaves, from an id minted here. Apollo replaces that entry with
  * the server's when it answers and rolls it back if the write fails, so the
  * only state this has to undo by hand is the emptied field.
+ *
+ * The ref goes to the field, so `n` can focus it from anywhere on the screen.
  */
-export function TodoComposer({ projectId, nextPosition }: { projectId: string; nextPosition: number }) {
+export const TodoComposer = forwardRef<
+  HTMLInputElement,
+  {
+    projectId: string;
+    nextPosition: number;
+    lanes: readonly CachedLane[];
+  }
+>(function TodoComposer({ projectId, nextPosition, lanes }, ref) {
   const [title, setTitle] = useState('');
   const [createTodo, { error }] = useMutation(CreateTodoDocument);
 
@@ -41,12 +51,19 @@ export function TodoComposer({ projectId, nextPosition }: { projectId: string; n
             __typename: 'Todo',
             id,
             title: trimmed,
+            // The composer takes a title and nothing else; both are set from
+            // the edit dialog, never from here.
+            notes: null,
+            dueAt: null,
             completedAt: null,
             position: nextPosition,
             isBlocked: false,
             blockedBy: [],
             dependencies: [],
             labels: [],
+            // A new todo is open, so it belongs in the first open column —
+            // the same lane the server's realignment will put it in.
+            lane: laneForCompletion(lanes, null),
           },
         },
         update(cache, { data }) {
@@ -70,8 +87,9 @@ export function TodoComposer({ projectId, nextPosition }: { projectId: string; n
     <form onSubmit={onSubmit} className="flex flex-col gap-1">
       <div className="flex gap-2">
         <Input
+          ref={ref}
           value={title}
-          placeholder="Add a todo…"
+          placeholder="Add a todo…  (press n)"
           onChange={(event) => setTitle(event.target.value)}
           aria-label="New todo"
         />
@@ -84,7 +102,11 @@ export function TodoComposer({ projectId, nextPosition }: { projectId: string; n
           Add
         </Button>
       </div>
-      {error ? <p className="text-destructive text-sm">{error.message}</p> : null}
+      {error ? (
+        <p className="text-destructive text-sm" aria-live="polite">
+          {describeError(error)}
+        </p>
+      ) : null}
     </form>
   );
-}
+});

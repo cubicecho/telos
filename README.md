@@ -10,6 +10,9 @@ to projects and todos alike. That is the whole product.
 - **Todos** — a title, a checkbox, a delete button. Add one in a sentence and Enter.
 - **Dependencies** — a blocked todo sits in its own section with its blockers
   named and its checkbox disabled. Cycles are rejected when you try to create them.
+- **A board, or a list** — the same todos as columns you name yourself, one of
+  which means done. Drag a card there and it is ticked off; tick the box and the
+  card moves. Everything the drag does, a menu does too.
 - **Labels** — one colour, one name, attachable to anything.
 - **Sign-in by magic link**, or no link at all on a private instance.
 
