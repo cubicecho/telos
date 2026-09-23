@@ -19,7 +19,7 @@ export interface Segment<T extends string> {
  * 1 of 2", not two unrelated buttons — and answers the arrow keys the roles
  * promise. (cubeui's `tabs` would do the roles, and it can be controlled now,
  * but its device trigger wraps every child in one `<Text>`, so a tab cannot
- * carry an icon beside its label.)
+ * carry an icon beside its label: cubicecho/cubeui#85.)
  */
 export function SegmentedControl<T extends string>({
   value,

@@ -107,7 +107,8 @@ export function TodoFormDialog({
           {/* A native date input rather than a calendar component: it is
               keyboard-accessible, localized and clearable for free. Clearing it
               is the path the server-side scalar override exists to keep honest:
-              an empty field saves `null`, never the epoch. */}
+              an empty field saves `null`, never the epoch. cubeui has no
+              optional date-only input yet: cubicecho/cubeui#88. */}
           <Input
             id="todo-due-at"
             type="date"

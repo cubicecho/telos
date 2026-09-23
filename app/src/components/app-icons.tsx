@@ -15,7 +15,7 @@ import { cn } from '@/lib/utils';
 /**
  * Icons this app draws that cubeui's `icons` item does not ship, wrapped the
  * way `ui/icons.tsx` wraps its own. That file keeps its `icon()` factory
- * private, so this is a copy of it — the registry could export it instead.
+ * private, so this is a copy of it until cubicecho/cubeui#87 exports it.
  */
 type IconProps = Omit<LucideProps, 'className'> & {
   className?: string | undefined;

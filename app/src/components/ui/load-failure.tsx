@@ -18,7 +18,7 @@ import { cn } from '@/lib/utils';
  *
  * Not cubeui's `QueryError`, which is the same idea as a full card: this one
  * sits inline — in a popover, in the sidebar — and words the failure through
- * `describeError` rather than showing the raw `message`.
+ * `describeError` rather than showing the raw `message` (cubicecho/cubeui#86).
  */
 export function LoadFailure({
   error,
