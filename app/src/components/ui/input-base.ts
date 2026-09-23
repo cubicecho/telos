@@ -74,6 +74,11 @@ export type InputProps = {
   className?: string | undefined;
   /** Web only: ties the control to its `<label>`. */
   id?: string | undefined;
+  /**
+   * The accessible name, for an input no `<label>` points at — the time box beside
+   * a date trigger. `TextInput` takes it on device, and react-native-web renders it.
+   */
+  'aria-label'?: string | undefined;
   autoFocus?: boolean | undefined;
   ref?: Ref<InputHandle> | undefined;
 };

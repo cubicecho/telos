@@ -166,10 +166,9 @@ export default function ProjectScreen() {
       <ProjectOverview project={project} />
 
       {/* The composer and the filter sit between the tabs and their panels, and
-          serve both. The list is not named ("Project view") until
-          cubicecho/cubeui#96 lets a shared `TabsList` take an `aria-label`. */}
+          serve both. */}
       <Tabs value={current} onValueChange={(next) => router.setParams({ view: next })} className="flex flex-col gap-6">
-        <TabsList className="self-start">
+        <TabsList aria-label="Project view" className="self-start">
           <TabsTrigger value="list">
             <List />
             List

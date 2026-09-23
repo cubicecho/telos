@@ -34,11 +34,29 @@ import { useContext } from 'react';
 import { IconClassContext } from '@/components/ui/icons-base';
 import { cn } from '@/lib/utils';
 
-type IconProps = Omit<LucideProps, 'className'> & {
+/** What a wrapped icon takes: lucide's props, with `className` doing the styling. */
+export type IconProps = Omit<LucideProps, 'className'> & {
   className?: string | undefined;
 };
 
-function icon(Source: LucideIcon) {
+/**
+ * Wraps one lucide glyph the way every icon in this file is wrapped. Exported
+ * so an app's extra glyph is one line, not a copy of this function — a copy
+ * that would miss the next change to how `IconClassContext` merges:
+ *
+ * ```tsx
+ * // app-icons.tsx
+ * import TagSource from "lucide-react-native/icons/tag";
+ * import { icon } from "@/components/ui/icons";
+ *
+ * export const Tag = icon(TagSource);
+ * ```
+ *
+ * `icons.web.tsx` exports an `icon` that hands its argument back, so the
+ * `app-icons.web.tsx` beside that file is the same line with the source taken
+ * from `lucide-react`.
+ */
+export function icon(Source: LucideIcon) {
   const Styled = styled(Source, {
     className: {
       target: 'style',

@@ -12,6 +12,13 @@ export type TabsProps = {
 };
 
 export type TabsListProps = {
+  /**
+   * The tablist's name, read on entering it: "Project view, tab list". Give one
+   * whenever no visible heading names the tabs — ARIA's tabs pattern asks for it.
+   */
+  'aria-label'?: string | undefined;
+  /** The id of a visible heading that names the tablist, in place of `aria-label`. */
+  'aria-labelledby'?: string | undefined;
   className?: string | undefined;
   children: ReactNode;
 };

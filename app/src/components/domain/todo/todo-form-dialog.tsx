@@ -2,11 +2,12 @@ import { useMutation } from '@apollo/client';
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { Button } from '@/components/ui/button';
+import { DateTimeInput } from '@/components/ui/date-time-input';
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { FormDialog, FormDialogFooter } from '@/components/ui/form-dialog';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { fromDateInputValue, toDateInputValue } from '@/lib/dates';
+import { parseDate } from '@/lib/dates';
 import { describeError } from '@/lib/errors';
 import { UpdateTodoDocument } from '@/lib/graphql';
 import type { TodoSummary } from './types';
@@ -38,7 +39,7 @@ export function TodoFormDialog({
 }) {
   const [title, setTitle] = useState('');
   const [notes, setNotes] = useState('');
-  const [dueAt, setDueAt] = useState('');
+  const [dueAt, setDueAt] = useState<Date | null>(null);
   const [updateTodo, { loading, error }] = useMutation(UpdateTodoDocument);
 
   // Reset from the todo each time it opens, not on mount: the dialog outlives a
@@ -48,7 +49,7 @@ export function TodoFormDialog({
     if (!open) return;
     setTitle(todo.title);
     setNotes(todo.notes ?? '');
-    setDueAt(toDateInputValue(todo.dueAt));
+    setDueAt(parseDate(todo.dueAt) ?? null);
   }, [open, todo]);
 
   const canSave = !loading && title.trim() !== '';
@@ -61,7 +62,7 @@ export function TodoFormDialog({
     const set = {
       title: trimmed,
       notes: notes.trim() === '' ? null : notes.trim(),
-      dueAt: fromDateInputValue(dueAt),
+      dueAt: dueAt ? dueAt.toISOString() : null,
     };
 
     try {
@@ -103,21 +104,19 @@ export function TodoFormDialog({
           <Textarea id="todo-notes" value={notes} placeholder="Optional." onChangeText={setNotes} />
         </Field>
         <Field>
-          <FieldLabel htmlFor="todo-due-at">Due</FieldLabel>
-          {/* A native date input rather than a calendar component: it is
-              keyboard-accessible, localized and clearable for free. Clearing it
-              is the path the server-side scalar override exists to keep honest:
-              an empty field saves `null`, never the epoch. cubeui has no
-              optional date-only input yet: cubicecho/cubeui#88. */}
-          <Input
-            id="todo-due-at"
-            type="date"
-            value={dueAt}
-            onChangeText={setDueAt}
-            onSubmitEditing={onSubmit}
-            className="w-40"
-          />
-          <FieldDescription>Empty for no due date.</FieldDescription>
+          <FieldLabel>Due</FieldLabel>
+          {/* Date only: a picked day is committed at local midnight, so the day
+              the reader chose is the day they get back in their own zone. Clear
+              saves `null`, never the epoch, which is the path the server-side
+              scalar override exists to keep honest.
+
+              The group is a local stand-in until cubicecho/cubeui#101:
+              `DateTimeInput` takes no `id` or `aria-label`, so the label above
+              cannot name it. */}
+          <View role="group" aria-label="Due" className="self-start">
+            <DateTimeInput mode="date" clearable value={dueAt} onChange={setDueAt} placeholder="No due date" />
+          </View>
+          <FieldDescription>Clear it from the calendar for no due date.</FieldDescription>
         </Field>
       </View>
       <FormDialogFooter onCancel={() => onOpenChange(false)} error={error ? describeError(error) : null}>

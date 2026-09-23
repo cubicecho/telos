@@ -30,10 +30,15 @@ function Tabs({ value: controlled, onValueChange, defaultValue, className, child
   );
 }
 
-function TabsList({ className, children }: TabsListProps) {
+function TabsList({ 'aria-label': ariaLabel, 'aria-labelledby': ariaLabelledBy, className, children }: TabsListProps) {
   // A `tab` outside a `tablist` is an orphan to a screen reader, and axe says so.
   return (
-    <View role="tablist" className={cn('flex-row', TABS_LIST_CLASS, className)}>
+    <View
+      role="tablist"
+      aria-label={ariaLabel}
+      aria-labelledby={ariaLabelledBy}
+      className={cn('flex-row', TABS_LIST_CLASS, className)}
+    >
       {children}
     </View>
   );

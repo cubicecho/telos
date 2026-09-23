@@ -19,7 +19,9 @@ export function Badge({ variant = 'default', backgroundColor, textColor, classNa
 
   return (
     <View
-      className={cn(badgeContainerVariants({ variant, shape }), className)}
+      // Yoga stretches a child across a column and has no fit-content to stop it, so on native the
+      // badge pins itself to the start. In a centred row, pass `className="self-center"`.
+      className={cn('self-start', badgeContainerVariants({ variant, shape }), className)}
       {...(backgroundColor ? { style: { backgroundColor } } : {})}
       // A dot carries meaning and no text, so it is named or it is decoration;
       // the same split `color-dot` makes, for the same reason.

@@ -1,5 +1,4 @@
 import type { ComponentProps } from 'react';
-import { View } from 'react-native';
 import { QueryError } from '@/components/query-state';
 import { describeError } from '@/lib/errors';
 
@@ -15,16 +14,10 @@ import { describeError } from '@/lib/errors';
  *
  * cubeui's `QueryError`, worded through `describeError` so the reader sees
  * "Your session has expired" rather than the transport's "Received status code
- * 401". `compact` is the form for a popover or the sidebar.
+ * 401". It is an alert, because it stands where the content the reader was
+ * waiting for should have been. `compact` is the form for a popover or the
+ * sidebar.
  */
 export function LoadFailure(props: Omit<ComponentProps<typeof QueryError>, 'describe'>) {
-  return (
-    // Local stand-in until cubicecho/cubeui#95: `QueryError` carries no role,
-    // and this replaces the content the reader was waiting for, so it is worth
-    // interrupting for — an alert rather than a polite live region. Drop the
-    // wrapper once the role is upstream.
-    <View role="alert">
-      <QueryError describe={describeError} {...props} />
-    </View>
-  );
+  return <QueryError describe={describeError} {...props} />;
 }

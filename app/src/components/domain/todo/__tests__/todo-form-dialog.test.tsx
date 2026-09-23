@@ -1,8 +1,8 @@
 import { MockedProvider } from '@apollo/client/testing';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { format } from 'date-fns';
 import { describe, expect, it, vi } from 'vitest';
-import { fromDateInputValue } from '@/lib/dates';
 import { UpdateTodoDocument } from '@/lib/graphql';
 import { TodoFormDialog } from '../todo-form-dialog';
 import type { TodoSummary } from '../types';
@@ -20,6 +20,11 @@ const TODO: TodoSummary = {
   labels: [],
   lane: null,
 };
+
+/** The button that opens the due-date calendar, found through the group that names it. */
+function dueTrigger() {
+  return within(screen.getByRole('group', { name: 'Due' })).getByRole('button');
+}
 
 /** The mutation as the dialog sends it, paired with a plausible answer. */
 function save(set: { title: string; notes: string | null; dueAt: string | null }) {
@@ -40,32 +45,34 @@ function open(todo: TodoSummary, mocks: ReturnType<typeof save>[], onOpenChange 
 
 describe('TodoFormDialog', () => {
   it('opens showing what is stored, not a blank form', () => {
-    open({ ...TODO, notes: 'The washer is perished.', dueAt: '2026-12-01T09:00:00.000Z' }, []);
+    open({ ...TODO, notes: 'The washer is perished.', dueAt: new Date(2026, 11, 1, 9).toISOString() }, []);
 
     expect(screen.getByLabelText('Title')).toHaveValue('Replace the tap');
     expect(screen.getByLabelText('Notes')).toHaveValue('The washer is perished.');
-    // The date input wants a local `yyyy-mm-dd`, which is the whole reason
-    // `toDateInputValue` exists rather than a `toISOString().slice(0, 10)`.
-    expect(screen.getByLabelText('Due')).toHaveValue('2026-12-01');
+    // The local day, as the badge on the row shows it.
+    expect(dueTrigger()).toHaveTextContent('December 1st, 2026');
   });
 
   it('saves the title, the notes and the due date together, and closes', async () => {
     const user = userEvent.setup();
-    // MockedProvider matches variables by deep equality, so the expected
-    // `dueAt` is built by the same function the dialog uses rather than
-    // hand-written: a date input names a local day, and what goes over the wire
-    // is that day's midnight here — which is a different instant in Lisbon.
+    // The calendar opens on this month when there is no date yet. What goes
+    // over the wire is the picked day's *local* midnight — a different instant
+    // in Lisbon — so the expectation is built here rather than hand-written.
+    const now = new Date();
+    const picked = new Date(now.getFullYear(), now.getMonth(), 15);
     const mock = save({
       title: 'Replace the kitchen tap',
       notes: 'Bring the big wrench.',
-      dueAt: fromDateInputValue('2026-12-01'),
+      dueAt: picked.toISOString(),
     });
     const onOpenChange = open(TODO, [mock]);
 
     await user.clear(screen.getByLabelText('Title'));
     await user.type(screen.getByLabelText('Title'), 'Replace the kitchen tap');
     await user.type(screen.getByLabelText('Notes'), 'Bring the big wrench.');
-    await user.type(screen.getByLabelText('Due'), '2026-12-01');
+    await user.click(dueTrigger());
+    await user.click(await screen.findByRole('button', { name: new RegExp(format(picked, 'MMMM do, yyyy')) }));
+    expect(dueTrigger()).toHaveTextContent(format(picked, 'PPP'));
     await user.click(screen.getByRole('button', { name: 'Save' }));
 
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
@@ -88,7 +95,9 @@ describe('TodoFormDialog', () => {
       save({ title: TODO.title, notes: null, dueAt: null }),
     ]);
 
-    await user.clear(screen.getByLabelText('Due'));
+    await user.click(dueTrigger());
+    await user.click(await screen.findByRole('button', { name: /clear/i }));
+    expect(dueTrigger()).toHaveTextContent('No due date');
     await user.click(screen.getByRole('button', { name: 'Save' }));
 
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));

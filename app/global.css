@@ -12,21 +12,10 @@
 @import "./cubeui-tokens.css";
 
 /*
-  Local patch until cubicecho/cubeui#97: the tokens take only the box-sizing line
-  of Tailwind's preflight, so raw DOM from a radix web half draws with the
-  browser's defaults — a tab or the dialog's Close with an outset border, grey
-  fill and black text, a `Label` in serif, a textarea in monospace. These are
-  the rest of preflight's control reset: bare element selectors, so every class
-  beats them, including react-native-web's own base class on the <button> it
-  renders for a pressable. The font is react-native-web's system stack, which it
-  puts on each `Text` but not on the page. Drop all of it once the tokens carry it.
+  The tokens reset <button> and put the system font on <html>, but leave form
+  fields to the browser, whose defaults draw a textarea in monospace. Bare element
+  selectors, so every class beats them. Local patch until cubicecho/cubeui#103.
 */
-button {
-  border: 0 solid;
-  background-color: transparent;
-}
-
-button,
 input,
 select,
 textarea {
@@ -34,8 +23,16 @@ textarea {
   font: inherit;
 }
 
-html {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+/*
+  Local patch until cubicecho/cubeui#102: the calendar's web half takes
+  react-day-picker's stylesheet with its stock blue accent. `:root` in front so
+  this outranks that sheet, which loads after this one.
+*/
+:root .rdp-root {
+  --rdp-accent-color: var(--primary);
+  --rdp-accent-background-color: var(--accent);
+  --rdp-range_start-color: var(--primary-foreground);
+  --rdp-range_end-color: var(--primary-foreground);
 }
 
 html,

@@ -99,6 +99,11 @@ export function QueryState({
  * and says "Retrying…" until it settles, so a second press does not stack a second request on a
  * slow server, and a rejected refetch is caught here rather than escaping as an unhandled
  * rejection. What the retry failed with is the query's to report, not the button's.
+ *
+ * The root is `role="alert"` in both forms — the counterpart of the loading rung's `role="status"`.
+ * An alert rather than a polite live region, because it replaces the content the reader asked for:
+ * somebody who triggered a load and cannot see the screen hears that it failed, rather than finding
+ * the card later by moving through the page.
  */
 export function QueryError({
   error,
@@ -139,7 +144,7 @@ export function QueryError({
   // only filled control stays the primary action above it.
   if (compact)
     return (
-      <View testID="query-error" className={cn('min-w-0 gap-1 px-2 py-1', className)}>
+      <View role="alert" testID="query-error" className={cn('min-w-0 gap-1 px-2 py-1', className)}>
         <View className="min-w-0 flex-row items-center gap-1.5">
           <TriangleAlert className="h-3.5 w-3.5 shrink-0 text-destructive" aria-hidden />
           <Text className="min-w-0 flex-1 font-medium text-destructive text-xs">Could not load {what}</Text>
@@ -156,6 +161,7 @@ export function QueryError({
 
   return (
     <Card
+      role="alert"
       testID="query-error"
       // No tinted ground behind it. The version this was lifted from washed the card with
       // `bg-destructive/5`, which drops both the red heading and the grey message under 4.5:1

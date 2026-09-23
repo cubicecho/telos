@@ -19,7 +19,7 @@
 @import "nativewind/theme";
 
 /*
- * The one line of Tailwind's preflight a web build needs, without the rest of it, which would
+ * The lines of Tailwind's preflight a web build needs, without the rest of it, which would
  * fight react-native-web's own reset. Preflight is the only thing that sets `border-box` on `*`.
  * react-native-web sets it on every element it renders, so a `View` or a `Pressable` never
  * noticed; a `.web.tsx` half that renders a raw `<input>` or `<textarea>` fell back to the
@@ -34,6 +34,36 @@
 ::before,
 ::after {
   box-sizing: border-box;
+}
+
+/*
+ * Two more lines of preflight, for the same raw-DOM halves and for the same reason. A `.web.tsx`
+ * half that renders a radix part renders a raw `<button>` — a tab trigger, a dialog's close — and
+ * the user-agent sheet gives it a `2px outset` border, a grey fill, and a colour and font of its
+ * own rather than inherited ones: an inactive tab ignored its list's `text-muted-foreground` and
+ * drew outset. Nothing sets a page font either, so a raw `<label>` drew in the browser's serif.
+ * The font is react-native-web's own stack, which every `Text` already wears.
+ *
+ * Unlayered and specificity zero, like the line above, so any utility still overrides it. That
+ * holds because this file imports the utilities unlayered too: all of them share one cascade, and
+ * a utility is a class, (0,1,0) at the least, so it wins on specificity before document order is
+ * consulted. (An unlayered rule beats every layered one, so this would *not* be safe beside an
+ * `@layer utilities` — which is the other reason this file never imports them that way.)
+ * `:where()` rather than a bare `button`, so it outranks nothing — not even an app's own
+ * unlayered `button { }` rule.
+ * react-native-web's base class is a class as well, so a `Pressable`, which it renders as a
+ * `<button>`, keeps its own look. Native never sees these: react-native-css drops an element
+ * selector as silently as it drops `*` — `tokens-dark.test.mjs` asserts that too.
+ */
+:where(button) {
+  border: 0 solid;
+  background-color: transparent;
+  color: inherit;
+  font: inherit;
+}
+
+:where(html) {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
 :root {

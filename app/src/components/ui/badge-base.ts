@@ -47,12 +47,16 @@ export function badgeHasLabel(children: ReactNode): boolean {
 }
 
 /**
+ * No `align-self` here: a badge beside a select or a button takes the row's `items-center` like
+ * everything else in it. Keeping it from stretching down a column is each half's job — `w-fit`
+ * on the web, `self-start` on native, where Yoga has no fit-content.
+ *
  * The container: shape and background. `shape` is derived from whether a label
  * was passed, not taken as a prop — a dot is what a badge with nothing to say
  * already is, and making it a second axis would allow the two states that mean
  * nothing: a dot with a label it cannot show, and an empty pill.
  */
-export const badgeContainerVariants = cva('shrink-0 self-start rounded-full border border-transparent', {
+export const badgeContainerVariants = cva('shrink-0 rounded-full border border-transparent', {
   variants: {
     variant: {
       default: 'bg-primary',
