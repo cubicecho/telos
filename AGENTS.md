@@ -186,15 +186,18 @@ and is generated — never edit it. It follows the *system* appearance through
 `:is(html.light)` blocks that win over the media query. `app/global.css` only
 imports it and sets the page background and border colour.
 
-**The theme is applied twice, on purpose.** The Settings theme picker puts
-`.light` or `.dark` on `<html>`. `app/public/index.html` sets the class before
-the bundle loads so there is no white flash, and `src/lib/theme.ts` maintains it
-afterwards. (cubeui's palette as TypeScript is `src/lib/cubeui-theme.ts`,
-installed by the `tokens` item.) The storage key `telos_theme` and the
-class rule are written out in both places — the script runs before any module
-exists — so a change to one is a change to both. That HTML file is also Expo's
-own template with a script added: `app/+html.tsx` is the documented place for
-this and does nothing under `web.output: "single"`.
+**The theme is applied twice, on purpose.** Both halves are cubeui's
+`theme-picker` item. Settings draws its `ThemePicker`, and the root layout calls
+`useThemePreference()` so the choice holds on every screen and System follows
+the OS. Before that, `app/public/index.html` runs a pasted copy of cubeui's
+`THEME_PRE_PAINT_SCRIPT` so there is no white flash. A test
+(`src/lib/__tests__/pre-paint.test.ts`) fails when a re-add changes the
+original, and the copy is then re-pasted. The line before it moves a preference
+saved under telos's old key, `telos_theme`, to cubeui's `cubeui-theme`. (cubeui's
+palette as TypeScript is `src/lib/cubeui-theme.ts`, installed by the `tokens`
+item.) That HTML file is also Expo's own template with a script added:
+`app/+html.tsx` is the documented place for this and does nothing under
+`web.output: "single"`.
 
 **A write returns the entity it changed, not the row it wrote.** Attaching a
 label and adding a dependency are junction-table inserts, but what the screen
@@ -286,7 +289,10 @@ a value it failed to read.
 - cubeui's split components ship `x.tsx` (device) and `x.web.tsx` (browser);
   Metro — and Vitest, via `resolve.extensions` — pick the web half. Files under
   `src/components/ui/` and the other registry-installed files are cubeui's:
-  change them upstream and re-add rather than editing here.
+  change them upstream and re-add rather than editing here. The exception is a
+  bug that blocks telos before a fix ships: patch the installed copy under a
+  `Local patch until cubicecho/cubeui#N` comment, and check for those comments
+  after every re-add, since a re-add overwrites them.
 - `import './preflight.ts';` stays first in `server/src/index.ts`, separated by a
   blank line so Biome's import sorting leaves it there. It has to run before
   `@telos/db` is imported.

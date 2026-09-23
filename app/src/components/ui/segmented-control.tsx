@@ -17,8 +17,9 @@ export interface Segment<T extends string> {
  * over it: the panel is rendered by the caller, so all this owns is the
  * choice. It carries the tab roles anyway — a screen reader should hear "tab,
  * 1 of 2", not two unrelated buttons — and answers the arrow keys the roles
- * promise. (cubeui's `tabs` would do the roles, but it is uncontrolled, and
- * this choice lives in the URL.)
+ * promise. (cubeui's `tabs` would do the roles, and it can be controlled now,
+ * but its device trigger wraps every child in one `<Text>`, so a tab cannot
+ * carry an icon beside its label.)
  */
 export function SegmentedControl<T extends string>({
   value,

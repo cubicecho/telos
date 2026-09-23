@@ -78,7 +78,7 @@ export function RouteError({
         <Text className="mt-1 text-center text-sm text-muted-foreground">{summary}</Text>
       </View>
       {shown ? (
-        <View testID="route-error-details" className="w-full max-w-md rounded-md border px-3 py-2">
+        <View testID="route-error-details" className="w-full max-w-md rounded-md border border-border px-3 py-2">
           {typeof shown === 'string' ? (
             <Text
               {...(Platform.OS === 'web' ? {} : { selectable: true })}

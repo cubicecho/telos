@@ -11,12 +11,17 @@ import { cn } from '@/lib/utils';
  */
 export type CheckboxProps = Omit<ComponentPropsWithRef<typeof CheckboxPrimitive.Root>, 'className'> & {
   className?: string | undefined;
+  accessibilityLabel?: string | undefined;
 };
 
-function Checkbox({ className, ...props }: CheckboxProps) {
+function Checkbox({ className, accessibilityLabel, ...props }: CheckboxProps) {
   return (
     <CheckboxPrimitive.Root
       data-slot="checkbox"
+      // Local patch until cubicecho/cubeui#83: a shared call site passes the device contract's
+      // `accessibilityLabel`, which radix would put on the <button> as an unknown attribute and
+      // leave the box unnamed. Drop this on the next re-add that fixes it.
+      aria-label={accessibilityLabel}
       {...props}
       className={cn(
         CHECKBOX_CLASS,

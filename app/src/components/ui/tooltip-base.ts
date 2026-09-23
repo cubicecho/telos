@@ -27,7 +27,7 @@ export type TooltipContentProps = {
   children: ReactNode;
 };
 
-export const TOOLTIP_CONTENT_CLASS = 'overflow-hidden rounded-md border bg-popover px-3 py-1.5';
+export const TOOLTIP_CONTENT_CLASS = 'overflow-hidden rounded-md border border-border bg-popover px-3 py-1.5';
 export const TOOLTIP_TEXT_CLASS = 'text-sm text-popover-foreground';
 
 /**

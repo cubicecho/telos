@@ -1,19 +1,18 @@
 import { ApolloProvider } from '@apollo/client';
 import { type ErrorBoundaryProps, Stack } from 'expo-router';
-import { useEffect } from 'react';
 import { Text, View } from 'react-native';
 import { RouteError } from '@/components/route-error';
 import { Button } from '@/components/ui/button';
+import { useThemePreference } from '@/components/ui/theme-preference';
 import { client } from '@/lib/apollo';
 import { describeError } from '@/lib/errors';
-import { syncTheme } from '@/lib/theme';
 import '../global.css';
 
 export default function RootLayout() {
   // `public/index.html` has already painted the right theme; this keeps it that
-  // way while the app runs, so switching the OS between light and dark repaints
-  // a `system` user without a reload.
-  useEffect(() => syncTheme(), []);
+  // way on every screen, not only Settings, and repaints a `system` user when
+  // the OS switches between light and dark.
+  useThemePreference();
 
   return (
     <ApolloProvider client={client}>

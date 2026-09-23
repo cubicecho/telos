@@ -15,17 +15,14 @@
       project has one, and from Expo's own copy otherwise. Keep the rest in step
       with node_modules/@expo/cli/static/template/index.html.
 
-      The key and the class rule are duplicated from src/lib/theme.ts because
-      none of the bundle has loaded yet. Change them together.
+      The script is cubeui's THEME_PRE_PAINT_SCRIPT (ui/theme-preference-base.ts),
+      pasted because none of the bundle has loaded yet; re-paste it when that
+      item changes. The line before it moves a preference saved under telos's
+      old key, `telos_theme`, to cubeui's.
     -->
     <script>
-      (function () {
-        try {
-          var stored = localStorage.getItem('telos_theme');
-          var dark = stored === 'dark' || (stored !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);
-          document.documentElement.classList.add(dark ? 'dark' : 'light');
-        } catch (e) {}
-      })();
+      (function(){try{var o=localStorage.getItem("telos_theme");if(o!==null){if(localStorage.getItem("cubeui-theme")===null)localStorage.setItem("cubeui-theme",o);localStorage.removeItem("telos_theme")}}catch(e){}})();
+      (function(){try{var p=localStorage.getItem("cubeui-theme");var d=p==="dark"||(p!=="light"&&matchMedia("(prefers-color-scheme: dark)").matches);var c=document.documentElement.classList;c.toggle("dark",d);c.toggle("light",p==="light")}catch(e){}})();
     </script>
     <!-- The `react-native-web` recommended style reset: https://necolas.github.io/react-native-web/docs/setup/#root-element -->
     <style id="expo-reset">
