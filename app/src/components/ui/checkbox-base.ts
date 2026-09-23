@@ -13,7 +13,8 @@ export type CheckboxProps = {
   /**
    * Required on device: the box carries no visible label of its own, and there is no
    * `<label htmlFor>` to borrow one from. (On web a `<Label htmlFor={id}>` or an `aria-label` does
-   * it, so the web half does not ask for this.)
+   * it, so the web half does not ask for this — but takes it, as the box's `aria-label`, so a call
+   * site shared across both halves is named on both.)
    */
   accessibilityLabel: string;
   className?: string | undefined;

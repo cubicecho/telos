@@ -1,6 +1,6 @@
 import { useQuery } from '@apollo/client';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useCallback, useId, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
 import { Columns3, List } from '@/components/app-icons';
 import { Board } from '@/components/domain/lane/board';
@@ -12,19 +12,14 @@ import type { TodoSummary } from '@/components/domain/todo/types';
 import { Button } from '@/components/ui/button';
 import type { InputHandle } from '@/components/ui/input';
 import { LoadFailure } from '@/components/ui/load-failure';
-import { type Segment, SegmentedControl, segmentPanelProps } from '@/components/ui/segmented-control';
 import { Spinner } from '@/components/ui/spinner';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { filterTodos, isFiltering, NO_FILTER, type TodoFilter } from '@/lib/filter-todos';
 import { ProjectDocument, ProjectLanesDocument, ProjectTodosDocument } from '@/lib/graphql';
 import { useHotkey } from '@/lib/hotkeys';
 import { cn } from '@/lib/utils';
 
 type ProjectView = 'list' | 'board';
-
-const VIEWS: readonly Segment<ProjectView>[] = [
-  { value: 'list', label: 'List', icon: List },
-  { value: 'board', label: 'Board', icon: Columns3 },
-];
 
 /** Focus a field and select what is in it — so typing replaces. */
 function focusAndSelect(field: InputHandle | null): void {
@@ -45,7 +40,6 @@ export default function ProjectScreen() {
     sort?: string;
   }>();
   const [showCompleted, setShowCompleted] = useState(false);
-  const tabs = useId();
   const composerRef = useRef<InputHandle>(null);
   const filterRef = useRef<InputHandle>(null);
 
@@ -135,7 +129,7 @@ export default function ProjectScreen() {
   if (projectError && !projectData) {
     return (
       <View className="flex-1 items-center justify-center px-6">
-        <LoadFailure error={projectError} onRetry={refetchProject} />
+        <LoadFailure error={projectError} onRetry={refetchProject} what="this project" />
       </View>
     );
   }
@@ -171,87 +165,100 @@ export default function ProjectScreen() {
     <View className={cn('mx-auto w-full gap-6 px-6 py-8', current === 'board' ? 'max-w-full' : 'max-w-3xl')}>
       <ProjectOverview project={project} />
 
-      <SegmentedControl
-        value={current}
-        segments={VIEWS}
-        label="Project view"
-        idPrefix={tabs}
-        onChange={(next) => router.setParams({ view: next })}
-      />
+      {/* The composer and the filter sit between the tabs and their panels, and
+          serve both. The list is not named ("Project view") until
+          cubicecho/cubeui#96 lets a shared `TabsList` take an `aria-label`. */}
+      <Tabs value={current} onValueChange={(next) => router.setParams({ view: next })} className="flex flex-col gap-6">
+        <TabsList className="self-start">
+          <TabsTrigger value="list">
+            <List />
+            List
+          </TabsTrigger>
+          <TabsTrigger value="board">
+            <Columns3 />
+            Board
+          </TabsTrigger>
+        </TabsList>
 
-      <TodoComposer ref={composerRef} projectId={project.id} nextPosition={nextPosition} lanes={lanes} />
+        <TodoComposer ref={composerRef} projectId={project.id} nextPosition={nextPosition} lanes={lanes} />
 
-      <TodoFilterBar ref={filterRef} filter={filter} onChange={setFilter} todos={all} matched={todos.length} />
+        <TodoFilterBar ref={filterRef} filter={filter} onChange={setFilter} todos={all} matched={todos.length} />
 
-      {todosLoading && all.length === 0 ? (
-        <Spinner />
-      ) : todosError && all.length === 0 ? (
-        <LoadFailure error={todosError} onRetry={refetchTodos} />
-      ) : current === 'board' ? (
-        <View {...segmentPanelProps(tabs, 'board')}>
-          {/* A board with no columns is not a board, and the todos being fine
-              does not make it one. */}
-          {lanesError && lanes.length === 0 ? (
-            <LoadFailure error={lanesError} onRetry={refetchLanes} />
-          ) : (
-            <Board projectId={project.id} lanes={lanes} todos={todos} />
-          )}
-        </View>
-      ) : (
-        <View {...segmentPanelProps(tabs, 'list')} className="gap-6">
-          <View className="gap-2">
-            {open.length === 0 ? (
-              <Text className="text-muted-foreground text-sm">
-                {isFiltering(filter)
-                  ? 'Nothing open matches.'
-                  : all.length === 0
-                    ? 'No todos yet.'
-                    : 'Nothing open — everything is blocked or done.'}
-              </Text>
-            ) : (
-              open.map((todo) => (
-                <TodoRow key={todo.id} todo={todo} projectId={project.id} siblings={all} lanes={lanes} />
-              ))
-            )}
-          </View>
+        {todosLoading && all.length === 0 ? (
+          <Spinner />
+        ) : todosError && all.length === 0 ? (
+          <LoadFailure error={todosError} onRetry={refetchTodos} what="the todos" />
+        ) : (
+          <>
+            <TabsContent value="board" className="mt-0">
+              {/* A board with no columns is not a board, and the todos being fine
+                  does not make it one. */}
+              {lanesError && lanes.length === 0 ? (
+                <LoadFailure error={lanesError} onRetry={refetchLanes} what="the board" />
+              ) : (
+                <Board projectId={project.id} lanes={lanes} todos={todos} />
+              )}
+            </TabsContent>
+            <TabsContent value="list" className="mt-0">
+              {/* The column is a view of its own: on web a display class on the
+                  panel itself would beat the `hidden` radix gives it when inactive. */}
+              <View className="gap-6">
+                <View className="gap-2">
+                  {open.length === 0 ? (
+                    <Text className="text-muted-foreground text-sm">
+                      {isFiltering(filter)
+                        ? 'Nothing open matches.'
+                        : all.length === 0
+                          ? 'No todos yet.'
+                          : 'Nothing open — everything is blocked or done.'}
+                    </Text>
+                  ) : (
+                    open.map((todo) => (
+                      <TodoRow key={todo.id} todo={todo} projectId={project.id} siblings={all} lanes={lanes} />
+                    ))
+                  )}
+                </View>
 
-          {blocked.length > 0 ? (
-            <View role="region" aria-label="Blocked" className="gap-2">
-              {/* Not cubeui's `SectionHeading`, which draws this exact look but
+                {blocked.length > 0 ? (
+                  <View role="region" aria-label="Blocked" className="gap-2">
+                    {/* Not cubeui's `SectionHeading`, which draws this exact look but
                   takes no `role`, so it could not be the heading it looks like. */}
-              <Text
-                role="heading"
-                aria-level={2}
-                className="font-medium text-muted-foreground text-xs uppercase tracking-wide"
-              >
-                {`Blocked (${blocked.length})`}
-              </Text>
-              {blocked.map((todo) => (
-                <TodoRow key={todo.id} todo={todo} projectId={project.id} siblings={all} lanes={lanes} />
-              ))}
-            </View>
-          ) : null}
+                    <Text
+                      role="heading"
+                      aria-level={2}
+                      className="font-medium text-muted-foreground text-xs uppercase tracking-wide"
+                    >
+                      {`Blocked (${blocked.length})`}
+                    </Text>
+                    {blocked.map((todo) => (
+                      <TodoRow key={todo.id} todo={todo} projectId={project.id} siblings={all} lanes={lanes} />
+                    ))}
+                  </View>
+                ) : null}
 
-          {completed.length > 0 ? (
-            <View className="gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="-ml-3 self-start text-muted-foreground"
-                aria-expanded={showCompleted}
-                onPress={() => setShowCompleted((shown) => !shown)}
-              >
-                {`${showCompleted ? 'Hide' : 'Show'} completed (${completed.length})`}
-              </Button>
-              {showCompleted
-                ? completed.map((todo) => (
-                    <TodoRow key={todo.id} todo={todo} projectId={project.id} siblings={all} lanes={lanes} />
-                  ))
-                : null}
-            </View>
-          ) : null}
-        </View>
-      )}
+                {completed.length > 0 ? (
+                  <View className="gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="-ml-3 self-start text-muted-foreground"
+                      aria-expanded={showCompleted}
+                      onPress={() => setShowCompleted((shown) => !shown)}
+                    >
+                      {`${showCompleted ? 'Hide' : 'Show'} completed (${completed.length})`}
+                    </Button>
+                    {showCompleted
+                      ? completed.map((todo) => (
+                          <TodoRow key={todo.id} todo={todo} projectId={project.id} siblings={all} lanes={lanes} />
+                        ))
+                      : null}
+                  </View>
+                ) : null}
+              </View>
+            </TabsContent>
+          </>
+        )}
+      </Tabs>
     </View>
   );
 }

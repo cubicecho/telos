@@ -56,7 +56,7 @@ export function LabelPicker({
           /* "No labels yet." here would read as an invitation to go and make
              one, which is the wrong errand when the list simply did not
              load. */
-          <LoadFailure error={error} onRetry={refetch} className="px-2 py-3" />
+          <LoadFailure error={error} onRetry={refetch} what="your labels" compact />
         ) : labels.length === 0 ? (
           <Text className="px-2 py-3 text-center text-muted-foreground text-sm">No labels yet.</Text>
         ) : (

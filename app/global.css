@@ -4,12 +4,39 @@
   brings Tailwind 4, NativeWind's theme, the light/dark tokens (sidebar included),
   the `box-sizing` reset raw DOM controls need, and the `html.dark` /
   `html.light` blocks that let the Settings theme picker beat the system
-  appearance: `src/lib/theme.ts` (and the pre-paint script in
+  appearance: cubeui's `useThemePreference` (and the pre-paint script in
   `public/index.html`) put one of those classes on <html>.
 
   What follows is only what the registry does not cover.
 */
 @import "./cubeui-tokens.css";
+
+/*
+  Local patch until cubicecho/cubeui#97: the tokens take only the box-sizing line
+  of Tailwind's preflight, so raw DOM from a radix web half draws with the
+  browser's defaults — a tab or the dialog's Close with an outset border, grey
+  fill and black text, a `Label` in serif, a textarea in monospace. These are
+  the rest of preflight's control reset: bare element selectors, so every class
+  beats them, including react-native-web's own base class on the <button> it
+  renders for a pressable. The font is react-native-web's system stack, which it
+  puts on each `Text` but not on the page. Drop all of it once the tokens carry it.
+*/
+button {
+  border: 0 solid;
+  background-color: transparent;
+}
+
+button,
+input,
+select,
+textarea {
+  color: inherit;
+  font: inherit;
+}
+
+html {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
 
 html,
 body {

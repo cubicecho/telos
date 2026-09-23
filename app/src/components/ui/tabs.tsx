@@ -1,5 +1,6 @@
-import { createContext, useContext, useState } from 'react';
+import { Children, createContext, type ReactNode, useContext, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
+import { IconClassContext } from '@/components/ui/icons-base';
 import {
   TABS_LIST_CLASS,
   TABS_TRIGGER_CLASS,
@@ -30,12 +31,47 @@ function Tabs({ value: controlled, onValueChange, defaultValue, className, child
 }
 
 function TabsList({ className, children }: TabsListProps) {
-  return <View className={cn('flex-row', TABS_LIST_CLASS, className)}>{children}</View>;
+  // A `tab` outside a `tablist` is an orphan to a screen reader, and axe says so.
+  return (
+    <View role="tablist" className={cn('flex-row', TABS_LIST_CLASS, className)}>
+      {children}
+    </View>
+  );
+}
+
+/**
+ * A trigger's children with each run of strings and numbers in one `<Text>`,
+ * and anything else (an icon, a badge) beside it in the row. An SVG is not
+ * valid inside a `<Text>` on device, and a run is kept whole so `{count} open`
+ * stays one label rather than two pieces spaced apart by the row's gap.
+ */
+function label(children: ReactNode, className: string): ReactNode[] {
+  const parts: ReactNode[] = [];
+  let run: (string | number)[] = [];
+  const flush = () => {
+    if (run.length === 0) return;
+    parts.push(
+      <Text key={`text-${parts.length}`} className={className}>
+        {run.join('')}
+      </Text>,
+    );
+    run = [];
+  };
+  for (const child of Children.toArray(children)) {
+    if (typeof child === 'string' || typeof child === 'number') run.push(child);
+    else {
+      flush();
+      parts.push(child);
+    }
+  }
+  flush();
+  return parts;
 }
 
 function TabsTrigger({ value, disabled = false, className, children }: TabsTriggerProps) {
   const tabs = useContext(TabsContext);
   const active = tabs.value === value;
+  const color = active ? 'text-foreground' : 'text-muted-foreground';
   return (
     <Pressable
       role="tab"
@@ -46,10 +82,11 @@ function TabsTrigger({ value, disabled = false, className, children }: TabsTrigg
       className={cn(TABS_TRIGGER_CLASS, active && 'bg-background', disabled && 'opacity-50', className)}
     >
       {/* Text colour does not inherit on native, so the active/inactive split
-          has to land on the `<Text>` rather than on the container. */}
-      <Text className={cn(TABS_TRIGGER_TEXT_CLASS, active ? 'text-foreground' : 'text-muted-foreground')}>
-        {children}
-      </Text>
+          lands on each `<Text>` and, through the context, on each icon — the
+          container's colour reaches neither. */}
+      <IconClassContext.Provider value={cn('size-4 shrink-0', color)}>
+        {label(children, cn(TABS_TRIGGER_TEXT_CLASS, color))}
+      </IconClassContext.Provider>
     </Pressable>
   );
 }

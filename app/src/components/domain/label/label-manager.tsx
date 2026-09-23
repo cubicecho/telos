@@ -65,7 +65,7 @@ export function LabelManager() {
       {loading && labels.length === 0 ? (
         <Spinner />
       ) : error && labels.length === 0 ? (
-        <LoadFailure error={error} onRetry={refetch} />
+        <LoadFailure error={error} onRetry={refetch} what="your labels" />
       ) : labels.length === 0 ? (
         <Text className="text-muted-foreground text-sm">No labels yet.</Text>
       ) : (

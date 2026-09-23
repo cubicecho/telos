@@ -36,14 +36,14 @@ describe('LabelManager', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Couldn’t reach the server.');
     expect(screen.queryByText('No labels yet.')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument();
   });
 
-  it('recovers on Retry without a reload', async () => {
+  it('recovers on Try again without a reload', async () => {
     const user = userEvent.setup();
     manager([{ request: { query: LabelsDocument }, error: new Error('Failed to fetch') }, listed([URGENT])]);
 
-    await user.click(await screen.findByRole('button', { name: /retry/i }));
+    await user.click(await screen.findByRole('button', { name: /try again/i }));
 
     expect(await screen.findByText('urgent')).toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();

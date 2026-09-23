@@ -10,6 +10,5 @@ export {
   Link2,
   List,
   LogOut,
-  RotateCw,
   Tag,
 } from 'lucide-react';

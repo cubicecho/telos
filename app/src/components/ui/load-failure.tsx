@@ -1,10 +1,7 @@
-import { useState } from 'react';
-import { Text, View } from 'react-native';
-import { RotateCw } from '@/components/app-icons';
-import { Button } from '@/components/ui/button';
-import { TriangleAlert } from '@/components/ui/icons';
+import type { ComponentProps } from 'react';
+import { View } from 'react-native';
+import { QueryError } from '@/components/query-state';
 import { describeError } from '@/lib/errors';
-import { cn } from '@/lib/utils';
 
 /**
  * What a screen shows when the data it needs did not arrive.
@@ -16,50 +13,18 @@ import { cn } from '@/lib/utils';
  * failure the reader can only respond to by reloading the whole app is barely
  * better than a blank page.
  *
- * Not cubeui's `QueryError`, which is the same idea as a full card: this one
- * sits inline — in a popover, in the sidebar — and words the failure through
- * `describeError` rather than showing the raw `message` (cubicecho/cubeui#86).
+ * cubeui's `QueryError`, worded through `describeError` so the reader sees
+ * "Your session has expired" rather than the transport's "Received status code
+ * 401". `compact` is the form for a popover or the sidebar.
  */
-export function LoadFailure({
-  error,
-  onRetry,
-  className,
-}: {
-  error: unknown;
-  /** Apollo's `refetch`. Its rejection is expected — a retry may fail too. */
-  onRetry?: () => unknown;
-  className?: string;
-}) {
-  const [retrying, setRetrying] = useState(false);
-
-  async function retry() {
-    if (!onRetry) return;
-    setRetrying(true);
-    try {
-      await onRetry();
-    } catch {
-      // Swallowed on purpose: the query's own `error` is what the screen
-      // reads, and it is already being rendered right here. Rethrowing would
-      // only turn a visible failure into an unhandled rejection as well.
-    } finally {
-      setRetrying(false);
-    }
-  }
-
+export function LoadFailure(props: Omit<ComponentProps<typeof QueryError>, 'describe'>) {
   return (
-    // `role="alert"` rather than a live region: this replaces the content the
-    // reader was waiting for, so it is worth interrupting for.
-    <View role="alert" className={cn('items-start gap-2', className)}>
-      <View className="flex-row items-start gap-2">
-        <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-destructive" aria-hidden />
-        <Text className="shrink text-muted-foreground text-sm">{describeError(error)}</Text>
-      </View>
-      {onRetry ? (
-        <Button variant="outline" size="sm" className="gap-1.5" onPress={retry} disabled={retrying}>
-          <RotateCw className={cn('h-3.5 w-3.5', retrying && 'animate-spin')} aria-hidden />
-          {retrying ? 'Retrying…' : 'Retry'}
-        </Button>
-      ) : null}
+    // Local stand-in until cubicecho/cubeui#95: `QueryError` carries no role,
+    // and this replaces the content the reader was waiting for, so it is worth
+    // interrupting for — an alert rather than a polite live region. Drop the
+    // wrapper once the role is upstream.
+    <View role="alert">
+      <QueryError describe={describeError} {...props} />
     </View>
   );
 }

@@ -20,6 +20,14 @@ let storage: ThemeStorage | null = null;
 let settled = false;
 const listeners = new Set<() => void>();
 
+/**
+ * "Follow the device", in the spelling both sides of React Native 0.82 accept at runtime. From 0.82
+ * `setColorScheme` takes `"unspecified"` and hands `null` to the native module as is; before it,
+ * `null` was the typed spelling but was turned into `"unspecified"` on the way down anyway. The
+ * cast is for the 0.81 types, which do not list the string — it keeps one call compiling on both.
+ */
+const FOLLOW_SYSTEM = 'unspecified' as unknown as Parameters<typeof Appearance.setColorScheme>[0];
+
 function subscribe(onChange: () => void) {
   listeners.add(onChange);
   return () => {
@@ -33,9 +41,7 @@ function snapshot() {
 
 function apply(next: ThemePreference) {
   current = next;
-  // Local patch until cubicecho/cubeui#82: React Native 0.82+ spells "follow the system"
-  // `'unspecified'`, and no longer takes `null`. Drop this on the next re-add that fixes it.
-  Appearance.setColorScheme(next === 'system' ? 'unspecified' : next);
+  Appearance.setColorScheme(next === 'system' ? FOLLOW_SYSTEM : next);
   for (const listener of listeners) listener();
 }
 

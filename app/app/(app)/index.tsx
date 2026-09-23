@@ -27,7 +27,7 @@ export default function HomeScreen() {
   if (error && !data) {
     return (
       <View className="flex-1 items-center justify-center px-6">
-        <LoadFailure error={error} onRetry={refetch} />
+        <LoadFailure error={error} onRetry={refetch} what="your projects" />
       </View>
     );
   }

@@ -57,7 +57,7 @@ export function Sidebar() {
                      last good list is still on screen should leave it there — the rail
                      is how you get anywhere, and replacing it with an apology would
                      strand the reader on whatever page they are already on. */
-                  <LoadFailure error={error} onRetry={refetch} className="px-2 py-2" />
+                  <LoadFailure error={error} onRetry={refetch} what="your projects" compact />
                 ) : projects.length === 0 ? (
                   <Text className="px-2 py-2 text-muted-foreground text-sm">No projects yet.</Text>
                 ) : null

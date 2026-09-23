@@ -21,6 +21,10 @@ export type TabsTriggerProps = {
   /** Not selectable, and dimmed. */
   disabled?: boolean | undefined;
   className?: string | undefined;
+  /**
+   * The label, and optionally an icon beside it: `<Clock /> Recent`. The icon
+   * takes the tab's active or inactive colour on both halves.
+   */
   children: ReactNode;
 };
 
@@ -31,5 +35,6 @@ export type TabsContentProps = {
 };
 
 export const TABS_LIST_CLASS = 'h-10 items-center justify-center rounded-md bg-muted p-1';
-export const TABS_TRIGGER_CLASS = 'items-center justify-center rounded-sm px-3 py-1.5';
+/** A row, so an icon sits beside the label. `gap-1.5` is shadcn's own. */
+export const TABS_TRIGGER_CLASS = 'flex-row items-center justify-center gap-1.5 rounded-sm px-3 py-1.5';
 export const TABS_TRIGGER_TEXT_CLASS = 'text-sm font-medium';
