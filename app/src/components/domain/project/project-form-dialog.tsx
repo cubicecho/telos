@@ -1,10 +1,11 @@
 import { useMutation } from '@apollo/client';
 import { useRouter } from 'expo-router';
-import { type FormEvent, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Field, FieldLabel } from '@/components/ui/field';
+import { FormDialog, FormDialogFooter } from '@/components/ui/form-dialog';
+import { FormElement } from '@/components/ui/form-element';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { describeError } from '@/lib/errors';
 import { CreateProjectDocument, ProjectDocument, ProjectsDocument, UpdateProjectDocument } from '@/lib/graphql';
@@ -39,10 +40,11 @@ export function ProjectFormDialog({
     setDescription(project?.description ?? '');
   }, [open, project]);
 
-  async function onSubmit(event: FormEvent) {
-    event.preventDefault();
+  const canSubmit = name.trim() !== '' && !creating && !updating;
+
+  async function onSubmit() {
     const values = { name: name.trim(), description: description.trim() === '' ? null : description.trim() };
-    if (values.name === '') return;
+    if (!canSubmit) return;
     try {
       if (project) {
         await updateProject({ variables: { id: project.id, set: values } });
@@ -89,43 +91,34 @@ export function ProjectFormDialog({
   const error = createError ?? updateError;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{project ? 'Edit project' : 'New project'}</DialogTitle>
-          <DialogDescription>A project is a list of todos. Nothing more, on purpose.</DialogDescription>
-        </DialogHeader>
-        <form onSubmit={onSubmit} className="flex flex-col gap-4">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="project-name">Name</Label>
-            <Input
-              id="project-name"
-              autoFocus
-              value={name}
-              placeholder="Kitchen renovation"
-              onChange={(event) => setName(event.target.value)}
-            />
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="project-description">Description</Label>
-            <Textarea
-              id="project-description"
-              value={description}
-              placeholder="Optional."
-              onChange={(event) => setDescription(event.target.value)}
-            />
-          </div>
-          {error ? <p className="text-destructive text-sm">{describeError(error)}</p> : null}
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={creating || updating || name.trim() === ''}>
-              {project ? 'Save' : 'Create'}
-            </Button>
-          </div>
-        </form>
-      </DialogContent>
-    </Dialog>
+    <FormDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title={project ? 'Edit project' : 'New project'}
+      description="A project is a list of todos. Nothing more, on purpose."
+    >
+      <FormElement onSubmit={onSubmit} className="gap-4">
+        <Field>
+          <FieldLabel htmlFor="project-name">Name</FieldLabel>
+          <Input id="project-name" autoFocus value={name} placeholder="Kitchen renovation" onChangeText={setName} />
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="project-description">Description</FieldLabel>
+          <Textarea
+            id="project-description"
+            value={description}
+            placeholder="Optional."
+            onChangeText={setDescription}
+          />
+        </Field>
+        <FormDialogFooter onCancel={() => onOpenChange(false)} error={error ? describeError(error) : null}>
+          {/* A Pressable raises no DOM submit, so it calls the handler itself;
+              Enter in the name field still submits through `FormElement`. */}
+          <Button disabled={!canSubmit} onPress={onSubmit}>
+            {project ? 'Save' : 'Create'}
+          </Button>
+        </FormDialogFooter>
+      </FormElement>
+    </FormDialog>
   );
 }

@@ -23,7 +23,7 @@
         try {
           var stored = localStorage.getItem('telos_theme');
           var dark = stored === 'dark' || (stored !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);
-          if (dark) document.documentElement.classList.add('dark');
+          document.documentElement.classList.add(dark ? 'dark' : 'light');
         } catch (e) {}
       })();
     </script>

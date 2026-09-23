@@ -1,6 +1,7 @@
 import { useMutation } from '@apollo/client';
 import { Link, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef } from 'react';
+import { Text, View } from 'react-native';
 import { Spinner } from '@/components/ui/spinner';
 import { setToken } from '@/lib/auth';
 import { describeError } from '@/lib/errors';
@@ -29,25 +30,27 @@ export default function VerifyScreen() {
   }, [token, verifyMagicLink, router]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="w-full max-w-sm text-center">
+    <View className="min-h-full flex-1 items-center justify-center bg-background px-4">
+      <View className="w-full max-w-sm items-center">
         {!token || error ? (
           <>
-            <h1 className="font-semibold text-xl">That link didn't work</h1>
-            <p className="mt-2 text-muted-foreground text-sm">
+            <Text role="heading" aria-level={1} className="font-semibold text-foreground text-xl">
+              That link didn't work
+            </Text>
+            <Text className="mt-2 text-center text-muted-foreground text-sm">
               {error ? describeError(error) : 'The link is missing its token.'} Sign-in links expire after 15 minutes.
-            </p>
-            <Link href="/login" className="mt-4 inline-block text-primary text-sm underline">
+            </Text>
+            <Link href="/login" className="mt-4 text-primary text-sm underline">
               Request a new one
             </Link>
           </>
         ) : (
-          <div className="flex items-center justify-center gap-2 text-muted-foreground text-sm">
+          <View className="flex-row items-center justify-center gap-2">
             <Spinner />
-            Signing you in…
-          </div>
+            <Text className="text-muted-foreground text-sm">Signing you in…</Text>
+          </View>
         )}
-      </div>
-    </div>
+      </View>
+    </View>
   );
 }

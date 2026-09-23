@@ -1,8 +1,11 @@
 import { useMutation } from '@apollo/client';
-import { Plus } from 'lucide-react';
-import { type FormEvent, forwardRef, useState } from 'react';
+import { forwardRef, useId, useState } from 'react';
+import { Text, View } from 'react-native';
 import { Button } from '@/components/ui/button';
+import { Plus } from '@/components/ui/icons';
+import type { InputHandle } from '@/components/ui/input';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { bumpProjectCounts, type CachedLane, laneForCompletion, updateProjectTodos } from '@/lib/cache';
 import { describeError } from '@/lib/errors';
 import { CreateTodoDocument } from '@/lib/graphql';
@@ -18,9 +21,11 @@ import { newId } from '@/lib/ids';
  * only state this has to undo by hand is the emptied field.
  *
  * The ref goes to the field, so `n` can focus it from anywhere on the screen.
+ * It is cubeui's `InputHandle` rather than the DOM element: `focus()` is all
+ * the hotkey needs, and it is the part both platforms can promise.
  */
 export const TodoComposer = forwardRef<
-  HTMLInputElement,
+  InputHandle,
   {
     projectId: string;
     nextPosition: number;
@@ -29,9 +34,9 @@ export const TodoComposer = forwardRef<
 >(function TodoComposer({ projectId, nextPosition, lanes }, ref) {
   const [title, setTitle] = useState('');
   const [createTodo, { error }] = useMutation(CreateTodoDocument);
+  const inputId = useId();
 
-  async function onSubmit(event: FormEvent) {
-    event.preventDefault();
+  async function onSubmit() {
     const trimmed = title.trim();
     if (trimmed === '') return;
 
@@ -84,29 +89,38 @@ export const TodoComposer = forwardRef<
   }
 
   return (
-    <form onSubmit={onSubmit} className="flex flex-col gap-1">
-      <div className="flex gap-2">
+    <View className="gap-1">
+      {/* cubeui's `Input` takes no `aria-label`, so the field is named by a
+          label the eye does not need — the placeholder already says it. */}
+      <Label htmlFor={inputId} className="sr-only">
+        New todo
+      </Label>
+      <View className="flex-row gap-2">
+        {/* Enter submits through `onSubmitEditing`: there is no `<form>` here,
+            which is the one shape both platforms agree on. */}
         <Input
           ref={ref}
+          id={inputId}
           value={title}
           placeholder="Add a todo…  (press n)"
-          onChange={(event) => setTitle(event.target.value)}
-          aria-label="New todo"
+          onChangeText={setTitle}
+          onSubmitEditing={onSubmit}
+          className="flex-1"
         />
         {/* Not disabled while the write is in flight: the row is already on the
             list and the field is already empty, so the only thing waiting on the
             server would be the next todo. An empty field is what stops a
             double-submit. */}
-        <Button type="submit" disabled={title.trim() === ''}>
+        <Button onPress={onSubmit} disabled={title.trim() === ''}>
           <Plus className="mr-1 h-4 w-4" />
           Add
         </Button>
-      </div>
+      </View>
       {error ? (
-        <p className="text-destructive text-sm" aria-live="polite">
+        <Text className="text-destructive text-sm" aria-live="polite">
           {describeError(error)}
-        </p>
+        </Text>
       ) : null}
-    </form>
+    </View>
   );
 });

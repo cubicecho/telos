@@ -1,10 +1,12 @@
 import { useQuery } from '@apollo/client';
 import { Link, usePathname } from 'expo-router';
-import { LogOut, Plus, Settings } from 'lucide-react';
 import { useState } from 'react';
+import { Pressable, Text, View } from 'react-native';
+import { LogOut } from '@/components/app-icons';
 import { ProjectFormDialog } from '@/components/domain/project/project-form-dialog';
-import { ProjectListItem } from '@/components/domain/project/project-list-item';
+import { Sidebar as SidebarFrame, SidebarNavItem, SidebarSection } from '@/components/sidebar';
 import { Button } from '@/components/ui/button';
+import { Plus, Settings } from '@/components/ui/icons';
 import { LoadFailure } from '@/components/ui/load-failure';
 import { Spinner } from '@/components/ui/spinner';
 import { clearToken } from '@/lib/auth';
@@ -23,81 +25,75 @@ export function Sidebar() {
   }
 
   return (
-    <aside className="flex h-screen w-64 shrink-0 flex-col border-sidebar-border border-r bg-sidebar text-sidebar-foreground">
-      <div className="px-4 pt-4 pb-3">
-        <Link href="/" className="font-semibold text-foreground text-lg tracking-tight no-underline">
-          Telos
-        </Link>
-      </div>
-
-      {/* The one action the sidebar offers, so it says what it does rather than
-          leaving a bare `+` next to the title for the reader to interpret, and
-          it wears `primary` — the theme's teal — rather than an outline. Nothing
-          else in the sidebar is filled, so the colour is the whole hierarchy:
-          spend it on the action and the project rows stay quiet. Taking it from
-          the token rather than a literal is what keeps it legible in both
-          themes; `--primary` is darker in light mode and brighter in dark. */}
-      <div className="px-3">
-        <Button size="sm" className="w-full gap-2 rounded-lg" onClick={() => setCreating(true)}>
-          <Plus className="h-4 w-4" />
-          New project
-        </Button>
-      </div>
-
-      <nav className="flex-1 overflow-y-auto px-2 pt-4 pb-2">
-        {/* `border-b` rather than a Separator element: the footer below already
-            draws its rule this way, and a divider that is part of the block it
-            labels cannot drift away from it. It is inset by the nav's own
-            padding so it lines up with the project rows, not the sidebar edge. */}
-        <p className="mb-1 border-b px-2 pb-2 font-medium text-muted-foreground text-xs uppercase tracking-wide">
-          Projects
-        </p>
-        {loading && projects.length === 0 ? (
-          <div className="px-2 py-2">
-            <Spinner />
-          </div>
-        ) : error && projects.length === 0 ? (
-          /* Only when there is nothing to show. A refetch that fails while the
-             last good list is still on screen should leave it there — the rail
-             is how you get anywhere, and replacing it with an apology would
-             strand the reader on whatever page they are already on. */
-          <LoadFailure error={error} onRetry={refetch} className="px-2 py-2" />
-        ) : projects.length === 0 ? (
-          <p className="px-2 py-2 text-muted-foreground text-sm">No projects yet.</p>
-        ) : (
-          <div className="flex flex-col gap-0.5">
-            {projects.map((project) => (
-              <ProjectListItem
-                key={project.id}
-                id={project.id}
-                name={project.name}
-                openTodoCount={project.openTodoCount}
-                active={pathname === `/projects/${project.id}`}
-              />
-            ))}
-          </div>
-        )}
-      </nav>
-
-      <div className="flex flex-col gap-0.5 border-t p-2">
-        <Link
-          href="/settings"
-          className="flex items-center gap-2 rounded-md px-2 py-1.5 text-muted-foreground text-sm no-underline hover:bg-accent/60 hover:text-accent-foreground"
-        >
-          <Settings className="h-4 w-4" />
-          Settings
-        </Link>
-        <button
-          type="button"
-          onClick={signOut}
-          className="flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-muted-foreground text-sm hover:bg-accent/60 hover:text-accent-foreground"
-        >
-          <LogOut className="h-4 w-4" />
-          Sign out
-        </button>
-      </div>
-
+    <>
+      <SidebarFrame
+        label="Telos"
+        header={
+          <>
+            <Link href="/" className="px-1 font-semibold text-foreground text-lg tracking-tight no-underline">
+              Telos
+            </Link>
+            {/* The one action the sidebar offers, so it says what it does rather
+                than leaving a bare `+` for the reader to interpret, and it wears
+                `primary`. Nothing else in the sidebar is filled, so the colour is
+                the whole hierarchy: spend it on the action and the rows stay quiet. */}
+            <Button size="sm" className="w-full gap-2 rounded-lg" onPress={() => setCreating(true)}>
+              <Plus className="h-4 w-4" />
+              New project
+            </Button>
+          </>
+        }
+        content={
+          <View role="navigation" aria-label="Projects">
+            <SidebarSection
+              title="Projects"
+              status={
+                loading && projects.length === 0 ? (
+                  <View className="px-2 py-2">
+                    <Spinner />
+                  </View>
+                ) : error && projects.length === 0 ? (
+                  /* Only when there is nothing to show. A refetch that fails while the
+                     last good list is still on screen should leave it there — the rail
+                     is how you get anywhere, and replacing it with an apology would
+                     strand the reader on whatever page they are already on. */
+                  <LoadFailure error={error} onRetry={refetch} className="px-2 py-2" />
+                ) : projects.length === 0 ? (
+                  <Text className="px-2 py-2 text-muted-foreground text-sm">No projects yet.</Text>
+                ) : null
+              }
+              content={projects.map((project) => (
+                <Link key={project.id} href={`/projects/${project.id}`} asChild>
+                  <SidebarNavItem
+                    href={`/projects/${project.id}`}
+                    label={project.name}
+                    count={project.openTodoCount > 0 ? project.openTodoCount : undefined}
+                    active={pathname === `/projects/${project.id}`}
+                  />
+                </Link>
+              ))}
+            />
+          </View>
+        }
+        footer={
+          <>
+            <Link href="/settings" asChild>
+              <SidebarNavItem href="/settings" label="Settings" icon={<Settings />} active={pathname === '/settings'} />
+            </Link>
+            {/* A button, not a link: it does something rather than going somewhere.
+                Drawn like the row above it so the footer reads as one list. */}
+            <Pressable
+              role="button"
+              onPress={signOut}
+              className="min-h-8 flex-row items-center gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-sidebar-accent"
+            >
+              <LogOut className="size-4 text-sidebar-foreground" />
+              <Text className="text-sidebar-foreground text-sm">Sign out</Text>
+            </Pressable>
+          </>
+        }
+      />
       <ProjectFormDialog open={creating} onOpenChange={setCreating} />
-    </aside>
+    </>
   );
 }

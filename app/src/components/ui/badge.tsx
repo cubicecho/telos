@@ -1,26 +1,47 @@
-import { cva, type VariantProps } from 'class-variance-authority';
-import type { ComponentProps } from 'react';
+import { Children } from 'react';
+import { Text, View } from 'react-native';
+import {
+  type BadgeProps,
+  type BadgeVariant,
+  badgeContainerVariants,
+  badgeHasLabel,
+  badgeTextFallback,
+  badgeTextVariants,
+  badgeVariants,
+} from '@/components/ui/badge-base';
 import { cn } from '@/lib/utils';
 
-const badgeVariants = cva(
-  'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 font-medium text-xs transition-colors',
-  {
-    variants: {
-      variant: {
-        default: 'border-transparent bg-primary text-primary-foreground',
-        secondary: 'border-transparent bg-secondary text-secondary-foreground',
-        outline: 'text-foreground',
-        destructive: 'border-transparent bg-destructive text-destructive-foreground',
-      },
-    },
-    defaultVariants: { variant: 'default' },
-  },
-);
+export type { BadgeProps, BadgeVariant };
 
-export interface BadgeProps extends ComponentProps<'span'>, VariantProps<typeof badgeVariants> {}
+export function Badge({ variant = 'default', backgroundColor, textColor, className, label, children }: BadgeProps) {
+  const shape = badgeHasLabel(children) ? 'pill' : 'dot';
+  const textClass = backgroundColor ? badgeTextFallback : badgeTextVariants({ variant });
 
-export function Badge({ className, variant, ...props }: BadgeProps) {
-  return <span className={cn(badgeVariants({ variant }), className)} {...props} />;
+  return (
+    <View
+      className={cn(badgeContainerVariants({ variant, shape }), className)}
+      {...(backgroundColor ? { style: { backgroundColor } } : {})}
+      // A dot carries meaning and no text, so it is named or it is decoration;
+      // the same split `color-dot` makes, for the same reason.
+      {...(shape === 'dot'
+        ? label
+          ? ({ role: 'img', 'aria-label': label } as const)
+          : ({ 'aria-hidden': true } as const)
+        : {})}
+    >
+      {shape === 'pill'
+        ? Children.map(children, (child) =>
+            typeof child === 'string' || typeof child === 'number' ? (
+              <Text className={textClass} {...(textColor ? { style: { color: textColor } } : {})}>
+                {child}
+              </Text>
+            ) : (
+              child
+            ),
+          )
+        : null}
+    </View>
+  );
 }
 
 export { badgeVariants };

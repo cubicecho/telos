@@ -42,6 +42,11 @@ export default defineConfig({
             // for the bundle, and nothing here reads the metro config.
             { find: /^react-native$/, replacement: 'react-native-web' },
           ],
+          // cubeui's split components ship `x.tsx` for device and `x.web.tsx`
+          // for the browser, and Metro picks the web half by extension. Vite
+          // has to be told the same preference, or the tests render the native
+          // half against react-native-web.
+          extensions: ['.web.tsx', '.web.ts', '.tsx', '.ts', '.web.js', '.js', '.mjs', '.json'],
         },
         test: {
           name: 'dom',

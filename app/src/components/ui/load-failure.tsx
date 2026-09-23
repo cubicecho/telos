@@ -1,6 +1,8 @@
-import { RotateCw, TriangleAlert } from 'lucide-react';
 import { useState } from 'react';
+import { Text, View } from 'react-native';
+import { RotateCw } from '@/components/app-icons';
 import { Button } from '@/components/ui/button';
+import { TriangleAlert } from '@/components/ui/icons';
 import { describeError } from '@/lib/errors';
 import { cn } from '@/lib/utils';
 
@@ -13,6 +15,10 @@ import { cn } from '@/lib/utils';
  * user's own data — and the offer to retry is the other half, because a
  * failure the reader can only respond to by reloading the whole app is barely
  * better than a blank page.
+ *
+ * Not cubeui's `QueryError`, which is the same idea as a full card: this one
+ * sits inline — in a popover, in the sidebar — and words the failure through
+ * `describeError` rather than showing the raw `message`.
  */
 export function LoadFailure({
   error,
@@ -43,17 +49,17 @@ export function LoadFailure({
   return (
     // `role="alert"` rather than a live region: this replaces the content the
     // reader was waiting for, so it is worth interrupting for.
-    <div role="alert" className={cn('flex flex-col items-start gap-2 text-sm', className)}>
-      <p className="flex items-start gap-2 text-muted-foreground">
+    <View role="alert" className={cn('items-start gap-2', className)}>
+      <View className="flex-row items-start gap-2">
         <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-destructive" aria-hidden />
-        <span>{describeError(error)}</span>
-      </p>
+        <Text className="shrink text-muted-foreground text-sm">{describeError(error)}</Text>
+      </View>
       {onRetry ? (
-        <Button variant="outline" size="sm" className="gap-1.5" onClick={retry} disabled={retrying}>
+        <Button variant="outline" size="sm" className="gap-1.5" onPress={retry} disabled={retrying}>
           <RotateCw className={cn('h-3.5 w-3.5', retrying && 'animate-spin')} aria-hidden />
           {retrying ? 'Retrying…' : 'Retry'}
         </Button>
       ) : null}
-    </div>
+    </View>
   );
 }

@@ -1,8 +1,12 @@
-import * as Popover from '@radix-ui/react-popover';
-import { Check, Columns3 } from 'lucide-react';
+import { useState } from 'react';
+import { Text } from 'react-native';
+import { Columns3 } from '@/components/app-icons';
 import { Button } from '@/components/ui/button';
+import { Check } from '@/components/ui/icons';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import type { LaneSummary } from './lane-badge';
+import { MenuItem } from './menu-item';
 
 /**
  * "Move to", as a menu.
@@ -32,44 +36,44 @@ export function LanePicker({
   align?: 'start' | 'end';
   className?: string;
 }) {
+  const [open, setOpen] = useState(false);
   if (lanes.length === 0) return null;
 
   return (
-    <Popover.Root>
-      <Popover.Trigger asChild>
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
         <Button
           variant="ghost"
           size="icon"
           className={cn('text-muted-foreground', className)}
           aria-label={current ? `Lane, currently ${current.name}` : 'Lane'}
-          title={current ? `Lane: ${current.name}` : 'Move to…'}
+          // Radix opens from the trigger's `onClick`, which react-native-web's
+          // Pressable swallows — see dependency-picker.tsx.
+          onPress={() => setOpen(!open)}
         >
           <Columns3 className="h-4 w-4" />
         </Button>
-      </Popover.Trigger>
-      <Popover.Portal>
-        <Popover.Content
-          sideOffset={6}
-          align={align}
-          className="z-50 w-52 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
-        >
-          {lanes.map((lane) => (
-            <Popover.Close asChild key={lane.id}>
-              <button
-                type="button"
-                disabled={lockedReason != null && lane.id !== current?.id}
-                onClick={() => onSelect(lane)}
-                className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-50"
-              >
-                <span className="flex-1 truncate">{lane.name}</span>
-                {lane.isDone ? <span className="text-muted-foreground text-xs">done</span> : null}
+      </PopoverTrigger>
+      <PopoverContent align={align} className="w-52 p-1">
+        {lanes.map((lane) => (
+          <MenuItem
+            key={lane.id}
+            label={lane.name}
+            disabled={lockedReason != null && lane.id !== current?.id}
+            onSelect={() => {
+              setOpen(false);
+              onSelect(lane);
+            }}
+            trailing={
+              <>
+                {lane.isDone ? <Text className="text-muted-foreground text-xs">done</Text> : null}
                 {lane.id === current?.id ? <Check className="h-3.5 w-3.5" /> : null}
-              </button>
-            </Popover.Close>
-          ))}
-          {lockedReason ? <p className="px-2 py-1.5 text-muted-foreground text-xs">{lockedReason}</p> : null}
-        </Popover.Content>
-      </Popover.Portal>
-    </Popover.Root>
+              </>
+            }
+          />
+        ))}
+        {lockedReason ? <Text className="px-2 py-1.5 text-muted-foreground text-xs">{lockedReason}</Text> : null}
+      </PopoverContent>
+    </Popover>
   );
 }

@@ -1,8 +1,11 @@
 import { ApolloProvider } from '@apollo/client';
 import { type ErrorBoundaryProps, Stack } from 'expo-router';
 import { useEffect } from 'react';
+import { Text, View } from 'react-native';
+import { RouteError } from '@/components/route-error';
 import { Button } from '@/components/ui/button';
 import { client } from '@/lib/apollo';
+import { describeError } from '@/lib/errors';
 import { syncTheme } from '@/lib/theme';
 import '../global.css';
 
@@ -25,32 +28,30 @@ export default function RootLayout() {
  * Expo Router looks for this named export on a route file and wraps the route
  * in it, so exporting it from the root layout covers every screen. It sits
  * *outside* the provider above — the throw may well have come from inside it —
- * so it can use nothing that needs Apollo, and it says only what it honestly
- * knows: something broke, here is what it said, here are the two ways out.
+ * so it can use nothing that needs Apollo.
  *
- * `retry` re-renders the route with the error cleared, which is enough for a
- * transient throw; a reload is the escape hatch for one that is not.
+ * Worded through `describeError`, so a thrown query failure reads the same here
+ * as everywhere else. The raw message is shown too — whoever ends up reading
+ * this is the one who has to file it — and a reload is the escape hatch for a
+ * throw that `retry` does not clear.
  */
 export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
   return (
-    <div role="alert" className="flex h-screen flex-col items-center justify-center gap-4 bg-background px-6">
-      <div className="max-w-md text-center">
-        <h1 className="font-semibold text-xl">Something broke.</h1>
-        <p className="mt-2 text-muted-foreground text-sm">
-          This is a bug in Telos, not something you did. Your data is untouched.
-        </p>
-        {/* The message verbatim, not a friendlier paraphrase: whoever ends up
-            reading this is the one who has to file it. */}
-        <pre className="mt-4 overflow-x-auto whitespace-pre-wrap rounded-md border bg-muted p-3 text-left text-muted-foreground text-xs">
-          {error.message}
-        </pre>
-      </div>
-      <div className="flex gap-2">
-        <Button onClick={() => void retry()}>Try again</Button>
-        <Button variant="outline" onClick={() => window.location.reload()}>
-          Reload
-        </Button>
-      </div>
-    </div>
+    <View className="h-full flex-1 bg-background">
+      <RouteError
+        error={error}
+        reset={() => void retry()}
+        describe={describeError}
+        details
+        actions={
+          <Button variant="outline" size="sm" onPress={() => window.location.reload()}>
+            Reload
+          </Button>
+        }
+      />
+      <Text className="mx-auto max-w-md px-6 pb-12 text-center text-muted-foreground text-sm">
+        This is a bug in Telos, not something you did. Your data is untouched.
+      </Text>
+    </View>
   );
 }

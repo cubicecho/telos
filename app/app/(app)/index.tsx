@@ -1,6 +1,7 @@
 import { useQuery } from '@apollo/client';
 import { Redirect } from 'expo-router';
 import { useState } from 'react';
+import { Text, View } from 'react-native';
 import { ProjectFormDialog } from '@/components/domain/project/project-form-dialog';
 import { Button } from '@/components/ui/button';
 import { LoadFailure } from '@/components/ui/load-failure';
@@ -13,9 +14,9 @@ export default function HomeScreen() {
 
   if (loading && !data) {
     return (
-      <div className="flex h-full items-center justify-center">
+      <View className="flex-1 items-center justify-center">
         <Spinner />
-      </div>
+      </View>
     );
   }
 
@@ -25,9 +26,9 @@ export default function HomeScreen() {
   // is the worst version of getting this wrong.
   if (error && !data) {
     return (
-      <div className="flex h-full items-center justify-center px-6">
+      <View className="flex-1 items-center justify-center px-6">
         <LoadFailure error={error} onRetry={refetch} />
-      </div>
+      </View>
     );
   }
 
@@ -35,13 +36,17 @@ export default function HomeScreen() {
   if (first) return <Redirect href={`/projects/${first.id}`} />;
 
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-4 px-6 text-center">
-      <div>
-        <h1 className="font-semibold text-xl">Nothing here yet</h1>
-        <p className="mt-1 text-muted-foreground text-sm">A project holds a list of todos. Start with one.</p>
-      </div>
-      <Button onClick={() => setCreating(true)}>Create a project</Button>
+    <View className="flex-1 items-center justify-center gap-4 px-6">
+      <View className="items-center">
+        <Text role="heading" aria-level={1} className="font-semibold text-foreground text-xl">
+          Nothing here yet
+        </Text>
+        <Text className="mt-1 text-center text-muted-foreground text-sm">
+          A project holds a list of todos. Start with one.
+        </Text>
+      </View>
+      <Button onPress={() => setCreating(true)}>Create a project</Button>
       <ProjectFormDialog open={creating} onOpenChange={setCreating} />
-    </div>
+    </View>
   );
 }

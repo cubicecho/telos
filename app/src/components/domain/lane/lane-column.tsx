@@ -1,54 +1,18 @@
-import { useDroppable } from '@dnd-kit/core';
-import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import * as Popover from '@radix-ui/react-popover';
-import { Check, CheckCircle2, ChevronLeft, ChevronRight, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
-import { type FormEvent, useState } from 'react';
+import { useState } from 'react';
+import { Text, TextInput, View } from 'react-native';
+import { Ellipsis } from '@/components/app-icons';
 import type { TodoSummary } from '@/components/domain/todo/types';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { Check, ChevronLeft, ChevronRight, CircleCheck, Pencil, Trash2 } from '@/components/ui/icons';
+import { INPUT_CLASS } from '@/components/ui/input-base';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import type { CachedLane } from '@/lib/cache';
 import { cn } from '@/lib/utils';
 import { BoardCard } from './board-card';
+import { DropLane } from './drag-surfaces';
 import type { LaneSummary } from './lane-badge';
-
-/** One action in the lane's menu — a row of the popover, not a button of its own. */
-function MenuItem({
-  onSelect,
-  children,
-  destructive,
-  disabled,
-}: {
-  onSelect: () => void;
-  children: React.ReactNode;
-  destructive?: boolean;
-  disabled?: boolean;
-}) {
-  return (
-    <Popover.Close asChild>
-      <button
-        type="button"
-        disabled={disabled}
-        onClick={onSelect}
-        className={cn(
-          'flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-50',
-          destructive && 'text-destructive',
-        )}
-      >
-        {children}
-      </button>
-    </Popover.Close>
-  );
-}
+import { MenuItem } from './menu-item';
 
 /**
  * One column of the board: a droppable region and everything the column itself
@@ -79,15 +43,15 @@ export function LaneColumn({
   onToggleDone: () => void;
   onDelete: () => void;
 }) {
-  const { setNodeRef, isOver } = useDroppable({ id: lane.id, data: { laneId: lane.id } });
   const [renaming, setRenaming] = useState(false);
   const [name, setName] = useState(lane.name);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   const index = lanes.findIndex((row) => row.id === lane.id);
 
-  function submitName(event: FormEvent) {
-    event.preventDefault();
+  function submitName() {
+    if (!renaming) return;
     const trimmed = name.trim();
     setRenaming(false);
     if (trimmed === '' || trimmed === lane.name) {
@@ -97,120 +61,130 @@ export function LaneColumn({
     onRename(trimmed);
   }
 
+  /** Close the menu, then act — the popover has no `Close` of its own. */
+  function select(action: () => void) {
+    return () => {
+      setMenuOpen(false);
+      action();
+    };
+  }
+
   return (
-    <section className="flex w-72 shrink-0 flex-col gap-2" aria-label={lane.name}>
-      <header className="flex h-8 items-center gap-2 px-1">
+    <View role="region" aria-label={lane.name} className="w-72 shrink-0 gap-2">
+      <View className="h-8 flex-row items-center gap-2 px-1">
         {renaming ? (
-          <form onSubmit={submitName} className="flex-1">
-            <Input
-              autoFocus
-              value={name}
-              aria-label={`Rename ${lane.name}`}
-              className="h-7 text-sm"
-              onChange={(event) => setName(event.target.value)}
-              onBlur={submitName}
-              onKeyDown={(event) => {
-                if (event.key !== 'Escape') return;
-                setName(lane.name);
-                setRenaming(false);
-              }}
-            />
-          </form>
+          <TextInput
+            autoFocus
+            value={name}
+            aria-label={`Rename ${lane.name}`}
+            className={cn(INPUT_CLASS, 'h-7 flex-1 py-1')}
+            onChangeText={setName}
+            onSubmitEditing={submitName}
+            onBlur={submitName}
+            onKeyPress={(event) => {
+              if (event.nativeEvent.key !== 'Escape') return;
+              setName(lane.name);
+              setRenaming(false);
+            }}
+          />
         ) : (
           <>
             {lane.isDone ? (
-              <CheckCircle2 className="h-4 w-4 shrink-0 text-muted-foreground" aria-label="Marks work done" />
+              <CircleCheck className="h-4 w-4 shrink-0 text-muted-foreground" aria-label="Marks work done" />
             ) : null}
-            <h3 className="min-w-0 flex-1 truncate font-medium text-sm">{lane.name}</h3>
-            <span className="shrink-0 text-muted-foreground text-xs tabular-nums">{todos.length}</span>
+            <Text
+              role="heading"
+              aria-level={3}
+              numberOfLines={1}
+              className="min-w-0 flex-1 font-medium text-foreground text-sm"
+            >
+              {lane.name}
+            </Text>
+            <Text className="shrink-0 text-muted-foreground text-xs tabular-nums">{todos.length}</Text>
           </>
         )}
 
-        <Popover.Root>
-          <Popover.Trigger asChild>
+        <Popover open={menuOpen} onOpenChange={setMenuOpen}>
+          <PopoverTrigger asChild>
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7 text-muted-foreground"
+              className="h-7 w-7"
               aria-label={`${lane.name} lane actions`}
+              // Radix opens from the trigger's `onClick`, which react-native-web's
+              // Pressable swallows — see dependency-picker.tsx.
+              onPress={() => setMenuOpen(!menuOpen)}
             >
-              <MoreHorizontal className="h-4 w-4" />
+              <Ellipsis className="h-4 w-4" />
             </Button>
-          </Popover.Trigger>
-          <Popover.Portal>
-            <Popover.Content
-              sideOffset={6}
-              align="end"
-              className="z-50 w-56 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
-            >
-              <MenuItem onSelect={() => setRenaming(true)}>
-                <Pencil className="h-3.5 w-3.5" />
-                Rename
-              </MenuItem>
-              <MenuItem onSelect={onToggleDone}>
-                <Check className={cn('h-3.5 w-3.5', !lane.isDone && 'opacity-0')} />
-                Marks work done
-              </MenuItem>
-              <MenuItem onSelect={() => onReorder(-1)} disabled={index <= 0}>
-                <ChevronLeft className="h-3.5 w-3.5" />
-                Move left
-              </MenuItem>
-              <MenuItem onSelect={() => onReorder(1)} disabled={index < 0 || index >= lanes.length - 1}>
-                <ChevronRight className="h-3.5 w-3.5" />
-                Move right
-              </MenuItem>
-              {/* The last lane has nowhere to send its todos, and a project
-                  without a board is a project whose Board tab is empty. */}
-              <MenuItem onSelect={() => setConfirmingDelete(true)} destructive disabled={lanes.length <= 1}>
-                <Trash2 className="h-3.5 w-3.5" />
-                Delete lane
-              </MenuItem>
-            </Popover.Content>
-          </Popover.Portal>
-        </Popover.Root>
-      </header>
-
-      <div
-        ref={setNodeRef}
-        className={cn(
-          'flex min-h-32 flex-1 flex-col gap-2 rounded-lg bg-muted/40 p-2 transition-colors',
-          isOver && 'bg-muted',
-        )}
-      >
-        <SortableContext id={lane.id} items={todos.map((todo) => todo.id)} strategy={verticalListSortingStrategy}>
-          {todos.map((todo) => (
-            <BoardCard
-              key={todo.id}
-              todo={todo}
-              lanes={lanes}
-              onMove={(target) => onMove(todo, target)}
-              onEdit={() => onEdit(todo)}
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-56 p-1">
+            <MenuItem
+              label="Rename"
+              icon={<Pencil className="h-3.5 w-3.5" />}
+              onSelect={select(() => setRenaming(true))}
             />
-          ))}
-        </SortableContext>
-        {todos.length === 0 ? <p className="px-1 py-2 text-muted-foreground text-xs">Drop a todo here.</p> : null}
-      </div>
+            <MenuItem
+              label="Marks work done"
+              icon={<Check className={cn('h-3.5 w-3.5', !lane.isDone && 'opacity-0')} />}
+              onSelect={select(onToggleDone)}
+            />
+            <MenuItem
+              label="Move left"
+              icon={<ChevronLeft className="h-3.5 w-3.5" />}
+              disabled={index <= 0}
+              onSelect={select(() => onReorder(-1))}
+            />
+            <MenuItem
+              label="Move right"
+              icon={<ChevronRight className="h-3.5 w-3.5" />}
+              disabled={index < 0 || index >= lanes.length - 1}
+              onSelect={select(() => onReorder(1))}
+            />
+            {/* The last lane has nowhere to send its todos, and a project
+                without a board is a project whose Board tab is empty. */}
+            <MenuItem
+              label="Delete lane"
+              icon={<Trash2 className="h-3.5 w-3.5" />}
+              destructive
+              disabled={lanes.length <= 1}
+              onSelect={select(() => setConfirmingDelete(true))}
+            />
+          </PopoverContent>
+        </Popover>
+      </View>
 
-      <AlertDialog open={confirmingDelete} onOpenChange={setConfirmingDelete}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete “{lane.name}”?</AlertDialogTitle>
-            <AlertDialogDescription>
-              The column goes away. The {todos.length === 1 ? 'todo' : 'todos'} in it{' '}
-              {todos.length === 1 ? 'is' : 'are'} kept and moved to the column their completion implies.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={onDelete}
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </section>
+      <DropLane
+        laneId={lane.id}
+        itemIds={todos.map((todo) => todo.id)}
+        className="min-h-32 flex-1 gap-2 rounded-lg bg-muted/40 p-2 transition-colors"
+        overClassName="bg-muted"
+      >
+        {todos.map((todo) => (
+          <BoardCard
+            key={todo.id}
+            todo={todo}
+            lanes={lanes}
+            onMove={(target) => onMove(todo, target)}
+            onEdit={() => onEdit(todo)}
+          />
+        ))}
+        {todos.length === 0 ? <Text className="px-1 py-2 text-muted-foreground text-xs">Drop a todo here.</Text> : null}
+      </DropLane>
+
+      <ConfirmDialog
+        open={confirmingDelete}
+        onOpenChange={setConfirmingDelete}
+        title={`Delete “${lane.name}”?`}
+        description={`The column goes away. The ${todos.length === 1 ? 'todo' : 'todos'} in it ${
+          todos.length === 1 ? 'is' : 'are'
+        } kept and moved to the column their completion implies.`}
+        confirmLabel="Delete"
+        onConfirm={() => {
+          setConfirmingDelete(false);
+          onDelete();
+        }}
+      />
+    </View>
   );
 }

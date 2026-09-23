@@ -1,5 +1,6 @@
 import { Redirect, Slot } from 'expo-router';
 import { useEffect, useState } from 'react';
+import { ScrollView, View } from 'react-native';
 import { Sidebar } from '@/components/layouts/sidebar';
 import { isAuthenticated } from '@/lib/auth';
 
@@ -12,15 +13,16 @@ export default function AppLayout() {
     setSignedIn(isAuthenticated());
   }, []);
 
-  if (signedIn === null) return <div className="min-h-screen bg-background" />;
+  if (signedIn === null) return <View className="flex-1 bg-background" />;
   if (!signedIn) return <Redirect href="/login" />;
 
   return (
-    <div className="flex h-screen bg-background">
+    <View className="h-full flex-1 flex-row bg-background">
       <Sidebar />
-      <main className="flex-1 overflow-y-auto">
+      {/* `role="main"` is what react-native-web turns into a <main>. */}
+      <ScrollView role="main" className="flex-1" contentContainerClassName="min-h-full">
         <Slot />
-      </main>
-    </div>
+      </ScrollView>
+    </View>
   );
 }

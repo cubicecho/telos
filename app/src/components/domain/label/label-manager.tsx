@@ -1,23 +1,17 @@
 import { useMutation, useQuery } from '@apollo/client';
-import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
+import { Text, View } from 'react-native';
 import type { LabelSummary } from '@/components/domain/label/label-badge';
 import { LabelFormDialog } from '@/components/domain/label/label-form-dialog';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
+import { ColorDot } from '@/components/ui/color-dot';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { Pencil, Plus, Trash2 } from '@/components/ui/icons';
 import { LoadFailure } from '@/components/ui/load-failure';
 import { Spinner } from '@/components/ui/spinner';
 import { describeError } from '@/lib/errors';
 import { DeleteLabelDocument, LabelsDocument } from '@/lib/graphql';
+import { cn, HOVER_REVEAL } from '@/lib/utils';
 
 /** The whole label lifecycle in one block: list, create, rename, delete. */
 export function LabelManager() {
@@ -30,15 +24,27 @@ export function LabelManager() {
 
   const labels = data?.labels ?? [];
 
+  async function confirmDelete() {
+    setDeleteError(null);
+    try {
+      if (deleting) await deleteLabel({ variables: { id: deleting.id } });
+    } catch (cause) {
+      setDeleteError(describeError(cause));
+    }
+    setDeleting(null);
+  }
+
   return (
-    <div className="flex flex-col gap-4">
-      <header className="flex items-center justify-between">
-        <div>
-          <h2 className="font-medium text-base">Labels</h2>
-          <p className="mt-1 text-muted-foreground text-sm">Attach them to projects and todos alike.</p>
-        </div>
+    <View className="gap-4">
+      <View className="flex-row items-center justify-between">
+        <View>
+          <Text role="heading" aria-level={2} className="font-medium text-base text-foreground">
+            Labels
+          </Text>
+          <Text className="mt-1 text-muted-foreground text-sm">Attach them to projects and todos alike.</Text>
+        </View>
         <Button
-          onClick={() => {
+          onPress={() => {
             setEditing(undefined);
             setFormOpen(true);
           }}
@@ -46,14 +52,14 @@ export function LabelManager() {
           <Plus className="mr-1 h-4 w-4" />
           New label
         </Button>
-      </header>
+      </View>
 
       {/* Kept outside the dialog: the dialog closes on the failure, and an
           error that vanishes with the thing that caused it was never read. */}
       {deleteError ? (
-        <p className="text-destructive text-sm" aria-live="polite">
+        <Text className="text-destructive text-sm" aria-live="polite">
           {deleteError}
-        </p>
+        </Text>
       ) : null}
 
       {loading && labels.length === 0 ? (
@@ -61,19 +67,25 @@ export function LabelManager() {
       ) : error && labels.length === 0 ? (
         <LoadFailure error={error} onRetry={refetch} />
       ) : labels.length === 0 ? (
-        <p className="text-muted-foreground text-sm">No labels yet.</p>
+        <Text className="text-muted-foreground text-sm">No labels yet.</Text>
       ) : (
-        <div className="flex flex-col gap-1">
+        <View role="list" className="gap-1">
           {labels.map((label) => (
-            <div key={label.id} className="group flex items-center gap-3 rounded-lg border bg-card px-3 py-2">
-              <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: label.color }} />
-              <span className="flex-1 truncate text-sm">{label.name}</span>
+            <View
+              key={label.id}
+              role="listitem"
+              className="group flex-row items-center gap-3 rounded-lg border border-border bg-card px-3 py-2"
+            >
+              <ColorDot color={label.color} />
+              <Text numberOfLines={1} className="flex-1 text-foreground text-sm">
+                {label.name}
+              </Text>
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100"
+                className={cn('h-8 w-8 focus-visible:opacity-100', HOVER_REVEAL)}
                 aria-label={`Rename ${label.name}`}
-                onClick={() => {
+                onPress={() => {
                   setEditing(label);
                   setFormOpen(true);
                 }}
@@ -83,46 +95,27 @@ export function LabelManager() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 text-muted-foreground opacity-0 transition-opacity hover:text-destructive focus-visible:opacity-100 group-hover:opacity-100"
+                className={cn('h-8 w-8 hover:text-destructive focus-visible:opacity-100', HOVER_REVEAL)}
                 aria-label={`Delete ${label.name}`}
-                onClick={() => setDeleting(label)}
+                onPress={() => setDeleting(label)}
               >
                 <Trash2 className="h-4 w-4" />
               </Button>
-            </div>
+            </View>
           ))}
-        </div>
+        </View>
       )}
 
       <LabelFormDialog open={formOpen} onOpenChange={setFormOpen} label={editing} />
 
-      <AlertDialog open={deleting !== null} onOpenChange={(open) => !open && setDeleting(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete “{deleting?.name}”?</AlertDialogTitle>
-            <AlertDialogDescription>
-              It is removed from every project and todo it is attached to. Nothing else is deleted.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={async () => {
-                setDeleteError(null);
-                try {
-                  if (deleting) await deleteLabel({ variables: { id: deleting.id } });
-                } catch (cause) {
-                  setDeleteError(describeError(cause));
-                }
-                setDeleting(null);
-              }}
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </div>
+      <ConfirmDialog
+        open={deleting !== null}
+        onOpenChange={(open) => !open && setDeleting(null)}
+        title={`Delete “${deleting?.name ?? ''}”?`}
+        description="It is removed from every project and todo it is attached to. Nothing else is deleted."
+        confirmLabel="Delete"
+        onConfirm={confirmDelete}
+      />
+    </View>
   );
 }

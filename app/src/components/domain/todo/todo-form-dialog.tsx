@@ -1,9 +1,10 @@
 import { useMutation } from '@apollo/client';
-import { type FormEvent, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { View } from 'react-native';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
+import { FormDialog, FormDialogFooter } from '@/components/ui/form-dialog';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { fromDateInputValue, toDateInputValue } from '@/lib/dates';
 import { describeError } from '@/lib/errors';
@@ -50,10 +51,11 @@ export function TodoFormDialog({
     setDueAt(toDateInputValue(todo.dueAt));
   }, [open, todo]);
 
-  async function onSubmit(event: FormEvent) {
-    event.preventDefault();
+  const canSave = !loading && title.trim() !== '';
+
+  async function onSubmit() {
     const trimmed = title.trim();
-    if (trimmed === '') return;
+    if (!canSave) return;
     // Empty means absent, for both: the columns are nullable precisely so that
     // "no notes" and "an empty note" cannot be two different stored states.
     const set = {
@@ -78,63 +80,50 @@ export function TodoFormDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Edit todo</DialogTitle>
-          <DialogDescription>
-            Its lane, labels and dependencies are set from the row itself, where the rules about them live.
-          </DialogDescription>
-        </DialogHeader>
-        <form onSubmit={onSubmit} className="flex flex-col gap-4">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="todo-title">Title</Label>
-            <Input
-              id="todo-title"
-              autoFocus
-              value={title}
-              placeholder="Replace the tap"
-              onChange={(event) => setTitle(event.target.value)}
-            />
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="todo-notes">Notes</Label>
-            <Textarea
-              id="todo-notes"
-              value={notes}
-              placeholder="Optional."
-              onChange={(event) => setNotes(event.target.value)}
-            />
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="todo-due-at">Due</Label>
-            {/* A native date input rather than a calendar component: it is
-                keyboard-accessible, localized and clearable for free, and the
-                app has no date picker to reuse. Clearing it is the path the
-                server-side scalar override exists to keep honest. */}
-            <Input
-              id="todo-due-at"
-              type="date"
-              value={dueAt}
-              onChange={(event) => setDueAt(event.target.value)}
-              className="w-fit"
-            />
-          </div>
-          {error ? (
-            <p className="text-destructive text-sm" aria-live="polite">
-              {describeError(error)}
-            </p>
-          ) : null}
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={loading || title.trim() === ''}>
-              Save
-            </Button>
-          </div>
-        </form>
-      </DialogContent>
-    </Dialog>
+    <FormDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Edit todo"
+      description="Its lane, labels and dependencies are set from the row itself, where the rules about them live."
+    >
+      <View className="gap-4">
+        <Field>
+          <FieldLabel htmlFor="todo-title">Title</FieldLabel>
+          <Input
+            id="todo-title"
+            autoFocus
+            value={title}
+            placeholder="Replace the tap"
+            onChangeText={setTitle}
+            onSubmitEditing={onSubmit}
+          />
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="todo-notes">Notes</FieldLabel>
+          <Textarea id="todo-notes" value={notes} placeholder="Optional." onChangeText={setNotes} />
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="todo-due-at">Due</FieldLabel>
+          {/* A native date input rather than a calendar component: it is
+              keyboard-accessible, localized and clearable for free. Clearing it
+              is the path the server-side scalar override exists to keep honest:
+              an empty field saves `null`, never the epoch. */}
+          <Input
+            id="todo-due-at"
+            type="date"
+            value={dueAt}
+            onChangeText={setDueAt}
+            onSubmitEditing={onSubmit}
+            className="w-40"
+          />
+          <FieldDescription>Empty for no due date.</FieldDescription>
+        </Field>
+      </View>
+      <FormDialogFooter onCancel={() => onOpenChange(false)} error={error ? describeError(error) : null}>
+        <Button onPress={onSubmit} disabled={!canSave}>
+          Save
+        </Button>
+      </FormDialogFooter>
+    </FormDialog>
   );
 }

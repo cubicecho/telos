@@ -1,7 +1,8 @@
 import { useQuery } from '@apollo/client';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Columns3, List } from 'lucide-react';
 import { useCallback, useId, useMemo, useRef, useState } from 'react';
+import { Text, View } from 'react-native';
+import { Columns3, List } from '@/components/app-icons';
 import { Board } from '@/components/domain/lane/board';
 import { ProjectOverview } from '@/components/domain/project/project-overview';
 import { TodoComposer } from '@/components/domain/todo/todo-composer';
@@ -9,20 +10,27 @@ import { TodoFilterBar } from '@/components/domain/todo/todo-filter-bar';
 import { TodoRow } from '@/components/domain/todo/todo-row';
 import type { TodoSummary } from '@/components/domain/todo/types';
 import { Button } from '@/components/ui/button';
+import type { InputHandle } from '@/components/ui/input';
 import { LoadFailure } from '@/components/ui/load-failure';
 import { type Segment, SegmentedControl, segmentPanelProps } from '@/components/ui/segmented-control';
 import { Spinner } from '@/components/ui/spinner';
 import { filterTodos, isFiltering, NO_FILTER, type TodoFilter } from '@/lib/filter-todos';
 import { ProjectDocument, ProjectLanesDocument, ProjectTodosDocument } from '@/lib/graphql';
-import { focusAndSelect, useHotkey } from '@/lib/hotkeys';
+import { useHotkey } from '@/lib/hotkeys';
 import { cn } from '@/lib/utils';
 
-type View = 'list' | 'board';
+type ProjectView = 'list' | 'board';
 
-const VIEWS: readonly Segment<View>[] = [
+const VIEWS: readonly Segment<ProjectView>[] = [
   { value: 'list', label: 'List', icon: List },
   { value: 'board', label: 'Board', icon: Columns3 },
 ];
+
+/** Focus a field and select what is in it — so typing replaces. */
+function focusAndSelect(field: InputHandle | null): void {
+  field?.focus();
+  field?.select?.();
+}
 
 export default function ProjectScreen() {
   // The view and the filter both live in the URL rather than in state, for the
@@ -38,8 +46,8 @@ export default function ProjectScreen() {
   }>();
   const [showCompleted, setShowCompleted] = useState(false);
   const tabs = useId();
-  const composerRef = useRef<HTMLInputElement>(null);
-  const filterRef = useRef<HTMLInputElement>(null);
+  const composerRef = useRef<InputHandle>(null);
+  const filterRef = useRef<InputHandle>(null);
 
   const filter: TodoFilter = useMemo(
     () => ({ text: q ?? '', labelId: label ?? null, sort: sort === 'due' ? 'due' : 'manual' }),
@@ -73,7 +81,12 @@ export default function ProjectScreen() {
       setFilter(NO_FILTER);
       return;
     }
-    if (document.activeElement === filterRef.current) filterRef.current?.blur();
+    // The field is behind an `InputHandle` now, which offers no identity to
+    // compare against and no `blur`, so this gives up whichever text field has
+    // focus. Escape inside the composer meaning "leave the field" is the same
+    // want, so the wider reach costs nothing.
+    const active = document.activeElement;
+    if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) active.blur();
   });
 
   // Three queries, three failures, and they are not the same failure: the
@@ -109,9 +122,9 @@ export default function ProjectScreen() {
 
   if (projectLoading && !projectData) {
     return (
-      <div className="flex h-full items-center justify-center">
+      <View className="flex-1 items-center justify-center">
         <Spinner />
-      </div>
+      </View>
     );
   }
 
@@ -121,22 +134,22 @@ export default function ProjectScreen() {
   // telling them nothing.
   if (projectError && !projectData) {
     return (
-      <div className="flex h-full items-center justify-center px-6">
+      <View className="flex-1 items-center justify-center px-6">
         <LoadFailure error={projectError} onRetry={refetchProject} />
-      </div>
+      </View>
     );
   }
 
   const project = projectData?.project;
   if (!project) {
     return (
-      <div className="flex h-full items-center justify-center px-6 text-center">
-        <p className="text-muted-foreground text-sm">That project doesn't exist, or isn't yours.</p>
-      </div>
+      <View className="flex-1 items-center justify-center px-6">
+        <Text className="text-center text-muted-foreground text-sm">That project doesn't exist, or isn't yours.</Text>
+      </View>
     );
   }
 
-  const current: View = view === 'board' ? 'board' : 'list';
+  const current: ProjectView = view === 'board' ? 'board' : 'list';
   const all = (todosData?.todos ?? []) as TodoSummary[];
   const lanes = lanesData?.lanes ?? [];
   // Filtered once, here, and handed to whichever view is showing — so the two
@@ -155,7 +168,7 @@ export default function ProjectScreen() {
   return (
     // The board is as wide as its columns need; the list stays a column of
     // readable width whatever the window does.
-    <div className={cn('mx-auto flex flex-col gap-6 px-6 py-8', current === 'board' ? 'max-w-full' : 'max-w-3xl')}>
+    <View className={cn('mx-auto w-full gap-6 px-6 py-8', current === 'board' ? 'max-w-full' : 'max-w-3xl')}>
       <ProjectOverview project={project} />
 
       <SegmentedControl
@@ -175,7 +188,7 @@ export default function ProjectScreen() {
       ) : todosError && all.length === 0 ? (
         <LoadFailure error={todosError} onRetry={refetchTodos} />
       ) : current === 'board' ? (
-        <div {...segmentPanelProps(tabs, 'board')}>
+        <View {...segmentPanelProps(tabs, 'board')}>
           {/* A board with no columns is not a board, and the todos being fine
               does not make it one. */}
           {lanesError && lanes.length === 0 ? (
@@ -183,55 +196,62 @@ export default function ProjectScreen() {
           ) : (
             <Board projectId={project.id} lanes={lanes} todos={todos} />
           )}
-        </div>
+        </View>
       ) : (
-        <div {...segmentPanelProps(tabs, 'list')} className="flex flex-col gap-6">
-          <section className="flex flex-col gap-2">
+        <View {...segmentPanelProps(tabs, 'list')} className="gap-6">
+          <View className="gap-2">
             {open.length === 0 ? (
-              <p className="text-muted-foreground text-sm">
+              <Text className="text-muted-foreground text-sm">
                 {isFiltering(filter)
                   ? 'Nothing open matches.'
                   : all.length === 0
                     ? 'No todos yet.'
                     : 'Nothing open — everything is blocked or done.'}
-              </p>
+              </Text>
             ) : (
               open.map((todo) => (
                 <TodoRow key={todo.id} todo={todo} projectId={project.id} siblings={all} lanes={lanes} />
               ))
             )}
-          </section>
+          </View>
 
           {blocked.length > 0 ? (
-            <section className="flex flex-col gap-2">
-              <h2 className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
-                Blocked ({blocked.length})
-              </h2>
+            <View role="region" aria-label="Blocked" className="gap-2">
+              {/* Not cubeui's `SectionHeading`, which draws this exact look but
+                  takes no `role`, so it could not be the heading it looks like. */}
+              <Text
+                role="heading"
+                aria-level={2}
+                className="font-medium text-muted-foreground text-xs uppercase tracking-wide"
+              >
+                {`Blocked (${blocked.length})`}
+              </Text>
               {blocked.map((todo) => (
                 <TodoRow key={todo.id} todo={todo} projectId={project.id} siblings={all} lanes={lanes} />
               ))}
-            </section>
+            </View>
           ) : null}
 
           {completed.length > 0 ? (
-            <section className="flex flex-col gap-2">
+            <View className="gap-2">
               <Button
                 variant="ghost"
                 size="sm"
                 className="-ml-3 self-start text-muted-foreground"
-                onClick={() => setShowCompleted((shown) => !shown)}
+                aria-expanded={showCompleted}
+                onPress={() => setShowCompleted((shown) => !shown)}
               >
-                {showCompleted ? 'Hide' : 'Show'} completed ({completed.length})
+                {`${showCompleted ? 'Hide' : 'Show'} completed (${completed.length})`}
               </Button>
               {showCompleted
                 ? completed.map((todo) => (
                     <TodoRow key={todo.id} todo={todo} projectId={project.id} siblings={all} lanes={lanes} />
                   ))
                 : null}
-            </section>
+            </View>
           ) : null}
-        </div>
+        </View>
       )}
-    </div>
+    </View>
   );
 }
