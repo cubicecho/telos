@@ -7,33 +7,9 @@
   appearance: cubeui's `useThemePreference` (and the pre-paint script in
   `public/index.html`) put one of those classes on <html>.
 
-  What follows is only what the registry does not cover.
+  What follows is only what the registry does not cover: the page's own colours.
 */
 @import "./cubeui-tokens.css";
-
-/*
-  The tokens reset <button> and put the system font on <html>, but leave form
-  fields to the browser, whose defaults draw a textarea in monospace. Bare element
-  selectors, so every class beats them. Local patch until cubicecho/cubeui#103.
-*/
-input,
-select,
-textarea {
-  color: inherit;
-  font: inherit;
-}
-
-/*
-  Local patch until cubicecho/cubeui#102: the calendar's web half takes
-  react-day-picker's stylesheet with its stock blue accent. `:root` in front so
-  this outranks that sheet, which loads after this one.
-*/
-:root .rdp-root {
-  --rdp-accent-color: var(--primary);
-  --rdp-accent-background-color: var(--accent);
-  --rdp-range_start-color: var(--primary-foreground);
-  --rdp-range_end-color: var(--primary-foreground);
-}
 
 html,
 body {

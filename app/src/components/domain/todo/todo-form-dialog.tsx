@@ -104,18 +104,20 @@ export function TodoFormDialog({
           <Textarea id="todo-notes" value={notes} placeholder="Optional." onChangeText={setNotes} />
         </Field>
         <Field>
-          <FieldLabel>Due</FieldLabel>
+          <FieldLabel htmlFor="todo-due-at">Due</FieldLabel>
           {/* Date only: a picked day is committed at local midnight, so the day
               the reader chose is the day they get back in their own zone. Clear
               saves `null`, never the epoch, which is the path the server-side
-              scalar override exists to keep honest.
-
-              The group is a local stand-in until cubicecho/cubeui#101:
-              `DateTimeInput` takes no `id` or `aria-label`, so the label above
-              cannot name it. */}
-          <View role="group" aria-label="Due" className="self-start">
-            <DateTimeInput mode="date" clearable value={dueAt} onChange={setDueAt} placeholder="No due date" />
-          </View>
+              scalar override exists to keep honest. */}
+          <DateTimeInput
+            id="todo-due-at"
+            mode="date"
+            clearable
+            value={dueAt}
+            onChange={setDueAt}
+            placeholder="No due date"
+            className="self-start"
+          />
           <FieldDescription>Clear it from the calendar for no due date.</FieldDescription>
         </Field>
       </View>

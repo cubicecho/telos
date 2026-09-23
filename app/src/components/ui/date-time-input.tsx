@@ -1,5 +1,5 @@
 import { format } from 'date-fns';
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { Text, View } from 'react-native';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
@@ -18,6 +18,22 @@ type DateTimeInputSharedProps = {
   /** What the trigger reads while the value is `null`. Only reachable with `clearable`. */
   placeholder?: string | undefined;
   className?: string | undefined;
+  /**
+   * The trigger's id — what a `FieldLabel htmlFor` points at on the web. React Native takes `id`
+   * as its `nativeID`, so on device it is a target for `aria-labelledby` rather than a label's.
+   */
+  id?: string | undefined;
+  /**
+   * The field's name, on the trigger. In `"datetime"` mode the time box is named after it —
+   * `"Due"` makes it `"Due, time"` — so two of these in one form are not both "Time".
+   */
+  'aria-label'?: string | undefined;
+  /**
+   * The field's name by reference — the id of the `Label` above it. The trigger takes it as is;
+   * the time box takes it followed by its own id, and its own `aria-label` of "time" is what that
+   * second reference reads, so it is named "Due time".
+   */
+  'aria-labelledby'?: string | undefined;
 };
 
 /**
@@ -42,10 +58,18 @@ export type DateTimeInputProps = DateTimeInputSharedProps &
   );
 
 export function DateTimeInput(props: DateTimeInputProps) {
-  const { mode = 'datetime', placeholder = 'Pick a date', className } = props;
+  const {
+    mode = 'datetime',
+    placeholder = 'Pick a date',
+    className,
+    id,
+    'aria-label': ariaLabel,
+    'aria-labelledby': ariaLabelledBy,
+  } = props;
   const value = props.value;
   const withTime = mode === 'datetime';
   const [open, setOpen] = useState(false);
+  const timeId = useId();
 
   function commit(next: Date) {
     // Both branches take a `Date`; the union of their `onChange`s does not say so.
@@ -98,6 +122,9 @@ export function DateTimeInput(props: DateTimeInputProps) {
               which runs after it, still closes the popover on a second click. */}
           <Button
             variant="outline"
+            id={id}
+            aria-label={ariaLabel}
+            aria-labelledby={ariaLabelledBy}
             className="flex-1 justify-start text-left font-normal"
             onPress={() => setOpen(true)}
           >
@@ -129,7 +156,13 @@ export function DateTimeInput(props: DateTimeInputProps) {
       {withTime ? (
         <Input
           type="time"
-          aria-label="Time"
+          // Named after the field, so a form with a start and an end is not two boxes called
+          // "Time". A reference names the box by pointing at the caller's label and then at the
+          // box itself, whose own `aria-label` is what that second reference reads — so there is
+          // no hidden text node to render. With no name given, it is "Time", as it always was.
+          id={ariaLabelledBy ? timeId : undefined}
+          aria-label={ariaLabelledBy ? 'time' : ariaLabel ? `${ariaLabel}, time` : 'Time'}
+          aria-labelledby={ariaLabelledBy ? `${ariaLabelledBy} ${timeId}` : undefined}
           value={value ? format(value, 'HH:mm') : ''}
           onChangeText={handleTimeChange}
           disabled={!value}

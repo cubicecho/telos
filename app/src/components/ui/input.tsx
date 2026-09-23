@@ -22,7 +22,9 @@ function Input({
   maxLength,
   disabled,
   autoFocus,
+  id,
   'aria-label': ariaLabel,
+  'aria-labelledby': ariaLabelledBy,
   ref,
 }: InputProps) {
   const inner = useRef<TextInput>(null);
@@ -42,7 +44,9 @@ function Input({
       maxLength={maxLength}
       editable={!disabled}
       autoFocus={autoFocus}
+      id={id}
       aria-label={ariaLabel}
+      aria-labelledby={ariaLabelledBy}
       inputMode={inputMode ?? NATIVE_INPUT_MODE[type] ?? 'text'}
       secureTextEntry={type === 'password'}
       className={cn(INPUT_CLASS, disabled && 'opacity-50', className)}

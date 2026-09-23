@@ -72,13 +72,21 @@ export type InputProps = {
   max?: number | undefined;
   disabled?: boolean | undefined;
   className?: string | undefined;
-  /** Web only: ties the control to its `<label>`. */
+  /**
+   * Ties the control to its `<label>` on the web. React Native takes `id` as its `nativeID`, so on
+   * device it is only a target for another element's `aria-labelledby`.
+   */
   id?: string | undefined;
   /**
    * The accessible name, for an input no `<label>` points at — the time box beside
    * a date trigger. `TextInput` takes it on device, and react-native-web renders it.
    */
   'aria-label'?: string | undefined;
+  /**
+   * The accessible name by reference. The web honours a list of ids; Android reads one, and iOS
+   * none, so a native caller that needs the name everywhere passes `aria-label` too.
+   */
+  'aria-labelledby'?: string | undefined;
   autoFocus?: boolean | undefined;
   ref?: Ref<InputHandle> | undefined;
 };

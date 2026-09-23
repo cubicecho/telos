@@ -1,5 +1,5 @@
 import { MockedProvider } from '@apollo/client/testing';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { format } from 'date-fns';
 import { describe, expect, it, vi } from 'vitest';
@@ -21,9 +21,9 @@ const TODO: TodoSummary = {
   lane: null,
 };
 
-/** The button that opens the due-date calendar, found through the group that names it. */
+/** The button that opens the due-date calendar, found through the label that names it. */
 function dueTrigger() {
-  return within(screen.getByRole('group', { name: 'Due' })).getByRole('button');
+  return screen.getByLabelText('Due');
 }
 
 /** The mutation as the dialog sends it, paired with a plausible answer. */

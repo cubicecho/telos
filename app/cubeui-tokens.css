@@ -37,7 +37,7 @@
 }
 
 /*
- * Two more lines of preflight, for the same raw-DOM halves and for the same reason. A `.web.tsx`
+ * More lines of preflight, for the same raw-DOM halves and for the same reason. A `.web.tsx`
  * half that renders a radix part renders a raw `<button>` — a tab trigger, a dialog's close — and
  * the user-agent sheet gives it a `2px outset` border, a grey fill, and a colour and font of its
  * own rather than inherited ones: an inactive tab ignored its list's `text-muted-foreground` and
@@ -54,10 +54,22 @@
  * react-native-web's base class is a class as well, so a `Pressable`, which it renders as a
  * `<button>`, keeps its own look. Native never sees these: react-native-css drops an element
  * selector as silently as it drops `*` — `tokens-dark.test.mjs` asserts that too.
+ *
+ * The form fields are the rest of preflight's control reset (#103). `input.web.tsx` and
+ * `textarea.web.tsx` render a raw `<input>` and `<textarea>`, which do not inherit the page
+ * font: the user-agent sheet drew the input in Arial and the textarea in monospace. Only `color`
+ * and `font` — their border and fill are the component's classes, not a browser look to undo.
+ * `color: inherit` reaches the element and not its `::placeholder`, so a
+ * `placeholder:text-muted-foreground` still colours the hint, and a `text-*` class still wins.
  */
 :where(button) {
   border: 0 solid;
   background-color: transparent;
+  color: inherit;
+  font: inherit;
+}
+
+:where(input, select, textarea) {
   color: inherit;
   font: inherit;
 }
