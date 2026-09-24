@@ -137,6 +137,15 @@ key cannot mint its own successor.
 checked in an `onWrite` hook in `server/src/resolvers/write-guards.ts`. A new
 table with a user-facing FK needs an entry in `FOREIGN_KEYS`.
 
+**Todo history is written by a trigger; stamp the actor before writing a todo.**
+The `todos_history` trigger (richer_todos migration) records one `todo_events`
+row per todo per transaction and reads who did it from `telos.*` settings.
+Any code that writes `todos` does so inside a transaction that first calls
+`stampActor` (`server/src/provenance.ts`); the `todos` and `lanes` write hooks
+already do this for generated writes. A write that forgets is recorded as
+`system`. Because the trigger lives in a migration, tests build their database
+from the migrations, not `pushSchema`.
+
 **A blocked todo cannot be completed, and cannot change lane.** The rule is an
 invariant, not a code path: `assertNoBlockedCompletions` re-checks it after any
 write that sets `completedAt`, so `completeTodo`, `updateTodo` and `updateTodos`

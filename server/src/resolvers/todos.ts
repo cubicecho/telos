@@ -4,6 +4,7 @@ import { extendSchema, GraphQLError, type GraphQLObjectType, type GraphQLSchema,
 import { assertNoCycle, assertNotBlocked } from '../blocking.ts';
 import type { Context } from '../context.ts';
 import { findDoneLaneId, findFirstOpenLaneId } from '../lanes.ts';
+import { stampActor } from '../provenance.ts';
 import { requireAuth } from './auth.ts';
 
 // What generated CRUD cannot express: the derived fields the project screen
@@ -28,9 +29,9 @@ const TODOS_SDL = parse(`
   }
 
   extend type Mutation {
-    "Marks a todo done. Fails while any todo it depends on is still open."
-    completeTodo(id: ID!): Todo!
-    reopenTodo(id: ID!): Todo!
+    "Marks a todo done. Fails while any todo it depends on is still open. \`reason\` goes on the todo's history."
+    completeTodo(id: ID!, reason: String): Todo!
+    reopenTodo(id: ID!, reason: String): Todo!
     "Makes \`todoId\` wait on \`dependsOnTodoId\`. Rejects cycles."
     addTodoDependency(todoId: ID!, dependsOnTodoId: ID!): Todo!
     removeTodoDependency(todoId: ID!, dependsOnTodoId: ID!): Todo!
@@ -65,16 +66,26 @@ async function loadOwnedTodo(context: Context, id: string): Promise<AnyRow> {
  * no column to move to, and dropping the todo off the board would be a larger
  * change than ticking a checkbox asked for.
  */
-async function setCompletedAt(context: Context, todo: AnyRow, completedAt: Date | null): Promise<AnyRow> {
-  const db = context.db as AnyRow;
-  const laneId = completedAt ? await findDoneLaneId(db, todo.projectId) : await findFirstOpenLaneId(db, todo.projectId);
-  const [updated] = await db
-    .update(dbSchema.todos)
-    .set({ completedAt, updatedAt: new Date(), ...(laneId ? { laneId } : {}) })
-    .where(and(eq(dbSchema.todos.id, todo.id), eq(dbSchema.todos.userId, requireAuth(context))))
-    .returning();
-  if (!updated) throw new GraphQLError('Todo not found', { extensions: { code: 'NOT_FOUND' } });
-  return updated;
+async function setCompletedAt(
+  context: Context,
+  todo: AnyRow,
+  completedAt: Date | null,
+  reason: string | null | undefined,
+): Promise<AnyRow> {
+  const userId = requireAuth(context);
+  return (context.db as AnyRow).transaction(async (tx: AnyRow) => {
+    await stampActor(tx, context.actor, { reason });
+    const laneId = completedAt
+      ? await findDoneLaneId(tx, todo.projectId)
+      : await findFirstOpenLaneId(tx, todo.projectId);
+    const [updated] = await tx
+      .update(dbSchema.todos)
+      .set({ completedAt, updatedAt: new Date(), ...(laneId ? { laneId } : {}) })
+      .where(and(eq(dbSchema.todos.id, todo.id), eq(dbSchema.todos.userId, userId)))
+      .returning();
+    if (!updated) throw new GraphQLError('Todo not found', { extensions: { code: 'NOT_FOUND' } });
+    return updated;
+  });
 }
 
 export function applyTodosExtension(schema: GraphQLSchema): GraphQLSchema {
@@ -94,17 +105,19 @@ export function applyTodosExtension(schema: GraphQLSchema): GraphQLSchema {
 
   const mutations = (extendedSchema.getType('Mutation') as GraphQLObjectType).getFields();
 
-  mutations.completeTodo.resolve = async (_parent: unknown, args: { id: string }, context: Context) => {
+  type TransitionArgs = { id: string; reason?: string | null };
+
+  mutations.completeTodo.resolve = async (_parent: unknown, args: TransitionArgs, context: Context) => {
     const todo = await loadOwnedTodo(context, args.id);
     if (todo.completedAt != null) return todo;
     await assertNotBlocked(context.db, [args.id]);
-    return setCompletedAt(context, todo, new Date());
+    return setCompletedAt(context, todo, new Date(), args.reason);
   };
 
-  mutations.reopenTodo.resolve = async (_parent: unknown, args: { id: string }, context: Context) => {
+  mutations.reopenTodo.resolve = async (_parent: unknown, args: TransitionArgs, context: Context) => {
     const todo = await loadOwnedTodo(context, args.id);
     if (todo.completedAt == null) return todo;
-    return setCompletedAt(context, todo, null);
+    return setCompletedAt(context, todo, null, args.reason);
   };
 
   mutations.addTodoDependency.resolve = async (

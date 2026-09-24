@@ -34,6 +34,8 @@ export const USER_OWNED_TABLES = [
   'labels',
   'projectLabels',
   'todoLabels',
+  'todoNotes',
+  'todoEvents',
 ] as const;
 
 /** Every table drizzle-graphql will generate fields for. */
@@ -52,9 +54,19 @@ export const scope: NonNullable<BuildSchemaConfig['scope']> = {
  * from the request on insert. This is what makes `userId` unstatable rather than
  * merely overwritten.
  */
-export const contextValues: NonNullable<BuildSchemaConfig['contextValues']> = Object.fromEntries(
-  USER_OWNED_TABLES.map((name) => [name, { userId: (context: Context) => requireAuth(context) }]),
-);
+export const contextValues: NonNullable<BuildSchemaConfig['contextValues']> = {
+  ...Object.fromEntries(
+    USER_OWNED_TABLES.map((name) => [name, { userId: (context: Context) => requireAuth(context) }]),
+  ),
+  // Who wrote a note is a fact about the request, like whose it is. An MCP
+  // client cannot sign a note as the user it acts for.
+  todoNotes: {
+    userId: (context: Context) => requireAuth(context),
+    actorKind: (context: Context) => context.actor.kind,
+    actorKeyId: (context: Context) => context.actor.keyId ?? null,
+    runId: (context: Context) => context.actor.runId ?? null,
+  },
+};
 
 /**
  * Tables whose writes belong to a hand-written mutation instead of generated CRUD.
@@ -62,15 +74,23 @@ export const contextValues: NonNullable<BuildSchemaConfig['contextValues']> = Ob
  * `users` is the auth flow's (resolvers/auth.ts): an account exists because a
  * sign-in created it. `todoDependencies` is `addTodoDependency`'s — a generated
  * insert would let a client write an edge without the cycle check, and a cycle
- * is a set of todos none of which can ever be completed.
+ * is a set of todos none of which can ever be completed. `todoEvents` is the
+ * `todos_history` trigger's, and history nobody can edit is the point of it.
  */
-const WRITES_RESERVED = new Set<string>(['users', 'todoDependencies']);
+const WRITES_RESERVED = new Set<string>(['users', 'todoDependencies', 'todoEvents']);
+
+/**
+ * Tables that can be added to and deleted from, but not rewritten. A note an
+ * agent was given, or a verdict it returned, should read later as it read then.
+ */
+const APPEND_ONLY = new Set<string>(['todoNotes']);
 
 const generatedWritesAllowed = (table: string) => !WRITES_RESERVED.has(table);
+const generatedUpdatesAllowed = (table: string) => generatedWritesAllowed(table) && !APPEND_ONLY.has(table);
 
 export const features: NonNullable<BuildSchemaConfig['features']> = {
   insert: generatedWritesAllowed,
-  update: generatedWritesAllowed,
-  updateMany: generatedWritesAllowed,
+  update: generatedUpdatesAllowed,
+  updateMany: generatedUpdatesAllowed,
   delete: generatedWritesAllowed,
 };

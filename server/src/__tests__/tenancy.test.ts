@@ -31,7 +31,9 @@ describe('tenancy configuration', () => {
       'projectLabels',
       'projects',
       'todoDependencies',
+      'todoEvents',
       'todoLabels',
+      'todoNotes',
       'todos',
       'users',
     ]);

@@ -1,8 +1,10 @@
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { PGlite } from '@electric-sql/pglite';
 import { relations } from '@telos/db/relations';
 import * as dbSchema from '@telos/db/schema';
-import { pushSchema } from 'drizzle-kit/api-postgres';
 import { drizzle } from 'drizzle-orm/pglite';
+import { migrate } from 'drizzle-orm/pglite/migrator';
 import { type ExecutionResult, graphql } from 'graphql';
 import { type Auth, createAuth } from '../auth.ts';
 import { createSchema } from '../build-schema.ts';
@@ -11,7 +13,11 @@ import { createLoaders } from '../loaders.ts';
 
 // A throwaway in-memory Postgres per suite. `@telos/db` is deliberately never
 // imported here — it opens a real connection at import time — so the schema is
-// pulled from `@telos/db/schema`, which is inert.
+// pulled from `@telos/db/schema`, which is inert. The committed migrations
+// build it, not a push of the models, because they carry what the models
+// cannot say: the trigger that writes todo history.
+
+const migrationsFolder = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../db/drizzle');
 
 // biome-ignore lint/suspicious/noExplicitAny: db type varies by driver
 export type TestDb = any;
@@ -19,8 +25,7 @@ export type TestDb = any;
 export async function createTestDb(): Promise<TestDb> {
   const client = new PGlite('memory://');
   const db = drizzle({ client, relations });
-  const { apply } = await pushSchema(dbSchema as never, db as never);
-  await apply();
+  await migrate(db as never, { migrationsFolder });
   return db;
 }
 

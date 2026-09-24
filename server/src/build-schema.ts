@@ -1,5 +1,6 @@
 import { AUTH_TABLES } from '@telos/db/schema';
 import { buildSchema, GraphQLDateTime } from '@vantreeseba/drizzle-graphql';
+import { applyAiSwitchesExtension } from './resolvers/ai-switches.ts';
 import { applyApiKeysExtension } from './resolvers/api-keys.ts';
 import { applyAuthExtension } from './resolvers/auth.ts';
 import { applyLanesExtension } from './resolvers/lanes.ts';
@@ -72,6 +73,7 @@ export function createSchema(db: AnyDb, options: SchemaOptions) {
   schema = applyLanesExtension(schema);
   if (options.ai) {
     schema = applyApiKeysExtension(schema);
+    schema = applyAiSwitchesExtension(schema);
   }
 
   return { schema, entities };

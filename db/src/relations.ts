@@ -25,6 +25,12 @@ export const relations = defineRelations(schema, (r) => ({
     user: r.one.users({ from: r.todos.userId, to: r.users.id }),
     project: r.one.projects({ from: r.todos.projectId, to: r.projects.id }),
     lane: r.one.lanes({ from: r.todos.laneId, to: r.lanes.id }),
+    parent: r.one.todos({ from: r.todos.parentId, to: r.todos.id, alias: 'todoParent' }),
+    children: r.many.todos({ from: r.todos.id, to: r.todos.parentId, alias: 'todoParent' }),
+    // Not `notes`: that is the todo's own description column.
+    thread: r.many.todoNotes({ from: r.todos.id, to: r.todoNotes.todoId }),
+    // Named `history` rather than `events`: it reads as what it is on a card.
+    history: r.many.todoEvents({ from: r.todos.id, to: r.todoEvents.todoId }),
     labels: r.many.labels({
       from: r.todos.id.through(r.todoLabels.todoId),
       to: r.labels.id.through(r.todoLabels.labelId),
@@ -69,6 +75,15 @@ export const relations = defineRelations(schema, (r) => ({
   todoLabels: {
     todo: r.one.todos({ from: r.todoLabels.todoId, to: r.todos.id }),
     label: r.one.labels({ from: r.todoLabels.labelId, to: r.labels.id }),
+  },
+
+  todoNotes: {
+    todo: r.one.todos({ from: r.todoNotes.todoId, to: r.todos.id }),
+  },
+
+  todoEvents: {
+    todo: r.one.todos({ from: r.todoEvents.todoId, to: r.todos.id }),
+    note: r.one.todoNotes({ from: r.todoEvents.noteId, to: r.todoNotes.id }),
   },
 
   todoDependencies: {

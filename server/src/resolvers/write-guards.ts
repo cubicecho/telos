@@ -1,10 +1,11 @@
 import * as dbSchema from '@telos/db/schema';
 import type { BuildSchemaConfig, WriteHookPayload } from '@vantreeseba/drizzle-graphql';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { GraphQLError } from 'graphql';
-import { assertNoBlockedCompletions } from '../blocking.ts';
+import { assertNoBlockedCompletions, resultRows } from '../blocking.ts';
 import type { Context } from '../context.ts';
 import { assertCompletionMatchesLane, assertEveryProjectHasLanes, realignLanes, seedMissingLanes } from '../lanes.ts';
+import { stampActor } from '../provenance.ts';
 import { requireAuth } from './auth.ts';
 
 // A row scope confines reads, updates and deletes, but it cannot reach a plain
@@ -15,6 +16,9 @@ import { requireAuth } from './auth.ts';
 //   2. Blocking on completion — a write that marks a todo done goes through the
 //      same check `completeTodo` does, so the generated `updateTodo` cannot
 //      route around the dependency rule.
+//
+// They also stamp the actor on the transaction before anything touches a todo,
+// so the history trigger can say who did it (provenance.ts).
 //
 // They run inside the mutation's own transaction, so a throw rolls the write
 // back and there is no window between the check and the write.
@@ -36,12 +40,14 @@ const project: ForeignKey = { key: 'projectId', entity: 'Project', parent: dbSch
 const todo: ForeignKey = { key: 'todoId', entity: 'Todo', parent: dbSchema.todos };
 const label: ForeignKey = { key: 'labelId', entity: 'Label', parent: dbSchema.labels };
 const lane: ForeignKey = { key: 'laneId', entity: 'Lane', parent: dbSchema.lanes };
+const parentTodo: ForeignKey = { key: 'parentId', entity: 'Todo', parent: dbSchema.todos };
 
 const FOREIGN_KEYS: Record<string, ForeignKey[]> = {
   lanes: [project],
-  todos: [project, lane],
+  todos: [project, lane, parentTodo],
   todoLabels: [todo, label],
   projectLabels: [project, label],
+  todoNotes: [todo],
 };
 
 /**
@@ -94,6 +100,80 @@ function statesLane(args: Parameters<typeof writtenRows>[0]): boolean {
   return writtenRows(args).some((row) => 'laneId' in row);
 }
 
+/** Whether this write states any of `keys`. */
+function states(args: Parameters<typeof writtenRows>[0], ...keys: string[]): boolean {
+  return writtenRows(args).some((row) => keys.some((key) => key in row));
+}
+
+/**
+ * The AI switches are only ever flipped by a person, through the mutations in
+ * ai-switches.ts, which also stop whatever the switch was letting run. A
+ * generated write would flip the flag and leave the rest running.
+ */
+function assertAiSwitchUntouched(args: Parameters<typeof writtenRows>[0]): void {
+  if (!states(args, 'aiEnabled')) return;
+  throw new GraphQLError('Use setProjectAiEnabled to switch AI on or off for a project.', {
+    extensions: { code: 'BAD_USER_INPUT' },
+  });
+}
+
+/**
+ * "AI ignores this" is a person's instruction to agents, so no agent or key may
+ * set it or, more to the point, clear it.
+ */
+function assertIgnoreFlagFromPerson(args: Parameters<typeof writtenRows>[0], context: Context): void {
+  if (!states(args, 'aiIgnored') || context.actor.kind === 'user') return;
+  throw new GraphQLError('Only a person can change whether AI ignores a todo.', {
+    extensions: { code: 'FORBIDDEN' },
+  });
+}
+
+/**
+ * People write plain notes. Reports and verdicts are what a run leaves behind,
+ * and the server writes those itself, so a generated insert cannot pass one off.
+ */
+function assertPlainNotes(args: Parameters<typeof writtenRows>[0]): void {
+  if (writtenRows(args).every((row) => row.kind === undefined || row.kind === 'note')) return;
+  throw new GraphQLError('Only notes of kind "note" can be written directly.', {
+    extensions: { code: 'BAD_USER_INPUT' },
+  });
+}
+
+/**
+ * A todo's parent is in its own project, and following parents never comes back
+ * around. Checked over the caller's todos after the write, for the reason the
+ * completion invariant is: the rows a `where` touched are not knowable before.
+ */
+async function assertParentsSound(tx: AnyTable, userId: string): Promise<void> {
+  const crossProject = resultRows(
+    await tx.execute(sql`
+      SELECT 1 FROM todos child JOIN todos parent ON parent.id = child.parent_id
+      WHERE child.user_id = ${userId} AND parent.project_id <> child.project_id
+      LIMIT 1
+    `),
+  );
+  if (crossProject.length > 0) {
+    throw new GraphQLError("A todo's parent must be in the same project.", { extensions: { code: 'BAD_USER_INPUT' } });
+  }
+  // The depth bound only stops the walk; any chain that long has already met a
+  // repeat, since no user has that many todos stacked in one line.
+  const cycles = resultRows(
+    await tx.execute(sql`
+      WITH RECURSIVE chain(start_id, parent_id, depth) AS (
+        SELECT id, parent_id, 1 FROM todos WHERE user_id = ${userId} AND parent_id IS NOT NULL
+        UNION ALL
+        SELECT chain.start_id, t.parent_id, chain.depth + 1
+        FROM chain JOIN todos t ON t.id = chain.parent_id
+        WHERE t.parent_id IS NOT NULL AND chain.start_id <> chain.parent_id AND chain.depth < 1000
+      )
+      SELECT 1 FROM chain WHERE start_id = parent_id LIMIT 1
+    `),
+  );
+  if (cycles.length > 0) {
+    throw new GraphQLError('A todo cannot be its own ancestor.', { extensions: { code: 'BAD_USER_INPUT' } });
+  }
+}
+
 /**
  * Which lane means done is `setDoneLane`'s to decide: moving the flag has to
  * move the todos with it, and a generated write would leave the board saying one
@@ -119,6 +199,8 @@ export const onWrite: NonNullable<BuildSchemaConfig['onWrite']> = {
   lanes: {
     before: async ({ args, context, tx }: WriteHookPayload) => {
       assertDoneFlagUntouched(args);
+      // Deleting a lane moves its todos (see `after`), which is history.
+      await stampActor(tx, (context as Context).actor);
       await assertForeignKeysOwned(tx, requireAuth(context as Context), writtenRows(args), FOREIGN_KEYS.lanes);
     },
     // Deleting a lane sets its todos' `lane_id` to null, which can strand a
@@ -133,6 +215,7 @@ export const onWrite: NonNullable<BuildSchemaConfig['onWrite']> = {
     },
   },
   projects: {
+    before: async ({ args }: WriteHookPayload) => assertAiSwitchUntouched(args),
     // A project without lanes has an empty board, so every project gets one at
     // the moment it is created — inside the creating transaction, so a project
     // never exists without it.
@@ -142,8 +225,11 @@ export const onWrite: NonNullable<BuildSchemaConfig['onWrite']> = {
     },
   },
   todos: {
-    before: async ({ args, context, tx }: WriteHookPayload) =>
-      assertForeignKeysOwned(tx, requireAuth(context as Context), writtenRows(args), FOREIGN_KEYS.todos),
+    before: async ({ args, context, tx }: WriteHookPayload) => {
+      assertIgnoreFlagFromPerson(args, context as Context);
+      await assertForeignKeysOwned(tx, requireAuth(context as Context), writtenRows(args), FOREIGN_KEYS.todos);
+      await stampActor(tx, (context as Context).actor);
+    },
     // Checked after the statement rather than before it: a `where` may name the
     // affected rows by anything at all, so which todos a write completes is only
     // knowable once it has run. The returned rows cannot answer that either —
@@ -153,14 +239,21 @@ export const onWrite: NonNullable<BuildSchemaConfig['onWrite']> = {
     after: async ({ args, context, operation, tx }: WriteHookPayload) => {
       if (operation === 'delete' || operation === 'restore') return;
       const created = operation === 'insert' || operation === 'upsert';
-      if (!created && !statesCompletion(args) && !statesLane(args)) return;
       const userId = requireAuth(context as Context);
+      if (states(args, 'parentId')) await assertParentsSound(tx, userId);
+      if (!created && !statesCompletion(args) && !statesLane(args)) return;
       if (marksComplete(args)) await assertNoBlockedCompletions(tx, userId);
       // A write that says what is done gets its lanes fixed to match; a write
       // that only names a lane is refused, because guessing which of the two the
       // caller meant would silently undo one of them.
       if (created || statesCompletion(args)) await realignLanes(tx, userId);
       await assertCompletionMatchesLane(tx, userId);
+    },
+  },
+  todoNotes: {
+    before: async ({ args, context, tx }: WriteHookPayload) => {
+      assertPlainNotes(args);
+      await assertForeignKeysOwned(tx, requireAuth(context as Context), writtenRows(args), FOREIGN_KEYS.todoNotes);
     },
   },
 };
