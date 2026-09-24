@@ -2,6 +2,7 @@ import { cloneElement, createContext, isValidElement, type ReactElement, useCont
 import { Modal, Pressable, Text, View } from 'react-native';
 import type {
   PopoverAnchorProps,
+  PopoverCloseProps,
   PopoverContentProps,
   PopoverProps,
   PopoverSectionProps,
@@ -55,6 +56,21 @@ function PopoverContent({ className, children }: PopoverContentProps) {
   );
 }
 
+function PopoverClose({ asChild, className, children }: PopoverCloseProps) {
+  const { setOpen } = useContext(PopoverContext);
+  if (asChild && isValidElement(children)) {
+    return cloneElement(children as ReactElement<{ onPress?: () => void }>, {
+      onPress: () => setOpen(false),
+    });
+  }
+  return (
+    // The `role` is hand-written because a `<button>` has no native counterpart.
+    <Pressable role="button" onPress={() => setOpen(false)} className={cn(className)}>
+      {children}
+    </Pressable>
+  );
+}
+
 /** The native sheet is centred and anchors to nothing, so an anchor is just its children. */
 function PopoverAnchor({ children }: PopoverAnchorProps) {
   return <>{children}</>;
@@ -72,4 +88,13 @@ function PopoverDescription({ className, children }: PopoverSectionProps) {
   return <Text className={cn('text-sm text-muted-foreground', className)}>{children}</Text>;
 }
 
-export { Popover, PopoverAnchor, PopoverContent, PopoverDescription, PopoverHeader, PopoverTitle, PopoverTrigger };
+export {
+  Popover,
+  PopoverAnchor,
+  PopoverClose,
+  PopoverContent,
+  PopoverDescription,
+  PopoverHeader,
+  PopoverTitle,
+  PopoverTrigger,
+};

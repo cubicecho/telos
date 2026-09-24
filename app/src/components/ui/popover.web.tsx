@@ -2,6 +2,7 @@ import { Popover as PopoverPrimitive } from 'radix-ui';
 import type * as React from 'react';
 import type {
   PopoverAnchorProps,
+  PopoverCloseProps,
   PopoverContentProps,
   PopoverProps,
   PopoverSectionProps,
@@ -68,6 +69,21 @@ function PopoverAnchor({
   return <PopoverPrimitive.Anchor data-slot="popover-anchor" asChild={asChild ?? false} {...props} />;
 }
 
+function PopoverClose({
+  asChild,
+  className,
+  ...props
+}: Wide<PopoverCloseProps, React.ComponentProps<typeof PopoverPrimitive.Close>>) {
+  return (
+    <PopoverPrimitive.Close
+      data-slot="popover-close"
+      asChild={asChild ?? false}
+      {...(className === undefined ? {} : { className })}
+      {...props}
+    />
+  );
+}
+
 function PopoverHeader({ className, ...props }: Wide<PopoverSectionProps, React.ComponentProps<'div'>>) {
   return <div data-slot="popover-header" className={cn('flex flex-col gap-1 text-sm', className)} {...props} />;
 }
@@ -80,4 +96,13 @@ function PopoverDescription({ className, ...props }: Wide<PopoverSectionProps, R
   return <p data-slot="popover-description" className={cn('text-muted-foreground', className)} {...props} />;
 }
 
-export { Popover, PopoverAnchor, PopoverContent, PopoverDescription, PopoverHeader, PopoverTitle, PopoverTrigger };
+export {
+  Popover,
+  PopoverAnchor,
+  PopoverClose,
+  PopoverContent,
+  PopoverDescription,
+  PopoverHeader,
+  PopoverTitle,
+  PopoverTrigger,
+};

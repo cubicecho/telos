@@ -30,6 +30,17 @@ export type PopoverContentProps = {
   children?: ReactNode;
 };
 
+/**
+ * Closes the popover it is inside. `asChild` hands the press to a `Button` rather than wrapping
+ * it — the same shape as `DialogClose`, so a pane's Done button does not need the caller to own
+ * `open` just to set it back to `false`.
+ */
+export type PopoverCloseProps = {
+  asChild?: boolean | undefined;
+  className?: string | undefined;
+  children?: ReactNode;
+};
+
 /** Web only in effect: the native sheet is centred, so it renders its children and anchors nothing. */
 export type PopoverAnchorProps = {
   asChild?: boolean | undefined;

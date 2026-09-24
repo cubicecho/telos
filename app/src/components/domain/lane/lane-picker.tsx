@@ -1,12 +1,10 @@
-import { useState } from 'react';
 import { Text } from 'react-native';
 import { Columns3 } from '@/components/app-icons';
 import { Button } from '@/components/ui/button';
 import { Check } from '@/components/ui/icons';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Menu, MenuContent, MenuItem, MenuTrigger } from '@/components/ui/menu';
 import { cn } from '@/lib/utils';
 import type { LaneSummary } from './lane-badge';
-import { MenuItem } from './menu-item';
 
 /**
  * "Move to", as a menu.
@@ -36,34 +34,27 @@ export function LanePicker({
   align?: 'start' | 'end';
   className?: string;
 }) {
-  const [open, setOpen] = useState(false);
   if (lanes.length === 0) return null;
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
+    <Menu>
+      <MenuTrigger asChild>
         <Button
           variant="ghost"
           size="icon"
           className={cn('text-muted-foreground', className)}
           aria-label={current ? `Lane, currently ${current.name}` : 'Lane'}
-          // Radix opens from the trigger's `onClick`, which react-native-web's
-          // Pressable swallows — see dependency-picker.tsx.
-          onPress={() => setOpen(!open)}
         >
           <Columns3 className="h-4 w-4" />
         </Button>
-      </PopoverTrigger>
-      <PopoverContent align={align} className="w-52 p-1">
+      </MenuTrigger>
+      <MenuContent align={align} className="w-52">
         {lanes.map((lane) => (
           <MenuItem
             key={lane.id}
             label={lane.name}
             disabled={lockedReason != null && lane.id !== current?.id}
-            onSelect={() => {
-              setOpen(false);
-              onSelect(lane);
-            }}
+            onSelect={() => onSelect(lane)}
             trailing={
               <>
                 {lane.isDone ? <Text className="text-muted-foreground text-xs">done</Text> : null}
@@ -73,7 +64,7 @@ export function LanePicker({
           />
         ))}
         {lockedReason ? <Text className="px-2 py-1.5 text-muted-foreground text-xs">{lockedReason}</Text> : null}
-      </PopoverContent>
-    </Popover>
+      </MenuContent>
+    </Menu>
   );
 }

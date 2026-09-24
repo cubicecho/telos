@@ -96,11 +96,11 @@ export function TodoFormDialog({
               scalar override exists to keep honest. */}
           <form.AppField name="dueAt">
             {(field) => (
-              <field.DateField
+              <field.DateTimeField
                 label="Due"
                 mode="date"
                 placeholder="No due date"
-                className="self-start"
+                clearable
                 description="Clear it from the calendar for no due date."
               />
             )}

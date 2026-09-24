@@ -5,10 +5,13 @@ import {
   type BadgeVariant,
   badgeContainerVariants,
   badgeHasLabel,
+  badgeIconClass,
+  badgeRemoveLabel,
   badgeTextFallback,
   badgeTextVariants,
   badgeVariants,
 } from '@/components/ui/badge-base';
+import { X } from '@/components/ui/icons';
 import { cn } from '@/lib/utils';
 
 export type { BadgeProps, BadgeVariant };
@@ -19,6 +22,8 @@ export function Badge({
   textColor,
   className,
   label,
+  onRemove,
+  removeLabel,
   asChild = false,
   style,
   children,
@@ -57,6 +62,23 @@ export function Badge({
       {...props}
     >
       {shape === 'pill' ? children : null}
+      {shape === 'pill' && onRemove && !asChild ? (
+        <button
+          type="button"
+          aria-label={removeLabel ?? badgeRemoveLabel(children, label)}
+          className="-my-1 -mr-1.5 -ml-1 inline-flex cursor-pointer items-center justify-center rounded-full p-1 text-inherit outline-none hover:opacity-75 focus-visible:ring-2 focus-visible:ring-current focus-visible:ring-inset"
+          onClick={(event) => {
+            event.stopPropagation();
+            onRemove();
+          }}
+          // The keys that press it, stopped too, so a badge's own `onKeyDown` does not act on them.
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') event.stopPropagation();
+          }}
+        >
+          <X className={badgeIconClass} aria-hidden />
+        </button>
+      ) : null}
     </Comp>
   );
 }

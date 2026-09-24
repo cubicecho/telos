@@ -36,7 +36,7 @@ telos/
 │   │   ├── __generated__/   # Generated GraphQL types (do not edit, not committed)
 │   │   ├── components/
 │   │   │   ├── ui/          # cubeui primitives (installed via shadcn) — no app logic
-│   │   │   ├── app-form.tsx # `useAppForm`: cubeui's native `Form` fields, registered
+│   │   │   ├── app-form.tsx # `useAppForm`: cubeui's `createAppForm`, plus the date and colour fields
 │   │   │   ├── domain/      # project/, todo/, lane/, label/, settings/
 │   │   │   └── layouts/     # sidebar
 │   │   └── lib/             # apollo, auth, theme, cache writers, blocking, graphql documents, cn()
@@ -299,8 +299,9 @@ a value it failed to read.
   `Local patch until cubicecho/cubeui#N` comment, and check for those comments
   after every re-add, since a re-add overwrites them.
 - Forms are TanStack Form through `useAppForm` in `src/components/app-form.tsx`,
-  which registers cubeui's native `Form` fields: `form.AppField` with a
-  `validators` rule, and `form.SubmitButton` for the disabled state. Not
+  cubeui's `createAppForm` with `DateTimeField` and `ColorField` joined to the
+  light fields: `form.AppField` with a `validators` rule, `field.*` for the
+  control, and `form.SubmitButton` for the disabled state. Not
   `useState` and a hand-computed `canSubmit`.
 - `import './preflight.ts';` stays first in `server/src/index.ts`, separated by a
   blank line so Biome's import sorting leaves it there. It has to run before

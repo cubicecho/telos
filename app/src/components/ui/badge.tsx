@@ -1,21 +1,39 @@
 import { Children } from 'react';
-import { Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import {
   type BadgeProps,
   type BadgeVariant,
   badgeContainerVariants,
   badgeHasLabel,
+  badgeIconClass,
+  badgeInkFallback,
+  badgeInkVariants,
+  badgeRemoveLabel,
   badgeTextFallback,
   badgeTextVariants,
   badgeVariants,
 } from '@/components/ui/badge-base';
+import { X } from '@/components/ui/icons';
 import { cn } from '@/lib/utils';
+
+/** A 12px glyph grown to about 28 by 28 of touch, without growing the pill. */
+const REMOVE_HIT_SLOP = { top: 8, bottom: 8, left: 6, right: 8 } as const;
 
 export type { BadgeProps, BadgeVariant };
 
-export function Badge({ variant = 'default', backgroundColor, textColor, className, label, children }: BadgeProps) {
+export function Badge({
+  variant = 'default',
+  backgroundColor,
+  textColor,
+  className,
+  label,
+  onRemove,
+  removeLabel,
+  children,
+}: BadgeProps) {
   const shape = badgeHasLabel(children) ? 'pill' : 'dot';
   const textClass = backgroundColor ? badgeTextFallback : badgeTextVariants({ variant });
+  const inkClass = backgroundColor ? badgeInkFallback : badgeInkVariants({ variant });
 
   return (
     <View
@@ -42,6 +60,21 @@ export function Badge({ variant = 'default', backgroundColor, textColor, classNa
             ),
           )
         : null}
+      {shape === 'pill' && onRemove ? (
+        <Pressable
+          onPress={onRemove}
+          // The `role` is hand-written because a `<button>` has no native counterpart.
+          role="button"
+          aria-label={removeLabel ?? badgeRemoveLabel(children, label)}
+          hitSlop={REMOVE_HIT_SLOP}
+        >
+          <X
+            className={cn(badgeIconClass, inkClass)}
+            // An inline prop wins over the colour the class maps to, as `style` does on the `Text`.
+            {...(textColor ? { color: textColor } : {})}
+          />
+        </Pressable>
+      ) : null}
     </View>
   );
 }

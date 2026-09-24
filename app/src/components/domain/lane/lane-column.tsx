@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Text, TextInput, View } from 'react-native';
 import { Ellipsis } from '@/components/app-icons';
 import type { TodoSummary } from '@/components/domain/todo/types';
@@ -6,13 +6,12 @@ import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Check, ChevronLeft, ChevronRight, CircleCheck, Pencil, Trash2 } from '@/components/ui/icons';
 import { INPUT_CLASS } from '@/components/ui/input-base';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Menu, MenuContent, MenuItem, MenuTrigger } from '@/components/ui/menu';
 import type { CachedLane } from '@/lib/cache';
 import { cn } from '@/lib/utils';
 import { BoardCard } from './board-card';
 import { DropLane } from './drag-surfaces';
 import type { LaneSummary } from './lane-badge';
-import { MenuItem } from './menu-item';
 
 /**
  * One column of the board: a droppable region and everything the column itself
@@ -44,8 +43,8 @@ export function LaneColumn({
   onDelete: () => void;
 }) {
   const [renaming, setRenaming] = useState(false);
+  const renameInput = useRef<TextInput>(null);
   const [name, setName] = useState(lane.name);
-  const [menuOpen, setMenuOpen] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   const index = lanes.findIndex((row) => row.id === lane.id);
@@ -61,19 +60,12 @@ export function LaneColumn({
     onRename(trimmed);
   }
 
-  /** Close the menu, then act — the popover has no `Close` of its own. */
-  function select(action: () => void) {
-    return () => {
-      setMenuOpen(false);
-      action();
-    };
-  }
-
   return (
     <View role="region" aria-label={lane.name} className="w-72 shrink-0 gap-2">
       <View className="h-8 flex-row items-center gap-2 px-1">
         {renaming ? (
           <TextInput
+            ref={renameInput}
             autoFocus
             value={name}
             aria-label={`Rename ${lane.name}`}
@@ -104,42 +96,45 @@ export function LaneColumn({
           </>
         )}
 
-        <Popover open={menuOpen} onOpenChange={setMenuOpen}>
-          <PopoverTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7"
-              aria-label={`${lane.name} lane actions`}
-              // Radix opens from the trigger's `onClick`, which react-native-web's
-              // Pressable swallows — see dependency-picker.tsx.
-              onPress={() => setMenuOpen(!menuOpen)}
-            >
+        <Menu>
+          <MenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-7 w-7" aria-label={`${lane.name} lane actions`}>
               <Ellipsis className="h-4 w-4" />
             </Button>
-          </PopoverTrigger>
-          <PopoverContent align="end" className="w-56 p-1">
-            <MenuItem
-              label="Rename"
-              icon={<Pencil className="h-3.5 w-3.5" />}
-              onSelect={select(() => setRenaming(true))}
-            />
+          </MenuTrigger>
+          <MenuContent
+            align="end"
+            className="w-56"
+            // Rename hands focus to its input, but the input mounts while the
+            // menu still traps focus, and radix gives it to the trigger once the
+            // menu unmounts. So the hand-off happens here, at the moment radix
+            // would return it. Web-only radix prop, so it goes past the shared
+            // types. Local patch until cubicecho/cubeui#119.
+            {...({
+              onCloseAutoFocus: (event: Event) => {
+                if (!renameInput.current) return;
+                event.preventDefault();
+                renameInput.current.focus();
+              },
+            } as object)}
+          >
+            <MenuItem label="Rename" icon={<Pencil className="h-3.5 w-3.5" />} onSelect={() => setRenaming(true)} />
             <MenuItem
               label="Marks work done"
               icon={<Check className={cn('h-3.5 w-3.5', !lane.isDone && 'opacity-0')} />}
-              onSelect={select(onToggleDone)}
+              onSelect={onToggleDone}
             />
             <MenuItem
               label="Move left"
               icon={<ChevronLeft className="h-3.5 w-3.5" />}
               disabled={index <= 0}
-              onSelect={select(() => onReorder(-1))}
+              onSelect={() => onReorder(-1)}
             />
             <MenuItem
               label="Move right"
               icon={<ChevronRight className="h-3.5 w-3.5" />}
               disabled={index < 0 || index >= lanes.length - 1}
-              onSelect={select(() => onReorder(1))}
+              onSelect={() => onReorder(1)}
             />
             {/* The last lane has nowhere to send its todos, and a project
                 without a board is a project whose Board tab is empty. */}
@@ -148,10 +143,10 @@ export function LaneColumn({
               icon={<Trash2 className="h-3.5 w-3.5" />}
               destructive
               disabled={lanes.length <= 1}
-              onSelect={select(() => setConfirmingDelete(true))}
+              onSelect={() => setConfirmingDelete(true)}
             />
-          </PopoverContent>
-        </Popover>
+          </MenuContent>
+        </Menu>
       </View>
 
       <DropLane

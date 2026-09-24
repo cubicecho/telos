@@ -1,5 +1,5 @@
 import { cva } from 'class-variance-authority';
-import type { ReactNode } from 'react';
+import { Children, type ReactNode } from 'react';
 
 export type BadgeVariant =
   | 'default'
@@ -30,10 +30,20 @@ export type BadgeProps = {
   textColor?: string | undefined;
   className?: string | undefined;
   /**
-   * What the dot stands for, exposed as its accessible name. Ignored in the
-   * pill form, where the label is already the name.
+   * What the dot stands for, exposed as its accessible name. In the pill form
+   * the text is already the name, so there it only feeds `removeLabel`'s default
+   * when the children hold no text of their own.
    */
   label?: string | undefined;
+  /**
+   * Draws a trailing ✕, a button of its own, that calls this — a tag or a filter
+   * chip the user can take off. The ✕ is in the label's colour, and pressing it
+   * reaches nothing else on the badge. Ignored by the dot, which has no room for
+   * it, and by the web half's `asChild`, whose one child is the whole badge.
+   */
+  onRemove?: (() => void) | undefined;
+  /** The ✕'s accessible name. Defaults to `Remove <text>`, the badge's own text. */
+  removeLabel?: string | undefined;
   /**
    * The label: text, a number, or elements such as an icon beside text. Absent —
    * including an empty string — collapses the badge to a dot.
@@ -44,6 +54,19 @@ export type BadgeProps = {
 /** Whether `children` holds anything to show, which is what decides pill or dot. */
 export function badgeHasLabel(children: ReactNode): boolean {
   return !(children === undefined || children === null || children === false || children === '');
+}
+
+/**
+ * The ✕'s default name: `Remove` and the badge's text — its string and number
+ * children — or `label` when the children are all elements.
+ */
+export function badgeRemoveLabel(children: ReactNode, label?: string | undefined): string {
+  const text = Children.toArray(children)
+    .filter((child) => typeof child === 'string' || typeof child === 'number')
+    .join('')
+    .trim();
+  const name = text || label;
+  return name ? `Remove ${name}` : 'Remove';
 }
 
 /**
@@ -76,25 +99,46 @@ export const badgeContainerVariants = cva('shrink-0 rounded-full border border-t
   defaultVariants: { variant: 'default', shape: 'pill' },
 });
 
+/** The label's colour and nothing else, per variant. */
+const BADGE_INK = {
+  default: 'text-primary-foreground',
+  secondary: 'text-secondary-foreground',
+  destructive: 'text-white',
+  outline: 'text-foreground',
+  ghost: 'text-foreground',
+  link: 'text-primary',
+  success: 'text-white',
+  warning: 'text-white',
+} satisfies Record<BadgeVariant, string>;
+
 /** The label's type and colour, per variant. */
 export const badgeTextVariants = cva('text-xs font-medium', {
   variants: {
-    variant: {
-      default: 'text-primary-foreground',
-      secondary: 'text-secondary-foreground',
-      destructive: 'text-white',
-      outline: 'text-foreground',
-      ghost: 'text-foreground',
-      link: 'text-primary underline-offset-4',
-      success: 'text-white',
-      warning: 'text-white',
-    },
+    variant: { ...BADGE_INK, link: 'text-primary underline-offset-4' },
   },
+  defaultVariants: { variant: 'default' },
+});
+
+/**
+ * The ✕'s colour on native, where nothing inherits: the label's ink without its
+ * type, which an `<Svg>` has no use for. The web ✕ takes `currentColor` instead.
+ */
+export const badgeInkVariants = cva('', {
+  variants: { variant: BADGE_INK },
   defaultVariants: { variant: 'default' },
 });
 
 /** The label's class when `backgroundColor` replaced the variant's own. */
 export const badgeTextFallback = 'text-xs font-medium text-foreground';
+
+/** `badgeInkVariants`' counterpart, for when `backgroundColor` replaced the variant's own. */
+export const badgeInkFallback = 'text-foreground';
+
+/**
+ * The badge's icon size — the one the web half gives an `<svg>` child — and so the ✕'s. It is
+ * shorter than the label's line, so the ✕ never makes the pill taller.
+ */
+export const badgeIconClass = 'size-3 shrink-0';
 
 /**
  * shadcn's `badgeVariants`: the whole pill's classes, container and label together, for dressing
