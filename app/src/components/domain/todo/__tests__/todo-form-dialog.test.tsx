@@ -21,9 +21,12 @@ const TODO: TodoSummary = {
   lane: null,
 };
 
-/** The button that opens the due-date calendar, found through the label that names it. */
-function dueTrigger() {
-  return screen.getByLabelText('Due');
+/**
+ * The button that opens the due-date calendar. Found by its whole name, which is
+ * the field's label and then its value, so a trigger that says only "Due" fails.
+ */
+function dueTrigger(value: string) {
+  return screen.getByRole('button', { name: `Due ${value}` });
 }
 
 /** The mutation as the dialog sends it, paired with a plausible answer. */
@@ -50,7 +53,7 @@ describe('TodoFormDialog', () => {
     expect(screen.getByLabelText('Title')).toHaveValue('Replace the tap');
     expect(screen.getByLabelText('Notes')).toHaveValue('The washer is perished.');
     // The local day, as the badge on the row shows it.
-    expect(dueTrigger()).toHaveTextContent('December 1st, 2026');
+    expect(dueTrigger('December 1st, 2026')).toBeInTheDocument();
   });
 
   it('saves the title, the notes and the due date together, and closes', async () => {
@@ -70,9 +73,9 @@ describe('TodoFormDialog', () => {
     await user.clear(screen.getByLabelText('Title'));
     await user.type(screen.getByLabelText('Title'), 'Replace the kitchen tap');
     await user.type(screen.getByLabelText('Notes'), 'Bring the big wrench.');
-    await user.click(dueTrigger());
+    await user.click(dueTrigger('No due date'));
     await user.click(await screen.findByRole('button', { name: new RegExp(format(picked, 'MMMM do, yyyy')) }));
-    expect(dueTrigger()).toHaveTextContent(format(picked, 'PPP'));
+    expect(dueTrigger(format(picked, 'PPP'))).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Save' }));
 
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
@@ -91,13 +94,13 @@ describe('TodoFormDialog', () => {
 
   it('clears a due date to null rather than to the epoch', async () => {
     const user = userEvent.setup();
-    const onOpenChange = open({ ...TODO, dueAt: '2026-12-01T09:00:00.000Z' }, [
+    const onOpenChange = open({ ...TODO, dueAt: new Date(2026, 11, 1, 9).toISOString() }, [
       save({ title: TODO.title, notes: null, dueAt: null }),
     ]);
 
-    await user.click(dueTrigger());
+    await user.click(dueTrigger('December 1st, 2026'));
     await user.click(await screen.findByRole('button', { name: /clear/i }));
-    expect(dueTrigger()).toHaveTextContent('No due date');
+    expect(dueTrigger('No due date')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Save' }));
 
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));

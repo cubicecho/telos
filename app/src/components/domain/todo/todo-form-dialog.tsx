@@ -104,13 +104,15 @@ export function TodoFormDialog({
           <Textarea id="todo-notes" value={notes} placeholder="Optional." onChangeText={setNotes} />
         </Field>
         <Field>
-          <FieldLabel htmlFor="todo-due-at">Due</FieldLabel>
+          <FieldLabel id="todo-due-at-label">Due</FieldLabel>
           {/* Date only: a picked day is committed at local midnight, so the day
               the reader chose is the day they get back in their own zone. Clear
               saves `null`, never the epoch, which is the path the server-side
-              scalar override exists to keep honest. */}
+              scalar override exists to keep honest. Named by reference rather
+              than `htmlFor`, which would name the trigger "Due" and drop the
+              date; this reads "Due September 15th, 2026", on both halves. */}
           <DateTimeInput
-            id="todo-due-at"
+            aria-labelledby="todo-due-at-label"
             mode="date"
             clearable
             value={dueAt}

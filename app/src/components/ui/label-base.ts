@@ -7,6 +7,11 @@ export type LabelProps = {
    * ignores it rather than pretending otherwise.
    */
   htmlFor?: string | undefined;
+  /**
+   * What a control's `aria-labelledby` points at — the way to name a control no `htmlFor` can
+   * reach, on either platform. React Native takes `id` as the `Text`'s `nativeID`.
+   */
+  id?: string | undefined;
   className?: string | undefined;
   children?: ReactNode;
 };

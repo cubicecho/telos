@@ -1,7 +1,7 @@
 import { format } from 'date-fns';
 import { useId, useState } from 'react';
 import { Text, View } from 'react-native';
-import { Button } from '@/components/ui/button';
+import { Button, buttonTextVariants } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Calendar as CalendarIcon, X } from '@/components/ui/icons';
 import { Input } from '@/components/ui/input';
@@ -21,17 +21,22 @@ type DateTimeInputSharedProps = {
   /**
    * The trigger's id — what a `FieldLabel htmlFor` points at on the web. React Native takes `id`
    * as its `nativeID`, so on device it is a target for `aria-labelledby` rather than a label's.
+   * A `<label for>` names the trigger by the label alone — the date is not in the name — so pass
+   * `aria-labelledby` when the field has a label with an id.
    */
   id?: string | undefined;
   /**
-   * The field's name, on the trigger. In `"datetime"` mode the time box is named after it —
-   * `"Due"` makes it `"Due, time"` — so two of these in one form are not both "Time".
+   * The field's name. The trigger is named by it and the date after it — `"Due"` makes it
+   * `"Due, September 15th, 2026"`, or `"Due, Pick a date"` while empty. In `"datetime"` mode
+   * the time box is named after it too — `"Due, time"` — so two of these in one form are not
+   * both "Time".
    */
   'aria-label'?: string | undefined;
   /**
-   * The field's name by reference — the id of the `Label` above it. The trigger takes it as is;
-   * the time box takes it followed by its own id, and its own `aria-label` of "time" is what that
-   * second reference reads, so it is named "Due time".
+   * The field's name by reference — the id of the `Label` above it. The trigger takes it followed
+   * by a reference to its own date text, so it is named "Due September 15th, 2026". The time box
+   * takes it followed by its own id, and its own `aria-label` of "time" is what that second
+   * reference reads, so it is named "Due time".
    */
   'aria-labelledby'?: string | undefined;
 };
@@ -70,6 +75,8 @@ export function DateTimeInput(props: DateTimeInputProps) {
   const withTime = mode === 'datetime';
   const [open, setOpen] = useState(false);
   const timeId = useId();
+  const valueId = useId();
+  const valueText = value ? format(value, 'PPP') : placeholder;
 
   function commit(next: Date) {
     // Both branches take a `Date`; the union of their `onChange`s does not say so.
@@ -123,19 +130,25 @@ export function DateTimeInput(props: DateTimeInputProps) {
           <Button
             variant="outline"
             id={id}
-            aria-label={ariaLabel}
-            aria-labelledby={ariaLabelledBy}
+            // A name on a button replaces its contents, so a bare "Due" would drop the date —
+            // the part of the field that changes. Both are in the name instead: an `aria-label`
+            // is composed with the value text, which iOS reads too, and a reference is followed
+            // by one to the value text below. `htmlFor` alone cannot do this — see the skill.
+            aria-label={ariaLabel ? `${ariaLabel}, ${valueText}` : undefined}
+            aria-labelledby={ariaLabelledBy ? `${ariaLabelledBy} ${valueId}` : undefined}
             className="flex-1 justify-start text-left font-normal"
             onPress={() => setOpen(true)}
           >
             <CalendarIcon className="mr-2 h-4 w-4" />
-            {value ? (
-              format(value, 'PPP')
-            ) : (
-              // Its own `Text`, because native has no colour inheritance: a muted
-              // class on the button would never reach the words.
-              <Text className="text-sm text-muted-foreground">{placeholder}</Text>
-            )}
+            {/* Its own `Text` in both states, for the id a reference points at; and because
+                native has no colour inheritance, the placeholder's muted class has to be on
+                the words themselves. */}
+            <Text
+              nativeID={valueId}
+              className={value ? buttonTextVariants({ variant: 'outline' }) : 'text-sm text-muted-foreground'}
+            >
+              {valueText}
+            </Text>
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0" align="start">
