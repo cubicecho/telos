@@ -33,3 +33,33 @@ export function magicLinkRequired(): boolean {
 export function magicLinkExposed(): boolean {
   return process.env.NODE_ENV !== 'production' || envFlag(process.env.EXPOSE_MAGIC_LINK);
 }
+
+/** What signs sessions when nothing is configured. preflight.ts refuses it in production. */
+export const DEV_SECRET = 'dev-secret-change-in-production';
+
+/**
+ * The secret better-auth signs with. `AUTH_SECRET`, or `JWT_SECRET` for an
+ * instance configured before sessions moved to better-auth.
+ */
+export function authSecret(): string {
+  return process.env.AUTH_SECRET || process.env.JWT_SECRET || DEV_SECRET;
+}
+
+/**
+ * Where magic links point. In production the server serves the client itself,
+ * so its own origin is the right default, but only for someone browsing from
+ * this machine. Set APP_URL to the address users actually type; a link to
+ * `localhost` is useless in an inbox.
+ */
+export function appUrl(): string {
+  return process.env.APP_URL ?? `http://localhost:${process.env.PORT ?? 3001}`;
+}
+
+/**
+ * The instance's AI switch, off unless `AI_ENABLED` says otherwise. Off, the
+ * AI surface does not exist: no `/mcp`, no API keys, no AI fields in the
+ * schema, and every account's own switch is moot.
+ */
+export function aiEnabled(): boolean {
+  return envFlag(process.env.AI_ENABLED);
+}

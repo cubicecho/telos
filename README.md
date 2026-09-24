@@ -35,7 +35,7 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      JWT_SECRET: ${JWT_SECRET:?generate one with `openssl rand -hex 32`}
+      AUTH_SECRET: ${AUTH_SECRET:?generate one with `openssl rand -hex 32`}
       DATABASE_URL: postgres://telos:${POSTGRES_PASSWORD:?set a database password}@postgres:5432/telos
       # The address you actually reach Telos at. Magic-link URLs are built from
       # it, so a link to localhost is useless in an inbox.
@@ -68,7 +68,7 @@ volumes:
 Generate the two secrets it refuses to start without, then bring it up:
 
 ```bash
-printf 'JWT_SECRET=%s\nPOSTGRES_PASSWORD=%s\n' \
+printf 'AUTH_SECRET=%s\nPOSTGRES_PASSWORD=%s\n' \
   "$(openssl rand -hex 32)" "$(openssl rand -hex 24)" > .env
 
 docker compose up -d
@@ -82,8 +82,8 @@ the magic link goes to the log, and that is the delivery channel:
 docker compose logs -f telos
 ```
 
-Keep that `.env`. `JWT_SECRET` signs sessions, so changing it signs everyone
-out, and `POSTGRES_PASSWORD` is the database's own. Your data lives in the
+Keep that `.env`. `AUTH_SECRET` is what sessions are signed with, and
+`POSTGRES_PASSWORD` is the database's own. Your data lives in the
 `telos_pgdata` volume, which survives `docker compose down`; upgrade with
 `docker compose pull && docker compose up -d`.
 
@@ -95,11 +95,12 @@ domain.
 | Variable | Default | Meaning |
 | --- | --- | --- |
 | `DATABASE_URL` | — | **Required.** Postgres connection string. There is no embedded fallback. |
-| `JWT_SECRET` | — | **Required in production.** Signs session and magic-link tokens. `openssl rand -hex 32`. |
+| `AUTH_SECRET` | — | **Required in production.** Signs sessions. `openssl rand -hex 32`. `JWT_SECRET`, its old name, is still read. |
 | `APP_URL` | `http://localhost:3001` | Public URL; magic-link URLs are built from it. |
 | `PORT` | `3001` | Port the server listens on. |
 | `AUTH_MAGIC_LINK` | `true` | Set to `false` to sign in with an address alone, no link. |
 | `EXPOSE_MAGIC_LINK` | dev only | Return the magic link in the API response so the login page can show it. |
+| `AI_ENABLED` | `false` | The instance's AI switch. Off, there is no AI surface at all: no MCP endpoint, no API keys. |
 
 Telos ships no mail provider. With magic links on, the link is written to the
 server log, and that is the delivery channel — pipe the log somewhere you can
@@ -120,9 +121,9 @@ for an instance on the public internet. Before putting Telos on a domain:
   as anyone.
 - **Never set `EXPOSE_MAGIC_LINK=true` on a reachable instance.** It hands the
   sign-in token to whoever asked for it, which is the same thing by another route.
-- **Set a real `JWT_SECRET`** and keep it. Changing it signs everyone out; leaking
-  it lets anyone mint a session. The server refuses to boot in production while
-  it is unset or still the default.
+- **Set a real `AUTH_SECRET`** and keep it. Leaking it lets anyone forge a
+  signed session cookie. The server refuses to boot in production while it is
+  unset or still the default.
 
 ## Development
 
@@ -131,7 +132,7 @@ git clone https://github.com/cubicecho/telos.git
 cd telos
 
 cp .env.example .env
-sed -i "s/^JWT_SECRET=.*/JWT_SECRET=$(openssl rand -hex 32)/" .env
+sed -i "s/^AUTH_SECRET=.*/AUTH_SECRET=$(openssl rand -hex 32)/" .env
 
 npm install
 npm run db:up          # Postgres on 127.0.0.1:5435
@@ -164,7 +165,7 @@ pulling it and publishes Postgres on `127.0.0.1:5435` so you can point your own
 tooling at it:
 
 ```bash
-export JWT_SECRET=$(openssl rand -hex 32)
+export AUTH_SECRET=$(openssl rand -hex 32)
 docker compose up --build
 ```
 

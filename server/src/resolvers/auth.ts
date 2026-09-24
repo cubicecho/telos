@@ -1,27 +1,8 @@
-import * as dbSchema from '@telos/db/schema';
-import { eq } from 'drizzle-orm';
 import { extendSchema, GraphQLError, type GraphQLObjectType, type GraphQLSchema, parse } from 'graphql';
-import jwt from 'jsonwebtoken';
+import { magicLinkUrl, requestMagicToken, signInDirectly, verifyMagicToken } from '../auth.ts';
 import { magicLinkExposed, magicLinkRequired } from '../config.ts';
 import type { Context } from '../context.ts';
 import { createRateLimiter } from '../rate-limit.ts';
-
-const DEV_SECRET = 'dev-secret-change-in-production';
-
-/** Read at call time so a test — or a reload — sees the current environment. */
-function jwtSecret(): string {
-  return process.env.JWT_SECRET ?? DEV_SECRET;
-}
-
-/**
- * Where magic links point. In production the server serves the client itself,
- * so its own origin is the right default — but only for someone browsing from
- * this machine. Set APP_URL to the address users actually type; a link to
- * `localhost` is useless in an inbox.
- */
-function appUrl(): string {
-  return process.env.APP_URL ?? `http://localhost:${process.env.PORT ?? 3001}`;
-}
 
 // Five sign-in attempts per address per quarter hour. requestMagicLink is
 // unauthenticated, so without this anyone who can reach the port can mint magic
@@ -48,45 +29,21 @@ const AUTH_SDL = parse(`
     userId: ID!
   }
 
+  "What this instance offers, readable before signing in."
+  type AuthConfig {
+    "Whether the instance has AI at all (AI_ENABLED). Off, the app shows no AI surface."
+    ai: Boolean!
+  }
+
+  extend type Query {
+    authConfig: AuthConfig!
+  }
+
   extend type Mutation {
     requestMagicLink(email: String!): RequestMagicLinkResult!
     verifyMagicLink(token: String!): AuthPayload!
   }
 `);
-
-/** A session token. Long-lived: there is no refresh flow and no session table. */
-export function signToken(userId: string): string {
-  return jwt.sign({ userId }, jwtSecret(), { expiresIn: '30d' });
-}
-
-/** A single-use-in-practice sign-in token, short-lived because it travels by mail. */
-export function signMagicToken(email: string): string {
-  return jwt.sign({ email }, jwtSecret(), { expiresIn: '15m' });
-}
-
-export function verifyToken(token: string): { userId: string } | null {
-  try {
-    return jwt.verify(token, jwtSecret()) as { userId: string };
-  } catch {
-    return null;
-  }
-}
-
-export function verifyMagicToken(token: string): { email: string } | null {
-  try {
-    const payload = jwt.verify(token, jwtSecret()) as { email?: string };
-    return payload.email ? { email: payload.email } : null;
-  } catch {
-    return null;
-  }
-}
-
-/** Read the authenticated userId from a request's Bearer token, if any. */
-export function extractUserId(req: { headers: { authorization?: string } }): string | null {
-  const auth = req.headers.authorization;
-  if (!auth?.startsWith('Bearer ')) return null;
-  return verifyToken(auth.slice(7))?.userId ?? null;
-}
 
 export function requireAuth(ctx: Context): string {
   if (!ctx.userId) {
@@ -102,25 +59,23 @@ function normalizeEmail(email: string): string {
 }
 
 /**
- * Registration is open: completing a sign-in for an address that has never been
- * seen creates the account. Self-hosting is the deployment model, so the person
- * who can reach the instance is the person who is meant to have an account.
+ * Only a person signed in with a session. An API key acts for its owner but
+ * may not manage the account itself: a leaked key that could mint its own
+ * successor would outlive being revoked.
  */
-// biome-ignore lint/suspicious/noExplicitAny: drizzle-orm 1.0 column type compat
-export async function findOrCreateUser(db: any, email: string): Promise<string> {
-  const existing = await db
-    .select({ id: dbSchema.users.id })
-    .from(dbSchema.users)
-    .where(eq(dbSchema.users.email, email));
-  if (existing.length > 0) return existing[0].id;
-
-  const [created] = await db.insert(dbSchema.users).values({ email }).returning({ id: dbSchema.users.id });
-  if (!created) throw new GraphQLError('Failed to create user');
-  return created.id;
+export function requireSession(ctx: Context): string {
+  const userId = requireAuth(ctx);
+  if (ctx.actor.kind !== 'user') {
+    throw new GraphQLError('Only a signed-in person can do this', { extensions: { code: 'FORBIDDEN' } });
+  }
+  return userId;
 }
 
-export function applyAuthExtension(schema: GraphQLSchema): GraphQLSchema {
+export function applyAuthExtension(schema: GraphQLSchema, options: { ai: boolean }): GraphQLSchema {
   const extendedSchema = extendSchema(schema, AUTH_SDL);
+  const queryType = extendedSchema.getType('Query') as GraphQLObjectType;
+  queryType.getFields().authConfig.resolve = () => ({ ai: options.ai });
+
   const mutationType = extendedSchema.getType('Mutation') as GraphQLObjectType;
   const fields = mutationType.getFields();
 
@@ -136,26 +91,28 @@ export function applyAuthExtension(schema: GraphQLSchema): GraphQLSchema {
     // on a private instance — see config.ts and the README's "Before you expose
     // it".
     if (!magicLinkRequired()) {
-      const userId = await findOrCreateUser(context.db, email);
+      const session = await signInDirectly(context.auth, email);
       console.log(`[auth] Magic links are off; signed ${email} in directly.`);
-      return { ok: true, magicLink: null, token: signToken(userId), userId };
+      return { ok: true, magicLink: null, ...session };
     }
 
-    const magicLink = `${appUrl()}/auth/verify?token=${signMagicToken(email)}`;
-    // Telos ships no mail provider, so the console is the delivery channel.
-    console.log(`\n[auth] Magic link for ${email}:\n${magicLink}\n`);
-    return { ok: true, magicLink: magicLinkExposed() ? magicLink : null, token: null, userId: null };
+    // The link itself is logged by auth.ts, which is the delivery channel.
+    const token = await requestMagicToken(context.auth, email);
+    const magicLink = token && magicLinkExposed() ? magicLinkUrl(token) : null;
+    return { ok: true, magicLink, token: null, userId: null };
   };
 
   fields.verifyMagicLink.resolve = async (_parent: unknown, args: { token: string }, context: Context) => {
-    const payload = verifyMagicToken(args.token);
-    if (!payload) {
+    // Registration is open: the first verified link for an address creates its
+    // account. Self-hosting is the deployment model, so whoever can reach the
+    // instance is meant to have one.
+    const session = await verifyMagicToken(context.auth, args.token);
+    if (!session) {
       throw new GraphQLError('Invalid or expired magic link', {
         extensions: { code: 'BAD_USER_INPUT' },
       });
     }
-    const userId = await findOrCreateUser(context.db, normalizeEmail(payload.email));
-    return { token: signToken(userId), userId };
+    return session;
   };
 
   return extendedSchema;

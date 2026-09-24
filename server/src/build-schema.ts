@@ -1,4 +1,6 @@
+import { AUTH_TABLES } from '@telos/db/schema';
 import { buildSchema, GraphQLDateTime } from '@vantreeseba/drizzle-graphql';
+import { applyApiKeysExtension } from './resolvers/api-keys.ts';
 import { applyAuthExtension } from './resolvers/auth.ts';
 import { applyLanesExtension } from './resolvers/lanes.ts';
 import { applyTodosExtension } from './resolvers/todos.ts';
@@ -19,7 +21,15 @@ type AnyDb = any;
 // The return type is inferred rather than written out: `GeneratedEntities` is
 // keyed by the naming config, so spelling it here would mean restating
 // `typeNameMapper` in a second place that could disagree with the first.
-export function createSchema(db: AnyDb) {
+export interface SchemaOptions {
+  /**
+   * The instance's AI switch (config.ts `aiEnabled`). Off, the AI extensions
+   * are never applied, so the schema has no AI fields for anyone to call.
+   */
+  ai: boolean;
+}
+
+export function createSchema(db: AnyDb, options: SchemaOptions) {
   const { schema: drizzleSchema, entities } = buildSchema(db, {
     prefixes: {
       insert: 'create',
@@ -52,11 +62,17 @@ export function createSchema(db: AnyDb) {
     // code instead of by someone remembering this comment.
     mapColumnType: (column) => (column.columnType === 'PgTimestamp' ? { input: GraphQLDateTime } : undefined),
     onWrite,
+    // better-auth's tables: sessions, key hashes and magic-link tokens. Only
+    // better-auth reads or writes them (auth.ts), so they generate nothing.
+    exclude: { tables: [...AUTH_TABLES] },
   });
 
-  let schema = applyAuthExtension(drizzleSchema);
+  let schema = applyAuthExtension(drizzleSchema, options);
   schema = applyTodosExtension(schema);
   schema = applyLanesExtension(schema);
+  if (options.ai) {
+    schema = applyApiKeysExtension(schema);
+  }
 
   return { schema, entities };
 }

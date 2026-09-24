@@ -4,8 +4,9 @@ import * as dbSchema from '@telos/db/schema';
 import { pushSchema } from 'drizzle-kit/api-postgres';
 import { drizzle } from 'drizzle-orm/pglite';
 import { type ExecutionResult, graphql } from 'graphql';
+import { type Auth, createAuth } from '../auth.ts';
 import { createSchema } from '../build-schema.ts';
-import type { Context } from '../context.ts';
+import type { Actor, Context } from '../context.ts';
 import { createLoaders } from '../loaders.ts';
 
 // A throwaway in-memory Postgres per suite. `@telos/db` is deliberately never
@@ -39,11 +40,35 @@ export interface TestClient {
   expectError: (query: string, variables?: Record<string, unknown>) => Promise<{ message: string; code: unknown }>;
 }
 
-export function createClient(db: TestDb, userId: string | null): TestClient {
-  const { schema } = createSchema(db);
+export interface ClientOptions {
+  /** Who the caller is, when it is not simply `userId` signed in with a session. */
+  actor?: Actor | undefined;
+  /** The instance's AI switch. Off by default, as it is in production. */
+  ai?: boolean | undefined;
+  /** Shared across clients of one database, so a session one opens another can see. */
+  auth?: Auth | undefined;
+}
+
+// One better-auth instance per database: it holds no state of its own, but
+// building one is not free and every client of a suite shares its database.
+const auths = new WeakMap<object, Auth>();
+
+export function authFor(db: TestDb): Auth {
+  let auth = auths.get(db);
+  if (!auth) {
+    auth = createAuth(db);
+    auths.set(db, auth);
+  }
+  return auth;
+}
+
+export function createClient(db: TestDb, userId: string | null, options: ClientOptions = {}): TestClient {
+  const { schema } = createSchema(db, { ai: options.ai ?? false });
+  const auth = options.auth ?? authFor(db);
+  const actor: Actor = options.actor ?? (userId ? { kind: 'user', userId } : { kind: 'anonymous', userId: null });
 
   const run = async (query: string, variables?: Record<string, unknown>) => {
-    const contextValue: Context = { db, userId, loaders: createLoaders(db) };
+    const contextValue: Context = { db, auth, userId: actor.userId, actor, loaders: createLoaders(db) };
     return graphql({ schema, source: query, contextValue, variableValues: variables });
   };
 

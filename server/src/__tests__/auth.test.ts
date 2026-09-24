@@ -1,6 +1,8 @@
+import * as dbSchema from '@telos/db/schema';
+import { eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { signMagicToken, signToken, verifyMagicToken, verifyToken } from '../resolvers/auth.ts';
-import { createClient, createTestDb, createUser, type TestClient, type TestDb } from './helpers.ts';
+import { resolveActor } from '../auth.ts';
+import { authFor, createClient, createTestDb, createUser, type TestClient, type TestDb } from './helpers.ts';
 
 const REQUEST = `mutation ($email: String!) { requestMagicLink(email: $email) { ok magicLink token userId } }`;
 const VERIFY = `mutation ($token: String!) { verifyMagicLink(token: $token) { token userId } }`;
@@ -18,39 +20,30 @@ const originalEnv = { ...process.env };
 beforeEach(async () => {
   db = await createTestDb();
   anonymous = createClient(db, null);
-  process.env.JWT_SECRET = 'test-secret';
+  process.env.AUTH_MAGIC_LINK = 'true';
 });
 
 afterEach(() => {
   process.env = { ...originalEnv };
 });
 
-describe('tokens', () => {
-  it('round-trips a session token', () => {
-    expect(verifyToken(signToken('a-user-id'))).toMatchObject({ userId: 'a-user-id' });
-  });
+/** Requests a link and pulls the token back out of it, as the app's verify screen does. */
+async function magicToken(email: string): Promise<string> {
+  const data = await anonymous.expectOk(REQUEST, { email });
+  const link = new URL(data.requestMagicLink.magicLink);
+  const token = link.searchParams.get('token');
+  if (!token) throw new Error(`no token in ${link}`);
+  return token;
+}
 
-  it('round-trips a magic token', () => {
-    expect(verifyMagicToken(signMagicToken('Someone@Example.com'))).toMatchObject({
-      email: 'Someone@Example.com',
-    });
-  });
-
-  it('rejects a token signed with a different secret', () => {
-    const token = signToken('a-user-id');
-    process.env.JWT_SECRET = 'a-different-secret';
-    expect(verifyToken(token)).toBeNull();
-  });
-
-  it('rejects garbage', () => {
-    expect(verifyToken('not-a-jwt')).toBeNull();
-    expect(verifyMagicToken('not-a-jwt')).toBeNull();
-  });
-});
+/** Who a session token signs in as, through the same path a request takes. */
+async function whoIs(token: string): Promise<string | null> {
+  const headers = new Headers({ authorization: `Bearer ${token}` });
+  return (await resolveActor(authFor(db), db, headers, { ai: false })).userId;
+}
 
 describe('requestMagicLink', () => {
   it('returns a link and no session when magic links are on', async () => {
-    process.env.AUTH_MAGIC_LINK = 'true';
     const data = await anonymous.expectOk(REQUEST, { email: nextEmail() });
     expect(data.requestMagicLink.ok).toBe(true);
     expect(data.requestMagicLink.token).toBeNull();
@@ -58,7 +51,6 @@ describe('requestMagicLink', () => {
   });
 
   it('withholds the link when exposing it is off', async () => {
-    process.env.AUTH_MAGIC_LINK = 'true';
     process.env.EXPOSE_MAGIC_LINK = 'false';
     process.env.NODE_ENV = 'production';
     const data = await anonymous.expectOk(REQUEST, { email: nextEmail() });
@@ -71,11 +63,10 @@ describe('requestMagicLink', () => {
     const data = await anonymous.expectOk(REQUEST, { email: nextEmail() });
     expect(data.requestMagicLink.magicLink).toBeNull();
     expect(data.requestMagicLink.userId).toBeTruthy();
-    expect(verifyToken(data.requestMagicLink.token)).toMatchObject({ userId: data.requestMagicLink.userId });
+    expect(await whoIs(data.requestMagicLink.token)).toBe(data.requestMagicLink.userId);
   });
 
   it('rate-limits repeated attempts for one address', async () => {
-    process.env.AUTH_MAGIC_LINK = 'true';
     const email = nextEmail();
     for (let attempt = 0; attempt < 5; attempt++) {
       await anonymous.expectOk(REQUEST, { email });
@@ -86,32 +77,60 @@ describe('requestMagicLink', () => {
 });
 
 describe('verifyMagicLink', () => {
+  it('opens a session the next request is signed in with', async () => {
+    const data = await anonymous.expectOk(VERIFY, { token: await magicToken(nextEmail()) });
+    expect(await whoIs(data.verifyMagicLink.token)).toBe(data.verifyMagicLink.userId);
+  });
+
   it('creates the account on first use and reuses it on the second', async () => {
     const email = nextEmail();
-    const first = await anonymous.expectOk(VERIFY, { token: signMagicToken(email) });
-    const second = await anonymous.expectOk(VERIFY, { token: signMagicToken(email) });
+    const first = await anonymous.expectOk(VERIFY, { token: await magicToken(email) });
+    const second = await anonymous.expectOk(VERIFY, { token: await magicToken(email) });
     expect(first.verifyMagicLink.userId).toBe(second.verifyMagicLink.userId);
+  });
+
+  it('signs an existing account in as itself, keeping its id', async () => {
+    // Accounts from before better-auth have no `accounts` row and a uuid
+    // better-auth never minted. Both have to keep working.
+    const email = nextEmail();
+    const existing = await createUser(db, email);
+    const data = await anonymous.expectOk(VERIFY, { token: await magicToken(email) });
+    expect(data.verifyMagicLink.userId).toBe(existing);
   });
 
   it('treats addresses case-insensitively', async () => {
     const email = nextEmail();
-    const lower = await anonymous.expectOk(VERIFY, { token: signMagicToken(email) });
-    const upper = await anonymous.expectOk(VERIFY, { token: signMagicToken(email.toUpperCase()) });
+    const lower = await anonymous.expectOk(VERIFY, { token: await magicToken(email) });
+    const upper = await anonymous.expectOk(VERIFY, { token: await magicToken(email.toUpperCase()) });
     expect(upper.verifyMagicLink.userId).toBe(lower.verifyMagicLink.userId);
+  });
+
+  it('works once', async () => {
+    const token = await magicToken(nextEmail());
+    await anonymous.expectOk(VERIFY, { token });
+    const error = await anonymous.expectError(VERIFY, { token });
+    expect(error.code).toBe('BAD_USER_INPUT');
   });
 
   it('rejects a garbage token as bad input, not as an expired session', async () => {
     // UNAUTHENTICATED is what the client drops its token on; a bad magic link is
     // a bad argument and must not sign anyone out.
-    const error = await anonymous.expectError(VERIFY, { token: 'not-a-jwt' });
+    const error = await anonymous.expectError(VERIFY, { token: 'not-a-token' });
     expect(error.code).toBe('BAD_USER_INPUT');
   });
 
-  it('rejects an expired token', async () => {
-    const expired = signMagicToken(nextEmail());
-    process.env.JWT_SECRET = 'rotated-secret';
-    const error = await anonymous.expectError(VERIFY, { token: expired });
-    expect(error.code).toBe('BAD_USER_INPUT');
+  it('marks the address verified', async () => {
+    const data = await anonymous.expectOk(VERIFY, { token: await magicToken(nextEmail()) });
+    const [user] = await db.select().from(dbSchema.users).where(eq(dbSchema.users.id, data.verifyMagicLink.userId));
+    expect(user.emailVerified).toBe(true);
+  });
+});
+
+describe('authConfig', () => {
+  it('says whether the instance has AI, before anyone signs in', async () => {
+    expect((await anonymous.expectOk(`{ authConfig { ai } }`)).authConfig.ai).toBe(false);
+    const withAi = createClient(db, null, { ai: true });
+    expect((await withAi.expectOk(`{ authConfig { ai } }`)).authConfig.ai).toBe(true);
   });
 });
 
@@ -126,5 +145,13 @@ describe('authentication', () => {
     await createUser(db, 'theirs@example.com');
     const data = await createClient(db, mine).expectOk(`query { users { id email } }`);
     expect(data.users).toEqual([{ id: mine, email: 'mine@example.com' }]);
+  });
+
+  it('keeps sessions and keys out of the schema', async () => {
+    const data = await anonymous.expectOk(`{ __schema { queryType { fields { name } } } }`);
+    const fields = data.__schema.queryType.fields.map((field: { name: string }) => field.name);
+    for (const name of ['sessions', 'accounts', 'verifications', 'apikeys']) {
+      expect(fields).not.toContain(name);
+    }
   });
 });

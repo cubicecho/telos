@@ -118,6 +118,21 @@ delete. A table missing from `scope` is visible across tenants, and nothing else
 in the code will say so. `tenancy.test.ts` fails when you forget — do not delete
 the test to make it pass.
 
+**Auth is better-auth, reached only through GraphQL.** `server/src/auth.ts`
+configures it (bearer sessions, magic links, API keys) over the tables in
+`db/src/models/auth.ts`, which `build-schema.ts` excludes from the generated
+schema. None of better-auth's REST routes are mounted. Every request resolves to
+an `actor` (`context.ts`): `user` for a session, `apiKey` for an MCP client,
+`anonymous` for nobody. `ctx.userId` is always `ctx.actor.userId`.
+
+**AI is off unless every switch says on.** `AI_ENABLED` (instance) decides
+whether the AI extensions are in the schema at all; `users.aiEnabled` (account)
+is asked by `ai-gate.ts` and by `resolveActor`, which refuses an API key whose
+owner has it off. Both default to off. An AI resolver calls `requireAi`, and
+answers NOT_FOUND rather than FORBIDDEN, because for someone who turned AI off
+the surface is not there. Key management needs a session (`requireSession`): a
+key cannot mint its own successor.
+
 **`scope` cannot reach a plain insert.** Any foreign key a caller can state gets
 checked in an `onWrite` hook in `server/src/resolvers/write-guards.ts`. A new
 table with a user-facing FK needs an entry in `FOREIGN_KEYS`.
