@@ -1,9 +1,11 @@
 import { useQuery } from '@apollo/client';
 import { Redirect } from 'expo-router';
 import { useState } from 'react';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
 import { ProjectFormDialog } from '@/components/domain/project/project-form-dialog';
+import { EmptyState } from '@/components/page';
 import { Button } from '@/components/ui/button';
+import { Plus } from '@/components/ui/icons';
 import { LoadFailure } from '@/components/ui/load-failure';
 import { Spinner } from '@/components/ui/spinner';
 import { ProjectsDocument } from '@/lib/graphql';
@@ -36,16 +38,13 @@ export default function HomeScreen() {
   if (first) return <Redirect href={`/projects/${first.id}`} />;
 
   return (
-    <View className="flex-1 items-center justify-center gap-4 px-6">
-      <View className="items-center">
-        <Text role="heading" aria-level={1} className="font-semibold text-foreground text-xl">
-          Nothing here yet
-        </Text>
-        <Text className="mt-1 text-center text-muted-foreground text-sm">
-          A project holds a list of todos. Start with one.
-        </Text>
-      </View>
-      <Button onPress={() => setCreating(true)}>Create a project</Button>
+    <View className="flex-1 justify-center px-6">
+      <EmptyState
+        icon={Plus}
+        title="Nothing here yet"
+        description="A project holds a list of todos. Start with one."
+        action={<Button onPress={() => setCreating(true)}>Create a project</Button>}
+      />
       <ProjectFormDialog open={creating} onOpenChange={setCreating} />
     </View>
   );

@@ -24,6 +24,7 @@ export function LanePicker({
   onSelect,
   lockedReason,
   align = 'start',
+  size = 'icon',
   className,
 }: {
   lanes: readonly LaneSummary[];
@@ -32,6 +33,8 @@ export function LanePicker({
   /** Why this todo cannot change column, when it cannot. */
   lockedReason?: string | null;
   align?: 'start' | 'end';
+  /** The trigger's square, from `Button`'s icon ladder. */
+  size?: 'icon' | 'icon-sm' | 'icon-xs';
   className?: string;
 }) {
   if (lanes.length === 0) return null;
@@ -41,7 +44,7 @@ export function LanePicker({
       <MenuTrigger asChild>
         <Button
           variant="ghost"
-          size="icon"
+          size={size}
           className={cn('text-muted-foreground', className)}
           aria-label={current ? `Lane, currently ${current.name}` : 'Lane'}
         >

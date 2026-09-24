@@ -252,13 +252,7 @@ export function TodoRow({
             the old `has-[[data-state=open]]` guard read a radix attribute that
             react-native-web does not forward onto a `Pressable`. */}
         <View className={cn('h-5 shrink-0 flex-row items-center focus-within:opacity-100', HOVER_REVEAL)}>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
-            onPress={() => setEditing(true)}
-            aria-label={`Edit ${todo.title}`}
-          >
+          <Button variant="ghost" size="icon-xs" onPress={() => setEditing(true)} aria-label={`Edit ${todo.title}`}>
             <Pencil className="h-4 w-4" />
           </Button>
           <LanePicker
@@ -267,20 +261,14 @@ export function TodoRow({
             onSelect={moveToLane}
             lockedReason={laneLock(todo)}
             align="end"
-            className="h-8 w-8"
+            size="icon-xs"
           />
-          <LabelPicker attached={todo.labels} onToggle={toggleLabel} align="end" className="h-8 w-8" />
-          <DependencyPicker
-            todo={todo}
-            candidates={siblings}
-            onToggle={toggleDependency}
-            align="end"
-            className="h-8 w-8"
-          />
+          <LabelPicker attached={todo.labels} onToggle={toggleLabel} align="end" size="icon-xs" />
+          <DependencyPicker todo={todo} candidates={siblings} onToggle={toggleDependency} align="end" size="icon-xs" />
           <Button
             variant="ghost"
-            size="icon"
-            className="h-8 w-8 hover:text-destructive"
+            size="icon-xs"
+            className="hover:text-destructive"
             onPress={() => setConfirmingDelete(true)}
             aria-label={`Delete ${todo.title}`}
           >

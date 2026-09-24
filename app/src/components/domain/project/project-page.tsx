@@ -1,9 +1,10 @@
 import { useMutation } from '@apollo/client';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { type ReactNode, useState } from 'react';
 import { Text, View } from 'react-native';
 import { LabelBadge, type LabelSummary } from '@/components/domain/label/label-badge';
 import { LabelPicker } from '@/components/domain/label/label-picker';
+import { PageLayout } from '@/components/page-layout';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Pencil, Trash2 } from '@/components/ui/icons';
@@ -25,7 +26,22 @@ export interface ProjectOverviewData {
   labels: readonly LabelSummary[];
 }
 
-export function ProjectOverview({ project }: { project: ProjectOverviewData }) {
+/**
+ * A project's page: its name, description and actions in the header, its
+ * counts and labels in the row under it, and whichever view is showing as the
+ * body. The dialogs and mutations behind the header's buttons live here with
+ * them.
+ */
+export function ProjectPage({
+  project,
+  width,
+  content,
+}: {
+  project: ProjectOverviewData;
+  /** `prose` for the list, `full` for the board, which is as wide as its columns. */
+  width: 'prose' | 'full';
+  content: ReactNode;
+}) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -73,22 +89,12 @@ export function ProjectOverview({ project }: { project: ProjectOverviewData }) {
   }
 
   return (
-    <View role="banner" className="gap-3 border-border border-b pb-6">
-      <View className="flex-row items-start justify-between gap-4">
-        <View className="min-w-0 shrink">
-          <Text
-            role="heading"
-            aria-level={1}
-            numberOfLines={1}
-            className="font-semibold text-2xl text-foreground tracking-tight"
-          >
-            {project.name}
-          </Text>
-          {project.description ? (
-            <Text className="mt-1 text-muted-foreground text-sm">{project.description}</Text>
-          ) : null}
-        </View>
-        <View className="shrink-0 flex-row items-center gap-1">
+    <PageLayout
+      width={width}
+      title={project.name}
+      description={project.description || undefined}
+      action={
+        <>
           <LabelPicker attached={project.labels} onToggle={toggleLabel} align="end" />
           <Button variant="ghost" size="icon" onPress={() => setEditing(true)} aria-label="Edit project">
             <Pencil className="h-4 w-4" />
@@ -102,45 +108,49 @@ export function ProjectOverview({ project }: { project: ProjectOverviewData }) {
           >
             <Trash2 className="h-4 w-4" />
           </Button>
+        </>
+      }
+      headerContent={
+        <View className="gap-3">
+          {/* Was a `<dl>`. A term/definition pair has no native counterpart and
+              react-native-web has no role that renders one, so each stat is a
+              group named by its term — which is what a screen reader said of the
+              `<dl>` anyway: "Open, 3". */}
+          <View className="flex-row gap-6">
+            <Stat term="Open" value={project.openTodoCount} />
+            <Stat term="Done" value={done} />
+            <Stat term="Total" value={project.todoCount} />
+          </View>
+
+          {actionError ? (
+            <Text className="text-destructive text-sm" aria-live="polite">
+              {actionError}
+            </Text>
+          ) : null}
+
+          {/* Only the badges, so no row is drawn for a project that has none. */}
+          {project.labels.length > 0 ? (
+            <View className="flex-row flex-wrap gap-1">
+              {project.labels.map((label) => (
+                <LabelBadge key={label.id} label={label} onRemove={() => toggleLabel(label, false)} />
+              ))}
+            </View>
+          ) : null}
+
+          <ProjectFormDialog open={editing} onOpenChange={setEditing} project={project} />
+
+          <ConfirmDialog
+            open={confirmingDelete}
+            onOpenChange={setConfirmingDelete}
+            title={`Delete “${project.name}”?`}
+            description={`Its ${project.todoCount} todo${project.todoCount === 1 ? '' : 's'} go with it. This cannot be undone.`}
+            confirmLabel="Delete"
+            onConfirm={confirmDelete}
+          />
         </View>
-      </View>
-
-      {/* Was a `<dl>`. A term/definition pair has no native counterpart and
-          react-native-web has no role that renders one, so each stat is a
-          group named by its term — which is what a screen reader said of the
-          `<dl>` anyway: "Open, 3". */}
-      <View className="flex-row gap-6">
-        <Stat term="Open" value={project.openTodoCount} />
-        <Stat term="Done" value={done} />
-        <Stat term="Total" value={project.todoCount} />
-      </View>
-
-      {actionError ? (
-        <Text className="text-destructive text-sm" aria-live="polite">
-          {actionError}
-        </Text>
-      ) : null}
-
-      {/* Only the badges now, so no row is drawn for a project that has none. */}
-      {project.labels.length > 0 ? (
-        <View className="flex-row flex-wrap gap-1">
-          {project.labels.map((label) => (
-            <LabelBadge key={label.id} label={label} onRemove={() => toggleLabel(label, false)} />
-          ))}
-        </View>
-      ) : null}
-
-      <ProjectFormDialog open={editing} onOpenChange={setEditing} project={project} />
-
-      <ConfirmDialog
-        open={confirmingDelete}
-        onOpenChange={setConfirmingDelete}
-        title={`Delete “${project.name}”?`}
-        description={`Its ${project.todoCount} todo${project.todoCount === 1 ? '' : 's'} go with it. This cannot be undone.`}
-        confirmLabel="Delete"
-        onConfirm={confirmDelete}
-      />
-    </View>
+      }
+      content={content}
+    />
   );
 }
 

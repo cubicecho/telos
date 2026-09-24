@@ -4,7 +4,6 @@
  * parent, so the component is lucide's own.
  */
 export {
-  ArrowDownWideNarrow,
   Columns3,
   Ellipsis,
   Link2,

@@ -18,20 +18,23 @@ export function DependencyPicker({
   candidates,
   onToggle,
   align = 'start',
+  size = 'icon',
   className,
 }: {
   todo: TodoSummary;
   candidates: readonly TodoSummary[];
   onToggle: (dependsOnTodoId: string, add: boolean) => void;
   align?: 'start' | 'end';
+  /** The trigger's square, from `Button`'s icon ladder. */
+  size?: 'icon' | 'icon-sm' | 'icon-xs';
   className?: string;
 }) {
   const dependencyIds = new Set(todo.dependencies.map((dependency) => dependency.id));
   const options = candidates.filter((candidate) => candidate.id !== todo.id);
   const waiting = todo.dependencies.length;
   // Controlled only so the trigger's `onPress` can open it: on web radix opens
-  // from `onClick`, which react-native-web's `Pressable` overwrites. See
-  // `TodoFilterBar`.
+  // from `onClick`, which react-native-web's `Pressable` overwrites. Local
+  // patch until cubicecho/cubeui#123.
   const [open, setOpen] = useState(false);
 
   return (
@@ -42,7 +45,7 @@ export function DependencyPicker({
             should not look identical to one that waits on nothing. */}
         <Button
           variant="ghost"
-          size="icon"
+          size={size}
           className={className}
           aria-label={waiting > 0 ? `Dependencies, waiting on ${waiting}` : 'Dependencies'}
           onPress={() => setOpen(!open)}

@@ -98,7 +98,7 @@ export function LaneColumn({
 
         <Menu>
           <MenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-7 w-7" aria-label={`${lane.name} lane actions`}>
+            <Button variant="ghost" size="icon-xs" aria-label={`${lane.name} lane actions`}>
               <Ellipsis className="h-4 w-4" />
             </Button>
           </MenuTrigger>

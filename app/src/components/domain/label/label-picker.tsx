@@ -21,11 +21,14 @@ export function LabelPicker({
   // Which edge the panel hangs from. A trigger sitting at the right of its row
   // wants `end`, or the panel opens away from the content it belongs to.
   align = 'start',
+  size = 'icon',
   className,
 }: {
   attached: readonly LabelSummary[];
   onToggle: (label: LabelSummary, attach: boolean) => void;
   align?: 'start' | 'end';
+  /** The trigger's square, from `Button`'s icon ladder. */
+  size?: 'icon' | 'icon-sm' | 'icon-xs';
   className?: string;
 }) {
   const labelsQuery = useQuery(LabelsDocument);
@@ -41,11 +44,11 @@ export function LabelPicker({
             a pointer hint would be cubeui's Tooltip.) */}
         <Button
           variant="ghost"
-          size="icon"
+          size={size}
           className={cn('text-muted-foreground', className)}
           aria-label="Labels"
           // Radix opens from the trigger's `onClick`, which react-native-web's
-          // Pressable swallows — see dependency-picker.tsx.
+          // Pressable swallows. Local patch until cubicecho/cubeui#123.
           onPress={() => setOpen(!open)}
         >
           <Tag className="h-4 w-4" />

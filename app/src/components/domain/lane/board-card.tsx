@@ -65,7 +65,8 @@ export function BoardCardBody({
             onSelect={onMove}
             lockedReason={locked}
             align="end"
-            className={cn('-mr-1 -mt-1 h-7 w-7 focus-visible:opacity-100', HOVER_REVEAL)}
+            size="icon-xs"
+            className={cn('-mr-1 -mt-1 focus-visible:opacity-100', HOVER_REVEAL)}
           />
         ) : null}
       </View>

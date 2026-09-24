@@ -37,6 +37,7 @@ telos/
 │   │   ├── components/
 │   │   │   ├── ui/          # cubeui primitives (installed via shadcn) — no app logic
 │   │   │   ├── app-form.tsx # `useAppForm`: cubeui's `createAppForm`, plus the date and colour fields
+│   │   │   ├── page-layout.tsx, card-layout.tsx, section.tsx, page.tsx  # cubeui layouts
 │   │   │   ├── domain/      # project/, todo/, lane/, label/, settings/
 │   │   │   └── layouts/     # sidebar
 │   │   └── lib/             # apollo, auth, theme, cache writers, blocking, graphql documents, cn()
@@ -303,6 +304,14 @@ a value it failed to read.
   light fields: `form.AppField` with a `validators` rule, `field.*` for the
   control, and `form.SubmitButton` for the disabled state. Not
   `useState` and a hand-computed `canSubmit`.
+- Every screen in `(app)` is a cubeui `PageLayout`: title, description and
+  actions in its header, `width="prose"` for reading pages and `"full"` for the
+  board. The `(app)` shell's main does not scroll; the `PageLayout` body does,
+  so the header stays put. A project's header is `ProjectPage` in
+  `domain/project/project-page.tsx`. A screen whose whole content is "nothing
+  here" or "that failed" is `EmptyState` (from `page.tsx`), not a hand-built
+  column. Icon buttons are `size="icon"` in headers, `"icon-sm"` in list rows
+  and `"icon-xs"` inside a todo row or a board card.
 - `import './preflight.ts';` stays first in `server/src/index.ts`, separated by a
   blank line so Biome's import sorting leaves it there. It has to run before
   `@telos/db` is imported.

@@ -1,38 +1,16 @@
-import { forwardRef, type ReactNode, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
-import { ArrowDownWideNarrow, Tag } from '@/components/app-icons';
+import { forwardRef } from 'react';
+import { Text, View } from 'react-native';
+import { Tag } from '@/components/app-icons';
 import { Button } from '@/components/ui/button';
 import { ColorDot } from '@/components/ui/color-dot';
 import { Check, Search, X } from '@/components/ui/icons';
 import type { InputHandle } from '@/components/ui/input';
 import { Input } from '@/components/ui/input';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { isFiltering, labelsInUse, NO_FILTER, type TodoFilter, type TodoSort } from '@/lib/filter-todos';
+import { Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger } from '@/components/ui/menu';
+import { SegmentedButton, SegmentedGroup } from '@/components/ui/segmented';
+import { isFiltering, labelsInUse, NO_FILTER, type TodoFilter } from '@/lib/filter-todos';
 import { cn } from '@/lib/utils';
 import type { TodoSummary } from './types';
-
-/** One row of the label popover, shaped like `LabelPicker`'s so the two read alike. */
-function LabelOption({
-  onSelect,
-  selected,
-  children,
-}: {
-  onSelect: () => void;
-  selected: boolean;
-  children: ReactNode;
-}) {
-  return (
-    <Pressable
-      role="radio"
-      aria-checked={selected}
-      onPress={onSelect}
-      className="w-full flex-row items-center gap-2 rounded-sm px-2 py-1.5 hover:bg-accent"
-    >
-      {children}
-      {selected ? <Check className="h-3.5 w-3.5 shrink-0" /> : null}
-    </Pressable>
-  );
-}
 
 /**
  * Finding a todo, which until now meant reading down the page.
@@ -60,18 +38,8 @@ export const TodoFilterBar = forwardRef<
   const labels = labelsInUse(todos);
   const active = isFiltering(filter);
   const selected = labels.find((label) => label.id === filter.labelId);
-  // Controlled, for two reasons. cubeui's popover has no `Close` part, so
-  // choosing a label has to close the list from here. And on web radix opens
-  // the popover from the trigger's `onClick`, which react-native-web's
-  // `Pressable` overwrites with its own press handler — so the button's
-  // `onPress` has to do the opening itself. (On device the trigger replaces
-  // `onPress` with its own opener, so this never runs twice.)
-  const [labelsOpen, setLabelsOpen] = useState(false);
-
-  function pickLabel(labelId: string | null) {
-    onChange({ ...filter, labelId });
-    setLabelsOpen(false);
-  }
+  const pickLabel = (labelId: string | null) => onChange({ ...filter, labelId });
+  const tick = (on: boolean) => (on ? <Check className="h-3.5 w-3.5" /> : null);
 
   return (
     <View className="gap-2">
@@ -89,59 +57,50 @@ export const TodoFilterBar = forwardRef<
           />
         </View>
 
-        <Popover open={labelsOpen} onOpenChange={setLabelsOpen}>
-          <PopoverTrigger asChild>
+        {/* One of N, and the menu closes on the pick. */}
+        <Menu>
+          <MenuTrigger asChild>
             <Button
               variant="outline"
               size="sm"
               className={cn('gap-2', selected && 'border-ring')}
               aria-label="Filter by label"
-              onPress={() => setLabelsOpen(!labelsOpen)}
             >
               {selected ? <ColorDot color={selected.color} size="sm" /> : <Tag className="h-4 w-4" />}
               {selected ? selected.name : 'Label'}
             </Button>
-          </PopoverTrigger>
-          <PopoverContent align="start" className="w-56 p-1">
+          </MenuTrigger>
+          <MenuContent align="start" className="w-56">
             {labels.length === 0 ? (
               <Text className="px-2 py-3 text-center text-muted-foreground text-sm">
                 No labels on this project's todos.
               </Text>
             ) : (
               <>
-                <LabelOption onSelect={() => pickLabel(null)} selected={filter.labelId === null}>
-                  <Text numberOfLines={1} className="flex-1 text-muted-foreground text-sm">
-                    Any label
-                  </Text>
-                </LabelOption>
+                <MenuItem label="Any label" onSelect={() => pickLabel(null)} trailing={tick(filter.labelId === null)} />
+                <MenuSeparator />
                 {labels.map((label) => (
-                  <LabelOption
+                  <MenuItem
                     key={label.id}
+                    icon={<ColorDot color={label.color} size="sm" />}
+                    label={label.name}
                     onSelect={() => pickLabel(label.id)}
-                    selected={filter.labelId === label.id}
-                  >
-                    <ColorDot color={label.color} size="sm" />
-                    <Text numberOfLines={1} className="flex-1 text-popover-foreground text-sm">
-                      {label.name}
-                    </Text>
-                  </LabelOption>
+                    trailing={tick(filter.labelId === label.id)}
+                  />
                 ))}
               </>
             )}
-          </PopoverContent>
-        </Popover>
+          </MenuContent>
+        </Menu>
 
-        {/* Two states, so a toggle rather than a select. */}
-        <Button
-          variant="outline"
-          size="sm"
-          className={cn('gap-2', filter.sort === 'due' && 'border-ring')}
-          aria-pressed={filter.sort === 'due'}
-          onPress={() => onChange({ ...filter, sort: nextSort(filter.sort) })}
+        <SegmentedGroup
+          aria-label="Sort"
+          value={filter.sort}
+          onValueChange={(sort) => onChange({ ...filter, sort: sort === 'due' ? 'due' : 'manual' })}
         >
-          <ArrowDownWideNarrow className="h-4 w-4" />
-          {filter.sort === 'due' ? 'By due date' : 'Manual order'}
-        </Button>
+          <SegmentedButton value="manual">Manual order</SegmentedButton>
+          <SegmentedButton value="due">By due date</SegmentedButton>
+        </SegmentedGroup>
 
         {active ? (
           <Button variant="ghost" size="sm" className="gap-2" onPress={() => onChange(NO_FILTER)}>
@@ -164,7 +123,3 @@ export const TodoFilterBar = forwardRef<
     </View>
   );
 });
-
-function nextSort(sort: TodoSort): TodoSort {
-  return sort === 'due' ? 'manual' : 'due';
-}

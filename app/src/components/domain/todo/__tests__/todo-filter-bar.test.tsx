@@ -66,13 +66,14 @@ describe('TodoFilterBar', () => {
     expect(screen.queryByRole('button', { name: 'Clear' })).not.toBeInTheDocument();
   });
 
-  it('toggles the sort and says which way it is', async () => {
+  it('switches the sort and says which way it is', async () => {
     const user = userEvent.setup();
     const onChange = bar();
 
-    const sort = screen.getByRole('button', { name: /manual order/i });
-    expect(sort).toHaveAttribute('aria-pressed', 'false');
-    await user.click(sort);
+    expect(screen.getByRole('button', { name: 'Manual order' })).toHaveAttribute('aria-pressed', 'true');
+    const due = screen.getByRole('button', { name: 'By due date' });
+    expect(due).toHaveAttribute('aria-pressed', 'false');
+    await user.click(due);
 
     expect(onChange).toHaveBeenCalledWith({ ...NO_FILTER, sort: 'due' });
   });

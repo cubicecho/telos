@@ -1,4 +1,5 @@
-import { Text, View } from 'react-native';
+import { Text } from 'react-native';
+import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
 /** The shape every lane-aware component reads. */
@@ -16,8 +17,9 @@ export interface LaneSummary {
  */
 export function LaneBadge({ lane, className }: { lane: LaneSummary; className?: string }) {
   return (
-    <View className={cn('shrink-0 flex-row items-center rounded-full border border-border px-2 py-0.5', className)}>
-      <Text className="font-medium text-[11px] text-muted-foreground leading-4">{lane.name}</Text>
-    </View>
+    // The label is its own `Text` so it can be muted: a badge's string ink is the variant's.
+    <Badge variant="outline" className={cn('self-auto', className)}>
+      <Text className="font-medium text-muted-foreground text-xs">{lane.name}</Text>
+    </Badge>
   );
 }

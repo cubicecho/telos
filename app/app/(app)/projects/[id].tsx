@@ -4,16 +4,18 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
 import { Columns3, List } from '@/components/app-icons';
 import { Board } from '@/components/domain/lane/board';
-import { ProjectOverview } from '@/components/domain/project/project-overview';
+import { ProjectPage } from '@/components/domain/project/project-page';
 import { TodoComposer } from '@/components/domain/todo/todo-composer';
 import { TodoFilterBar } from '@/components/domain/todo/todo-filter-bar';
 import { TodoRow } from '@/components/domain/todo/todo-row';
 import type { TodoSummary } from '@/components/domain/todo/types';
+import { EmptyState } from '@/components/page';
+import { PageLayout } from '@/components/page-layout';
 import { SectionHeading } from '@/components/section-heading';
 import { Button } from '@/components/ui/button';
+import { CircleAlert } from '@/components/ui/icons';
 import type { InputHandle } from '@/components/ui/input';
 import { LoadFailure, LoadState } from '@/components/ui/load-failure';
-import { Spinner } from '@/components/ui/spinner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { filterTodos, isFiltering, NO_FILTER, type TodoFilter } from '@/lib/filter-todos';
 import { ProjectDocument, ProjectLanesDocument, ProjectTodosDocument } from '@/lib/graphql';
@@ -110,12 +112,10 @@ export default function ProjectScreen() {
     skip: !id,
   });
 
+  // The title waits at its own height; nothing below it has anything to show
+  // until the project lands.
   if (projectLoading && !projectData) {
-    return (
-      <View className="flex-1 items-center justify-center">
-        <Spinner />
-      </View>
-    );
+    return <PageLayout width="prose" loading title={undefined} content={null} />;
   }
 
   // Ahead of the not-found message, which is a claim about the caller's own
@@ -133,8 +133,17 @@ export default function ProjectScreen() {
   const project = projectData?.project;
   if (!project) {
     return (
-      <View className="flex-1 items-center justify-center px-6">
-        <Text className="text-center text-muted-foreground text-sm">That project doesn't exist, or isn't yours.</Text>
+      <View className="flex-1 justify-center px-6">
+        <EmptyState
+          icon={CircleAlert}
+          title="Project not found"
+          description="That project doesn't exist, or isn't yours."
+          action={
+            <Button variant="outline" size="sm" onPress={() => router.replace('/')}>
+              Go to your projects
+            </Button>
+          }
+        />
       </View>
     );
   }
@@ -157,98 +166,107 @@ export default function ProjectScreen() {
 
   return (
     // The board is as wide as its columns need; the list stays a column of
-    // readable width whatever the window does.
-    <View className={cn('mx-auto w-full gap-6 px-6 py-8', current === 'board' ? 'max-w-full' : 'max-w-3xl')}>
-      <ProjectOverview project={project} />
-
-      {/* The composer and the filter sit between the tabs and their panels, and
+    // readable width whatever the window does. A `full` body brings no inset of
+    // its own, so the board's is added here.
+    <ProjectPage
+      project={project}
+      width={current === 'board' ? 'full' : 'prose'}
+      content={
+        <View className={cn('gap-6 pt-2 pb-6', current === 'board' && 'px-4')}>
+          {/* The composer and the filter sit between the tabs and their panels, and
           serve both. */}
-      <Tabs value={current} onValueChange={(next) => router.setParams({ view: next })} className="flex flex-col gap-6">
-        <TabsList aria-label="Project view" className="self-start">
-          <TabsTrigger value="list">
-            <List />
-            List
-          </TabsTrigger>
-          <TabsTrigger value="board">
-            <Columns3 />
-            Board
-          </TabsTrigger>
-        </TabsList>
+          <Tabs
+            value={current}
+            onValueChange={(next) => router.setParams({ view: next })}
+            className="flex flex-col gap-6"
+          >
+            <TabsList aria-label="Project view" className="self-start">
+              <TabsTrigger value="list">
+                <List />
+                List
+              </TabsTrigger>
+              <TabsTrigger value="board">
+                <Columns3 />
+                Board
+              </TabsTrigger>
+            </TabsList>
 
-        <TodoComposer ref={composerRef} projectId={project.id} nextPosition={nextPosition} lanes={lanes} />
+            <TodoComposer ref={composerRef} projectId={project.id} nextPosition={nextPosition} lanes={lanes} />
 
-        <TodoFilterBar ref={filterRef} filter={filter} onChange={setFilter} todos={all} matched={todos.length} />
+            <TodoFilterBar ref={filterRef} filter={filter} onChange={setFilter} todos={all} matched={todos.length} />
 
-        {/* No `empty`: an empty project still has a board to show, and the
+            {/* No `empty`: an empty project still has a board to show, and the
             list's own empty line depends on the filter. The rungs only stand in
             while there is no answer at all. */}
-        {todosQuery.data === undefined ? (
-          <LoadState query={todosQuery} what="the todos" count={all.length} />
-        ) : (
-          <>
-            <TabsContent value="board" className="mt-0">
-              {/* A board with no columns is not a board, and the todos being fine
+            {todosQuery.data === undefined ? (
+              <LoadState query={todosQuery} what="the todos" count={all.length} />
+            ) : (
+              <>
+                <TabsContent value="board" className="mt-0">
+                  {/* A board with no columns is not a board, and the todos being fine
                   does not make it one. */}
-              {lanesError && lanes.length === 0 ? (
-                <LoadFailure error={lanesError} onRetry={refetchLanes} what="the board" />
-              ) : (
-                <Board projectId={project.id} lanes={lanes} todos={todos} />
-              )}
-            </TabsContent>
-            <TabsContent value="list" className="mt-0">
-              {/* The column is a view of its own: on web a display class on the
-                  panel itself would beat the `hidden` radix gives it when inactive. */}
-              <View className="gap-6">
-                <View className="gap-2">
-                  {open.length === 0 ? (
-                    <Text className="text-muted-foreground text-sm">
-                      {isFiltering(filter)
-                        ? 'Nothing open matches.'
-                        : all.length === 0
-                          ? 'No todos yet.'
-                          : 'Nothing open — everything is blocked or done.'}
-                    </Text>
+                  {lanesError && lanes.length === 0 ? (
+                    <LoadFailure error={lanesError} onRetry={refetchLanes} what="the board" />
                   ) : (
-                    open.map((todo) => (
-                      <TodoRow key={todo.id} todo={todo} projectId={project.id} siblings={all} lanes={lanes} />
-                    ))
+                    <Board projectId={project.id} lanes={lanes} todos={todos} />
                   )}
-                </View>
-
-                {blocked.length > 0 ? (
-                  <View role="region" aria-label="Blocked" className="gap-2">
-                    <SectionHeading variant="overline" level={2}>
-                      {`Blocked (${blocked.length})`}
-                    </SectionHeading>
-                    {blocked.map((todo) => (
-                      <TodoRow key={todo.id} todo={todo} projectId={project.id} siblings={all} lanes={lanes} />
-                    ))}
-                  </View>
-                ) : null}
-
-                {completed.length > 0 ? (
-                  <View className="gap-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="-ml-3 self-start text-muted-foreground"
-                      aria-expanded={showCompleted}
-                      onPress={() => setShowCompleted((shown) => !shown)}
-                    >
-                      {`${showCompleted ? 'Hide' : 'Show'} completed (${completed.length})`}
-                    </Button>
-                    {showCompleted
-                      ? completed.map((todo) => (
+                </TabsContent>
+                <TabsContent value="list" className="mt-0">
+                  {/* The column is a view of its own: on web a display class on the
+                  panel itself would beat the `hidden` radix gives it when inactive. */}
+                  <View className="gap-6">
+                    <View className="gap-2">
+                      {open.length === 0 ? (
+                        <Text className="text-muted-foreground text-sm">
+                          {isFiltering(filter)
+                            ? 'Nothing open matches.'
+                            : all.length === 0
+                              ? 'No todos yet.'
+                              : 'Nothing open — everything is blocked or done.'}
+                        </Text>
+                      ) : (
+                        open.map((todo) => (
                           <TodoRow key={todo.id} todo={todo} projectId={project.id} siblings={all} lanes={lanes} />
                         ))
-                      : null}
+                      )}
+                    </View>
+
+                    {blocked.length > 0 ? (
+                      <View role="region" aria-label="Blocked" className="gap-2">
+                        <SectionHeading variant="overline" level={2}>
+                          {`Blocked (${blocked.length})`}
+                        </SectionHeading>
+                        {blocked.map((todo) => (
+                          <TodoRow key={todo.id} todo={todo} projectId={project.id} siblings={all} lanes={lanes} />
+                        ))}
+                      </View>
+                    ) : null}
+
+                    {completed.length > 0 ? (
+                      <View className="gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="-ml-3 self-start text-muted-foreground"
+                          aria-expanded={showCompleted}
+                          onPress={() => setShowCompleted((shown) => !shown)}
+                        >
+                          {`${showCompleted ? 'Hide' : 'Show'} completed (${completed.length})`}
+                        </Button>
+                        {showCompleted
+                          ? completed.map((todo) => (
+                              <TodoRow key={todo.id} todo={todo} projectId={project.id} siblings={all} lanes={lanes} />
+                            ))
+                          : null}
+                      </View>
+                    ) : null}
                   </View>
-                ) : null}
-              </View>
-            </TabsContent>
-          </>
-        )}
-      </Tabs>
-    </View>
+                </TabsContent>
+              </>
+            )}
+          </Tabs>
+        </View>
+      }
+    />
   );
 }
