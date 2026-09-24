@@ -3,7 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { format } from 'date-fns';
 import { describe, expect, it, vi } from 'vitest';
-import { UpdateTodoDocument } from '@/lib/graphql';
+import { AiStateDocument, UpdateTodoDocument } from '@/lib/graphql';
 import { TodoFormDialog } from '../todo-form-dialog';
 import type { TodoSummary } from '../types';
 
@@ -11,6 +11,9 @@ const TODO: TodoSummary = {
   id: 't1',
   title: 'Replace the tap',
   notes: null,
+  acceptance: null,
+  aiIgnored: false,
+  parentId: null,
   dueAt: null,
   completedAt: null,
   position: 0,
@@ -29,17 +32,39 @@ function dueTrigger(value: string) {
   return screen.getByRole('button', { name: `Due ${value}` });
 }
 
+type Set = {
+  title: string;
+  notes: string | null;
+  acceptance?: string | null;
+  dueAt: string | null;
+  aiIgnored?: boolean;
+};
+
 /** The mutation as the dialog sends it, paired with a plausible answer. */
-function save(set: { title: string; notes: string | null; dueAt: string | null }) {
+function save({ acceptance = null, ...rest }: Set) {
+  const set = { ...rest, acceptance };
   return {
     request: { query: UpdateTodoDocument, variables: { id: TODO.id, set } },
-    result: { data: { updateTodo: { __typename: 'Todo', id: TODO.id, ...set } } },
+    result: { data: { updateTodo: { __typename: 'Todo', id: TODO.id, aiIgnored: false, ...set } } },
   };
 }
 
-function open(todo: TodoSummary, mocks: ReturnType<typeof save>[], onOpenChange = vi.fn()) {
+/** What the server says about AI: the instance's switch and the account's. */
+function aiState(instance: boolean, account: boolean) {
+  return {
+    request: { query: AiStateDocument },
+    result: {
+      data: {
+        authConfig: { __typename: 'AuthConfig', ai: instance },
+        users: [{ __typename: 'User', id: 'u1', aiEnabled: account }],
+      },
+    },
+  };
+}
+
+function open(todo: TodoSummary, mocks: ReturnType<typeof save>[], onOpenChange = vi.fn(), ai = aiState(false, false)) {
   render(
-    <MockedProvider mocks={mocks}>
+    <MockedProvider mocks={[ai, ...mocks]}>
       <TodoFormDialog open onOpenChange={onOpenChange} todo={todo} />
     </MockedProvider>,
   );
@@ -128,10 +153,11 @@ describe('TodoFormDialog', () => {
           {
             request: {
               query: UpdateTodoDocument,
-              variables: { id: TODO.id, set: { title: TODO.title, notes: null, dueAt: null } },
+              variables: { id: TODO.id, set: { title: TODO.title, notes: null, dueAt: null, acceptance: null } },
             },
             result: { errors: [{ message: 'That todo is not yours.' }] },
           },
+          aiState(false, false),
         ]}
       >
         <TodoFormDialog open onOpenChange={onOpenChange} todo={TODO} />
@@ -143,5 +169,48 @@ describe('TodoFormDialog', () => {
     expect(await screen.findByText('That todo is not yours.')).toBeInTheDocument();
     // Closing on a failure would throw away what was typed and imply it saved.
     expect(onOpenChange).not.toHaveBeenCalledWith(false);
+  });
+
+  it('saves acceptance criteria, and null when they are blank', async () => {
+    const user = userEvent.setup();
+    const onOpenChange = open(TODO, [
+      save({ title: TODO.title, notes: null, dueAt: null, acceptance: 'The tap no longer drips.' }),
+    ]);
+
+    await user.type(screen.getByLabelText('Acceptance criteria'), 'The tap no longer drips.');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
+  });
+
+  it('shows nothing of AI, and sends no AI flag, while the account has it off', async () => {
+    const user = userEvent.setup();
+    // `aiIgnored` absent from `set`: a mock with it would not match.
+    const onOpenChange = open(
+      TODO,
+      [save({ title: TODO.title, notes: null, dueAt: null })],
+      vi.fn(),
+      aiState(true, false),
+    );
+
+    await waitFor(() => expect(screen.queryByLabelText('AI ignores this')).not.toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
+  });
+
+  it('lets a person tell AI to leave a todo alone once AI is on', async () => {
+    const user = userEvent.setup();
+    const onOpenChange = open(
+      TODO,
+      [save({ title: TODO.title, notes: null, dueAt: null, aiIgnored: true })],
+      vi.fn(),
+      aiState(true, true),
+    );
+
+    await user.click(await screen.findByLabelText('AI ignores this'));
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
   });
 });

@@ -1,4 +1,5 @@
 import { Pressable, Text, View } from 'react-native';
+import { AiIgnoredBadge } from '@/components/domain/ai/ai-ignored-badge';
 import { LabelBadge } from '@/components/domain/label/label-badge';
 import { DueBadge } from '@/components/domain/todo/due-badge';
 import type { TodoSummary } from '@/components/domain/todo/types';
@@ -95,6 +96,8 @@ export function BoardCardBody({
           ))}
         </View>
       ) : null}
+
+      <AiIgnoredBadge ignored={todo.aiIgnored} className="mt-2" />
     </View>
   );
 }

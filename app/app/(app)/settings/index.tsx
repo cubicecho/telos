@@ -1,4 +1,5 @@
 import { View } from 'react-native';
+import { AiSettings } from '@/components/domain/ai/ai-settings';
 import { LabelManager } from '@/components/domain/label/label-manager';
 import { PageLayout } from '@/components/page-layout';
 import { Section } from '@/components/section';
@@ -21,6 +22,8 @@ export default function SettingsScreen() {
           />
           {/* Its own section: the header's "New label" shares the list's state. */}
           <LabelManager />
+          {/* Nothing at all when the instance has no AI. */}
+          <AiSettings />
         </View>
       }
     />

@@ -57,6 +57,9 @@ export const TodoComposer = forwardRef<
             // The composer takes a title and nothing else; both are set from
             // the edit dialog, never from here.
             notes: null,
+            acceptance: null,
+            aiIgnored: false,
+            parentId: null,
             dueAt: null,
             completedAt: null,
             position: nextPosition,

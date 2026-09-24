@@ -6,6 +6,10 @@ export interface TodoSummary {
   id: string;
   title: string;
   notes: string | null;
+  acceptance: string | null;
+  /** Whether AI leaves it alone. Shown, and settable, only while AI is on. */
+  aiIgnored: boolean;
+  parentId: string | null;
   dueAt: string | null;
   completedAt: string | null;
   position: number | null;

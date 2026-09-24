@@ -2,6 +2,7 @@ import { useMutation } from '@apollo/client';
 import { useRouter } from 'expo-router';
 import { type ReactNode, useState } from 'react';
 import { Text, View } from 'react-native';
+import { ProjectAiSwitch } from '@/components/domain/ai/project-ai-switch';
 import { LabelBadge, type LabelSummary } from '@/components/domain/label/label-badge';
 import { LabelPicker } from '@/components/domain/label/label-picker';
 import { PageLayout } from '@/components/page-layout';
@@ -23,6 +24,8 @@ export interface ProjectOverviewData {
   description: string | null;
   todoCount: number;
   openTodoCount: number;
+  /** The project's AI switch. Meaningless, and not shown, unless AI is on for the account. */
+  aiEnabled: boolean;
   labels: readonly LabelSummary[];
 }
 
@@ -121,6 +124,8 @@ export function ProjectPage({
             <Stat term="Done" value={done} />
             <Stat term="Total" value={project.todoCount} />
           </View>
+
+          <ProjectAiSwitch projectId={project.id} enabled={project.aiEnabled} />
 
           {actionError ? (
             <Text className="text-destructive text-sm" aria-live="polite">

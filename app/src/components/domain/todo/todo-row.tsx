@@ -1,6 +1,7 @@
 import { type ApolloCache, useMutation } from '@apollo/client';
 import { useState } from 'react';
 import { Pressable, Text, View, type ViewProps } from 'react-native';
+import { AiIgnoredBadge } from '@/components/domain/ai/ai-ignored-badge';
 import { LabelBadge, type LabelSummary } from '@/components/domain/label/label-badge';
 import { LabelPicker } from '@/components/domain/label/label-picker';
 import { LaneBadge } from '@/components/domain/lane/lane-badge';
@@ -214,6 +215,7 @@ export function TodoRow({
             </Pressable>
             <DueBadge dueAt={todo.dueAt} done={done} className="mt-px" />
             {todo.lane && !todo.lane.isDone ? <LaneBadge lane={todo.lane} className="mt-px" /> : null}
+            <AiIgnoredBadge ignored={todo.aiIgnored} className="mt-px" />
           </View>
 
           {/* One line of the notes, because their presence is otherwise

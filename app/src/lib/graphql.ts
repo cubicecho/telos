@@ -31,6 +31,9 @@ export const TodoFieldsFragment = graphql(`
     id
     title
     notes
+    acceptance
+    aiIgnored
+    parentId
     dueAt
     completedAt
     position
@@ -96,6 +99,7 @@ export const ProjectDocument = graphql(`
       createdAt
       todoCount
       openTodoCount
+      aiEnabled
       ...ProjectLabelFields
     }
   }
@@ -141,6 +145,134 @@ export const MeDocument = graphql(`
   }
 `);
 
+// AI. The instance's switch (`authConfig.ai`) decides whether any of the
+// documents below exist in the server's schema at all: they are generated into
+// the app's types regardless, so every screen that sends one checks `useAi`
+// first. Off, not one of them is sent.
+
+export const AiStateDocument = graphql(`
+  query AiState {
+    authConfig {
+      ai
+    }
+    users {
+      id
+      aiEnabled
+    }
+  }
+`);
+
+export const SetAiEnabledDocument = graphql(`
+  mutation SetAiEnabled($enabled: Boolean!) {
+    setAiEnabled(enabled: $enabled) {
+      id
+      aiEnabled
+    }
+  }
+`);
+
+export const SetProjectAiEnabledDocument = graphql(`
+  mutation SetProjectAiEnabled($projectId: ID!, $enabled: Boolean!) {
+    setProjectAiEnabled(projectId: $projectId, enabled: $enabled) {
+      id
+      aiEnabled
+    }
+  }
+`);
+
+export const ApiKeyFieldsFragment = graphql(`
+  fragment ApiKeyFields on ApiKey {
+    id
+    name
+    start
+    createdAt
+    lastRequest
+    expiresAt
+  }
+`);
+
+export const ApiKeysDocument = graphql(`
+  query ApiKeys {
+    apiKeys {
+      ...ApiKeyFields
+    }
+  }
+`);
+
+export const CreateApiKeyDocument = graphql(`
+  mutation CreateApiKey($name: String!, $expiresInDays: Int) {
+    createApiKey(name: $name, expiresInDays: $expiresInDays) {
+      key
+      apiKey {
+        ...ApiKeyFields
+      }
+    }
+  }
+`);
+
+export const DeleteApiKeyDocument = graphql(`
+  mutation DeleteApiKey($id: ID!) {
+    deleteApiKey(id: $id)
+  }
+`);
+
+// A todo's record: its notes thread and the history the database trigger
+// writes. Read only by the todo dialog, so neither is in `TodoFields`.
+
+export const TodoNoteFieldsFragment = graphql(`
+  fragment TodoNoteFields on TodoNote {
+    id
+    kind
+    body
+    actorKind
+    createdAt
+  }
+`);
+
+export const TodoRecordDocument = graphql(`
+  query TodoRecord($id: UUID!) {
+    todo(where: { id: { eq: $id } }) {
+      id
+      thread(orderBy: { createdAt: { direction: asc, priority: 1 } }) {
+        ...TodoNoteFields
+      }
+      history(orderBy: { at: { direction: asc, priority: 1 } }) {
+        id
+        kind
+        fromLaneId
+        toLaneId
+        fields
+        actorKind
+        reason
+        at
+      }
+      project {
+        id
+        lanes {
+          id
+          name
+        }
+      }
+    }
+  }
+`);
+
+export const CreateTodoNoteDocument = graphql(`
+  mutation CreateTodoNote($todoId: UUID!, $body: String!) {
+    createTodoNote(values: { todoId: $todoId, body: $body }) {
+      ...TodoNoteFields
+    }
+  }
+`);
+
+export const DeleteTodoNoteDocument = graphql(`
+  mutation DeleteTodoNote($id: UUID!) {
+    deleteTodoNote(where: { id: { eq: $id } }) {
+      id
+    }
+  }
+`);
+
 export const CreateProjectDocument = graphql(`
   mutation CreateProject($values: CreateProjectInput!) {
     createProject(values: $values) {
@@ -181,6 +313,8 @@ export const UpdateTodoDocument = graphql(`
       id
       title
       notes
+      acceptance
+      aiIgnored
       dueAt
     }
   }
