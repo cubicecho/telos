@@ -216,8 +216,7 @@ export type SidebarNavItemProps = Omit<React.ComponentProps<typeof Pressable>, '
   count?: number | string | undefined;
   /** The row for the page on screen — filled, and `aria-current="page"`. */
   active?: boolean | undefined;
-  // Re-declared rather than inherited: under `exactOptionalPropertyTypes` the inherited one takes no
-  // explicit `undefined`.
+  // Re-declared rather than inherited, for `exactOptionalPropertyTypes` — see `segmented.tsx`.
   className?: string | undefined;
 };
 
@@ -239,9 +238,9 @@ export type SidebarNavItemProps = Omit<React.ComponentProps<typeof Pressable>, '
  * `useLinkClickHandler`, TanStack's `createLink` — and the `<a href>` is already there.
  *
  * `role="link"` is what makes it a link on both platforms: TalkBack and VoiceOver say "link", and
- * the compiler emits an `<a>`. The current page is said twice — `accessibilityState` on device,
- * `aria-current="page"` on the web, which is the one spelling a web screen reader reads and the one
- * react-native-web would have dropped.
+ * the compiler emits an `<a>`. The current page is said twice, for the same reason `segmented`
+ * says its pill twice — `accessibilityState` on device, `aria-current="page"` on the web, which is
+ * the one spelling a web screen reader reads and the one react-native-web would have dropped.
  */
 const SidebarNavItem = React.forwardRef<React.ElementRef<typeof Pressable>, SidebarNavItemProps>(
   ({ href, label, icon, count, active = false, className, ...props }, ref) => {
