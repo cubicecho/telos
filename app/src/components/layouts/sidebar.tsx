@@ -7,17 +7,16 @@ import { ProjectFormDialog } from '@/components/domain/project/project-form-dial
 import { Sidebar as SidebarFrame, SidebarNavItem, SidebarSection } from '@/components/sidebar';
 import { Button } from '@/components/ui/button';
 import { Plus, Settings } from '@/components/ui/icons';
-import { LoadFailure } from '@/components/ui/load-failure';
-import { Spinner } from '@/components/ui/spinner';
+import { LoadState } from '@/components/ui/load-failure';
 import { clearToken } from '@/lib/auth';
 import { ProjectsDocument } from '@/lib/graphql';
 
 /** The persistent shell: every project, always one click away. */
 export function Sidebar() {
   const pathname = usePathname();
-  const { data, loading, error, refetch } = useQuery(ProjectsDocument);
+  const projectsQuery = useQuery(ProjectsDocument);
   const [creating, setCreating] = useState(false);
-  const projects = data?.projects ?? [];
+  const projects = projectsQuery.data?.projects ?? [];
 
   function signOut() {
     clearToken();
@@ -48,19 +47,17 @@ export function Sidebar() {
             <SidebarSection
               title="Projects"
               status={
-                loading && projects.length === 0 ? (
-                  <View className="px-2 py-2">
-                    <Spinner />
-                  </View>
-                ) : error && projects.length === 0 ? (
-                  /* Only when there is nothing to show. A refetch that fails while the
-                     last good list is still on screen should leave it there — the rail
-                     is how you get anywhere, and replacing it with an apology would
-                     strand the reader on whatever page they are already on. */
-                  <LoadFailure error={error} onRetry={refetch} what="your projects" compact />
-                ) : projects.length === 0 ? (
-                  <Text className="px-2 py-2 text-muted-foreground text-sm">No projects yet.</Text>
-                ) : null
+                /* Only when there is nothing to show. A refetch that fails while the
+                   last good list is still on screen leaves it there — the rail is how
+                   you get anywhere, and replacing it with an apology would strand the
+                   reader on whatever page they are already on. */
+                <LoadState
+                  query={projectsQuery}
+                  what="your projects"
+                  count={projects.length}
+                  compact
+                  empty={<Text className="px-2 py-2 text-muted-foreground text-sm">No projects yet.</Text>}
+                />
               }
               content={projects.map((project) => (
                 <Link key={project.id} href={`/projects/${project.id}`} asChild>

@@ -9,9 +9,10 @@ import { TodoComposer } from '@/components/domain/todo/todo-composer';
 import { TodoFilterBar } from '@/components/domain/todo/todo-filter-bar';
 import { TodoRow } from '@/components/domain/todo/todo-row';
 import type { TodoSummary } from '@/components/domain/todo/types';
+import { SectionHeading } from '@/components/section-heading';
 import { Button } from '@/components/ui/button';
 import type { InputHandle } from '@/components/ui/input';
-import { LoadFailure } from '@/components/ui/load-failure';
+import { LoadFailure, LoadState } from '@/components/ui/load-failure';
 import { Spinner } from '@/components/ui/spinner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { filterTodos, isFiltering, NO_FILTER, type TodoFilter } from '@/lib/filter-todos';
@@ -96,12 +97,7 @@ export default function ProjectScreen() {
     variables: { id: id as string },
     skip: !id,
   });
-  const {
-    data: todosData,
-    loading: todosLoading,
-    error: todosError,
-    refetch: refetchTodos,
-  } = useQuery(ProjectTodosDocument, {
+  const todosQuery = useQuery(ProjectTodosDocument, {
     variables: { projectId: id as string },
     skip: !id,
   });
@@ -144,7 +140,7 @@ export default function ProjectScreen() {
   }
 
   const current: ProjectView = view === 'board' ? 'board' : 'list';
-  const all = (todosData?.todos ?? []) as TodoSummary[];
+  const all = (todosQuery.data?.todos ?? []) as TodoSummary[];
   const lanes = lanesData?.lanes ?? [];
   // Filtered once, here, and handed to whichever view is showing — so the two
   // tabs cannot come to disagree about what the filter means.
@@ -183,10 +179,11 @@ export default function ProjectScreen() {
 
         <TodoFilterBar ref={filterRef} filter={filter} onChange={setFilter} todos={all} matched={todos.length} />
 
-        {todosLoading && all.length === 0 ? (
-          <Spinner />
-        ) : todosError && all.length === 0 ? (
-          <LoadFailure error={todosError} onRetry={refetchTodos} what="the todos" />
+        {/* No `empty`: an empty project still has a board to show, and the
+            list's own empty line depends on the filter. The rungs only stand in
+            while there is no answer at all. */}
+        {todosQuery.data === undefined ? (
+          <LoadState query={todosQuery} what="the todos" count={all.length} />
         ) : (
           <>
             <TabsContent value="board" className="mt-0">
@@ -220,15 +217,9 @@ export default function ProjectScreen() {
 
                 {blocked.length > 0 ? (
                   <View role="region" aria-label="Blocked" className="gap-2">
-                    {/* Not cubeui's `SectionHeading`, which draws this exact look but
-                  takes no `role`, so it could not be the heading it looks like. */}
-                    <Text
-                      role="heading"
-                      aria-level={2}
-                      className="font-medium text-muted-foreground text-xs uppercase tracking-wide"
-                    >
+                    <SectionHeading variant="overline" level={2}>
                       {`Blocked (${blocked.length})`}
-                    </Text>
+                    </SectionHeading>
                     {blocked.map((todo) => (
                       <TodoRow key={todo.id} todo={todo} projectId={project.id} siblings={all} lanes={lanes} />
                     ))}

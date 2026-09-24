@@ -7,22 +7,21 @@ import { Button } from '@/components/ui/button';
 import { ColorDot } from '@/components/ui/color-dot';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Pencil, Plus, Trash2 } from '@/components/ui/icons';
-import { LoadFailure } from '@/components/ui/load-failure';
-import { Spinner } from '@/components/ui/spinner';
+import { LoadState } from '@/components/ui/load-failure';
 import { describeError } from '@/lib/errors';
 import { DeleteLabelDocument, LabelsDocument } from '@/lib/graphql';
 import { cn, HOVER_REVEAL } from '@/lib/utils';
 
 /** The whole label lifecycle in one block: list, create, rename, delete. */
 export function LabelManager() {
-  const { data, loading, error, refetch } = useQuery(LabelsDocument);
+  const labelsQuery = useQuery(LabelsDocument);
   const [editing, setEditing] = useState<LabelSummary | undefined>();
   const [formOpen, setFormOpen] = useState(false);
   const [deleting, setDeleting] = useState<LabelSummary | null>(null);
   const [deleteLabel] = useMutation(DeleteLabelDocument, { refetchQueries: [LabelsDocument] });
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  const labels = data?.labels ?? [];
+  const labels = labelsQuery.data?.labels ?? [];
 
   async function confirmDelete() {
     setDeleteError(null);
@@ -62,13 +61,13 @@ export function LabelManager() {
         </Text>
       ) : null}
 
-      {loading && labels.length === 0 ? (
-        <Spinner />
-      ) : error && labels.length === 0 ? (
-        <LoadFailure error={error} onRetry={refetch} what="your labels" />
-      ) : labels.length === 0 ? (
-        <Text className="text-muted-foreground text-sm">No labels yet.</Text>
-      ) : (
+      <LoadState
+        query={labelsQuery}
+        what="your labels"
+        count={labels.length}
+        empty={<Text className="text-muted-foreground text-sm">No labels yet.</Text>}
+      />
+      {labels.length === 0 ? null : (
         <View role="list" className="gap-1">
           {labels.map((label) => (
             <View

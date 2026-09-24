@@ -18,8 +18,8 @@ export interface LabelSummary {
  * previous shape and it failed in the dark theme, where a dark label sat all but
  * invisible on a near-black surface.
  *
- * cubeui's `Badge` takes only a string, so the remove control sits beside it in
- * a shared pill rather than inside it.
+ * cubeui's `Badge` has no remove control, so the ✕ sits beside it in a shared
+ * pill rather than inside it. Local patch until cubicecho/cubeui#113.
  */
 export function LabelBadge({
   label,

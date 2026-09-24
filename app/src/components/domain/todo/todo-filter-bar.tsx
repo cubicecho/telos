@@ -1,4 +1,4 @@
-import { forwardRef, type ReactNode, useId, useState } from 'react';
+import { forwardRef, type ReactNode, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { ArrowDownWideNarrow, Tag } from '@/components/app-icons';
 import { Button } from '@/components/ui/button';
@@ -6,7 +6,6 @@ import { ColorDot } from '@/components/ui/color-dot';
 import { Check, Search, X } from '@/components/ui/icons';
 import type { InputHandle } from '@/components/ui/input';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { isFiltering, labelsInUse, NO_FILTER, type TodoFilter, type TodoSort } from '@/lib/filter-todos';
 import { cn } from '@/lib/utils';
@@ -61,7 +60,6 @@ export const TodoFilterBar = forwardRef<
   const labels = labelsInUse(todos);
   const active = isFiltering(filter);
   const selected = labels.find((label) => label.id === filter.labelId);
-  const searchId = useId();
   // Controlled, for two reasons. cubeui's popover has no `Close` part, so
   // choosing a label has to close the list from here. And on web radix opens
   // the popover from the trigger's `onClick`, which react-native-web's
@@ -80,15 +78,10 @@ export const TodoFilterBar = forwardRef<
       <View className="flex-row flex-wrap items-center gap-2">
         <View className="relative min-w-48 flex-1 justify-center">
           <Search className="pointer-events-none absolute left-2.5 z-10 h-4 w-4 text-muted-foreground" />
-          {/* cubeui's `Input` takes no `aria-label`; a visually hidden label
-              names it instead, which is what the placeholder says anyway. */}
-          <Label htmlFor={searchId} className="sr-only">
-            Filter todos by title or notes
-          </Label>
           <Input
             ref={ref}
             type="search"
-            id={searchId}
+            aria-label="Filter todos by title or notes"
             value={filter.text}
             placeholder="Filter todos…  (press /)"
             onChangeText={(text) => onChange({ ...filter, text })}

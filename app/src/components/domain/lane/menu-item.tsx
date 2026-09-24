@@ -6,8 +6,9 @@ import { cn } from '@/lib/utils';
 /**
  * One action in a popover menu — a row, not a button of its own.
  *
- * cubeui's `Popover` has no `Close`, so the caller owns the open state and
- * `onSelect` is expected to close it.
+ * cubeui's `Popover` has no `Close` and no menu item, so the caller owns the
+ * open state and `onSelect` is expected to close it. Local patch until
+ * cubicecho/cubeui#114.
  */
 export function MenuItem({
   onSelect,

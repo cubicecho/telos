@@ -1,11 +1,10 @@
 import { useMutation } from '@apollo/client';
-import { forwardRef, useId, useState } from 'react';
+import { forwardRef, useState } from 'react';
 import { Text, View } from 'react-native';
 import { Button } from '@/components/ui/button';
 import { Plus } from '@/components/ui/icons';
 import type { InputHandle } from '@/components/ui/input';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { bumpProjectCounts, type CachedLane, laneForCompletion, updateProjectTodos } from '@/lib/cache';
 import { describeError } from '@/lib/errors';
 import { CreateTodoDocument } from '@/lib/graphql';
@@ -34,7 +33,6 @@ export const TodoComposer = forwardRef<
 >(function TodoComposer({ projectId, nextPosition, lanes }, ref) {
   const [title, setTitle] = useState('');
   const [createTodo, { error }] = useMutation(CreateTodoDocument);
-  const inputId = useId();
 
   async function onSubmit() {
     const trimmed = title.trim();
@@ -90,17 +88,13 @@ export const TodoComposer = forwardRef<
 
   return (
     <View className="gap-1">
-      {/* cubeui's `Input` takes no `aria-label`, so the field is named by a
-          label the eye does not need — the placeholder already says it. */}
-      <Label htmlFor={inputId} className="sr-only">
-        New todo
-      </Label>
       <View className="flex-row gap-2">
         {/* Enter submits through `onSubmitEditing`: there is no `<form>` here,
             which is the one shape both platforms agree on. */}
         <Input
           ref={ref}
-          id={inputId}
+          // Named without a visible label: the placeholder already says it.
+          aria-label="New todo"
           value={title}
           placeholder="Add a todo…  (press n)"
           onChangeText={setTitle}

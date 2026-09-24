@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { LoadFailure } from '../load-failure';
+import { LoadFailure, LoadState } from '../load-failure';
 
 describe('LoadFailure', () => {
   it('says what went wrong, as an alert', () => {
@@ -37,5 +37,52 @@ describe('LoadFailure', () => {
     expect(await screen.findByRole('button', { name: /try again/i })).toBeEnabled();
     // Still showing the query's error, which is the one the screen reads.
     expect(screen.getByRole('alert')).toHaveTextContent('Boom');
+  });
+});
+
+describe('LoadState', () => {
+  const refetch = () => Promise.resolve();
+
+  it('stands in with placeholders while there is no answer yet', () => {
+    render(<LoadState query={{ loading: true, refetch }} what="your labels" count={0} empty="No labels yet." />);
+    expect(screen.getByRole('status', { name: 'Loading' })).toBeInTheDocument();
+    expect(screen.queryByText('No labels yet.')).not.toBeInTheDocument();
+  });
+
+  it('says it failed rather than that there are none', () => {
+    render(
+      <LoadState
+        query={{ loading: false, error: new Error('Failed to fetch'), refetch }}
+        what="your labels"
+        count={0}
+        empty="No labels yet."
+      />,
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent('Couldn’t reach the server.');
+    expect(screen.queryByText('No labels yet.')).not.toBeInTheDocument();
+  });
+
+  it('keeps the last good rows through a refetch and a failed one', () => {
+    const data = { labels: [{ id: '1' }] };
+    const { container, rerender } = render(
+      <LoadState query={{ loading: true, data, refetch }} what="your labels" count={1} />,
+    );
+    expect(container).toBeEmptyDOMElement();
+    rerender(
+      <LoadState query={{ loading: false, error: new Error('Boom'), data, refetch }} what="your labels" count={1} />,
+    );
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it('says there are none once the server says so', () => {
+    render(
+      <LoadState
+        query={{ loading: false, data: { labels: [] }, refetch }}
+        what="your labels"
+        count={0}
+        empty="No labels yet."
+      />,
+    );
+    expect(screen.getByText('No labels yet.')).toBeInTheDocument();
   });
 });

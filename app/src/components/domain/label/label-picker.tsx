@@ -5,7 +5,7 @@ import { Tag } from '@/components/app-icons';
 import { Button } from '@/components/ui/button';
 import { ColorDot } from '@/components/ui/color-dot';
 import { Check } from '@/components/ui/icons';
-import { LoadFailure } from '@/components/ui/load-failure';
+import { LoadState } from '@/components/ui/load-failure';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { LabelsDocument } from '@/lib/graphql';
 import { cn } from '@/lib/utils';
@@ -28,9 +28,9 @@ export function LabelPicker({
   align?: 'start' | 'end';
   className?: string;
 }) {
-  const { data, error, refetch } = useQuery(LabelsDocument);
+  const labelsQuery = useQuery(LabelsDocument);
   const attachedIds = new Set(attached.map((label) => label.id));
-  const labels = data?.labels ?? [];
+  const labels = labelsQuery.data?.labels ?? [];
   const [open, setOpen] = useState(false);
 
   return (
@@ -52,33 +52,35 @@ export function LabelPicker({
         </Button>
       </PopoverTrigger>
       <PopoverContent align={align} className="w-56 p-1">
-        {error && labels.length === 0 ? (
-          /* "No labels yet." here would read as an invitation to go and make
-             one, which is the wrong errand when the list simply did not
-             load. */
-          <LoadFailure error={error} onRetry={refetch} what="your labels" compact />
-        ) : labels.length === 0 ? (
-          <Text className="px-2 py-3 text-center text-muted-foreground text-sm">No labels yet.</Text>
-        ) : (
-          labels.map((label) => {
-            const isAttached = attachedIds.has(label.id);
-            return (
-              <Pressable
-                key={label.id}
-                role="checkbox"
-                aria-checked={isAttached}
-                onPress={() => onToggle(label, !isAttached)}
-                className="w-full flex-row items-center gap-2 rounded-sm px-2 py-1.5 hover:bg-accent"
-              >
-                <ColorDot color={label.color} size="sm" />
-                <Text numberOfLines={1} className="flex-1 text-popover-foreground text-sm">
-                  {label.name}
-                </Text>
-                {isAttached ? <Check className="h-3.5 w-3.5" /> : null}
-              </Pressable>
-            );
-          })
-        )}
+        {/* The failure, not "No labels yet.", when the list did not load: the
+            empty line reads as an invitation to go and make one, which is the
+            wrong errand when the list simply did not arrive. */}
+        <LoadState
+          query={labelsQuery}
+          what="your labels"
+          count={labels.length}
+          compact
+          rows={2}
+          empty={<Text className="px-2 py-3 text-center text-muted-foreground text-sm">No labels yet.</Text>}
+        />
+        {labels.map((label) => {
+          const isAttached = attachedIds.has(label.id);
+          return (
+            <Pressable
+              key={label.id}
+              role="checkbox"
+              aria-checked={isAttached}
+              onPress={() => onToggle(label, !isAttached)}
+              className="w-full flex-row items-center gap-2 rounded-sm px-2 py-1.5 hover:bg-accent"
+            >
+              <ColorDot color={label.color} size="sm" />
+              <Text numberOfLines={1} className="flex-1 text-popover-foreground text-sm">
+                {label.name}
+              </Text>
+              {isAttached ? <Check className="h-3.5 w-3.5" /> : null}
+            </Pressable>
+          );
+        })}
       </PopoverContent>
     </Popover>
   );
