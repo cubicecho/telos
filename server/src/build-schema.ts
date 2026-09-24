@@ -1,9 +1,11 @@
 import { AUTH_TABLES } from '@telos/db/schema';
 import { buildSchema, GraphQLDateTime } from '@vantreeseba/drizzle-graphql';
+import { applyActorLock } from './resolvers/actor-lock.ts';
 import { applyAiSwitchesExtension } from './resolvers/ai-switches.ts';
 import { applyApiKeysExtension } from './resolvers/api-keys.ts';
 import { applyAuthExtension } from './resolvers/auth.ts';
 import { applyLanesExtension } from './resolvers/lanes.ts';
+import { applyRequestsExtension } from './resolvers/requests.ts';
 import { applyTodosExtension } from './resolvers/todos.ts';
 import { onWrite } from './resolvers/write-guards.ts';
 import { contextValues, features, scope } from './tenancy.ts';
@@ -74,7 +76,10 @@ export function createSchema(db: AnyDb, options: SchemaOptions) {
   if (options.ai) {
     schema = applyApiKeysExtension(schema);
     schema = applyAiSwitchesExtension(schema);
+    schema = applyRequestsExtension(schema);
   }
+  // Last, so it sees every mutation the extensions above added.
+  schema = applyActorLock(schema);
 
   return { schema, entities };
 }

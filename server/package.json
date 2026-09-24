@@ -15,6 +15,7 @@
     "@apollo/server": "^5.5.1",
     "@as-integrations/express5": "^1.1.2",
     "@better-auth/api-key": "^1.7.6",
+    "@cubicecho/graphql-mcp": "^2.10.0",
     "@telos/db": "*",
     "@vantreeseba/drizzle-graphql": "^13.0.0",
     "better-auth": "^1.7.6",
@@ -27,6 +28,7 @@
     "graphql-scalars": "^2.0.0"
   },
   "devDependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.1",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6"
   }

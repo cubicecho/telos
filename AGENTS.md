@@ -51,7 +51,9 @@ telos/
 ├── server/                  # GraphQL API (port 3001)
 │   ├── __generated__/       # Generated SDL + resolver types (not committed)
 │   └── src/
-│       ├── index.ts         # Entry point: migrate, mount /graphql, serve the SPA
+│       ├── index.ts         # Entry point: migrate, mount /graphql and /mcp, serve the SPA
+│       ├── request-context.ts  # Headers -> Context, shared by both doors
+│       ├── mcp.ts, mcp.graphql # The MCP door: the operations in mcp.graphql are its tools
 │       ├── preflight.ts     # Boot guards — imported first, on purpose
 │       ├── build-schema.ts  # createSchema(db) — buildSchema + extensions
 │       ├── schema.ts        # Binds createSchema to the real database
@@ -132,6 +134,19 @@ owner has it off. Both default to off. An AI resolver calls `requireAi`, and
 answers NOT_FOUND rather than FORBIDDEN, because for someone who turned AI off
 the surface is not there. Key management needs a session (`requireSession`): a
 key cannot mint its own successor.
+
+**AI adds work; it does not work the board.** An `apiKey` or `agent` actor
+(`isAiActor`) is held to two narrower rules. What it sees: `tenancy.ts` narrows
+its scope to projects with `aiEnabled` and, in them, todos without `aiIgnored`,
+and hides everything hanging off a hidden todo. A resolver that reads rows
+directly (a loader, a hand-written mutation) has to apply the same narrowing
+itself — see `visibleToAi` in `resolvers/todos.ts` and `loadAiTodo` in
+`resolvers/requests.ts`. What it writes: `resolvers/actor-lock.ts` wraps every
+mutation and refuses AI all but `AI_MUTATIONS` (`submitRequest`,
+`cancelRequest`, `addTodoNote`). A new mutation is closed to AI until it is
+added there. The MCP door (`mcp.ts`) serves only the operations written in
+`mcp.graphql` — the tool list is the menu, the lock is the lock. `/mcp` is
+mounted only with `AI_ENABLED`, and is a 404 otherwise.
 
 **`scope` cannot reach a plain insert.** Any foreign key a caller can state gets
 checked in an `onWrite` hook in `server/src/resolvers/write-guards.ts`. A new

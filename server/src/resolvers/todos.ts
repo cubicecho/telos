@@ -1,8 +1,8 @@
 import * as dbSchema from '@telos/db/schema';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { extendSchema, GraphQLError, type GraphQLObjectType, type GraphQLSchema, parse } from 'graphql';
 import { assertNoCycle, assertNotBlocked } from '../blocking.ts';
-import type { Context } from '../context.ts';
+import { type Context, isAiActor } from '../context.ts';
 import { findDoneLaneId, findFirstOpenLaneId } from '../lanes.ts';
 import { stampActor } from '../provenance.ts';
 import { requireAuth } from './auth.ts';
@@ -88,14 +88,34 @@ async function setCompletedAt(
   });
 }
 
+/**
+ * The blockers an AI caller may see. The loader reads rows directly, outside
+ * the tenancy scope, so a blocker the user told AI to ignore — or one in a
+ * project closed to AI — would otherwise hand over its title. `isBlocked`
+ * still counts them: that a todo is waiting is not a secret, what on is.
+ */
+async function visibleToAi(context: Context, blockers: AnyRow[]): Promise<AnyRow[]> {
+  const candidates = blockers.filter((row) => !row.aiIgnored);
+  if (candidates.length === 0) return [];
+  const projectIds = [...new Set(candidates.map((row) => String(row.projectId)))];
+  const open: Array<{ id: string }> = await (context.db as AnyRow)
+    .select({ id: dbSchema.projects.id })
+    .from(dbSchema.projects)
+    .where(and(inArray(dbSchema.projects.id, projectIds), eq(dbSchema.projects.aiEnabled, true)));
+  const openIds = new Set(open.map((row) => String(row.id)));
+  return candidates.filter((row) => openIds.has(String(row.projectId)));
+}
+
 export function applyTodosExtension(schema: GraphQLSchema): GraphQLSchema {
   const extendedSchema = extendSchema(schema, TODOS_SDL);
 
   const todoFields = (extendedSchema.getType('Todo') as GraphQLObjectType).getFields();
   todoFields.isBlocked.resolve = (parent: AnyRow, _args: unknown, context: Context) =>
     context.loaders.blocked.load(String(parent.id));
-  todoFields.blockedBy.resolve = (parent: AnyRow, _args: unknown, context: Context) =>
-    context.loaders.blockers.load(String(parent.id));
+  todoFields.blockedBy.resolve = async (parent: AnyRow, _args: unknown, context: Context) => {
+    const blockers = await context.loaders.blockers.load(String(parent.id));
+    return isAiActor(context) ? visibleToAi(context, blockers) : blockers;
+  };
 
   const projectFields = (extendedSchema.getType('Project') as GraphQLObjectType).getFields();
   projectFields.todoCount.resolve = async (parent: AnyRow, _args: unknown, context: Context) =>

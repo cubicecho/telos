@@ -2,16 +2,15 @@ import type { Server } from 'node:http';
 import { ApolloServer } from '@apollo/server';
 import { ApolloServerPluginDrainHttpServer } from '@apollo/server/plugin/drainHttpServer';
 import { expressMiddleware } from '@as-integrations/express5';
-import { db } from '@telos/db';
 import express, { Router } from 'express';
-import { resolveActor, toHeaders } from '../auth.ts';
+import { toHeaders } from '../auth.ts';
 import type { Context } from '../context.ts';
-import { createLoaders } from '../loaders.ts';
-import { ai, auth, schema } from '../schema.ts';
+import type { ContextFactory } from '../request-context.ts';
+import { schema } from '../schema.ts';
 
 export type { Context };
 
-export async function createGraphQLRouter(httpServer: Server) {
+export async function createGraphQLRouter(httpServer: Server, contextFor: ContextFactory) {
   const apolloServer = new ApolloServer<Context>({
     schema,
     plugins: [ApolloServerPluginDrainHttpServer({ httpServer })],
@@ -22,14 +21,9 @@ export async function createGraphQLRouter(httpServer: Server) {
   const router = Router();
 
   router.use(
-    express.json(),
+    express.json({ limit: '1mb' }),
     expressMiddleware(apolloServer, {
-      // Loaders are built per request: their batching is only ever valid within
-      // one request, and their cache must not outlive it.
-      context: async ({ req }) => {
-        const actor = await resolveActor(auth, db, toHeaders(req.headers), { ai });
-        return { db, auth, userId: actor.userId, actor, loaders: createLoaders(db) };
-      },
+      context: ({ req }) => contextFor(toHeaders(req.headers)),
     }),
   );
 

@@ -36,3 +36,12 @@ export interface Context {
   actor: Actor;
   loaders: Loaders;
 }
+
+/**
+ * Whether the caller is AI: an MCP client on a key, or an agent on a run token.
+ * What such a caller may see is narrower than what its user may (tenancy.ts),
+ * and what it may write is a short list (resolvers/actor-lock.ts).
+ */
+export function isAiActor(ctx: Pick<Context, 'actor'>): boolean {
+  return ctx.actor.kind === 'apiKey' || ctx.actor.kind === 'agent';
+}

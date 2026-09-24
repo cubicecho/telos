@@ -1,4 +1,6 @@
 import { randomUUID } from 'node:crypto';
+import * as dbSchema from '@telos/db/schema';
+import { eq } from 'drizzle-orm';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createClient, createTestDb, createUser, type TestClient, type TestDb } from './helpers.ts';
 
@@ -37,6 +39,13 @@ let lanes: Array<{ id: string; name: string; isDone: boolean }>;
 // biome-ignore lint/suspicious/noExplicitAny: response shape
 async function history(id = todoId, as = client): Promise<any[]> {
   return (await as.expectOk(HISTORY, { id })).todo.history;
+}
+
+/** Opens the account and the project to AI, and returns a client acting as one of its keys. */
+async function asKey(keyId: string): Promise<TestClient> {
+  await db.update(dbSchema.users).set({ aiEnabled: true }).where(eq(dbSchema.users.id, userId));
+  await db.update(dbSchema.projects).set({ aiEnabled: true }).where(eq(dbSchema.projects.id, projectId));
+  return createClient(db, userId, { ai: true, actor: { kind: 'apiKey', userId, keyId } });
 }
 
 beforeEach(async () => {
@@ -126,10 +135,17 @@ describe('todo history', () => {
   });
 
   it('says when an API key made the change, and which key', async () => {
+    // A key edits nothing through generated CRUD (actor-lock.ts); withdrawing
+    // a request is the one change to a todo it can make.
     const keyId = randomUUID();
-    const key = createClient(db, userId, { actor: { kind: 'apiKey', userId, keyId } });
-    await key.expectOk(UPDATE, { id: todoId, set: { notes: 'From Claude.' } });
-    expect((await history()).at(-1)).toMatchObject({ kind: 'edit', actorKind: 'apiKey', actorKeyId: keyId });
+    const key = await asKey(keyId);
+    await key.expectOk(`mutation ($id: ID!) { cancelRequest(id: $id, reason: "Not needed.") }`, { id: todoId });
+    expect((await history()).at(-1)).toMatchObject({
+      kind: 'edit',
+      actorKind: 'apiKey',
+      actorKeyId: keyId,
+      reason: 'Not needed.',
+    });
   });
 
   it('cannot be written through the API', async () => {
@@ -155,10 +171,17 @@ describe('todo notes', () => {
     const note = (await client.expectOk(ADD, { todoId, body: 'Check the edge case.' })).createTodoNote;
     expect(note).toMatchObject({ kind: 'note', body: 'Check the edge case.', actorKind: 'user', actorKeyId: null });
 
+    // A key writes notes through `addTodoNote`, never generated CRUD.
     const keyId = randomUUID();
-    const key = createClient(db, userId, { actor: { kind: 'apiKey', userId, keyId } });
-    const byKey = (await key.expectOk(ADD, { todoId, body: 'Done, see PR.' })).createTodoNote;
-    expect(byKey).toMatchObject({ actorKind: 'apiKey', actorKeyId: keyId });
+    const key = await asKey(keyId);
+    expect((await key.expectError(ADD, { todoId, body: 'Done, see PR.' })).code).toBe('FORBIDDEN');
+    const byKey = (
+      await key.expectOk(
+        `mutation ($todoId: ID!, $body: String!) { addTodoNote(todoId: $todoId, body: $body) { kind actorKind actorKeyId } }`,
+        { todoId, body: 'Done, see PR.' },
+      )
+    ).addTodoNote;
+    expect(byKey).toMatchObject({ kind: 'note', actorKind: 'apiKey', actorKeyId: keyId });
   });
 
   it('refuses a caller-stated signature', async () => {

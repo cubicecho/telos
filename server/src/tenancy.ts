@@ -1,6 +1,7 @@
+import * as dbSchema from '@telos/db/schema';
 import type { BuildSchemaConfig, RowScope } from '@vantreeseba/drizzle-graphql';
-import { eq } from 'drizzle-orm';
-import type { Context } from './context.ts';
+import { and, eq, inArray, type SQL } from 'drizzle-orm';
+import { type Context, isAiActor } from './context.ts';
 import { requireAuth } from './resolvers/auth.ts';
 
 // Multi-tenancy, expressed as drizzle-graphql configuration rather than as
@@ -43,10 +44,62 @@ export const ALL_TABLES = ['users', ...USER_OWNED_TABLES] as const;
 
 const scopeByUserId: RowScope<Context> = (context, table) => eq((table as AnyTable).userId, requireAuth(context));
 
+// What AI sees is narrower than what its user sees: only projects with AI
+// switched on, and in them only the todos nobody told AI to ignore. Everything
+// hanging off a hidden project or todo — lanes, notes, history, labels on it,
+// dependency edges touching it — is hidden with it. A person's session is
+// untouched by any of this.
+
+/** The caller's projects with AI on, as a subquery. */
+function aiProjectIds(context: Context, userId: string) {
+  return (context.db as AnyTable)
+    .select({ id: dbSchema.projects.id })
+    .from(dbSchema.projects)
+    .where(and(eq(dbSchema.projects.userId, userId), eq(dbSchema.projects.aiEnabled, true)));
+}
+
+/** The caller's todos AI may see, as a subquery. */
+function aiTodoIds(context: Context, userId: string) {
+  return (context.db as AnyTable)
+    .select({ id: dbSchema.todos.id })
+    .from(dbSchema.todos)
+    .where(
+      and(
+        eq(dbSchema.todos.userId, userId),
+        eq(dbSchema.todos.aiIgnored, false),
+        inArray(dbSchema.todos.projectId, aiProjectIds(context, userId)),
+      ),
+    );
+}
+
+/** The user scope, and for an AI caller whatever `narrow` adds to it. */
+function aiNarrowed(narrow: (context: Context, table: AnyTable, userId: string) => SQL | undefined): RowScope<Context> {
+  return (context, table) => {
+    const userId = requireAuth(context);
+    const own = eq((table as AnyTable).userId, userId);
+    return isAiActor(context) ? and(own, narrow(context, table as AnyTable, userId)) : own;
+  };
+}
+
+const AI_SCOPES: Partial<Record<(typeof USER_OWNED_TABLES)[number], RowScope<Context>>> = {
+  projects: aiNarrowed((_context, table) => eq(table.aiEnabled, true)),
+  lanes: aiNarrowed((context, table, userId) => inArray(table.projectId, aiProjectIds(context, userId))),
+  projectLabels: aiNarrowed((context, table, userId) => inArray(table.projectId, aiProjectIds(context, userId))),
+  todos: aiNarrowed((context, table, userId) =>
+    and(eq(table.aiIgnored, false), inArray(table.projectId, aiProjectIds(context, userId))),
+  ),
+  todoNotes: aiNarrowed((context, table, userId) => inArray(table.todoId, aiTodoIds(context, userId))),
+  todoEvents: aiNarrowed((context, table, userId) => inArray(table.todoId, aiTodoIds(context, userId))),
+  todoLabels: aiNarrowed((context, table, userId) => inArray(table.todoId, aiTodoIds(context, userId))),
+  todoDependencies: aiNarrowed((context, table, userId) =>
+    and(inArray(table.todoId, aiTodoIds(context, userId)), inArray(table.dependsOnTodoId, aiTodoIds(context, userId))),
+  ),
+};
+
 export const scope: NonNullable<BuildSchemaConfig['scope']> = {
   // A user row is only ever visible to its owner. There is no directory here.
   users: (context, table) => eq((table as AnyTable).id, requireAuth(context as Context)),
-  ...Object.fromEntries(USER_OWNED_TABLES.map((name) => [name, scopeByUserId])),
+  ...Object.fromEntries(USER_OWNED_TABLES.map((name) => [name, AI_SCOPES[name] ?? scopeByUserId])),
 };
 
 /**
