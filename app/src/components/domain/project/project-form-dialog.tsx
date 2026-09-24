@@ -1,12 +1,9 @@
 import { useMutation } from '@apollo/client';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Field, FieldLabel } from '@/components/ui/field';
+import { useEffect } from 'react';
+import { useAppForm } from '@/components/app-form';
+import { Form } from '@/components/ui/form';
 import { FormDialog, FormDialogFooter } from '@/components/ui/form-dialog';
-import { FormElement } from '@/components/ui/form-element';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { describeError } from '@/lib/errors';
 import { CreateProjectDocument, ProjectDocument, ProjectsDocument, UpdateProjectDocument } from '@/lib/graphql';
 import { newId } from '@/lib/ids';
@@ -27,24 +24,27 @@ export function ProjectFormDialog({
   project?: ProjectDraft;
 }) {
   const router = useRouter();
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
   const [createProject, { loading: creating, error: createError }] = useMutation(CreateProjectDocument);
   const [updateProject, { loading: updating, error: updateError }] = useMutation(UpdateProjectDocument, {
     refetchQueries: [ProjectsDocument, ...(project ? [{ query: ProjectDocument, variables: { id: project.id } }] : [])],
   });
 
+  const form = useAppForm({
+    defaultValues: { name: '', description: '' },
+    onSubmit: ({ value }) => save(value),
+  });
+
+  // Reset from the project each time it opens, not on mount: the dialog
+  // outlives a cancel, so a reopened form must show what is stored rather than
+  // what was last typed and abandoned.
   useEffect(() => {
     if (!open) return;
-    setName(project?.name ?? '');
-    setDescription(project?.description ?? '');
-  }, [open, project]);
+    form.reset({ name: project?.name ?? '', description: project?.description ?? '' });
+  }, [open, project, form]);
 
-  const canSubmit = name.trim() !== '' && !creating && !updating;
-
-  async function onSubmit() {
+  async function save({ name, description }: { name: string; description: string }) {
     const values = { name: name.trim(), description: description.trim() === '' ? null : description.trim() };
-    if (!canSubmit) return;
+    if (creating || updating) return;
     try {
       if (project) {
         await updateProject({ variables: { id: project.id, set: values } });
@@ -97,28 +97,22 @@ export function ProjectFormDialog({
       title={project ? 'Edit project' : 'New project'}
       description="A project is a list of todos. Nothing more, on purpose."
     >
-      <FormElement onSubmit={onSubmit} className="gap-4">
-        <Field>
-          <FieldLabel htmlFor="project-name">Name</FieldLabel>
-          <Input id="project-name" autoFocus value={name} placeholder="Kitchen renovation" onChangeText={setName} />
-        </Field>
-        <Field>
-          <FieldLabel htmlFor="project-description">Description</FieldLabel>
-          <Textarea
-            id="project-description"
-            value={description}
-            placeholder="Optional."
-            onChangeText={setDescription}
-          />
-        </Field>
-        <FormDialogFooter onCancel={() => onOpenChange(false)} error={error ? describeError(error) : null}>
-          {/* A Pressable raises no DOM submit, so it calls the handler itself;
-              Enter in the name field still submits through `FormElement`. */}
-          <Button disabled={!canSubmit} onPress={onSubmit}>
-            {project ? 'Save' : 'Create'}
-          </Button>
-        </FormDialogFooter>
-      </FormElement>
+      <form.AppForm>
+        <Form className="gap-4">
+          <form.AppField
+            name="name"
+            validators={{ onChange: ({ value }) => (value.trim() === '' ? 'Give the project a name.' : undefined) }}
+          >
+            {(field) => <field.InputField label="Name" autoFocus placeholder="Kitchen renovation" />}
+          </form.AppField>
+          <form.AppField name="description">
+            {(field) => <field.TextAreaField label="Description" placeholder="Optional." />}
+          </form.AppField>
+          <FormDialogFooter onCancel={() => onOpenChange(false)} error={error ? describeError(error) : null}>
+            <form.SubmitButton isEdit={project !== undefined} editLabel="Save" />
+          </FormDialogFooter>
+        </Form>
+      </form.AppForm>
     </FormDialog>
   );
 }

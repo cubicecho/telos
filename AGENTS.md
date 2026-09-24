@@ -36,6 +36,7 @@ telos/
 │   │   ├── __generated__/   # Generated GraphQL types (do not edit, not committed)
 │   │   ├── components/
 │   │   │   ├── ui/          # cubeui primitives (installed via shadcn) — no app logic
+│   │   │   ├── app-form.tsx # `useAppForm`: cubeui's native `Form` fields, registered
 │   │   │   ├── domain/      # project/, todo/, lane/, label/, settings/
 │   │   │   └── layouts/     # sidebar
 │   │   └── lib/             # apollo, auth, theme, cache writers, blocking, graphql documents, cn()
@@ -214,9 +215,11 @@ field the query reads leaves that field stale, so widen the fragment rather than
 the document.
 
 **An empty state means the server said "none", never that we failed to ask.**
-Every `useQuery` destructures `error` and renders `ui/load-failure.tsx` (cubeui's
-`QueryError`, worded through `describeError()` and announced as an alert) in place
-of its empty state while it has nothing else to show. The app used to answer a
+A list renders `LoadState` from `ui/load-failure.tsx` (cubeui's `QueryState` over
+an Apollo result, worded through `describeError()`): placeholder rows while
+there is no answer, the failure as an alert, then its `empty`, and nothing once
+there are rows. A screen about one thing — the project, the home redirect —
+renders `LoadFailure` (cubeui's `QueryError`) in the same place. The app used to answer a
 stopped API with "No projects yet." and "That project doesn't exist, or isn't
 yours." — confident claims about the reader's own data, made by code that had
 not heard back. The ordering is the rule: the failure branch comes *before* the
@@ -295,6 +298,10 @@ a value it failed to read.
   bug that blocks telos before a fix ships: patch the installed copy under a
   `Local patch until cubicecho/cubeui#N` comment, and check for those comments
   after every re-add, since a re-add overwrites them.
+- Forms are TanStack Form through `useAppForm` in `src/components/app-form.tsx`,
+  which registers cubeui's native `Form` fields: `form.AppField` with a
+  `validators` rule, and `form.SubmitButton` for the disabled state. Not
+  `useState` and a hand-computed `canSubmit`.
 - `import './preflight.ts';` stays first in `server/src/index.ts`, separated by a
   blank line so Biome's import sorting leaves it there. It has to run before
   `@telos/db` is imported.

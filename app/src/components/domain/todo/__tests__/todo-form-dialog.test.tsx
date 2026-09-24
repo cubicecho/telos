@@ -112,9 +112,10 @@ describe('TodoFormDialog', () => {
 
     await user.clear(screen.getByLabelText('Title'));
 
-    // Disabled rather than failing on submit: there is no todo to be had, and
+    // Disabled, and saying why at the field: there is no todo to be had, and
     // an empty title is not a thing the server should be asked about.
     expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+    expect(screen.getByLabelText('Title')).toHaveAccessibleDescription('A todo needs a title.');
     expect(onOpenChange).not.toHaveBeenCalled();
   });
 

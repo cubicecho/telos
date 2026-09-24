@@ -1,12 +1,8 @@
 import { useMutation } from '@apollo/client';
-import { useEffect, useState } from 'react';
-import { View } from 'react-native';
-import { Button } from '@/components/ui/button';
-import { DateTimeInput } from '@/components/ui/date-time-input';
-import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
+import { useEffect } from 'react';
+import { useAppForm } from '@/components/app-form';
+import { Form } from '@/components/ui/form';
 import { FormDialog, FormDialogFooter } from '@/components/ui/form-dialog';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { parseDate } from '@/lib/dates';
 import { describeError } from '@/lib/errors';
 import { UpdateTodoDocument } from '@/lib/graphql';
@@ -37,26 +33,22 @@ export function TodoFormDialog({
   onOpenChange: (open: boolean) => void;
   todo: TodoSummary;
 }) {
-  const [title, setTitle] = useState('');
-  const [notes, setNotes] = useState('');
-  const [dueAt, setDueAt] = useState<Date | null>(null);
-  const [updateTodo, { loading, error }] = useMutation(UpdateTodoDocument);
+  const [updateTodo, { error }] = useMutation(UpdateTodoDocument);
+  const form = useAppForm({
+    defaultValues: { title: '', notes: '', dueAt: null as Date | null },
+    onSubmit: ({ value }) => save(value),
+  });
 
   // Reset from the todo each time it opens, not on mount: the dialog outlives a
   // cancel, so a reopened form must show what is stored rather than what was
   // last typed and abandoned.
   useEffect(() => {
     if (!open) return;
-    setTitle(todo.title);
-    setNotes(todo.notes ?? '');
-    setDueAt(parseDate(todo.dueAt) ?? null);
-  }, [open, todo]);
+    form.reset({ title: todo.title, notes: todo.notes ?? '', dueAt: parseDate(todo.dueAt) ?? null });
+  }, [open, todo, form]);
 
-  const canSave = !loading && title.trim() !== '';
-
-  async function onSubmit() {
+  async function save({ title, notes, dueAt }: { title: string; notes: string; dueAt: Date | null }) {
     const trimmed = title.trim();
-    if (!canSave) return;
     // Empty means absent, for both: the columns are nullable precisely so that
     // "no notes" and "an empty note" cannot be two different stored states.
     const set = {
@@ -87,47 +79,37 @@ export function TodoFormDialog({
       title="Edit todo"
       description="Its lane, labels and dependencies are set from the row itself, where the rules about them live."
     >
-      <View className="gap-4">
-        <Field>
-          <FieldLabel htmlFor="todo-title">Title</FieldLabel>
-          <Input
-            id="todo-title"
-            autoFocus
-            value={title}
-            placeholder="Replace the tap"
-            onChangeText={setTitle}
-            onSubmitEditing={onSubmit}
-          />
-        </Field>
-        <Field>
-          <FieldLabel htmlFor="todo-notes">Notes</FieldLabel>
-          <Textarea id="todo-notes" value={notes} placeholder="Optional." onChangeText={setNotes} />
-        </Field>
-        <Field>
-          <FieldLabel id="todo-due-at-label">Due</FieldLabel>
+      <form.AppForm>
+        <Form className="gap-4">
+          <form.AppField
+            name="title"
+            validators={{ onChange: ({ value }) => (value.trim() === '' ? 'A todo needs a title.' : undefined) }}
+          >
+            {(field) => <field.InputField label="Title" autoFocus placeholder="Replace the tap" />}
+          </form.AppField>
+          <form.AppField name="notes">
+            {(field) => <field.TextAreaField label="Notes" placeholder="Optional." />}
+          </form.AppField>
           {/* Date only: a picked day is committed at local midnight, so the day
               the reader chose is the day they get back in their own zone. Clear
               saves `null`, never the epoch, which is the path the server-side
-              scalar override exists to keep honest. Named by reference rather
-              than `htmlFor`, which would name the trigger "Due" and drop the
-              date; this reads "Due September 15th, 2026", on both halves. */}
-          <DateTimeInput
-            aria-labelledby="todo-due-at-label"
-            mode="date"
-            clearable
-            value={dueAt}
-            onChange={setDueAt}
-            placeholder="No due date"
-            className="self-start"
-          />
-          <FieldDescription>Clear it from the calendar for no due date.</FieldDescription>
-        </Field>
-      </View>
-      <FormDialogFooter onCancel={() => onOpenChange(false)} error={error ? describeError(error) : null}>
-        <Button onPress={onSubmit} disabled={!canSave}>
-          Save
-        </Button>
-      </FormDialogFooter>
+              scalar override exists to keep honest. */}
+          <form.AppField name="dueAt">
+            {(field) => (
+              <field.DateField
+                label="Due"
+                mode="date"
+                placeholder="No due date"
+                className="self-start"
+                description="Clear it from the calendar for no due date."
+              />
+            )}
+          </form.AppField>
+          <FormDialogFooter onCancel={() => onOpenChange(false)} error={error ? describeError(error) : null}>
+            <form.SubmitButton isEdit editLabel="Save" />
+          </FormDialogFooter>
+        </Form>
+      </form.AppForm>
     </FormDialog>
   );
 }
