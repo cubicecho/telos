@@ -15,7 +15,6 @@ import { bumpProjectCounts, type CachedLane, laneForCompletion, updateProjectTod
 import { describeError } from '@/lib/errors';
 import {
   AddTodoDependencyDocument,
-  ArchivedTodosDocument,
   ArchiveTodoDocument,
   AttachTodoLabelDocument,
   CompleteTodoDocument,
@@ -51,7 +50,9 @@ export function TodoRow({
   // list already holding it.
   const [completeTodo] = useMutation(CompleteTodoDocument);
   const [reopenTodo] = useMutation(ReopenTodoDocument);
-  const [archiveTodo] = useMutation(ArchiveTodoDocument, { refetchQueries: [ArchivedTodosDocument] });
+  // No refetch of the archived list: it is on another tab, and asks the server
+  // again whenever it is opened.
+  const [archiveTodo] = useMutation(ArchiveTodoDocument);
   const [attachLabel] = useMutation(AttachTodoLabelDocument);
   const [detachLabel] = useMutation(DetachTodoLabelDocument);
   const [addDependency] = useMutation(AddTodoDependencyDocument);

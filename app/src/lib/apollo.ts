@@ -98,8 +98,26 @@ const replace = { merge: false } as const;
 
 const cache = new InMemoryCache({
   typePolicies: {
+    // The root lists too: each set of arguments is its own entry, always the
+    // whole answer for them (a longer page is asked for with a new limit), so a
+    // shorter one after an archive or a delete is the list as it now stands.
+    Query: {
+      fields: {
+        projects: replace,
+        todos: replace,
+        lanes: replace,
+        labels: replace,
+        runs: replace,
+        artifacts: replace,
+        agents: replace,
+        drafts: replace,
+        boardTemplates: replace,
+      },
+    },
     Todo: {
       fields: {
+        thread: replace,
+        history: replace,
         blockedBy: replace,
         dependencies: replace,
         dependents: replace,
