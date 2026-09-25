@@ -10,14 +10,23 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      # Required — generate with: openssl rand -hex 32
-      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required — generate one with `openssl rand -hex 32`}
+      # Required — generate with: openssl rand -hex 32. JWT_SECRET, its old
+      # name, is still read.
+      AUTH_SECRET: ${AUTH_SECRET:-${JWT_SECRET:?AUTH_SECRET is required — generate one with `openssl rand -hex 32`}}
       DATABASE_URL: postgres://telos:${POSTGRES_PASSWORD:-telos}@postgres:5432/telos
       APP_URL: ${APP_URL:-http://localhost:3001}
       # Leave magic links on unless this instance is private and has no mail
       # relay. See "Before you expose it" in the README.
       AUTH_MAGIC_LINK: ${AUTH_MAGIC_LINK:-true}
       EXPOSE_MAGIC_LINK: ${EXPOSE_MAGIC_LINK:-false}
+      # false removes AI entirely; otherwise an admin switches it on in Settings.
+      # See "AI" in the README.
+      AI_ENABLED: ${AI_ENABLED:-}
+      # The runner comes with the server and needs no key; these only tune it.
+      RUNNER_CONCURRENCY: ${RUNNER_CONCURRENCY:-2}
+      RUNNER_POLL_SECONDS: ${RUNNER_POLL_SECONDS:-5}
+      # Leave off unless every user with AI on is someone you would hand a shell.
+      RUNNER_ALLOW_STDIO: ${RUNNER_ALLOW_STDIO:-false}
       NODE_ENV: production
       PORT: 3001
     ports:

@@ -1,11 +1,17 @@
 import { useMutation } from '@apollo/client';
-import { useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { Text } from 'react-native';
 import { useAppForm } from '@/components/app-form';
+import { DialogLayout } from '@/components/dialog-layout';
+import { TodoRuns, useTodoRuns } from '@/components/domain/ai/todo-runs';
+import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
-import { FormDialog, FormDialogFooter } from '@/components/ui/form-dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useAi } from '@/lib/ai';
 import { parseDate } from '@/lib/dates';
 import { describeError } from '@/lib/errors';
 import { UpdateTodoDocument } from '@/lib/graphql';
+import { TodoHistory, TodoThread } from './todo-record';
 import type { TodoSummary } from './types';
 
 /**
@@ -13,10 +19,20 @@ import type { TodoSummary } from './types';
  *
  * Modelled on `ProjectFormDialog`, minus the create half: a todo is created by
  * the inline composer, which takes a title and nothing else, so this dialog only
- * ever edits. The three fields here are the whole of what an edit may touch —
+ * ever edits. The fields here are the whole of what an edit may touch —
  * the lane, labels, dependencies and completion each have their own affordance
  * on the row, and each carries invariants a free-form form would have to
  * re-state.
+ *
+ * Beside the form, the todo's record: its notes thread and its history, each a
+ * tab, loaded only when opened. "AI ignores this" is the one AI field, drawn —
+ * and sent — only while AI is on for the account. With AI on for the project
+ * as well, a Runs tab shows what the stations' agents made of it.
+ *
+ * A `DialogLayout`, so the title and the Save stay put and only the body
+ * scrolls: a long thread or history would otherwise carry the whole dialog,
+ * title first, off the top of the screen. The form's provider wraps the whole
+ * dialog so the footer's Save can submit it.
  *
  * No `update` function, unusually for this app. The other todo mutations write
  * a cache updater because completing or deleting moves *other* rows — the
@@ -24,18 +40,49 @@ import type { TodoSummary } from './types';
  * normalized by id, so the mutation's own result settles the row in the list,
  * on the board, and in every "Blocked by …" line that names it.
  */
+/** The dialog's tabs. `notes` is the one labelled Thread. */
+export type TodoTab = 'details' | 'notes' | 'history' | 'runs';
+
 export function TodoFormDialog({
   open,
   onOpenChange,
   todo,
+  initialTab = 'details',
+  focusNoteId = null,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   todo: TodoSummary;
+  /** The tab it opens on: Thread, say, when opened from a note an agent left. */
+  initialTab?: TodoTab;
+  /** A note to mark in the thread. */
+  focusNoteId?: string | null;
 }) {
+  const ai = useAi();
+  const [tab, setTab] = useState<string>(initialTab);
+  const [focusedNote, setFocusedNote] = useState<string | null>(focusNoteId);
+  // Asked only while the account's AI is on: off, the schema has no runs. The
+  // answer carries the project's switch, which is what decides the tab.
+  const runsQuery = useTodoRuns(todo.id, { skip: !ai.on });
+  const showRuns = ai.on && runsQuery.data?.todo?.project?.aiEnabled === true;
   const [updateTodo, { error }] = useMutation(UpdateTodoDocument);
+  // The todo as the form holds it, and so the form's defaults as well as what
+  // it resets to. Both matter: TanStack re-applies `defaultValues` whenever they
+  // change on a render of an untouched form, so blank literals here would wipe
+  // the reset below the moment anything re-rendered the dialog — `useAi`
+  // answering, say.
+  const initial = useMemo(
+    () => ({
+      title: todo.title,
+      notes: todo.notes ?? '',
+      acceptance: todo.acceptance ?? '',
+      dueAt: parseDate(todo.dueAt) ?? null,
+      aiIgnored: todo.aiIgnored,
+    }),
+    [todo],
+  );
   const form = useAppForm({
-    defaultValues: { title: '', notes: '', dueAt: null as Date | null },
+    defaultValues: initial,
     onSubmit: ({ value }) => save(value),
   });
 
@@ -44,23 +91,36 @@ export function TodoFormDialog({
   // last typed and abandoned.
   useEffect(() => {
     if (!open) return;
-    form.reset({ title: todo.title, notes: todo.notes ?? '', dueAt: parseDate(todo.dueAt) ?? null });
-  }, [open, todo, form]);
+    setTab(initialTab);
+    setFocusedNote(focusNoteId);
+    form.reset(initial);
+  }, [open, initial, form, initialTab, focusNoteId]);
 
-  async function save({ title, notes, dueAt }: { title: string; notes: string; dueAt: Date | null }) {
-    const trimmed = title.trim();
-    // Empty means absent, for both: the columns are nullable precisely so that
-    // "no notes" and "an empty note" cannot be two different stored states.
+  async function save(value: {
+    title: string;
+    notes: string;
+    acceptance: string;
+    dueAt: Date | null;
+    aiIgnored: boolean;
+  }) {
+    // Empty means absent: the columns are nullable precisely so that "no notes"
+    // and "an empty note" cannot be two different stored states.
+    const orNull = (text: string) => (text.trim() === '' ? null : text.trim());
     const set = {
-      title: trimmed,
-      notes: notes.trim() === '' ? null : notes.trim(),
-      dueAt: dueAt ? dueAt.toISOString() : null,
+      title: value.title.trim(),
+      notes: orNull(value.notes),
+      acceptance: orNull(value.acceptance),
+      dueAt: value.dueAt ? value.dueAt.toISOString() : null,
+      // Only while AI is on: off, the flag is not this form's to change.
+      ...(ai.on ? { aiIgnored: value.aiIgnored } : {}),
     };
 
     try {
       await updateTodo({
         variables: { id: todo.id, set },
-        optimisticResponse: { updateTodo: { __typename: 'Todo', id: todo.id, ...set } },
+        optimisticResponse: {
+          updateTodo: { __typename: 'Todo', id: todo.id, aiIgnored: todo.aiIgnored, ...set },
+        },
       });
     } catch {
       // The mutation rejects as well as setting `error`, so an uncaught await
@@ -72,44 +132,105 @@ export function TodoFormDialog({
     onOpenChange(false);
   }
 
+  const details = tab === 'details';
+
   return (
-    <FormDialog
-      open={open}
-      onOpenChange={onOpenChange}
-      title="Edit todo"
-      description="Its lane, labels and dependencies are set from the row itself, where the rules about them live."
-    >
-      <form.AppForm>
-        <Form className="gap-4">
-          <form.AppField
-            name="title"
-            validators={{ onChange: ({ value }) => (value.trim() === '' ? 'A todo needs a title.' : undefined) }}
-          >
-            {(field) => <field.InputField label="Title" autoFocus placeholder="Replace the tap" />}
-          </form.AppField>
-          <form.AppField name="notes">
-            {(field) => <field.TextAreaField label="Notes" placeholder="Optional." />}
-          </form.AppField>
-          {/* Date only: a picked day is committed at local midnight, so the day
-              the reader chose is the day they get back in their own zone. Clear
-              saves `null`, never the epoch, which is the path the server-side
-              scalar override exists to keep honest. */}
-          <form.AppField name="dueAt">
-            {(field) => (
-              <field.DateTimeField
-                label="Due"
-                mode="date"
-                placeholder="No due date"
-                clearable
-                description="Clear it from the calendar for no due date."
-              />
-            )}
-          </form.AppField>
-          <FormDialogFooter onCancel={() => onOpenChange(false)} error={error ? describeError(error) : null}>
-            <form.SubmitButton isEdit editLabel="Save" />
-          </FormDialogFooter>
-        </Form>
-      </form.AppForm>
-    </FormDialog>
+    <form.AppForm>
+      <DialogLayout
+        open={open}
+        onOpenChange={onOpenChange}
+        size="lg"
+        title="Edit todo"
+        description="Its lane, labels and dependencies are set from the row itself, where the rules about them live."
+        hasUnsavedChanges={() => !form.state.isDefaultValue}
+        footer={
+          details && error ? (
+            <Text role="alert" className="text-sm text-destructive">
+              {describeError(error)}
+            </Text>
+          ) : null
+        }
+        footerActions={(close) =>
+          details ? (
+            <>
+              <Button variant="outline" onPress={close}>
+                Cancel
+              </Button>
+              <form.SubmitButton isEdit editLabel="Save" />
+            </>
+          ) : null
+        }
+        content={
+          <Tabs value={tab} onValueChange={setTab} className="gap-4">
+            <TabsList aria-label="Todo" className="self-start">
+              <TabsTrigger value="details">Details</TabsTrigger>
+              <TabsTrigger value="notes">Thread</TabsTrigger>
+              <TabsTrigger value="history">History</TabsTrigger>
+              {showRuns ? <TabsTrigger value="runs">Runs</TabsTrigger> : null}
+            </TabsList>
+            <TabsContent value="details">
+              <Form className="gap-4">
+                <form.AppField
+                  name="title"
+                  validators={{ onChange: ({ value }) => (value.trim() === '' ? 'A todo needs a title.' : undefined) }}
+                >
+                  {(field) => <field.InputField label="Title" autoFocus placeholder="Replace the tap" />}
+                </form.AppField>
+                <form.AppField name="notes">
+                  {(field) => <field.TextAreaField label="Notes" placeholder="Optional." />}
+                </form.AppField>
+                <form.AppField name="acceptance">
+                  {(field) => (
+                    <field.TextAreaField label="Acceptance criteria" placeholder="Optional. What done looks like." />
+                  )}
+                </form.AppField>
+                {/* Date only: a picked day is committed at local midnight, so the day
+                  the reader chose is the day they get back in their own zone. Clear
+                  saves `null`, never the epoch, which is the path the server-side
+                  scalar override exists to keep honest. */}
+                <form.AppField name="dueAt">
+                  {(field) => (
+                    <field.DateTimeField
+                      label="Due"
+                      mode="date"
+                      placeholder="No due date"
+                      clearable
+                      description="Clear it from the calendar for no due date."
+                    />
+                  )}
+                </form.AppField>
+                {ai.on ? (
+                  <form.AppField name="aiIgnored">
+                    {(field) => (
+                      <field.CheckboxField
+                        label="AI ignores this"
+                        description="No agent picks it up, and AI clients cannot read it."
+                      />
+                    )}
+                  </form.AppField>
+                ) : null}
+              </Form>
+            </TabsContent>
+            <TabsContent value="notes">
+              <TodoThread todoId={todo.id} focusNoteId={focusedNote} />
+            </TabsContent>
+            <TabsContent value="history">
+              <TodoHistory todoId={todo.id} runs={showRuns ? runsQuery.data?.todo?.runs : undefined} />
+            </TabsContent>
+            {showRuns ? (
+              <TabsContent value="runs">
+                <TodoRuns
+                  todoId={todo.id}
+                  onOpenNote={(noteId) => {
+                    setFocusedNote(noteId);
+                    setTab('notes');
+                  }}
+                />
+              </TabsContent>
+            ) : null}
+          </Tabs>
+        }
+      />
+    </form.AppForm>
   );
 }

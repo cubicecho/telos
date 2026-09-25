@@ -31,6 +31,9 @@ export const TodoFieldsFragment = graphql(`
     id
     title
     notes
+    acceptance
+    aiIgnored
+    parentId
     dueAt
     completedAt
     position
@@ -96,16 +99,20 @@ export const ProjectDocument = graphql(`
       createdAt
       todoCount
       openTodoCount
+      aiEnabled
       ...ProjectLabelFields
     }
   }
 `);
 
+// The board's order is `position`; `createdAt` only breaks a tie. The highest
+// `priority` sorts first, so `position` has the higher one: the other way
+// round, a lane or card moved ahead of an older one snaps back on refetch.
 export const ProjectTodosDocument = graphql(`
   query ProjectTodos($projectId: UUID!) {
     todos(
       where: { projectId: { eq: $projectId } }
-      orderBy: { position: { direction: asc, priority: 1 }, createdAt: { direction: asc, priority: 2 } }
+      orderBy: { position: { direction: asc, priority: 2 }, createdAt: { direction: asc, priority: 1 } }
     ) {
       ...TodoFields
     }
@@ -116,7 +123,7 @@ export const ProjectLanesDocument = graphql(`
   query ProjectLanes($projectId: UUID!) {
     lanes(
       where: { projectId: { eq: $projectId } }
-      orderBy: { position: { direction: asc, priority: 1 }, createdAt: { direction: asc, priority: 2 } }
+      orderBy: { position: { direction: asc, priority: 2 }, createdAt: { direction: asc, priority: 1 } }
     ) {
       ...LaneFields
     }
@@ -137,6 +144,473 @@ export const MeDocument = graphql(`
       id
       email
       name
+    }
+  }
+`);
+
+// AI. Whether the server offers AI (`authConfig.aiAvailable`) decides whether
+// any of the documents below exist in its schema at all, and the instance's
+// switch (`authConfig.ai`) whether they do anything: they are generated into
+// the app's types regardless, so every screen that sends one checks `useAi`
+// first. Off, not one of them is sent, bar an admin's instance switch.
+
+export const AiStateDocument = graphql(`
+  query AiState {
+    authConfig {
+      ai
+      aiAvailable
+    }
+    users {
+      id
+      aiEnabled
+      isAdmin
+    }
+  }
+`);
+
+export const SetInstanceAiEnabledDocument = graphql(`
+  mutation SetInstanceAiEnabled($enabled: Boolean!) {
+    setInstanceAiEnabled(enabled: $enabled) {
+      ai
+      aiAvailable
+    }
+  }
+`);
+
+export const SetAiEnabledDocument = graphql(`
+  mutation SetAiEnabled($enabled: Boolean!) {
+    setAiEnabled(enabled: $enabled) {
+      id
+      aiEnabled
+    }
+  }
+`);
+
+export const RunRetentionDocument = graphql(`
+  query RunRetention {
+    users {
+      id
+      runRetentionDays
+    }
+  }
+`);
+
+export const SetRunRetentionDocument = graphql(`
+  mutation SetRunRetention($days: Int) {
+    setRunRetention(days: $days) {
+      id
+      runRetentionDays
+    }
+  }
+`);
+
+export const SetProjectAiEnabledDocument = graphql(`
+  mutation SetProjectAiEnabled($projectId: ID!, $enabled: Boolean!) {
+    setProjectAiEnabled(projectId: $projectId, enabled: $enabled) {
+      id
+      aiEnabled
+    }
+  }
+`);
+
+export const ApiKeyFieldsFragment = graphql(`
+  fragment ApiKeyFields on ApiKey {
+    id
+    name
+    start
+    createdAt
+    lastRequest
+    expiresAt
+  }
+`);
+
+export const ApiKeysDocument = graphql(`
+  query ApiKeys {
+    apiKeys {
+      ...ApiKeyFields
+    }
+  }
+`);
+
+export const CreateApiKeyDocument = graphql(`
+  mutation CreateApiKey($name: String!, $expiresInDays: Int) {
+    createApiKey(name: $name, expiresInDays: $expiresInDays) {
+      key
+      apiKey {
+        ...ApiKeyFields
+      }
+    }
+  }
+`);
+
+export const DeleteApiKeyDocument = graphql(`
+  mutation DeleteApiKey($id: ID!) {
+    deleteApiKey(id: $id)
+  }
+`);
+
+// Agents, and the lanes they work as stations. `apiKey` is not in the schema:
+// it is written with `setAgentApiKey`, and all that comes back is `hasApiKey`.
+
+export const AgentFieldsFragment = graphql(`
+  fragment AgentFields on Agent {
+    id
+    name
+    baseUrl
+    model
+    systemPrompt
+    temperature
+    maxTokens
+    contextLength
+    maxToolIterations
+    toolDiscovery
+    toolSelectModel
+    requestTimeoutSeconds
+    maxRetries
+    mcpServers
+    hasApiKey
+  }
+`);
+
+export const TestMcpServerDocument = graphql(`
+  mutation TestMcpServer($server: String!) {
+    testMcpServer(server: $server) {
+      id
+    }
+  }
+`);
+
+export const McpProbeDocument = graphql(`
+  query McpProbe($id: ID!) {
+    mcpProbe(id: $id) {
+      id
+      status
+      ok
+      tools {
+        name
+        description
+      }
+      error
+    }
+  }
+`);
+
+export const AgentModelsDocument = graphql(`
+  query AgentModels($baseUrl: String!, $agentId: ID) {
+    agentModels(baseUrl: $baseUrl, agentId: $agentId) {
+      id
+      contextLength
+    }
+  }
+`);
+
+export const AgentsDocument = graphql(`
+  query Agents {
+    agents(orderBy: { name: { direction: asc, priority: 1 } }) {
+      ...AgentFields
+    }
+  }
+`);
+
+export const CreateAgentDocument = graphql(`
+  mutation CreateAgent($values: CreateAgentInput!) {
+    createAgent(values: $values) {
+      ...AgentFields
+    }
+  }
+`);
+
+export const UpdateAgentDocument = graphql(`
+  mutation UpdateAgent($id: UUID!, $set: UpdateAgentInput!) {
+    updateAgent(set: $set, where: { id: { eq: $id } }) {
+      ...AgentFields
+    }
+  }
+`);
+
+export const DeleteAgentDocument = graphql(`
+  mutation DeleteAgent($id: UUID!) {
+    deleteAgent(where: { id: { eq: $id } }) {
+      id
+    }
+  }
+`);
+
+export const SetAgentApiKeyDocument = graphql(`
+  mutation SetAgentApiKey($agentId: ID!, $apiKey: String) {
+    setAgentApiKey(agentId: $agentId, apiKey: $apiKey) {
+      id
+      hasApiKey
+    }
+  }
+`);
+
+// The station columns exist only while the instance has AI, so they are not
+// in `LaneFields` — every board would ask for fields the server does not have.
+// Read on their own, they land on the same normalized `Lane` rows.
+export const StationFieldsFragment = graphql(`
+  fragment StationFields on Lane {
+    id
+    agentId
+    contract
+    prompt
+    onSuccessLaneId
+    onFailureLaneId
+    wipLimit
+    maxAttempts
+  }
+`);
+
+export const ProjectStationsDocument = graphql(`
+  query ProjectStations($projectId: UUID!) {
+    lanes(where: { projectId: { eq: $projectId } }) {
+      ...StationFields
+    }
+    agents(orderBy: { name: { direction: asc, priority: 1 } }) {
+      id
+      name
+    }
+  }
+`);
+
+export const UpdateStationDocument = graphql(`
+  mutation UpdateStation($id: UUID!, $set: UpdateLaneInput!) {
+    updateLane(set: $set, where: { id: { eq: $id } }) {
+      ...StationFields
+    }
+  }
+`);
+
+// Runs and what they left behind: a todo's, read by the todo dialog, and a
+// project's, read by its Runs and Artifacts views and the board's live marks.
+// Read only while AI is on for the account.
+
+// A run's summary is what a list polls: no log, no prompts, no output, which
+// are the heavy parts. RunFields adds them, for a run someone has opened.
+export const RunSummaryFieldsFragment = graphql(`
+  fragment RunSummaryFields on Run {
+    id
+    status
+    verdict
+    contract
+    error
+    toolCalls
+    promptTokens
+    completionTokens
+    totalTokens
+    model
+    startedAt
+    finishedAt
+    cancelRequestedAt
+    agent {
+      id
+      name
+    }
+    lane {
+      id
+      name
+    }
+    todo {
+      id
+      title
+    }
+  }
+`);
+
+export const RunFieldsFragment = graphql(`
+  fragment RunFields on Run {
+    ...RunSummaryFields
+    output
+    events
+    systemPrompt
+    userPrompt
+  }
+`);
+
+export const ArtifactFieldsFragment = graphql(`
+  fragment ArtifactFields on Artifact {
+    id
+    location
+    source
+    action
+    serverSlug
+    tool
+    title
+    description
+    mediaType
+    sizeBytes
+    createdAt
+  }
+`);
+
+export const TodoRunsDocument = graphql(`
+  query TodoRuns($id: UUID!) {
+    todo(where: { id: { eq: $id } }) {
+      id
+      project {
+        id
+        aiEnabled
+      }
+      runs(orderBy: { startedAt: { direction: desc, priority: 1 } }) {
+        ...RunSummaryFields
+      }
+      artifacts(orderBy: { createdAt: { direction: desc, priority: 1 } }) {
+        ...ArtifactFields
+      }
+    }
+  }
+`);
+
+export const CancelRunDocument = graphql(`
+  mutation CancelRun($id: ID!) {
+    cancelRun(id: $id) {
+      ...RunSummaryFields
+    }
+  }
+`);
+
+export const DeleteRunDocument = graphql(`
+  mutation DeleteRun($id: ID!) {
+    deleteRun(id: $id)
+  }
+`);
+
+/** Takes an artifact off the board. What it points at stays where it was stored. */
+export const DeleteArtifactDocument = graphql(`
+  mutation DeleteArtifact($id: ID!) {
+    deleteArtifact(id: $id)
+  }
+`);
+
+/** One run, for a view that follows it as it goes. */
+export const RunDocument = graphql(`
+  query Run($id: UUID!) {
+    run(where: { id: { eq: $id } }) {
+      ...RunFields
+    }
+  }
+`);
+
+/** A project's runs, newest first, a page at a time, optionally of one status. */
+export const ProjectRunsDocument = graphql(`
+  query ProjectRuns($where: RunFilters!, $limit: Int!, $offset: Int!) {
+    runs(where: $where, orderBy: { startedAt: { direction: desc, priority: 1 } }, limit: $limit, offset: $offset) {
+      ...RunSummaryFields
+    }
+  }
+`);
+
+/**
+ * What a project's agents are doing now, and have spent since `since`: the
+ * board's live marks and the project header's figures, polled together.
+ */
+export const ProjectActivityDocument = graphql(`
+  query ProjectActivity($projectId: UUID!, $project: ID!, $since: DateTime!) {
+    stations: aiStatus(projectId: $project) {
+      todos {
+        todoId
+        state
+        reason
+        failures
+      }
+    }
+    live: runs(where: { projectId: { eq: $projectId }, status: { eq: "running" } }) {
+      id
+      todoId
+      laneId
+      cancelRequestedAt
+      agent {
+        id
+        name
+      }
+    }
+    spent: runsAggregate(where: { projectId: { eq: $projectId }, startedAt: { gte: $since } }) {
+      count
+      sum {
+        promptTokens
+        completionTokens
+        totalTokens
+      }
+    }
+  }
+`);
+
+/**
+ * Everything a project's runs left behind, newest first, with the todo each is
+ * on: the whole of it, so a note artifact can open that todo's dialog.
+ */
+export const ProjectArtifactsDocument = graphql(`
+  query ProjectArtifacts($projectId: UUID!, $limit: Int!, $offset: Int!) {
+    artifacts(
+      where: { projectId: { eq: $projectId } }
+      orderBy: { createdAt: { direction: desc, priority: 1 } }
+      limit: $limit
+      offset: $offset
+    ) {
+      ...ArtifactFields
+      todo {
+        ...TodoFields
+      }
+    }
+  }
+`);
+
+// A todo's record: its notes thread and the history the database trigger
+// writes. Read only by the todo dialog, so neither is in `TodoFields`.
+
+export const TodoNoteFieldsFragment = graphql(`
+  fragment TodoNoteFields on TodoNote {
+    id
+    kind
+    body
+    actorKind
+    runId
+    createdAt
+  }
+`);
+
+export const TodoRecordDocument = graphql(`
+  query TodoRecord($id: UUID!) {
+    todo(where: { id: { eq: $id } }) {
+      id
+      thread(orderBy: { createdAt: { direction: asc, priority: 1 } }) {
+        ...TodoNoteFields
+      }
+      history(orderBy: { at: { direction: asc, priority: 1 } }) {
+        id
+        kind
+        fromLaneId
+        toLaneId
+        fields
+        actorKind
+        runId
+        reason
+        at
+      }
+      project {
+        id
+        aiEnabled
+        lanes {
+          id
+          name
+        }
+      }
+    }
+  }
+`);
+
+export const CreateTodoNoteDocument = graphql(`
+  mutation CreateTodoNote($todoId: UUID!, $body: String!) {
+    createTodoNote(values: { todoId: $todoId, body: $body }) {
+      ...TodoNoteFields
+    }
+  }
+`);
+
+export const DeleteTodoNoteDocument = graphql(`
+  mutation DeleteTodoNote($id: UUID!) {
+    deleteTodoNote(where: { id: { eq: $id } }) {
+      id
     }
   }
 `);
@@ -181,14 +655,53 @@ export const UpdateTodoDocument = graphql(`
       id
       title
       notes
+      acceptance
+      aiIgnored
       dueAt
     }
   }
 `);
 
-export const DeleteTodoDocument = graphql(`
-  mutation DeleteTodo($id: UUID!) {
+// Deleting a todo archives it (the server's `softDelete`): out of every list
+// until restored. Only `hard: true` removes it.
+export const ArchiveTodoDocument = graphql(`
+  mutation ArchiveTodo($id: UUID!) {
     deleteTodo(where: { id: { eq: $id } }) {
+      id
+    }
+  }
+`);
+
+export const ArchivedTodosDocument = graphql(`
+  query ArchivedTodos($projectId: UUID!) {
+    todos(
+      where: { projectId: { eq: $projectId } }
+      deleted: ONLY
+      orderBy: { archivedAt: { direction: desc, priority: 1 } }
+    ) {
+      id
+      title
+      completedAt
+      archivedAt
+      lane {
+        id
+        name
+      }
+    }
+  }
+`);
+
+export const RestoreTodoDocument = graphql(`
+  mutation RestoreTodo($id: UUID!) {
+    restoreTodo(where: { id: { eq: $id } }) {
+      id
+    }
+  }
+`);
+
+export const DeleteTodoForGoodDocument = graphql(`
+  mutation DeleteTodoForGood($id: UUID!) {
+    deleteTodo(where: { id: { eq: $id } }, hard: true) {
       id
     }
   }
@@ -374,6 +887,222 @@ export const VerifyMagicLinkDocument = graphql(`
     verifyMagicLink(token: $token) {
       token
       userId
+    }
+  }
+`);
+
+/** Where every open todo stands with the stations, across the AI projects. */
+export const AiStatusDocument = graphql(`
+  query AiStatus {
+    aiStatus {
+      todos {
+        todoId
+        title
+        projectId
+        laneId
+        state
+        reason
+        failures
+        liveRunId
+      }
+      projects {
+        projectId
+        name
+        lanes {
+          laneId
+          name
+          station
+          isDone
+          attention
+          running
+          blocked
+          queued
+          parked
+          done
+        }
+      }
+      runnerSeenAt
+    }
+  }
+`);
+
+/** Just how many todos need a person, for the sidebar. */
+export const AiAttentionDocument = graphql(`
+  query AiAttention {
+    aiStatus {
+      todos {
+        todoId
+        state
+      }
+    }
+  }
+`);
+
+/** The most recent runs that failed, anywhere. */
+export const RecentFailuresDocument = graphql(`
+  query RecentFailures($since: DateTime!) {
+    runs(
+      where: { status: { eq: "error" }, startedAt: { gte: $since } }
+      orderBy: { startedAt: { direction: desc, priority: 1 } }
+      limit: 10
+    ) {
+      ...RunSummaryFields
+      project {
+        id
+        name
+      }
+    }
+  }
+`);
+
+export const RetryTodoDocument = graphql(`
+  mutation RetryTodo($id: ID!, $reason: String) {
+    retryTodo(id: $id, reason: $reason)
+  }
+`);
+
+export const BoardTemplatesDocument = graphql(`
+  query BoardTemplates {
+    boardTemplates(orderBy: { name: { direction: asc, priority: 1 } }) {
+      id
+      name
+      lanes
+    }
+  }
+`);
+
+export const SaveBoardTemplateDocument = graphql(`
+  mutation SaveBoardTemplate($projectId: ID!, $name: String!) {
+    saveBoardTemplate(projectId: $projectId, name: $name) {
+      id
+      name
+      lanes
+    }
+  }
+`);
+
+export const ApplyBoardTemplateDocument = graphql(`
+  mutation ApplyBoardTemplate($projectId: ID!, $templateId: ID!) {
+    applyBoardTemplate(projectId: $projectId, templateId: $templateId) {
+      id
+    }
+  }
+`);
+
+export const DeleteBoardTemplateDocument = graphql(`
+  mutation DeleteBoardTemplate($id: UUID!) {
+    deleteBoardTemplate(where: { id: { eq: $id } }) {
+      id
+    }
+  }
+`);
+
+export const SearchTodosDocument = graphql(`
+  query SearchTodos($text: String!) {
+    todos(
+      where: { OR: [{ title: { iContains: $text } }, { notes: { iContains: $text } }] }
+      orderBy: { updatedAt: { direction: desc, priority: 1 } }
+      limit: 20
+    ) {
+      ...TodoFields
+      project {
+        id
+        name
+      }
+    }
+  }
+`);
+
+// Drafts: talking a request over with an agent before it becomes a todo.
+// The runner answers, so an open draft polls while it waits.
+
+export const DraftFieldsFragment = graphql(`
+  fragment DraftFields on Draft {
+    id
+    projectId
+    agentId
+    title
+    brief
+    waitingSince
+    error
+    todoId
+    updatedAt
+  }
+`);
+
+export const DraftDocument = graphql(`
+  query Draft($id: UUID!) {
+    draft(where: { id: { eq: $id } }) {
+      ...DraftFields
+      agent {
+        id
+        name
+      }
+      messages(orderBy: { createdAt: { direction: asc, priority: 1 } }) {
+        id
+        role
+        content
+      }
+    }
+  }
+`);
+
+export const OpenDraftsDocument = graphql(`
+  query OpenDrafts($projectId: UUID!) {
+    drafts(
+      where: { projectId: { eq: $projectId }, todoId: { isNull: true } }
+      orderBy: { updatedAt: { direction: desc, priority: 1 } }
+      limit: 5
+    ) {
+      ...DraftFields
+    }
+  }
+`);
+
+export const StartDraftDocument = graphql(`
+  mutation StartDraft($projectId: ID!, $agentId: ID!, $message: String!) {
+    startDraft(projectId: $projectId, agentId: $agentId, message: $message) {
+      ...DraftFields
+    }
+  }
+`);
+
+export const SayToDraftDocument = graphql(`
+  mutation SayToDraft($id: ID!, $message: String!) {
+    sayToDraft(id: $id, message: $message) {
+      ...DraftFields
+    }
+  }
+`);
+
+export const StopDraftDocument = graphql(`
+  mutation StopDraft($id: ID!) {
+    stopDraft(id: $id) {
+      ...DraftFields
+    }
+  }
+`);
+
+export const MakeTodoFromDraftDocument = graphql(`
+  mutation MakeTodoFromDraft($id: ID!, $title: String, $brief: String) {
+    makeTodoFromDraft(id: $id, title: $title, brief: $brief) {
+      id
+      title
+    }
+  }
+`);
+
+export const DiscardDraftDocument = graphql(`
+  mutation DiscardDraft($id: ID!) {
+    discardDraft(id: $id)
+  }
+`);
+
+export const BoardChangedDocument = graphql(`
+  subscription BoardChanged($projectId: ID!) {
+    boardChanged(projectId: $projectId) {
+      projectId
+      table
     }
   }
 `);

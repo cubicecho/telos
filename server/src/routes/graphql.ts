@@ -2,19 +2,33 @@ import type { Server } from 'node:http';
 import { ApolloServer } from '@apollo/server';
 import { ApolloServerPluginDrainHttpServer } from '@apollo/server/plugin/drainHttpServer';
 import { expressMiddleware } from '@as-integrations/express5';
-import { db } from '@telos/db';
 import express, { Router } from 'express';
+import { toHeaders } from '../auth.ts';
 import type { Context } from '../context.ts';
-import { createLoaders } from '../loaders.ts';
-import { extractUserId } from '../resolvers/auth.ts';
+import type { ContextFactory } from '../request-context.ts';
 import { schema } from '../schema.ts';
+import { serveSubscriptions } from './subscriptions.ts';
 
 export type { Context };
 
-export async function createGraphQLRouter(httpServer: Server) {
+export async function createGraphQLRouter(httpServer: Server, contextFor: ContextFactory) {
+  const closeSockets = serveSubscriptions(httpServer, schema, contextFor);
+
   const apolloServer = new ApolloServer<Context>({
     schema,
-    plugins: [ApolloServerPluginDrainHttpServer({ httpServer })],
+    plugins: [
+      ApolloServerPluginDrainHttpServer({ httpServer }),
+      // Close open sockets on shutdown, or the HTTP server waits on them.
+      {
+        async serverWillStart() {
+          return {
+            async drainServer() {
+              await closeSockets();
+            },
+          };
+        },
+      },
+    ],
   });
 
   await apolloServer.start();
@@ -22,11 +36,9 @@ export async function createGraphQLRouter(httpServer: Server) {
   const router = Router();
 
   router.use(
-    express.json(),
+    express.json({ limit: '1mb' }),
     expressMiddleware(apolloServer, {
-      // Loaders are built per request: their batching is only ever valid within
-      // one request, and their cache must not outlive it.
-      context: async ({ req }) => ({ db, userId: extractUserId(req), loaders: createLoaders(db) }),
+      context: ({ req }) => contextFor(toHeaders(req.headers)),
     }),
   );
 

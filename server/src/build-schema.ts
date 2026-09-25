@@ -1,6 +1,17 @@
+import { AUTH_TABLES, SERVER_TABLES } from '@telos/db/schema';
 import { buildSchema, GraphQLDateTime } from '@vantreeseba/drizzle-graphql';
+import { applyActorLock } from './resolvers/actor-lock.ts';
+import { applyAgentsExtension } from './resolvers/agents.ts';
+import { applyAiStatusExtension } from './resolvers/ai-status.ts';
+import { applyAiSwitchesExtension } from './resolvers/ai-switches.ts';
+import { applyApiKeysExtension } from './resolvers/api-keys.ts';
 import { applyAuthExtension } from './resolvers/auth.ts';
+import { applyBoardChangesExtension } from './resolvers/board-changes.ts';
+import { applyBoardTemplatesExtension } from './resolvers/board-templates.ts';
+import { applyDraftsExtension } from './resolvers/drafts.ts';
 import { applyLanesExtension } from './resolvers/lanes.ts';
+import { applyRequestsExtension } from './resolvers/requests.ts';
+import { applyRunsExtension } from './resolvers/runs.ts';
 import { applyTodosExtension } from './resolvers/todos.ts';
 import { onWrite } from './resolvers/write-guards.ts';
 import { contextValues, features, scope } from './tenancy.ts';
@@ -19,7 +30,30 @@ type AnyDb = any;
 // The return type is inferred rather than written out: `GeneratedEntities` is
 // keyed by the naming config, so spelling it here would mean restating
 // `typeNameMapper` in a second place that could disagree with the first.
-export function createSchema(db: AnyDb) {
+export interface SchemaOptions {
+  /**
+   * Whether the server offers AI (config.ts `aiAvailable`). Off, the AI
+   * extensions are never applied, so the schema has no AI fields for anyone to
+   * call. On, the instance's own switch still decides, per request.
+   */
+  ai: boolean;
+}
+
+/** Tables that exist in the API only while the instance has AI on. */
+const AI_TABLES = ['agents', 'runs', 'artifacts', 'drafts', 'draftMessages'];
+
+/** A lane's station settings, which mean nothing without agents. */
+const AI_LANE_COLUMNS = [
+  'agentId',
+  'contract',
+  'prompt',
+  'onSuccessLaneId',
+  'onFailureLaneId',
+  'wipLimit',
+  'maxAttempts',
+];
+
+export function createSchema(db: AnyDb, options: SchemaOptions) {
   const { schema: drizzleSchema, entities } = buildSchema(db, {
     prefixes: {
       insert: 'create',
@@ -52,11 +86,39 @@ export function createSchema(db: AnyDb) {
     // code instead of by someone remembering this comment.
     mapColumnType: (column) => (column.columnType === 'PgTimestamp' ? { input: GraphQLDateTime } : undefined),
     onWrite,
+    // Deleting a todo archives it: `restoreTodo` brings it back, and only
+    // `deleteTodo(hard: true)` removes it. `scope: 'root'` keeps an archived
+    // todo readable through the rows that point at it — a run, a note, a
+    // dependency — since history should still say what it was about.
+    softDelete: { todos: { column: 'archivedAt', hardDelete: true, scope: 'root' } },
+    // better-auth's tables: sessions, key hashes and magic-link tokens. Only
+    // better-auth reads or writes them (auth.ts), so they generate nothing.
+    // Nor does the instance's settings row, which belongs to no user.
+    //
+    // An agent's API key is write-only: `setAgentApiKey` stores it and only
+    // the runner's `claimRun` reads it back. With AI off, the agent machinery
+    // is not in the schema at all.
+    exclude: options.ai
+      ? { tables: [...AUTH_TABLES, ...SERVER_TABLES], columns: { agents: ['apiKey'] } }
+      : { tables: [...AUTH_TABLES, ...SERVER_TABLES, ...AI_TABLES], columns: { lanes: AI_LANE_COLUMNS } },
   });
 
-  let schema = applyAuthExtension(drizzleSchema);
+  let schema = applyAuthExtension(drizzleSchema, options);
   schema = applyTodosExtension(schema);
   schema = applyLanesExtension(schema);
+  schema = applyBoardTemplatesExtension(schema);
+  schema = applyBoardChangesExtension(schema);
+  if (options.ai) {
+    schema = applyApiKeysExtension(schema);
+    schema = applyAiSwitchesExtension(schema);
+    schema = applyRequestsExtension(schema);
+    schema = applyAgentsExtension(schema);
+    schema = applyRunsExtension(schema);
+    schema = applyDraftsExtension(schema);
+    schema = applyAiStatusExtension(schema);
+  }
+  // Last, so it sees every mutation the extensions above added.
+  schema = applyActorLock(schema);
 
   return { schema, entities };
 }

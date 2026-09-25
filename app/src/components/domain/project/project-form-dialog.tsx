@@ -1,12 +1,22 @@
-import { useMutation } from '@apollo/client';
+import { useMutation, useQuery } from '@apollo/client';
 import { useRouter } from 'expo-router';
 import { useEffect } from 'react';
 import { useAppForm } from '@/components/app-form';
 import { Form } from '@/components/ui/form';
 import { FormDialog, FormDialogFooter } from '@/components/ui/form-dialog';
 import { describeError } from '@/lib/errors';
-import { CreateProjectDocument, ProjectDocument, ProjectsDocument, UpdateProjectDocument } from '@/lib/graphql';
+import {
+  ApplyBoardTemplateDocument,
+  BoardTemplatesDocument,
+  CreateProjectDocument,
+  ProjectDocument,
+  ProjectsDocument,
+  UpdateProjectDocument,
+} from '@/lib/graphql';
 import { newId } from '@/lib/ids';
+
+/** The "Start from" choice for the lanes every new project is given. */
+const DEFAULT_LANES = 'default';
 
 export interface ProjectDraft {
   id: string;
@@ -29,8 +39,13 @@ export function ProjectFormDialog({
     refetchQueries: [ProjectsDocument, ...(project ? [{ query: ProjectDocument, variables: { id: project.id } }] : [])],
   });
 
+  // Only a new project starts from a template: applying one replaces a board.
+  const templatesQuery = useQuery(BoardTemplatesDocument, { skip: !open || project !== undefined });
+  const templates = templatesQuery.data?.boardTemplates ?? [];
+  const [applyTemplate] = useMutation(ApplyBoardTemplateDocument);
+
   const form = useAppForm({
-    defaultValues: { name: '', description: '' },
+    defaultValues: { name: '', description: '', template: DEFAULT_LANES },
     onSubmit: ({ value }) => save(value),
   });
 
@@ -39,10 +54,10 @@ export function ProjectFormDialog({
   // what was last typed and abandoned.
   useEffect(() => {
     if (!open) return;
-    form.reset({ name: project?.name ?? '', description: project?.description ?? '' });
+    form.reset({ name: project?.name ?? '', description: project?.description ?? '', template: DEFAULT_LANES });
   }, [open, project, form]);
 
-  async function save({ name, description }: { name: string; description: string }) {
+  async function save({ name, description, template }: { name: string; description: string; template: string }) {
     const values = { name: name.trim(), description: description.trim() === '' ? null : description.trim() };
     if (creating || updating) return;
     try {
@@ -73,6 +88,13 @@ export function ProjectFormDialog({
             );
           },
         });
+        if (template !== DEFAULT_LANES) {
+          // The project exists by now, with the default lanes, so a template
+          // that fails to apply leaves it usable rather than half made: go to
+          // it anyway, rather than keep a dialog whose resend would make a
+          // second project.
+          await applyTemplate({ variables: { projectId: id, templateId: template } }).catch(() => undefined);
+        }
         // Navigated only once the row exists. The id is known up front, but the
         // project screen reads fields this mutation does not return, so arriving
         // early would mean a query for a row Postgres has not written yet.
@@ -108,6 +130,19 @@ export function ProjectFormDialog({
           <form.AppField name="description">
             {(field) => <field.TextAreaField label="Description" placeholder="Optional." />}
           </form.AppField>
+          {project === undefined && templates.length > 0 ? (
+            <form.AppField name="template">
+              {(field) => (
+                <field.SelectField
+                  label="Start from"
+                  options={[
+                    { label: 'The usual lanes', value: DEFAULT_LANES },
+                    ...templates.map((row) => ({ label: row.name, value: row.id })),
+                  ]}
+                />
+              )}
+            </form.AppField>
+          ) : null}
           <FormDialogFooter onCancel={() => onOpenChange(false)} error={error ? describeError(error) : null}>
             <form.SubmitButton isEdit={project !== undefined} editLabel="Save" />
           </FormDialogFooter>

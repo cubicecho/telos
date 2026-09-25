@@ -1,14 +1,20 @@
 import './preflight.ts';
 
+import { readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { db } from '@telos/db';
+import { type EmbeddedRunner, startRunner } from '@telos/runner/embed';
 import cors from 'cors';
 import { migrate } from 'drizzle-orm/postgres-js/migrator';
 import express from 'express';
-import { magicLinkExposed, magicLinkRequired } from './config.ts';
+import { magicLinkExposed, magicLinkRequired, runnerKey } from './config.ts';
+import { mountMcp } from './mcp.ts';
+import { createContextFactory } from './request-context.ts';
+import { startPruning } from './retention.ts';
 import { createGraphQLRouter } from './routes/graphql.ts';
+import { ai, auth, schema } from './schema.ts';
 import { createStaticHandler } from './static.ts';
 
 export type { Context } from './context.ts';
@@ -38,12 +44,19 @@ try {
   throw error;
 }
 
+let runner: EmbeddedRunner | undefined;
+// Old runs go whenever AI does; without it there are none to prune.
+const stopPruning = ai ? startPruning(db) : undefined;
+
 const app = express();
 const httpServer = createServer(app);
 const serveStatic = createStaticHandler(staticDir);
+const contextFor = createContextFactory(db, auth, { ai, runnerKey: runnerKey() });
+const { version } = JSON.parse(readFileSync(join(__dirname, '../package.json'), 'utf8')) as { version: string };
 
 app.use(cors());
-app.use('/graphql', await createGraphQLRouter(httpServer));
+app.use('/graphql', await createGraphQLRouter(httpServer, contextFor));
+const mcp = mountMcp(app, { ai, db, schema, contextFor, version });
 app.get('/healthz', (_req, res) => {
   res.json({ ok: true });
 });
@@ -52,9 +65,29 @@ app.use((req, res) => serveStatic(req, res));
 httpServer.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Telos ready at http://localhost:${PORT}`);
   console.log(`   GraphQL at http://localhost:${PORT}/graphql`);
+  if (mcp) console.log(`   MCP at http://localhost:${PORT}/mcp (API key in x-api-key)`);
+  // The runner comes with the server whenever AI does. Until an admin turns AI
+  // on in Settings its queue is empty and it only asks, every few seconds.
+  if (ai) {
+    runner = startRunner({ telosUrl: `http://127.0.0.1:${PORT}`, runnerKey: runnerKey() });
+    console.log('   Runner working the stations (idle until AI is on in Settings)');
+  }
   if (!magicLinkRequired()) {
     console.warn('⚠️  AUTH_MAGIC_LINK is off: any email address signs in without a link. Private networks only.');
   } else if (magicLinkExposed()) {
     console.warn('⚠️  EXPOSE_MAGIC_LINK is on: sign-in links are returned in API responses. Private networks only.');
   }
 });
+
+// Stop the runner first, while the server can still take its runs' reports,
+// then close open MCP streams, so the HTTP server is not left waiting on them.
+for (const signal of ['SIGTERM', 'SIGINT'] as const) {
+  process.once(signal, () => {
+    void (async () => {
+      stopPruning?.();
+      await runner?.stop().catch((error: unknown) => console.error('[runner] stop failed:', error));
+      await mcp?.close().catch((error: unknown) => console.error('[mcp] close failed:', error));
+      httpServer.close(() => process.exit(0));
+    })();
+  });
+}

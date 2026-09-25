@@ -1,11 +1,17 @@
-import { useState } from 'react';
+import { useMutation, useQuery } from '@apollo/client';
+import { useMemo, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
+import type { LiveRun, StuckTodo } from '@/components/domain/ai/project-activity';
+import { StationDialog } from '@/components/domain/ai/station-dialog';
+import { WatchRunDialog } from '@/components/domain/ai/watch-run-dialog';
 import { TodoFormDialog } from '@/components/domain/todo/todo-form-dialog';
 import type { TodoSummary } from '@/components/domain/todo/types';
+import { useAi } from '@/lib/ai';
 import type { CachedLane } from '@/lib/cache';
 import { describeError } from '@/lib/errors';
+import { ProjectActivityDocument, ProjectStationsDocument, RetryTodoDocument } from '@/lib/graphql';
 import { todosInLane } from '@/lib/lanes';
-import { BoardCardBody } from './board-card';
+import { type BoardAi, BoardCardBody } from './board-card';
 import { DragBoard } from './drag-surfaces';
 import type { Drop } from './drag-surfaces-base';
 import type { LaneSummary } from './lane-badge';
@@ -24,15 +30,28 @@ import { useMoveTodo } from './use-move-todo';
  * Dragging is the obvious gesture and reaches only a pointer, so every move it
  * offers is also a menu item: each card carries "Move to", each column header
  * carries its own actions.
+ *
+ * With AI on for the account and the project, a column can also be a station,
+ * and its settings are read here in a query of their own: the columns do not
+ * exist in the schema otherwise, so `LaneFields` cannot carry them.
  */
 export function Board({
   projectId,
+  aiEnabled = false,
   lanes,
   todos,
+  live,
+  stuck,
 }: {
   projectId: string;
+  /** The project's own AI switch. */
+  aiEnabled?: boolean;
   lanes: readonly CachedLane[];
   todos: readonly TodoSummary[];
+  /** The runs working todos now, by todo id. The page polls it, for its header too. */
+  live?: ReadonlyMap<string, LiveRun> | undefined;
+  /** The todos a station stopped on, by todo id, from the same poll. */
+  stuck?: ReadonlyMap<string, StuckTodo> | undefined;
 }) {
   const [dragging, setDragging] = useState<TodoSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -40,6 +59,27 @@ export function Board({
   // only ever one can be open, and mounting dozens would cost a Radix portal
   // each for a surface nobody has asked for yet.
   const [editing, setEditing] = useState<TodoSummary | null>(null);
+
+  const ai = useAi();
+  const stationsOn = ai.on && aiEnabled;
+  const stationsQuery = useQuery(ProjectStationsDocument, { variables: { projectId }, skip: !stationsOn });
+  const stations = useMemo(
+    () => new Map((stationsQuery.data?.lanes ?? []).map((row) => [row.id, row])),
+    [stationsQuery.data],
+  );
+  const agents = stationsQuery.data?.agents ?? [];
+  const [stationLane, setStationLane] = useState<CachedLane | null>(null);
+  const [watching, setWatching] = useState<TodoSummary | null>(null);
+  const shownLive = stationsOn ? live : undefined;
+  const [retryTodo] = useMutation(RetryTodoDocument, { refetchQueries: [ProjectActivityDocument] });
+  const boardAi: BoardAi | undefined = shownLive
+    ? {
+        live: shownLive,
+        stuck: stuck ?? new Map(),
+        onWatch: setWatching,
+        onRetry: (todo) => run(() => retryTodo({ variables: { id: todo.id } })),
+      }
+    : undefined;
 
   const actions = useLaneActions(projectId);
   const moveTodo = useMoveTodo(projectId);
@@ -94,7 +134,7 @@ export function Board({
         onDragStart={onDragStart}
         onDrop={onDrop}
         onDragCancel={() => setDragging(null)}
-        overlay={dragging ? <BoardCardBody todo={dragging} lanes={lanes} /> : null}
+        overlay={dragging ? <BoardCardBody todo={dragging} lanes={lanes} live={shownLive?.get(dragging.id)} /> : null}
       >
         <ScrollView horizontal contentContainerClassName="flex-row items-start gap-3 pb-2">
           {lanes.map((lane) => (
@@ -109,6 +149,11 @@ export function Board({
               onReorder={(delta) => run(() => actions.moveLane(lanes, lane, delta))}
               onToggleDone={() => run(() => actions.toggleDoneLane(lane))}
               onDelete={() => run(() => actions.deleteLane(lane))}
+              station={stationsOn ? (stations.get(lane.id) ?? null) : undefined}
+              agentName={agents.find((agent) => agent.id === stations.get(lane.id)?.agentId)?.name}
+              // Offered once the settings are in, so a save cannot overwrite them with defaults.
+              onEditStation={stationsOn && stationsQuery.data ? () => setStationLane(lane) : undefined}
+              ai={boardAi}
             />
           ))}
           <LaneComposer onCreate={(name) => run(() => actions.createLane(name, lanes.length))} />
@@ -126,6 +171,30 @@ export function Board({
           board has moved on from it. */}
       {editing ? (
         <TodoFormDialog key={editing.id} open onOpenChange={(next) => !next && setEditing(null)} todo={editing} />
+      ) : null}
+
+      {/* Keyed by todo: the dialog follows the todo from run to run, and
+          stays open on the last one after the todo's run ends. */}
+      {watching ? (
+        <WatchRunDialog
+          key={watching.id}
+          open
+          onOpenChange={(next) => !next && setWatching(null)}
+          todoTitle={watching.title}
+          live={shownLive?.get(watching.id)}
+        />
+      ) : null}
+
+      {stationLane && stationsOn ? (
+        <StationDialog
+          key={stationLane.id}
+          open
+          onOpenChange={(next) => !next && setStationLane(null)}
+          lane={stationLane}
+          lanes={lanes}
+          station={stations.get(stationLane.id) ?? null}
+          agents={agents}
+        />
       ) : null}
     </View>
   );

@@ -28,7 +28,8 @@ COPY package.json package-lock.json ./
 COPY db/package.json db/
 COPY server/package.json server/
 COPY app/package.json app/
-RUN npm ci --omit=dev --include-workspace-root --workspace @telos/db --workspace @telos/server \
+COPY runner/package.json runner/
+RUN npm ci --omit=dev --include-workspace-root --workspace @telos/db --workspace @telos/runner --workspace @telos/server \
  && npm cache clean --force
 
 # The server is not compiled: it runs its TypeScript sources directly under
@@ -36,6 +37,8 @@ RUN npm ci --omit=dev --include-workspace-root --workspace @telos/db --workspace
 COPY db/src db/src
 COPY db/drizzle db/drizzle
 COPY server/src server/src
+# The runner works the stations from inside the server's process.
+COPY runner/src runner/src
 COPY --from=builder /app/app/dist app/dist
 
 ENV NODE_ENV=production

@@ -51,14 +51,21 @@ telos/
 ├── server/                  # GraphQL API (port 3001)
 │   ├── __generated__/       # Generated SDL + resolver types (not committed)
 │   └── src/
-│       ├── index.ts         # Entry point: migrate, mount /graphql, serve the SPA
+│       ├── index.ts         # Entry point: migrate, mount /graphql and /mcp, serve the SPA
+│       ├── request-context.ts  # Headers -> Context, shared by both doors
+│       ├── mcp.ts, mcp.graphql # The MCP door: the operations in mcp.graphql are its tools
 │       ├── preflight.ts     # Boot guards — imported first, on purpose
 │       ├── build-schema.ts  # createSchema(db) — buildSchema + extensions
 │       ├── schema.ts        # Binds createSchema to the real database
 │       ├── tenancy.ts       # Row scope + server-owned columns, as buildSchema config
 │       ├── blocking.ts      # The dependency rules, in one place
 │       ├── lanes.ts         # The lane rules, in one place
+│       ├── stations.ts      # Which todos an agent may start on, and stopping runs
+│       ├── instance.ts      # The instance's AI switch, and its admins
+│       ├── run-tokens.ts    # Per-run tokens, and the runner's key check
 │       ├── loaders.ts       # Per-request DataLoaders
+│       ├── board-events.ts  # Relays the board_notify trigger's NOTIFYs to `boardChanged`
+│       ├── routes/          # /graphql over HTTP, and its socket for subscriptions
 │       ├── resolvers/       # SDL extensions for what CRUD cannot express
 │       └── __tests__/       # Server tests
 ├── db/
@@ -68,6 +75,22 @@ telos/
 │       ├── schema.ts        # Barrel re-exporting models/
 │       ├── relations.ts     # defineRelations config (drives the GraphQL schema)
 │       └── index.ts         # DB singleton + re-exports
+├── runner/                  # @telos/runner — works the stations; talks to telos over HTTP only
+│   └── src/
+│       ├── embed.ts         # startRunner: how the server runs it, in its own process
+│       ├── index.ts         # Standalone entry, for a second runner on another host (needs RUNNER_KEY)
+│       ├── config.ts        # Env -> RunnerConfig
+│       ├── telos.ts         # The runner's GraphQL client (queue, claim, heartbeat, finish)
+│       ├── loop.ts          # Poll the queue, claim up to the concurrency, execute
+│       ├── execute.ts       # One run: agent-core's runAgentLoop over a per-run MCP pool
+│       ├── tools.ts         # The pool: telos's /mcp with the run token, plus the agent's servers and hooks
+│       ├── artifacts.ts     # What a run made: record_artifact, and writes read off tool calls
+│       ├── prompts.ts       # System prompts per contract, and the brief
+│       └── __tests__/       # End to end against a real telos and a scripted model
+├── scripts/
+│   ├── import-kanban.ts     # `npm run import:kanban`: copy a kanban_server board to one user
+│   ├── admin.ts             # `npm run admin -- --user <email>`: make an account an admin
+│   └── __tests__/
 ├── .agents/mvp-plan.md      # The plan this repo was built from
 ├── vitest.config.ts
 ├── biome.json
@@ -77,12 +100,12 @@ telos/
 ## Commands
 
 ```bash
-npm run dev              # server (3001) + Expo dev server (3000)
+npm run dev              # server (3001, runner included) + Expo dev server (3000)
 npm run db:up            # Postgres on ${POSTGRES_BIND:-127.0.0.1}:5435
 npm run db:generate      # new migration from a schema change
 npm run db:migrate       # apply migrations
 npm run codegen          # GraphQL types for both server and app
-npm run check            # codegen + biome + tsc --noEmit, all three workspaces
+npm run check            # codegen + biome + tsc --noEmit, every workspace
 npm test                 # Vitest
 ```
 
@@ -118,9 +141,92 @@ delete. A table missing from `scope` is visible across tenants, and nothing else
 in the code will say so. `tenancy.test.ts` fails when you forget — do not delete
 the test to make it pass.
 
+**Auth is better-auth, reached only through GraphQL.** `server/src/auth.ts`
+configures it (bearer sessions, magic links, API keys) over the tables in
+`db/src/models/auth.ts`, which `build-schema.ts` excludes from the generated
+schema. None of better-auth's REST routes are mounted. Every request resolves to
+an `actor` (`context.ts`): `user` for a session, `apiKey` for an MCP client,
+`agent` for a run token, `system` for the runner, `anonymous` for nobody.
+`ctx.userId` is always `ctx.actor.userId` — null for `system`, so generated
+CRUD refuses the runner outright.
+
+**AI is off unless every switch says on.** `AI_ENABLED=false` removes the AI
+extensions from the schema at all; otherwise they are built, and the instance's
+switch (`instance_settings.aiEnabled`, `instance.ts`) decides at runtime. Only
+an admin (`users.isAdmin`; the first account to sign up) flips it, with
+`setInstanceAiEnabled`. It is read on every request, never cached: by
+`ai-gate.ts`, by `resolveActor` for API keys and run tokens, by `readyTodos`
+(`INSTANCE_AI_ON`), by `finishRun`/`heartbeatRun` and by `/mcp`. The runner's
+key still resolves with it off, so a heartbeat can say stop. `users.aiEnabled`
+(account) is asked by the same places. All of them default to off. An AI resolver calls `requireAi`, and
+answers NOT_FOUND rather than FORBIDDEN, because for someone who turned AI off
+the surface is not there. Key management needs a session (`requireSession`): a
+key cannot mint its own successor.
+
+**AI adds work; it does not work the board.** An `apiKey` or `agent` actor
+(`isAiActor`) is held to two narrower rules. What it sees: `tenancy.ts` narrows
+its scope to projects with `aiEnabled` and, in them, todos without `aiIgnored`,
+and hides everything hanging off a hidden todo. A resolver that reads rows
+directly (a loader, a hand-written mutation) has to apply the same narrowing
+itself — see `visibleToAi` in `resolvers/todos.ts` and `loadAiTodo` in
+`resolvers/requests.ts`. What it writes: `resolvers/actor-lock.ts` wraps every
+mutation and refuses AI all but `AI_MUTATIONS` (`submitRequest`,
+`cancelRequest`, `addTodoNote`). A new mutation is closed to AI until it is
+added there. The MCP door (`mcp.ts`) serves only the operations written in
+`mcp.graphql` — the tool list is the menu, the lock is the lock. `/mcp` is
+a 404 unless the instance's switch is on.
+
+**Agents work the board only at stations, and only through the runner.** A
+lane with an `agentId` is a station: its `contract` (work, verdict, expand),
+`prompt`, `onSuccessLaneId`/`onFailureLaneId` arrows, `wipLimit` and
+`maxAttempts` say what happens there. The runner (`@telos/runner`, which never
+imports `@telos/db`) runs inside the server's process: `index.ts` starts it
+with `startRunner` whenever AI is included, handing it a key made up at boot
+(`config.ts` `runnerKey`; `RUNNER_KEY` fixes it, for a second runner elsewhere).
+It still talks to the server only over HTTP, and signs in with `x-runner-key`
+as the `system` actor, which may call only
+`RUNNER_MUTATIONS` (`claimRun`, `heartbeatRun`, `finishRun`) and
+`runnerQueue`. What is ready is one SQL query, `readyTodos` in `stations.ts`,
+used by both the queue and the claim, and it checks every AI switch itself.
+`claimRun` returns a run token (`x-run-token`) the agent uses to reach `/mcp`
+as the `agent` actor, scoped to the run's owner, and only while the run is
+live. `finishRun` decides the verdict and the move on the server; the runner
+only reports. A switch turned off (`ai-switches.ts`, `aiIgnored`) sets
+`cancelRequestedAt` on live runs, the next heartbeat tells the runner to stop,
+and a stopped run writes nothing. `agents.apiKey` is excluded from the schema;
+it is written with `setAgentApiKey` and read only by the runner, in a claim.
+
+**The runner never imports the server or the database.** Everything it knows
+comes from `runnerQueue` and `claimRun`, and everything it does goes back
+through `finishRun` or, for the agent, through `/mcp` with the run token; its
+tests import server code only to stand a real telos up. Each run gets its own
+MCP pool, because the telos server in it carries that run's token. Agents'
+stdio MCP servers are refused unless `RUNNER_ALLOW_STDIO=true`: an agent
+belongs to a user, and a command runs on the runner's host with its rights.
+
+**A run reports what it did; it never writes it.** The runner sends events
+(tool calls, tool results, hook notes, notices) with each heartbeat and the
+rest with `finishRun`, where they land in `runs.events`, capped at
+`MAX_RUN_EVENTS`. That is the live view: the app polls the run. Artifacts are
+what the run made, declared by the agent through the runner's own
+`record_artifact` tool or read off a write/edit/move/delete tool call, one per
+location; `finishRun` stores them in `artifacts`, a reserved table no client
+can write. A stopped run keeps its events but no artifacts. An agent's MCP
+servers may carry `hooks` (agent-mcp-pool's `ToolHook`) and `hiddenTools`;
+invalid hooks are dropped with a notice, and a failing hook never fails a run.
+
 **`scope` cannot reach a plain insert.** Any foreign key a caller can state gets
 checked in an `onWrite` hook in `server/src/resolvers/write-guards.ts`. A new
 table with a user-facing FK needs an entry in `FOREIGN_KEYS`.
+
+**Todo history is written by a trigger; stamp the actor before writing a todo.**
+The `todos_history` trigger (richer_todos migration) records one `todo_events`
+row per todo per transaction and reads who did it from `telos.*` settings.
+Any code that writes `todos` does so inside a transaction that first calls
+`stampActor` (`server/src/provenance.ts`); the `todos` and `lanes` write hooks
+already do this for generated writes. A write that forgets is recorded as
+`system`. Because the trigger lives in a migration, tests build their database
+from the migrations, not `pushSchema`.
 
 **A blocked todo cannot be completed, and cannot change lane.** The rule is an
 invariant, not a code path: `assertNoBlockedCompletions` re-checks it after any

@@ -1,25 +1,35 @@
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { PGlite } from '@electric-sql/pglite';
 import { relations } from '@telos/db/relations';
 import * as dbSchema from '@telos/db/schema';
-import { pushSchema } from 'drizzle-kit/api-postgres';
 import { drizzle } from 'drizzle-orm/pglite';
+import { migrate } from 'drizzle-orm/pglite/migrator';
 import { type ExecutionResult, graphql } from 'graphql';
+import { type Auth, createAuth } from '../auth.ts';
 import { createSchema } from '../build-schema.ts';
-import type { Context } from '../context.ts';
+import type { Actor, Context } from '../context.ts';
+import { setInstanceAi } from '../instance.ts';
 import { createLoaders } from '../loaders.ts';
 
 // A throwaway in-memory Postgres per suite. `@telos/db` is deliberately never
 // imported here — it opens a real connection at import time — so the schema is
-// pulled from `@telos/db/schema`, which is inert.
+// pulled from `@telos/db/schema`, which is inert. The committed migrations
+// build it, not a push of the models, because they carry what the models
+// cannot say: the trigger that writes todo history.
+
+const migrationsFolder = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../db/drizzle');
 
 // biome-ignore lint/suspicious/noExplicitAny: db type varies by driver
 export type TestDb = any;
 
-export async function createTestDb(): Promise<TestDb> {
+export async function createTestDb(options: { instanceAi?: boolean } = {}): Promise<TestDb> {
   const client = new PGlite('memory://');
   const db = drizzle({ client, relations });
-  const { apply } = await pushSchema(dbSchema as never, db as never);
-  await apply();
+  await migrate(db as never, { migrationsFolder });
+  // On unless a test says otherwise: most tests are about what happens once
+  // AI is on, and the instance switch has tests of its own (instance-ai.test.ts).
+  await setInstanceAi(db, options.instanceAi ?? true);
   return db;
 }
 
@@ -39,11 +49,35 @@ export interface TestClient {
   expectError: (query: string, variables?: Record<string, unknown>) => Promise<{ message: string; code: unknown }>;
 }
 
-export function createClient(db: TestDb, userId: string | null): TestClient {
-  const { schema } = createSchema(db);
+export interface ClientOptions {
+  /** Who the caller is, when it is not simply `userId` signed in with a session. */
+  actor?: Actor | undefined;
+  /** The instance's AI switch. Off by default, as it is in production. */
+  ai?: boolean | undefined;
+  /** Shared across clients of one database, so a session one opens another can see. */
+  auth?: Auth | undefined;
+}
+
+// One better-auth instance per database: it holds no state of its own, but
+// building one is not free and every client of a suite shares its database.
+const auths = new WeakMap<object, Auth>();
+
+export function authFor(db: TestDb): Auth {
+  let auth = auths.get(db);
+  if (!auth) {
+    auth = createAuth(db);
+    auths.set(db, auth);
+  }
+  return auth;
+}
+
+export function createClient(db: TestDb, userId: string | null, options: ClientOptions = {}): TestClient {
+  const { schema } = createSchema(db, { ai: options.ai ?? false });
+  const auth = options.auth ?? authFor(db);
+  const actor: Actor = options.actor ?? (userId ? { kind: 'user', userId } : { kind: 'anonymous', userId: null });
 
   const run = async (query: string, variables?: Record<string, unknown>) => {
-    const contextValue: Context = { db, userId, loaders: createLoaders(db) };
+    const contextValue: Context = { db, auth, userId: actor.userId, actor, loaders: createLoaders(db) };
     return graphql({ schema, source: query, contextValue, variableValues: variables });
   };
 

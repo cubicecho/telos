@@ -2,12 +2,19 @@ import { useMutation } from '@apollo/client';
 import { useRouter } from 'expo-router';
 import { type ReactNode, useState } from 'react';
 import { Text, View } from 'react-native';
+import { MessageSquare } from '@/components/app-icons';
+import { type ProjectActivity, ProjectActivityLine } from '@/components/domain/ai/project-activity';
+import { ProjectAiSwitch } from '@/components/domain/ai/project-ai-switch';
+import { DraftDialog } from '@/components/domain/draft/draft-dialog';
 import { LabelBadge, type LabelSummary } from '@/components/domain/label/label-badge';
 import { LabelPicker } from '@/components/domain/label/label-picker';
+import { SaveTemplateDialog } from '@/components/domain/template/save-template-dialog';
+import { PROSE_COLUMN } from '@/components/header-content-footer';
 import { PageLayout } from '@/components/page-layout';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { Pencil, Trash2 } from '@/components/ui/icons';
+import { Copy, Pencil, Trash2 } from '@/components/ui/icons';
+import { useAi } from '@/lib/ai';
 import { describeError } from '@/lib/errors';
 import {
   AttachProjectLabelDocument,
@@ -23,28 +30,36 @@ export interface ProjectOverviewData {
   description: string | null;
   todoCount: number;
   openTodoCount: number;
+  /** The project's AI switch. Meaningless, and not shown, unless AI is on for the account. */
+  aiEnabled: boolean;
   labels: readonly LabelSummary[];
 }
 
 /**
  * A project's page: its name, description and actions in the header, its
  * counts and labels in the row under it, and whichever view is showing as the
- * body. The dialogs and mutations behind the header's buttons live here with
+ * body. The body is full width, for the board; the header keeps to the
+ * reading column. The dialogs and mutations behind the header's buttons live here with
  * them.
  */
 export function ProjectPage({
   project,
-  width,
   content,
+  activity,
 }: {
   project: ProjectOverviewData;
-  /** `prose` for the list, `full` for the board, which is as wide as its columns. */
-  width: 'prose' | 'full';
   content: ReactNode;
+  /** What its agents are doing, while AI is on for the account and the project. */
+  activity?: ProjectActivity | undefined;
 }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [savingTemplate, setSavingTemplate] = useState(false);
+  const [drafting, setDrafting] = useState(false);
+  const ai = useAi();
+  const canDraft = ai.on && project.aiEnabled;
+  const [notice, setNotice] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
   // Attaching a label returns the project with its labels selected exactly as
@@ -90,12 +105,37 @@ export function ProjectPage({
 
   return (
     <PageLayout
-      width={width}
+      width="full"
+      headerClassName={PROSE_COLUMN}
       title={project.name}
       description={project.description || undefined}
       action={
         <>
           <LabelPicker attached={project.labels} onToggle={toggleLabel} align="end" />
+          {canDraft ? (
+            <Button
+              variant="ghost"
+              size="icon"
+              onPress={() => {
+                setNotice(null);
+                setDrafting(true);
+              }}
+              aria-label="Talk a request over"
+            >
+              <MessageSquare className="h-4 w-4" />
+            </Button>
+          ) : null}
+          <Button
+            variant="ghost"
+            size="icon"
+            onPress={() => {
+              setNotice(null);
+              setSavingTemplate(true);
+            }}
+            aria-label="Save lanes as a template"
+          >
+            <Copy className="h-4 w-4" />
+          </Button>
           <Button variant="ghost" size="icon" onPress={() => setEditing(true)} aria-label="Edit project">
             <Pencil className="h-4 w-4" />
           </Button>
@@ -122,9 +162,17 @@ export function ProjectPage({
             <Stat term="Total" value={project.todoCount} />
           </View>
 
+          <ProjectAiSwitch projectId={project.id} enabled={project.aiEnabled} />
+          {activity ? <ProjectActivityLine activity={activity} /> : null}
+
           {actionError ? (
             <Text className="text-destructive text-sm" aria-live="polite">
               {actionError}
+            </Text>
+          ) : null}
+          {notice ? (
+            <Text className="text-muted-foreground text-sm" aria-live="polite">
+              {notice}
             </Text>
           ) : null}
 
@@ -138,6 +186,22 @@ export function ProjectPage({
           ) : null}
 
           <ProjectFormDialog open={editing} onOpenChange={setEditing} project={project} />
+          <SaveTemplateDialog
+            open={savingTemplate}
+            onOpenChange={setSavingTemplate}
+            projectId={project.id}
+            projectName={project.name}
+            onSaved={(name) => setNotice(`Saved its lanes as the template “${name}”.`)}
+          />
+
+          {canDraft ? (
+            <DraftDialog
+              open={drafting}
+              onOpenChange={setDrafting}
+              projectId={project.id}
+              onMade={(title) => setNotice(`Made the todo “${title}”.`)}
+            />
+          ) : null}
 
           <ConfirmDialog
             open={confirmingDelete}

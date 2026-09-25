@@ -1,3 +1,5 @@
+import { randomBytes } from 'node:crypto';
+
 /** Truthy env-var values: "1", "true", "yes" (case-insensitive). */
 export function envFlag(value: string | undefined): boolean {
   return ['1', 'true', 'yes'].includes((value ?? '').trim().toLowerCase());
@@ -33,3 +35,45 @@ export function magicLinkRequired(): boolean {
 export function magicLinkExposed(): boolean {
   return process.env.NODE_ENV !== 'production' || envFlag(process.env.EXPOSE_MAGIC_LINK);
 }
+
+/** What signs sessions when nothing is configured. preflight.ts refuses it in production. */
+export const DEV_SECRET = 'dev-secret-change-in-production';
+
+/**
+ * The secret better-auth signs with. `AUTH_SECRET`, or `JWT_SECRET` for an
+ * instance configured before sessions moved to better-auth.
+ */
+export function authSecret(): string {
+  return process.env.AUTH_SECRET || process.env.JWT_SECRET || DEV_SECRET;
+}
+
+/**
+ * Where magic links point. In production the server serves the client itself,
+ * so its own origin is the right default, but only for someone browsing from
+ * this machine. Set APP_URL to the address users actually type; a link to
+ * `localhost` is useless in an inbox.
+ */
+export function appUrl(): string {
+  return process.env.APP_URL ?? `http://localhost:${process.env.PORT ?? 3001}`;
+}
+
+/**
+ * Whether this server offers AI at all, which it does unless `AI_ENABLED` is
+ * false. Offered, an admin turns it on or off in Settings (instance.ts), and it
+ * starts off. With `AI_ENABLED=false` the AI surface does not exist: no `/mcp`,
+ * no API keys, no AI fields in the schema, and no switch to flip.
+ */
+export function aiAvailable(): boolean {
+  return !envDisabled(process.env.AI_ENABLED);
+}
+
+/**
+ * The runner's key, which the runner sends as `x-runner-key` to act as the
+ * system principal (resolvers/runs.ts). The server runs its own runner and
+ * hands it this key, so by default it is made up at boot and never leaves the
+ * process. Set `RUNNER_KEY` only to let a runner on another host in as well.
+ */
+export const runnerKey: () => string = (() => {
+  const key = process.env.RUNNER_KEY?.trim() || randomBytes(32).toString('hex');
+  return () => key;
+})();

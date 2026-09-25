@@ -30,7 +30,13 @@ export async function findBlocked(db: AnyDb, todoIds: readonly string[]): Promis
     .selectDistinct({ todoId: dbSchema.todoDependencies.todoId })
     .from(dbSchema.todoDependencies)
     .innerJoin(dbSchema.todos, eq(dbSchema.todos.id, dbSchema.todoDependencies.dependsOnTodoId))
-    .where(and(inArray(dbSchema.todoDependencies.todoId, [...todoIds]), isNull(dbSchema.todos.completedAt)));
+    .where(
+      and(
+        inArray(dbSchema.todoDependencies.todoId, [...todoIds]),
+        isNull(dbSchema.todos.completedAt),
+        isNull(dbSchema.todos.archivedAt),
+      ),
+    );
   return new Set(rows.map((row) => row.todoId));
 }
 
@@ -42,7 +48,13 @@ export async function findBlockers(db: AnyDb, todoIds: readonly string[]): Promi
     .select({ todoId: dbSchema.todoDependencies.todoId, blocker: dbSchema.todos })
     .from(dbSchema.todoDependencies)
     .innerJoin(dbSchema.todos, eq(dbSchema.todos.id, dbSchema.todoDependencies.dependsOnTodoId))
-    .where(and(inArray(dbSchema.todoDependencies.todoId, [...todoIds]), isNull(dbSchema.todos.completedAt)));
+    .where(
+      and(
+        inArray(dbSchema.todoDependencies.todoId, [...todoIds]),
+        isNull(dbSchema.todos.completedAt),
+        isNull(dbSchema.todos.archivedAt),
+      ),
+    );
   for (const row of rows) {
     const existing = byTodo.get(row.todoId);
     if (existing) existing.push(row.blocker);
@@ -83,7 +95,14 @@ export async function assertNoBlockedCompletions(db: AnyDb, userId: string): Pro
     .from(dbSchema.todos)
     .innerJoin(dbSchema.todoDependencies, eq(dbSchema.todoDependencies.todoId, dbSchema.todos.id))
     .innerJoin(blockers, eq(blockers.id, dbSchema.todoDependencies.dependsOnTodoId))
-    .where(and(eq(dbSchema.todos.userId, userId), isNotNull(dbSchema.todos.completedAt), isNull(blockers.completedAt)))
+    .where(
+      and(
+        eq(dbSchema.todos.userId, userId),
+        isNotNull(dbSchema.todos.completedAt),
+        isNull(blockers.completedAt),
+        isNull(blockers.archivedAt),
+      ),
+    )
     .limit(3);
   if (rows.length === 0) return;
   throw new GraphQLError(`This todo is blocked by ${rows.map((row) => row.blocker).join(', ')}. Complete it first.`, {

@@ -1,9 +1,10 @@
 import * as dbSchema from '@telos/db/schema';
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, eq, isNull } from 'drizzle-orm';
 import { extendSchema, GraphQLError, type GraphQLObjectType, type GraphQLSchema, parse } from 'graphql';
 import { assertNotBlocked } from '../blocking.ts';
 import type { Context } from '../context.ts';
 import { syncLaneCompletion } from '../lanes.ts';
+import { stampActor } from '../provenance.ts';
 import { requireAuth } from './auth.ts';
 
 // The board's own transitions. Generated CRUD already creates, renames and
@@ -28,8 +29,9 @@ const LANES_SDL = parse(`
     """
     Puts a todo in a lane, optionally at an index within it. Completes the todo
     when the lane marks work done, and reopens it when the lane does not.
+    \`reason\` goes on the todo's history.
     """
-    moveTodo(id: ID!, laneId: ID!, position: Int): Todo!
+    moveTodo(id: ID!, laneId: ID!, position: Int, reason: String): Todo!
     "Chooses which lane means done, or none at all. At most one per project."
     setDoneLane(projectId: ID!, laneId: ID): [Lane!]!
     "Rewrites lane order from the given ids, first to last."
@@ -103,17 +105,20 @@ export function applyLanesExtension(schema: GraphQLSchema): GraphQLSchema {
 
   mutations.moveTodo.resolve = async (
     _parent: unknown,
-    args: { id: string; laneId: string; position?: number | null },
+    args: { id: string; laneId: string; position?: number | null; reason?: string | null },
     context: Context,
   ) => {
     const userId = requireAuth(context);
     const db = context.db as AnyRow;
 
     return db.transaction(async (tx: AnyRow) => {
+      await stampActor(tx, context.actor, { reason: args.reason });
       const [todo] = await tx
         .select()
         .from(dbSchema.todos)
-        .where(and(eq(dbSchema.todos.id, args.id), eq(dbSchema.todos.userId, userId)))
+        .where(
+          and(eq(dbSchema.todos.id, args.id), eq(dbSchema.todos.userId, userId), isNull(dbSchema.todos.archivedAt)),
+        )
         .limit(1);
       if (!todo) throw new GraphQLError('Todo not found', { extensions: { code: 'NOT_FOUND' } });
 
@@ -174,6 +179,8 @@ export function applyLanesExtension(schema: GraphQLSchema): GraphQLSchema {
 
     return db.transaction(async (tx: AnyRow) => {
       await loadOwnedProject(tx, userId, args.projectId);
+      // Moving the flag moves todos (syncLaneCompletion), which is history.
+      await stampActor(tx, context.actor);
       const now = new Date();
       // Cleared first, unconditionally: the partial unique index allows one done
       // lane per project, so the flag has to leave the old lane before it can

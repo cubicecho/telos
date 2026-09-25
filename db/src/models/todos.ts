@@ -1,4 +1,4 @@
-import { index, integer, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { type AnyPgColumn, boolean, index, integer, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 
 import { lanes } from './lanes.ts';
 import { projects } from './projects.ts';
@@ -19,6 +19,16 @@ export const todos = pgTable(
     // rather than defaulted to '': "no notes" and "an empty note" are the same
     // thing, and only one of them should be storable.
     notes: text('notes'),
+    // What "done" means for this todo, when it is worth writing down. An agent
+    // is judged against it; a person can simply read it.
+    acceptance: text('acceptance'),
+    // The todo this one was split out of. `set null` because deleting the
+    // parent should leave the pieces standing. write-guards.ts keeps the
+    // chain acyclic.
+    parentId: uuid('parent_id').references((): AnyPgColumn => todos.id, { onDelete: 'set null' }),
+    // "Hands off": no agent picks this todo up or reads it, whatever its
+    // project's AI switch says. Only a person may set or clear it.
+    aiIgnored: boolean('ai_ignored').notNull().default(false),
     // Which board column the todo sits in. Nullable because a project may have
     // no lanes yet, and `set null` because deleting a lane must not delete work.
     laneId: uuid('lane_id').references(() => lanes.id, { onDelete: 'set null' }),
@@ -30,6 +40,11 @@ export const todos = pgTable(
     // most todos are not. Unlike completedAt this carries no invariant: no
     // lane, guard or count reads it, so it is safe for a plain update to set.
     dueAt: timestamp('due_at', { withTimezone: true }),
+    // Put away, not gone: set by `deleteTodo`, cleared by `restoreTodo`, and
+    // only `deleteTodo(hard: true)` removes the row. The generated reads hide
+    // archived todos (build-schema.ts `softDelete`); the hand-written SQL has
+    // to say so itself.
+    archivedAt: timestamp('archived_at', { withTimezone: true }),
     position: integer('position').notNull().default(0),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     // `$onUpdate` rather than a stamp at each call site. The hand-written
@@ -46,6 +61,8 @@ export const todos = pgTable(
     index('idx_todos_project_id').on(t.projectId),
     index('idx_todos_completed_at').on(t.completedAt),
     index('idx_todos_lane_id').on(t.laneId),
+    index('idx_todos_parent_id').on(t.parentId),
+    index('idx_todos_archived_at').on(t.archivedAt),
     // Not yet load-bearing: the due-date sort runs in the client over the
     // project's already-fetched rows. It is here because the column is the
     // obvious thing to order or filter on server-side the moment a project

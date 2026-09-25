@@ -245,6 +245,27 @@ describe('reorderLanes', () => {
     expect(updated.map((lane: { name: string }) => lane.name)).toEqual(['Done', 'In progress', 'To do']);
   });
 
+  it('holds when read back the way the board reads it', async () => {
+    // A lane added later was made later, so ordering by creation first would
+    // put it back at the end: the board's own query (app ProjectLanes) sorts
+    // the highest `priority` first, and has to give `position` the higher one.
+    await client.expectOk(
+      `mutation ($projectId: UUID!) { createLane(values: { projectId: $projectId, name: "Later", position: 3 }) { id } }`,
+      { projectId },
+    );
+    const later = (await readLanes()).find((lane) => lane.name === 'Later');
+    await client.expectOk(REORDER, { projectId, laneIds: [later?.id, ...lanes.map((lane) => lane.id)] });
+
+    const BOARD = `query ($projectId: UUID!) {
+      lanes(
+        where: { projectId: { eq: $projectId } }
+        orderBy: { position: { direction: asc, priority: 2 }, createdAt: { direction: asc, priority: 1 } }
+      ) { name }
+    }`;
+    const read = (await client.expectOk(BOARD, { projectId })).lanes.map((lane: { name: string }) => lane.name);
+    expect(read).toEqual(['Later', 'To do', 'In progress', 'Done']);
+  });
+
   it('refuses a list that is not every lane exactly once', async () => {
     const partial = await client.expectError(REORDER, { projectId, laneIds: [lanes[0].id] });
     expect(partial.code).toBe('BAD_USER_INPUT');

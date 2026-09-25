@@ -15,6 +15,7 @@ export const relations = defineRelations(schema, (r) => ({
     user: r.one.users({ from: r.projects.userId, to: r.users.id }),
     todos: r.many.todos({ from: r.projects.id, to: r.todos.projectId }),
     lanes: r.many.lanes({ from: r.projects.id, to: r.lanes.projectId }),
+    runs: r.many.runs({ from: r.projects.id, to: r.runs.projectId }),
     labels: r.many.labels({
       from: r.projects.id.through(r.projectLabels.projectId),
       to: r.labels.id.through(r.projectLabels.labelId),
@@ -25,6 +26,14 @@ export const relations = defineRelations(schema, (r) => ({
     user: r.one.users({ from: r.todos.userId, to: r.users.id }),
     project: r.one.projects({ from: r.todos.projectId, to: r.projects.id }),
     lane: r.one.lanes({ from: r.todos.laneId, to: r.lanes.id }),
+    parent: r.one.todos({ from: r.todos.parentId, to: r.todos.id, alias: 'todoParent' }),
+    children: r.many.todos({ from: r.todos.id, to: r.todos.parentId, alias: 'todoParent' }),
+    // Not `notes`: that is the todo's own description column.
+    thread: r.many.todoNotes({ from: r.todos.id, to: r.todoNotes.todoId }),
+    // Named `history` rather than `events`: it reads as what it is on a card.
+    history: r.many.todoEvents({ from: r.todos.id, to: r.todoEvents.todoId }),
+    runs: r.many.runs({ from: r.todos.id, to: r.runs.todoId }),
+    artifacts: r.many.artifacts({ from: r.todos.id, to: r.artifacts.todoId }),
     labels: r.many.labels({
       from: r.todos.id.through(r.todoLabels.todoId),
       to: r.labels.id.through(r.todoLabels.labelId),
@@ -47,6 +56,40 @@ export const relations = defineRelations(schema, (r) => ({
     user: r.one.users({ from: r.lanes.userId, to: r.users.id }),
     project: r.one.projects({ from: r.lanes.projectId, to: r.projects.id }),
     todos: r.many.todos({ from: r.lanes.id, to: r.todos.laneId }),
+    agent: r.one.agents({ from: r.lanes.agentId, to: r.agents.id }),
+    onSuccessLane: r.one.lanes({ from: r.lanes.onSuccessLaneId, to: r.lanes.id, alias: 'laneOnSuccess' }),
+    onFailureLane: r.one.lanes({ from: r.lanes.onFailureLaneId, to: r.lanes.id, alias: 'laneOnFailure' }),
+    runs: r.many.runs({ from: r.lanes.id, to: r.runs.laneId }),
+  },
+
+  agents: {
+    lanes: r.many.lanes({ from: r.agents.id, to: r.lanes.agentId }),
+    runs: r.many.runs({ from: r.agents.id, to: r.runs.agentId }),
+  },
+
+  runs: {
+    todo: r.one.todos({ from: r.runs.todoId, to: r.todos.id }),
+    lane: r.one.lanes({ from: r.runs.laneId, to: r.lanes.id }),
+    agent: r.one.agents({ from: r.runs.agentId, to: r.agents.id }),
+    project: r.one.projects({ from: r.runs.projectId, to: r.projects.id }),
+    artifacts: r.many.artifacts({ from: r.runs.id, to: r.artifacts.runId }),
+  },
+
+  drafts: {
+    project: r.one.projects({ from: r.drafts.projectId, to: r.projects.id }),
+    agent: r.one.agents({ from: r.drafts.agentId, to: r.agents.id }),
+    todo: r.one.todos({ from: r.drafts.todoId, to: r.todos.id }),
+    messages: r.many.draftMessages({ from: r.drafts.id, to: r.draftMessages.draftId }),
+  },
+
+  draftMessages: {
+    draft: r.one.drafts({ from: r.draftMessages.draftId, to: r.drafts.id }),
+  },
+
+  artifacts: {
+    todo: r.one.todos({ from: r.artifacts.todoId, to: r.todos.id }),
+    run: r.one.runs({ from: r.artifacts.runId, to: r.runs.id }),
+    project: r.one.projects({ from: r.artifacts.projectId, to: r.projects.id }),
   },
 
   labels: {
@@ -69,6 +112,15 @@ export const relations = defineRelations(schema, (r) => ({
   todoLabels: {
     todo: r.one.todos({ from: r.todoLabels.todoId, to: r.todos.id }),
     label: r.one.labels({ from: r.todoLabels.labelId, to: r.labels.id }),
+  },
+
+  todoNotes: {
+    todo: r.one.todos({ from: r.todoNotes.todoId, to: r.todos.id }),
+  },
+
+  todoEvents: {
+    todo: r.one.todos({ from: r.todoEvents.todoId, to: r.todos.id }),
+    note: r.one.todoNotes({ from: r.todoEvents.noteId, to: r.todoNotes.id }),
   },
 
   todoDependencies: {

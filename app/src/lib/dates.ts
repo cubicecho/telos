@@ -71,3 +71,18 @@ export function formatDueDateLong(iso: string | null | undefined): string | unde
   const date = parseDate(iso);
   return date && FULL.format(date);
 }
+
+const STAMP = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+
+/** A short date, with the year only when it is not this one. Empty for a malformed value. */
+export function formatShortDate(iso: string | null | undefined, from: Date = new Date()): string {
+  const date = parseDate(iso);
+  if (!date) return '';
+  return date.getFullYear() === from.getFullYear() ? SHORT.format(date) : WITH_YEAR.format(date);
+}
+
+/** A moment, date and time, for a history line or a note's byline. Empty for a malformed value. */
+export function formatTimestamp(iso: string | null | undefined): string {
+  const date = parseDate(iso);
+  return date ? STAMP.format(date) : '';
+}

@@ -4,10 +4,14 @@
  * parent, so the component is lucide's own.
  */
 export {
+  Activity,
+  Archive,
+  ArchiveRestore,
   Columns3,
   Ellipsis,
   Link2,
   List,
   LogOut,
+  MessageSquare,
   Tag,
 } from 'lucide-react';

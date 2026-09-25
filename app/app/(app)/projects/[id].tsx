@@ -2,27 +2,35 @@ import { useQuery } from '@apollo/client';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
-import { Columns3, List } from '@/components/app-icons';
+import { Archive, Columns3, List } from '@/components/app-icons';
+import { useProjectActivity } from '@/components/domain/ai/project-activity';
+import { ProjectArtifacts, ProjectRuns } from '@/components/domain/ai/project-runs';
 import { Board } from '@/components/domain/lane/board';
 import { ProjectPage } from '@/components/domain/project/project-page';
+import { ArchivedTodos } from '@/components/domain/todo/archived-todos';
 import { TodoComposer } from '@/components/domain/todo/todo-composer';
 import { TodoFilterBar } from '@/components/domain/todo/todo-filter-bar';
 import { TodoRow } from '@/components/domain/todo/todo-row';
 import type { TodoSummary } from '@/components/domain/todo/types';
+import { PROSE_COLUMN } from '@/components/header-content-footer';
 import { EmptyState } from '@/components/page';
 import { PageLayout } from '@/components/page-layout';
 import { SectionHeading } from '@/components/section-heading';
 import { Button } from '@/components/ui/button';
-import { CircleAlert } from '@/components/ui/icons';
+import { CircleAlert, Play, Upload } from '@/components/ui/icons';
 import type { InputHandle } from '@/components/ui/input';
 import { LoadFailure, LoadState } from '@/components/ui/load-failure';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useAi } from '@/lib/ai';
+import { useBoardUpdates } from '@/lib/board-updates';
 import { filterTodos, isFiltering, NO_FILTER, type TodoFilter } from '@/lib/filter-todos';
 import { ProjectDocument, ProjectLanesDocument, ProjectTodosDocument } from '@/lib/graphql';
 import { useHotkey } from '@/lib/hotkeys';
 import { cn } from '@/lib/utils';
 
-type ProjectView = 'list' | 'board';
+type ProjectView = 'list' | 'board' | 'runs' | 'artifacts' | 'archived';
+
+const VIEWS: readonly ProjectView[] = ['list', 'board', 'runs', 'artifacts', 'archived'];
 
 /** Focus a field and select what is in it — so typing replaces. */
 function focusAndSelect(field: InputHandle | null): void {
@@ -86,6 +94,14 @@ export default function ProjectScreen() {
     if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) active.blur();
   });
 
+  // Asked for whatever the project's own switch says: runs are history, and a
+  // project whose AI is off still has what its agents did before.
+  const ai = useAi();
+  const activity = useProjectActivity(id as string, { skip: !id || !ai.on });
+
+  // What an agent, an MCP client or another tab changes shows up here too.
+  useBoardUpdates(id);
+
   // Three queries, three failures, and they are not the same failure: the
   // project not loading means there is no screen, while the todos or the lanes
   // not loading means the header is still right and only one panel is empty.
@@ -115,7 +131,7 @@ export default function ProjectScreen() {
   // The title waits at its own height; nothing below it has anything to show
   // until the project lands.
   if (projectLoading && !projectData) {
-    return <PageLayout width="prose" loading title={undefined} content={null} />;
+    return <PageLayout width="full" headerClassName={PROSE_COLUMN} loading title={undefined} content={null} />;
   }
 
   // Ahead of the not-found message, which is a claim about the caller's own
@@ -148,7 +164,13 @@ export default function ProjectScreen() {
     );
   }
 
-  const current: ProjectView = view === 'board' ? 'board' : 'list';
+  const requested = VIEWS.find((name) => name === view) ?? 'list';
+  // The AI views exist only while AI is on for the account and this project; a
+  // link to one opened without it lands on the list. A project with AI off
+  // shows none of what its runs left, even from when it was on.
+  const aiHere = ai.on && project.aiEnabled;
+  const current: ProjectView = !aiHere && (requested === 'runs' || requested === 'artifacts') ? 'list' : requested;
+  const todoView = current === 'list' || current === 'board';
   const all = (todosQuery.data?.todos ?? []) as TodoSummary[];
   const lanes = lanesData?.lanes ?? [];
   // Filtered once, here, and handed to whichever view is showing — so the two
@@ -165,56 +187,116 @@ export default function ProjectScreen() {
   const nextPosition = all.reduce((max, todo) => Math.max(max, todo.position ?? 0), -1) + 1;
 
   return (
-    // The board is as wide as its columns need; the list stays a column of
-    // readable width whatever the window does. A `full` body brings no inset of
-    // its own, so the board's is added here.
+    // The page is full width so the board can be as wide as its columns need,
+    // but everything read as text — the header, the composer, the filter and
+    // the list — keeps to the reading column. Switching views then moves none
+    // of it; only the panel under the switcher changes. A `full` body brings no
+    // inset of its own, so each part adds `px-4` to line up with the header.
     <ProjectPage
       project={project}
-      width={current === 'board' ? 'full' : 'prose'}
+      activity={aiHere ? activity : undefined}
       content={
-        <View className={cn('gap-6 pt-2 pb-6', current === 'board' && 'px-4')}>
-          {/* The composer and the filter sit between the tabs and their panels, and
-          serve both. */}
+        <View className="gap-6 pt-2 pb-6">
           <Tabs
             value={current}
             onValueChange={(next) => router.setParams({ view: next })}
             className="flex flex-col gap-6"
           >
-            <TabsList aria-label="Project view" className="self-start">
-              <TabsTrigger value="list">
-                <List />
-                List
-              </TabsTrigger>
-              <TabsTrigger value="board">
-                <Columns3 />
-                Board
-              </TabsTrigger>
-            </TabsList>
+            {/* The composer and the filter serve both views, so they sit above
+            the switcher, which sits directly above what it switches. */}
+            <View className={cn(PROSE_COLUMN, 'gap-6 px-4')}>
+              {/* Adding and filtering todos mean nothing over a list of runs. */}
+              {todoView ? (
+                <>
+                  <TodoComposer ref={composerRef} projectId={project.id} nextPosition={nextPosition} lanes={lanes} />
+                  <TodoFilterBar
+                    ref={filterRef}
+                    filter={filter}
+                    onChange={setFilter}
+                    todos={all}
+                    matched={todos.length}
+                  />
+                </>
+              ) : null}
 
-            <TodoComposer ref={composerRef} projectId={project.id} nextPosition={nextPosition} lanes={lanes} />
-
-            <TodoFilterBar ref={filterRef} filter={filter} onChange={setFilter} todos={all} matched={todos.length} />
+              <TabsList aria-label="Project view" className="self-start">
+                <TabsTrigger value="list">
+                  <List />
+                  List
+                </TabsTrigger>
+                <TabsTrigger value="board">
+                  <Columns3 />
+                  Board
+                </TabsTrigger>
+                {aiHere ? (
+                  <>
+                    <TabsTrigger value="runs">
+                      <Play />
+                      Runs
+                    </TabsTrigger>
+                    <TabsTrigger value="artifacts">
+                      <Upload />
+                      Artifacts
+                    </TabsTrigger>
+                  </>
+                ) : null}
+                <TabsTrigger value="archived">
+                  <Archive />
+                  Archived
+                </TabsTrigger>
+              </TabsList>
+            </View>
 
             {/* No `empty`: an empty project still has a board to show, and the
             list's own empty line depends on the filter. The rungs only stand in
             while there is no answer at all. */}
             {todosQuery.data === undefined ? (
-              <LoadState query={todosQuery} what="the todos" count={all.length} />
+              <View className={cn(PROSE_COLUMN, 'px-4')}>
+                <LoadState query={todosQuery} what="the todos" count={all.length} />
+              </View>
             ) : (
               <>
                 <TabsContent value="board" className="mt-0">
                   {/* A board with no columns is not a board, and the todos being fine
                   does not make it one. */}
-                  {lanesError && lanes.length === 0 ? (
-                    <LoadFailure error={lanesError} onRetry={refetchLanes} what="the board" />
-                  ) : (
-                    <Board projectId={project.id} lanes={lanes} todos={todos} />
-                  )}
+                  <View className="px-4">
+                    {lanesError && lanes.length === 0 ? (
+                      <LoadFailure error={lanesError} onRetry={refetchLanes} what="the board" />
+                    ) : (
+                      <Board
+                        projectId={project.id}
+                        aiEnabled={project.aiEnabled}
+                        lanes={lanes}
+                        todos={todos}
+                        live={activity.live}
+                        stuck={activity.stuck}
+                      />
+                    )}
+                  </View>
+                </TabsContent>
+                {aiHere ? (
+                  <>
+                    <TabsContent value="runs" className="mt-0">
+                      <View className={cn(PROSE_COLUMN, 'px-4')}>
+                        {current === 'runs' ? <ProjectRuns projectId={project.id} activity={activity} /> : null}
+                      </View>
+                    </TabsContent>
+                    <TabsContent value="artifacts" className="mt-0">
+                      <View className={cn(PROSE_COLUMN, 'px-4')}>
+                        {current === 'artifacts' ? <ProjectArtifacts projectId={project.id} /> : null}
+                      </View>
+                    </TabsContent>
+                  </>
+                ) : null}
+                <TabsContent value="archived" className="mt-0">
+                  <View className={cn(PROSE_COLUMN, 'px-4')}>
+                    {current === 'archived' ? <ArchivedTodos projectId={project.id} /> : null}
+                  </View>
                 </TabsContent>
                 <TabsContent value="list" className="mt-0">
                   {/* The column is a view of its own: on web a display class on the
                   panel itself would beat the `hidden` radix gives it when inactive. */}
-                  <View className="gap-6">
+                  <View className={cn(PROSE_COLUMN, 'gap-6 px-4')}>
                     <View className="gap-2">
                       {open.length === 0 ? (
                         <Text className="text-muted-foreground text-sm">

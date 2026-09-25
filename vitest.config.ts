@@ -29,7 +29,13 @@ export default defineConfig({
         test: {
           name: 'node',
           environment: 'node',
-          include: ['db/**/*.test.ts', 'server/**/*.test.ts', 'app/src/lib/**/*.test.ts'],
+          include: [
+            'db/**/*.test.ts',
+            'server/**/*.test.ts',
+            'runner/**/*.test.ts',
+            'scripts/**/*.test.ts',
+            'app/src/lib/**/*.test.ts',
+          ],
         },
       },
       {

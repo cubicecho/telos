@@ -1,0 +1,154 @@
+# The MCP door's whole surface (mcp.ts). Each operation is one tool: its name
+# is the tool's name, the comment above it is the tool's description, and the
+# comment above a variable describes that argument.
+#
+# The surface is for handing work to the board and following it, not for
+# working the board: nothing here moves, completes or edits a todo. The
+# board's own agents do the work; a person owns the board.
+
+# The projects open to AI, each with its lanes in board order. Start here: a
+# request needs a project id, and a lane id means nothing without its name.
+# Projects whose owner has not switched AI on for them are not listed.
+query projects {
+  projects(where: { archivedAt: { isNull: true } }, orderBy: { name: { direction: asc, priority: 1 } }) {
+    id
+    name
+    description
+    context
+    openTodoCount
+    lanes(orderBy: { position: { direction: asc, priority: 1 } }) {
+      id
+      name
+      isDone
+    }
+  }
+}
+
+# The todos in one project, in board order: a summary line each. Use
+# `request` for one todo's detail, thread and history.
+query todos(
+  # From `projects`.
+  $projectId: UUID!
+  # How many to return.
+  $limit: Int! = 100
+) {
+  todos(
+    where: { projectId: { eq: $projectId } }
+    orderBy: { position: { direction: asc, priority: 2 }, createdAt: { direction: asc, priority: 1 } }
+    limit: $limit
+  ) {
+    id
+    title
+    laneId
+    parentId
+    isBlocked
+    completedAt
+    createdAt
+  }
+}
+
+# One todo in full: what was asked (`brief`, `acceptance`), where it sits on
+# the board, what it is part of or split into, what blocks it, its thread of
+# notes and its history of moves and edits. Works for any todo AI can see,
+# not only ones submitted as requests.
+query request(
+  # A todo id, as `submit_request` or `todos` returned it.
+  $id: UUID!
+) {
+  todo(where: { id: { eq: $id } }) {
+    id
+    projectId
+    title
+    brief: notes
+    acceptance
+    completedAt
+    createdAt
+    updatedAt
+    lane {
+      id
+      name
+      isDone
+    }
+    parent {
+      id
+      title
+    }
+    children(orderBy: { position: { direction: asc, priority: 1 } }) {
+      id
+      title
+      completedAt
+      laneId
+    }
+    blockedBy {
+      id
+      title
+    }
+    thread(orderBy: { createdAt: { direction: asc, priority: 1 } }) {
+      id
+      kind
+      body
+      actorKind
+      createdAt
+    }
+    history(orderBy: { at: { direction: asc, priority: 1 } }) {
+      kind
+      fromLaneId
+      toLaneId
+      fields
+      actorKind
+      reason
+      at
+    }
+  }
+}
+
+# Hands a piece of work to a project. It lands as a new todo at the back of
+# the project's first open lane, and the board takes it from there: check on
+# it with `request`. Write the brief for someone with no other context.
+mutation submitRequest(
+  # From `projects`. The project must be open to AI.
+  $projectId: ID!
+  # One line: what is wanted.
+  $title: String!
+  # What to do and why, with whatever context the work needs.
+  $brief: String
+  # How to tell it is done: the checks a reviewer should make.
+  $acceptance: String
+  # A todo in the same project this is part of, if any.
+  $parentId: ID
+) {
+  submitRequest(projectId: $projectId, title: $title, brief: $brief, acceptance: $acceptance, parentId: $parentId) {
+    id
+    title
+    lane {
+      id
+      name
+    }
+    createdAt
+  }
+}
+
+# Withdraws a request that is no longer wanted. AI stops seeing it, and it
+# goes back to its owner to close or keep. Nothing is deleted.
+mutation cancelRequest(
+  # The todo to withdraw.
+  $id: ID!
+  # Why, for the owner. Added to the todo's thread.
+  $reason: String
+) {
+  cancelRequest(id: $id, reason: $reason)
+}
+
+# Adds a note to a todo's thread: a clarification, an answer to a question on
+# it, context that turned up later. Signed as this key, never as the owner.
+mutation addTodoNote(
+  # The todo to add it to.
+  $todoId: ID!
+  # The note, in markdown.
+  $body: String!
+) {
+  addTodoNote(todoId: $todoId, body: $body) {
+    id
+    createdAt
+  }
+}
