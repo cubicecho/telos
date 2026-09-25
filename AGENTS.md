@@ -87,6 +87,7 @@ telos/
 │       └── __tests__/       # End to end against a real telos and a scripted model
 ├── scripts/
 │   ├── import-kanban.ts     # `npm run import:kanban`: copy a kanban_server board to one user
+│   ├── admin.ts             # `npm run admin -- --user <email>`: make an account an admin
 │   └── __tests__/
 ├── .agents/mvp-plan.md      # The plan this repo was built from
 ├── vitest.config.ts

@@ -37,6 +37,7 @@
     "db:studio": "npm run studio -w @telos/db",
     "db:up": "docker compose -f docker-compose.dev.yml up -d",
     "db:down": "docker compose -f docker-compose.dev.yml down",
+    "admin": "node --experimental-strip-types --env-file-if-exists=.env scripts/admin.ts",
     "import:kanban": "node --experimental-strip-types --env-file-if-exists=.env scripts/import-kanban.ts"
   },
   "overrides": {

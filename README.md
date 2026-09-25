@@ -116,7 +116,8 @@ Telos is a board for people first, and AI is off unless you turn it on, at
 every level:
 
 1. **The instance**: Settings → AI → "AI on this instance", which only an
-   admin sees. The first account to sign up is the admin. Off, the server's
+   admin sees. The first account to sign up is the admin; make another with
+   `npm run admin -- --user <email>`. Off, the server's
    `/mcp` is a 404, no account can use AI, and the app shows none of it. To
    remove AI outright, so not even an admin can switch it on, set
    `AI_ENABLED=false`.
