@@ -1,3 +1,28 @@
+# [1.1.0](https://github.com/cubicecho/telos/compare/v1.0.0...v1.1.0) (2026-09-25)
+
+
+### Bug Fixes
+
+* **app:** keep the picked date in the due-date trigger's name ([0cc81bd](https://github.com/cubicecho/telos/commit/0cc81bdba3a25e41df934cca761bc48522e47391)), closes [#112](https://github.com/cubicecho/telos/issues/112)
+
+
+### Features
+
+* **app:** build the UI on cubeui's native registry ([7d54a97](https://github.com/cubicecho/telos/commit/7d54a97ac097cec1e1660246f9c2220b023b54bb))
+* **app:** drop the last local cubeui patches ([cc83187](https://github.com/cubicecho/telos/commit/cc831877399ad795f2fff4ffd9e755c6d8bf4198)), closes [cubeui#101](https://github.com/cubeui/issues/101) [#102](https://github.com/cubicecho/telos/issues/102) [#103](https://github.com/cubicecho/telos/issues/103) [cubeui#101](https://github.com/cubeui/issues/101) [cubeui#102](https://github.com/cubeui/issues/102) [cubeui#103](https://github.com/cubeui/issues/103) [cubeui#111](https://github.com/cubeui/issues/111)
+* **app:** form dialogs use cubeui's native Form ([922125a](https://github.com/cubicecho/telos/commit/922125af1c4eee0b410e859cf8f47b195a953e02)), closes [cubicecho/cubeui#115](https://github.com/cubicecho/cubeui/issues/115)
+* **app:** lists take cubeui's QueryState rungs ([ca13521](https://github.com/cubicecho/telos/commit/ca13521d3abc57893c4af1491b088eaa33930884)), closes [cubicecho/cubeui#113](https://github.com/cubicecho/cubeui/issues/113) [#114](https://github.com/cubicecho/telos/issues/114)
+* **app:** move onto cubeui's Menu, Badge onRemove and createAppForm ([4b283f6](https://github.com/cubicecho/telos/commit/4b283f6b7f5feb1727bebbc943911183088165dd)), closes [cubicecho/cubeui#116](https://github.com/cubicecho/cubeui/issues/116) [#117](https://github.com/cubicecho/telos/issues/117) [#118](https://github.com/cubicecho/telos/issues/118) [cubicecho/cubeui#119](https://github.com/cubicecho/cubeui/issues/119)
+* **app:** pick up cubeui's fixes, and edit due dates with its date picker ([a2ba2f0](https://github.com/cubicecho/telos/commit/a2ba2f020367615fc45642db13b9193a4d4bec14)), closes [cubeui#95](https://github.com/cubeui/issues/95) [cubeui#96](https://github.com/cubeui/issues/96) [cubeui#97](https://github.com/cubeui/issues/97) [cubeui#87](https://github.com/cubeui/issues/87) [cubeui#88](https://github.com/cubeui/issues/88)
+* **app:** screens on cubeui's PageLayout and friends ([e439ee4](https://github.com/cubicecho/telos/commit/e439ee4172120ca654e0b0ff00ecde0d00cb3931))
+* **app:** take cubeui's tabs and QueryError, and drop the fixed local patches ([9bec86f](https://github.com/cubicecho/telos/commit/9bec86f83bab607eb5be265bb5607bd635becadf)), closes [#84](https://github.com/cubicecho/telos/issues/84) [#89](https://github.com/cubicecho/telos/issues/89) [#90](https://github.com/cubicecho/telos/issues/90) [cubeui#82](https://github.com/cubeui/issues/82) [#83](https://github.com/cubicecho/telos/issues/83) [#85](https://github.com/cubicecho/telos/issues/85) [cubeui#96](https://github.com/cubeui/issues/96) [#86](https://github.com/cubicecho/telos/issues/86)
+* **app:** take the theme picker from cubeui, and pick up its border fix ([cce2b14](https://github.com/cubicecho/telos/commit/cce2b1403a3ddaa3933a1818f07124f95209e1b9)), closes [cubeui#80](https://github.com/cubeui/issues/80)
+
+
+### Reverts
+
+* **app:** put sidebar.tsx back to the registry's copy ([d036185](https://github.com/cubicecho/telos/commit/d036185d1b1b8be8dbab1c3937d2dc3ba950342e))
+
 # 1.0.0 (2026-09-13)
 
 
