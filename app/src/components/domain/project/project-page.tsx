@@ -5,6 +5,7 @@ import { Text, View } from 'react-native';
 import { ProjectAiSwitch } from '@/components/domain/ai/project-ai-switch';
 import { LabelBadge, type LabelSummary } from '@/components/domain/label/label-badge';
 import { LabelPicker } from '@/components/domain/label/label-picker';
+import { PROSE_COLUMN } from '@/components/header-content-footer';
 import { PageLayout } from '@/components/page-layout';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -32,19 +33,11 @@ export interface ProjectOverviewData {
 /**
  * A project's page: its name, description and actions in the header, its
  * counts and labels in the row under it, and whichever view is showing as the
- * body. The dialogs and mutations behind the header's buttons live here with
+ * body. The body is full width, for the board; the header keeps to the
+ * reading column. The dialogs and mutations behind the header's buttons live here with
  * them.
  */
-export function ProjectPage({
-  project,
-  width,
-  content,
-}: {
-  project: ProjectOverviewData;
-  /** `prose` for the list, `full` for the board, which is as wide as its columns. */
-  width: 'prose' | 'full';
-  content: ReactNode;
-}) {
+export function ProjectPage({ project, content }: { project: ProjectOverviewData; content: ReactNode }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -93,7 +86,8 @@ export function ProjectPage({
 
   return (
     <PageLayout
-      width={width}
+      width="full"
+      headerClassName={PROSE_COLUMN}
       title={project.name}
       description={project.description || undefined}
       action={

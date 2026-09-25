@@ -9,6 +9,7 @@ import { TodoComposer } from '@/components/domain/todo/todo-composer';
 import { TodoFilterBar } from '@/components/domain/todo/todo-filter-bar';
 import { TodoRow } from '@/components/domain/todo/todo-row';
 import type { TodoSummary } from '@/components/domain/todo/types';
+import { PROSE_COLUMN } from '@/components/header-content-footer';
 import { EmptyState } from '@/components/page';
 import { PageLayout } from '@/components/page-layout';
 import { SectionHeading } from '@/components/section-heading';
@@ -115,7 +116,7 @@ export default function ProjectScreen() {
   // The title waits at its own height; nothing below it has anything to show
   // until the project lands.
   if (projectLoading && !projectData) {
-    return <PageLayout width="prose" loading title={undefined} content={null} />;
+    return <PageLayout width="full" headerClassName={PROSE_COLUMN} loading title={undefined} content={null} />;
   }
 
   // Ahead of the not-found message, which is a claim about the caller's own
@@ -165,56 +166,63 @@ export default function ProjectScreen() {
   const nextPosition = all.reduce((max, todo) => Math.max(max, todo.position ?? 0), -1) + 1;
 
   return (
-    // The board is as wide as its columns need; the list stays a column of
-    // readable width whatever the window does. A `full` body brings no inset of
-    // its own, so the board's is added here.
+    // The page is full width so the board can be as wide as its columns need,
+    // but everything read as text — the header, the composer, the filter and
+    // the list — keeps to the reading column. Switching views then moves none
+    // of it; only the panel under the switcher changes. A `full` body brings no
+    // inset of its own, so each part adds `px-4` to line up with the header.
     <ProjectPage
       project={project}
-      width={current === 'board' ? 'full' : 'prose'}
       content={
-        <View className={cn('gap-6 pt-2 pb-6', current === 'board' && 'px-4')}>
-          {/* The composer and the filter sit between the tabs and their panels, and
-          serve both. */}
+        <View className="gap-6 pt-2 pb-6">
           <Tabs
             value={current}
             onValueChange={(next) => router.setParams({ view: next })}
             className="flex flex-col gap-6"
           >
-            <TabsList aria-label="Project view" className="self-start">
-              <TabsTrigger value="list">
-                <List />
-                List
-              </TabsTrigger>
-              <TabsTrigger value="board">
-                <Columns3 />
-                Board
-              </TabsTrigger>
-            </TabsList>
+            {/* The composer and the filter serve both views, so they sit above
+            the switcher, which sits directly above what it switches. */}
+            <View className={cn(PROSE_COLUMN, 'gap-6 px-4')}>
+              <TodoComposer ref={composerRef} projectId={project.id} nextPosition={nextPosition} lanes={lanes} />
 
-            <TodoComposer ref={composerRef} projectId={project.id} nextPosition={nextPosition} lanes={lanes} />
+              <TodoFilterBar ref={filterRef} filter={filter} onChange={setFilter} todos={all} matched={todos.length} />
 
-            <TodoFilterBar ref={filterRef} filter={filter} onChange={setFilter} todos={all} matched={todos.length} />
+              <TabsList aria-label="Project view" className="self-start">
+                <TabsTrigger value="list">
+                  <List />
+                  List
+                </TabsTrigger>
+                <TabsTrigger value="board">
+                  <Columns3 />
+                  Board
+                </TabsTrigger>
+              </TabsList>
+            </View>
 
             {/* No `empty`: an empty project still has a board to show, and the
             list's own empty line depends on the filter. The rungs only stand in
             while there is no answer at all. */}
             {todosQuery.data === undefined ? (
-              <LoadState query={todosQuery} what="the todos" count={all.length} />
+              <View className={cn(PROSE_COLUMN, 'px-4')}>
+                <LoadState query={todosQuery} what="the todos" count={all.length} />
+              </View>
             ) : (
               <>
                 <TabsContent value="board" className="mt-0">
                   {/* A board with no columns is not a board, and the todos being fine
                   does not make it one. */}
-                  {lanesError && lanes.length === 0 ? (
-                    <LoadFailure error={lanesError} onRetry={refetchLanes} what="the board" />
-                  ) : (
-                    <Board projectId={project.id} aiEnabled={project.aiEnabled} lanes={lanes} todos={todos} />
-                  )}
+                  <View className="px-4">
+                    {lanesError && lanes.length === 0 ? (
+                      <LoadFailure error={lanesError} onRetry={refetchLanes} what="the board" />
+                    ) : (
+                      <Board projectId={project.id} aiEnabled={project.aiEnabled} lanes={lanes} todos={todos} />
+                    )}
+                  </View>
                 </TabsContent>
                 <TabsContent value="list" className="mt-0">
                   {/* The column is a view of its own: on web a display class on the
                   panel itself would beat the `hidden` radix gives it when inactive. */}
-                  <View className="gap-6">
+                  <View className={cn(PROSE_COLUMN, 'gap-6 px-4')}>
                     <View className="gap-2">
                       {open.length === 0 ? (
                         <Text className="text-muted-foreground text-sm">
