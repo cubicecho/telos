@@ -149,6 +149,54 @@ describe('the tool surface', () => {
   });
 });
 
+describe('the prompts', () => {
+  it('are offered beside the tools, each described, and said so on the way in', async () => {
+    const b = await board();
+    const client = await connect(await serve(), b.key);
+    expect(client.getServerCapabilities()?.prompts).toBeTruthy();
+    const { prompts } = await client.listPrompts();
+    expect(prompts.map((prompt) => prompt.name).sort()).toEqual([
+      'start_project',
+      'submit_work',
+      'telos_guide',
+      'triage_board',
+    ]);
+    for (const prompt of prompts) {
+      expect(prompt.description, prompt.name).toBeTruthy();
+      for (const argument of prompt.arguments ?? []) {
+        expect(argument.description, `${prompt.name}.${argument.name}`).toBeTruthy();
+      }
+    }
+    const start = prompts.find((prompt) => prompt.name === 'start_project');
+    expect(start?.arguments?.map((argument) => [argument.name, argument.required])).toEqual([
+      ['goal', true],
+      ['name', false],
+    ]);
+  });
+
+  it('render, arguments and all, naming only tools that exist', async () => {
+    const b = await board();
+    const client = await connect(await serve(), b.key);
+    const text = async (name: string, args?: Record<string, string>) =>
+      (await client.getPrompt({ name, ...(args ? { arguments: args } : {}) })).messages
+        .map((message) => (message.content.type === 'text' ? message.content.text : ''))
+        .join('\n');
+
+    expect(await text('telos_guide')).toMatch(/Call `projects`/);
+    const submit = await text('submit_work', { project: 'Kitchen', request: 'Fix the tap' });
+    expect(submit).toContain('**Board:** Kitchen');
+    expect(submit).toContain('Fix the tap');
+
+    // Every tool a prompt names in backticks, in snake case, is one the door serves.
+    for (const name of ['telos_guide', 'start_project', 'submit_work', 'triage_board']) {
+      const body = await text(name, { goal: 'g', project: 'p', request: 'r' });
+      for (const [, tool] of body.matchAll(/`([a-z]+(?:_[a-z]+)*)`/g)) {
+        if (tool.includes('_') || TOOLS.includes(tool)) expect(TOOLS, `${name} names ${tool}`).toContain(tool);
+      }
+    }
+  });
+});
+
 describe('submitting a request', () => {
   it('lands at the back of the first open lane and reads back in full', async () => {
     const b = await board();

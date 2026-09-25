@@ -6,7 +6,7 @@
   "main": "./src/index.ts",
   "scripts": {
     "dev": "node --experimental-strip-types --env-file-if-exists=../.env --watch src/index.ts",
-    "build": "echo 'no server build needed \u2014 TypeScript runs directly'",
+    "build": "echo 'no server build needed — TypeScript runs directly'",
     "start": "node --experimental-strip-types src/index.ts",
     "clean": "rm -rf __generated__",
     "codegen": "node --experimental-strip-types --import=./src/preload-env.ts src/write_schema.ts && graphql-codegen-esm"
@@ -26,7 +26,8 @@
     "express": "^5.2.1",
     "graphql": "^16.10.0",
     "graphql-parse-resolve-info": "^4.14.1",
-    "graphql-scalars": "^2.0.0"
+    "graphql-scalars": "^2.0.0",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "^1.30.1",

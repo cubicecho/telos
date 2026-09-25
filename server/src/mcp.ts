@@ -4,6 +4,7 @@ import express, { type Express, type Response } from 'express';
 import { type GraphQLSchema, Source } from 'graphql';
 import { toHeaders } from './auth.ts';
 import { instanceAiOn } from './instance.ts';
+import { registerPrompts } from './mcp-prompts.ts';
 import type { ContextFactory } from './request-context.ts';
 
 // The AI door: the same schema as /graphql, served as MCP tools to a client
@@ -29,6 +30,8 @@ export function createMcpHandler(schema: GraphQLSchema, contextFor: ContextFacto
     // Only the operations above: no tool per root field.
     include: [],
     mutationHints: 'byName',
+    // Orientation and jobs of work, beside the tools (mcp-prompts.ts).
+    decorateServer: registerPrompts,
     contextFromRequest: (req) => contextFor(toHeaders(req.headers)),
   });
 }
