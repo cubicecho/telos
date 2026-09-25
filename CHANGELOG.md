@@ -1,3 +1,48 @@
+# [1.2.0](https://github.com/cubicecho/telos/compare/v1.1.0...v1.2.0) (2026-09-25)
+
+
+### Bug Fixes
+
+* a long thread keeps the todo dialog's title and Save on screen ([362eae2](https://github.com/cubicecho/telos/commit/362eae245ffc2d0270d6d420d755ff68f1f2fe16))
+* a moved lane or card keeps its place after a refetch ([7d714e5](https://github.com/cubicecho/telos/commit/7d714e57c38d8baefc3dc04e59a2d8a87909b8d0))
+* an agent records only what its tools stored, and its notes link to the thread ([1e47750](https://github.com/cubicecho/telos/commit/1e477504904c725d4e17829840031e6e83d0c337))
+* **app:** room for focus rings in the agent form's scroll area ([4c923fa](https://github.com/cubicecho/telos/commit/4c923fa7a0d64c9dc97cad357ef8677b7dd15b04))
+* quiet Apollo's list warnings, and stop refetching a tab that isn't open ([90b161c](https://github.com/cubicecho/telos/commit/90b161cbfb19eb858ea2e1821763a646b6c36cda))
+
+
+### Features
+
+* a project with AI off shows none of its runs or artifacts ([b60b4ce](https://github.com/cubicecho/telos/commit/b60b4ce833b4a46abb2b5ebd5cd8c7caa9391009))
+* a stations page, and retry and stop from the board ([bef3a36](https://github.com/cubicecho/telos/commit/bef3a360116e5505ff1665aa7eca4d5429c1d1f5))
+* an admin's instance AI switch in Settings ([22a7fd7](https://github.com/cubicecho/telos/commit/22a7fd71a2441f6b917d588cc74607c9781e0d09))
+* **app:** a todo's history shows its runs, and notes and moves open the run that made them ([e0eea18](https://github.com/cubicecho/telos/commit/e0eea1878f139e646c7bae1871bcad855edaf74c))
+* **app:** agents, stations, and a todo's runs and artifacts ([26e7faf](https://github.com/cubicecho/telos/commit/26e7fafa6ec706ff1c490395986ef761afddba45))
+* **app:** AI settings in their own tab ([23270b5](https://github.com/cubicecho/telos/commit/23270b538417a443632c64d10530a98650f0f72f))
+* **app:** keep the project header and list in the reading column, the board full width ([bb332ef](https://github.com/cubicecho/telos/commit/bb332efa05a034bcd970092a4bda4815a179f52f))
+* **app:** todo notes, history and acceptance; AI switches and API keys ([832fedf](https://github.com/cubicecho/telos/commit/832fedf50ecca8fca4fbe894f7cf0c06f8aa9ea4))
+* archive todos, restore them, or delete them for good ([1d0ae59](https://github.com/cubicecho/telos/commit/1d0ae5924cb0f9b5360d218fbd436f1dbe0edfd7))
+* boards update live as their todos and lanes change ([37da2e4](https://github.com/cubicecho/telos/commit/37da2e4e26ebf1a09fce96a91ae3b471078f0732))
+* find any todo with Ctrl+K ([e75509e](https://github.com/cubicecho/telos/commit/e75509e0646f4010137161de71ccfc415f2b8b55))
+* MCP prompts that explain the board and walk through handing it work ([c8ec603](https://github.com/cubicecho/telos/commit/c8ec6032cfdd19728c3c69fcceccddbf7a6eca85))
+* pick an agent's model from what its endpoint lists ([4f8d016](https://github.com/cubicecho/telos/commit/4f8d01666e31e43ec779e598fcc2506868dc518e))
+* prune old runs after the account's retention ([62e2e1a](https://github.com/cubicecho/telos/commit/62e2e1ad8bc6f1dcd384f0ac5fc78cc29da01226))
+* **runner:** hooks, artifacts and a live event feed ([764f880](https://github.com/cubicecho/telos/commit/764f8800ea7bd6bc1b8b6a00aaf1d8ae82348641))
+* **runner:** the runner that works the stations ([3d44779](https://github.com/cubicecho/telos/commit/3d44779b88fff92d795ee85de6bdd4f7f7ffe017))
+* save a board's lanes as a template and start projects from it ([618ecfe](https://github.com/cubicecho/telos/commit/618ecfe751ce9d16555da774afc1ea108149533f))
+* **scripts:** import a kanban_server board ([bccde1e](https://github.com/cubicecho/telos/commit/bccde1ebe7b92048467195fd4119b9c5b4c9f129))
+* **scripts:** make an account an admin ([2f129bb](https://github.com/cubicecho/telos/commit/2f129bbc498b945c69add327f1311dbb6fdded96))
+* **server:** agents, lanes as stations, and runs ([24a06fc](https://github.com/cubicecho/telos/commit/24a06fcf1d40cc9ebed33dbbaab7c280099a1dba))
+* **server:** better-auth sessions, API keys and the AI switches ([6d9bd28](https://github.com/cubicecho/telos/commit/6d9bd28eaf399c6dfea921ece553e013b1d8d14f))
+* **server:** run events and artifacts ([eeb3b3d](https://github.com/cubicecho/telos/commit/eeb3b3d41fca321435d5a49f9073f79cd170b3bc))
+* **server:** the MCP door, where AI hands work to the board ([5f3a007](https://github.com/cubicecho/telos/commit/5f3a0070c440c1a562e0d9a7656371cac9e1184f))
+* **server:** todo history, notes, acceptance, parents and project AI switch ([d99e768](https://github.com/cubicecho/telos/commit/d99e7684066cac40bc0b9ef2bc143ffd4d17817a))
+* stopping a run tells AI to ignore its todo ([12a7424](https://github.com/cubicecho/telos/commit/12a742416892579333ba62bfd01af45595195e9c))
+* take an artifact off the board, leaving what it points at ([ae465a4](https://github.com/cubicecho/telos/commit/ae465a4d4d1db7eaff7cc94e73bad5c9cbeedbc3))
+* talk a request over with an agent before it becomes a todo ([406861b](https://github.com/cubicecho/telos/commit/406861be42d17b7347df0d23029b69d4371e5af4))
+* test an agent's MCP server from its form ([455e8dd](https://github.com/cubicecho/telos/commit/455e8dd034997fc022fd79b678eaa4d31e9e3e0f))
+* the runner comes with the server, no key to set ([73c919e](https://github.com/cubicecho/telos/commit/73c919e6a81dea0b5531326c6ca874c8698f8cd9))
+* watch what the AI is doing ([c4a1a82](https://github.com/cubicecho/telos/commit/c4a1a820eadf88cbc7ba2eebdd244bb37ae01a98))
+
 # [1.1.0](https://github.com/cubicecho/telos/compare/v1.0.0...v1.1.0) (2026-09-25)
 
 
