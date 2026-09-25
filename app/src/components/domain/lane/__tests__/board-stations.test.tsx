@@ -3,8 +3,8 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { TodoSummary } from '@/components/domain/todo/types';
-import { AiStateDocument, ProjectStationsDocument } from '@/lib/graphql';
-import { fullRun, runMock } from '../../ai/__tests__/run-fixtures';
+import { AiStateDocument, CancelRunDocument, ProjectStationsDocument, RetryTodoDocument } from '@/lib/graphql';
+import { fullRun, run, runMock } from '../../ai/__tests__/run-fixtures';
 import { Board } from '../board';
 
 const LANES = [
@@ -69,6 +69,10 @@ const LIVE = new Map([
   ],
 ]);
 
+const STUCK = new Map([
+  ['t1', { __typename: 'StationTodo' as const, todoId: 't1', state: 'attention', reason: 'It broke.', failures: 4 }],
+]);
+
 const STATIONS = {
   request: { query: ProjectStationsDocument, variables: { projectId: 'p1' } },
   result: {
@@ -83,11 +87,11 @@ function board(
   // biome-ignore lint/suspicious/noExplicitAny: MockedProvider's mock array type
   mocks: any[],
   aiEnabled: boolean,
-  { todos = [], live }: { todos?: TodoSummary[]; live?: typeof LIVE } = {},
+  { todos = [], live, stuck }: { todos?: TodoSummary[]; live?: typeof LIVE; stuck?: typeof STUCK } = {},
 ) {
   render(
     <MockedProvider mocks={mocks}>
-      <Board projectId="p1" aiEnabled={aiEnabled} lanes={LANES} todos={todos} live={live} />
+      <Board projectId="p1" aiEnabled={aiEnabled} lanes={LANES} todos={todos} live={live} stuck={stuck} />
     </MockedProvider>,
   );
 }
@@ -171,5 +175,43 @@ describe('Board stations', () => {
     expect(await screen.findByText('Write it')).toBeInTheDocument();
     await new Promise((resolve) => setTimeout(resolve, 20));
     expect(screen.queryByText(/Working/)).not.toBeInTheDocument();
+  });
+
+  it('says why a station stopped on a card, and sends it round again', async () => {
+    const user = userEvent.setup();
+    const retried = vi.fn(() => ({ data: { retryTodo: true } }));
+    board(
+      [
+        aiState(true, true),
+        STATIONS,
+        { request: { query: RetryTodoDocument, variables: { id: 't1' } }, result: retried },
+      ],
+      true,
+      { todos: [CARD], live: new Map(), stuck: STUCK },
+    );
+    expect(await screen.findByText('It broke.')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Send “Write it” round again' }));
+    await vi.waitFor(() => expect(retried).toHaveBeenCalled());
+  });
+
+  it('stops the agent from the watch dialog', async () => {
+    const user = userEvent.setup();
+    const cancelled = vi.fn(() => ({
+      data: { cancelRun: run('r1', 'running', { cancelRequestedAt: '2026-09-24T10:00:30.000Z' }) },
+    }));
+    board(
+      [
+        aiState(true, true),
+        STATIONS,
+        runMock(fullRun('r1', 'running')),
+        { request: { query: CancelRunDocument, variables: { id: 'r1' } }, result: cancelled },
+      ],
+      true,
+      { todos: [CARD], live: LIVE },
+    );
+    await user.click(await screen.findByRole('button', { name: 'Watch the agent work “Write it”' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.click(await within(dialog).findByRole('button', { name: 'Stop' }));
+    await vi.waitFor(() => expect(cancelled).toHaveBeenCalled());
   });
 });

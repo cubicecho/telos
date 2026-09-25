@@ -2,12 +2,14 @@ import { useQuery } from '@apollo/client';
 import { Link, usePathname } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
-import { LogOut } from '@/components/app-icons';
+import { Activity, LogOut } from '@/components/app-icons';
+import { useAttentionCount } from '@/components/domain/ai/ai-status';
 import { ProjectFormDialog } from '@/components/domain/project/project-form-dialog';
 import { Sidebar as SidebarFrame, SidebarNavItem, SidebarSection } from '@/components/sidebar';
 import { Button } from '@/components/ui/button';
 import { Plus, Settings } from '@/components/ui/icons';
 import { LoadState } from '@/components/ui/load-failure';
+import { useAi } from '@/lib/ai';
 import { clearToken } from '@/lib/auth';
 import { ProjectsDocument } from '@/lib/graphql';
 
@@ -17,6 +19,8 @@ export function Sidebar() {
   const projectsQuery = useQuery(ProjectsDocument);
   const [creating, setCreating] = useState(false);
   const projects = projectsQuery.data?.projects ?? [];
+  const ai = useAi();
+  const attention = useAttentionCount();
 
   function signOut() {
     clearToken();
@@ -74,6 +78,17 @@ export function Sidebar() {
         }
         footer={
           <>
+            {ai.on ? (
+              <Link href="/stations" asChild>
+                <SidebarNavItem
+                  href="/stations"
+                  label="Stations"
+                  icon={<Activity />}
+                  count={attention > 0 ? attention : undefined}
+                  active={pathname === '/stations'}
+                />
+              </Link>
+            ) : null}
             <Link href="/settings" asChild>
               <SidebarNavItem href="/settings" label="Settings" icon={<Settings />} active={pathname === '/settings'} />
             </Link>

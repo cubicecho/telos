@@ -13,9 +13,14 @@ export const SPEND_DAYS = 30;
 
 export type LiveRun = ProjectActivityQuery['live'][number];
 
+/** A todo a station gave up on or finished with, and why. */
+export type StuckTodo = ProjectActivityQuery['stations']['todos'][number];
+
 export interface ProjectActivity {
   /** The run working each todo now, by todo id. */
   live: ReadonlyMap<string, LiveRun>;
+  /** The todos waiting on a person, by todo id. */
+  stuck: ReadonlyMap<string, StuckTodo>;
   spent: ProjectActivityQuery['spent'] | undefined;
   loading: boolean;
 }
@@ -30,21 +35,26 @@ function spendSince(): string {
 }
 
 /**
- * What a project's agents are doing now and have spent lately, polled while
- * the project is on screen. One query serves the header's line and the
- * board's live marks, so the page polls once.
+ * What a project's agents are doing now and have spent lately, and which todos
+ * wait on a person, polled while the project is on screen. One query serves
+ * the header's line and the board's marks, so the page polls once.
  */
 export function useProjectActivity(projectId: string, { skip = false }: { skip?: boolean } = {}): ProjectActivity {
   const since = useMemo(spendSince, []);
   const query = useQuery(ProjectActivityDocument, {
-    variables: { projectId, since },
+    variables: { projectId, project: projectId, since },
     skip,
     pollInterval: skip ? 0 : ACTIVITY_POLL_MS,
     fetchPolicy: 'cache-and-network',
   });
   const rows = query.data?.live;
   const live = useMemo(() => new Map((rows ?? []).map((run) => [run.todoId, run])), [rows]);
-  return { live, spent: query.data?.spent, loading: query.loading };
+  const stations = query.data?.stations.todos;
+  const stuck = useMemo(
+    () => new Map((stations ?? []).filter((todo) => todo.state === 'attention').map((todo) => [todo.todoId, todo])),
+    [stations],
+  );
+  return { live, stuck, spent: query.data?.spent, loading: query.loading };
 }
 
 /** "3 running · 41,200 tokens in 30 days", or nothing before the answer lands. */

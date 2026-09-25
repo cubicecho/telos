@@ -8,6 +8,7 @@ import { instanceAiOn } from '../instance.ts';
 import { findFirstOpenLaneId } from '../lanes.ts';
 import { stampActor } from '../provenance.ts';
 import { mintRunToken } from '../run-tokens.ts';
+import { markRunnerSeen } from '../runner-seen.ts';
 import { expireLapsedRuns, LEASE_SECONDS, readyTodos } from '../stations.ts';
 import { requireAuth } from './auth.ts';
 
@@ -683,6 +684,7 @@ export function applyRunsExtension(schema: GraphQLSchema): GraphQLSchema {
 
   queries.runnerQueue.resolve = async (_parent: unknown, args: { limit?: number | null }, context: Context) => {
     requireSystem(context);
+    markRunnerSeen();
     const limit = Math.max(1, Math.min(args.limit ?? 20, 200));
     return readyTodos(context.db, {}, limit);
   };

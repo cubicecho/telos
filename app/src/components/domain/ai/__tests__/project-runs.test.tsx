@@ -11,6 +11,7 @@ const ACTIVITY: ProjectActivity = {
   live: new Map([
     ['t1', { __typename: 'Run', id: 'r2', todoId: 't1', laneId: 'l1', cancelRequestedAt: null, agent: null }],
   ]),
+  stuck: new Map(),
   spent: {
     __typename: 'RunAggregate',
     count: 12,

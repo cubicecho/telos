@@ -445,7 +445,15 @@ export const ProjectRunsDocument = graphql(`
  * board's live marks and the project header's figures, polled together.
  */
 export const ProjectActivityDocument = graphql(`
-  query ProjectActivity($projectId: UUID!, $since: DateTime!) {
+  query ProjectActivity($projectId: UUID!, $project: ID!, $since: DateTime!) {
+    stations: aiStatus(projectId: $project) {
+      todos {
+        todoId
+        state
+        reason
+        failures
+      }
+    }
     live: runs(where: { projectId: { eq: $projectId }, status: { eq: "running" } }) {
       id
       todoId
@@ -780,5 +788,75 @@ export const VerifyMagicLinkDocument = graphql(`
       token
       userId
     }
+  }
+`);
+
+/** Where every open todo stands with the stations, across the AI projects. */
+export const AiStatusDocument = graphql(`
+  query AiStatus {
+    aiStatus {
+      todos {
+        todoId
+        title
+        projectId
+        laneId
+        state
+        reason
+        failures
+        liveRunId
+      }
+      projects {
+        projectId
+        name
+        lanes {
+          laneId
+          name
+          station
+          isDone
+          attention
+          running
+          blocked
+          queued
+          parked
+          done
+        }
+      }
+      runnerSeenAt
+    }
+  }
+`);
+
+/** Just how many todos need a person, for the sidebar. */
+export const AiAttentionDocument = graphql(`
+  query AiAttention {
+    aiStatus {
+      todos {
+        todoId
+        state
+      }
+    }
+  }
+`);
+
+/** The most recent runs that failed, anywhere. */
+export const RecentFailuresDocument = graphql(`
+  query RecentFailures($since: DateTime!) {
+    runs(
+      where: { status: { eq: "error" }, startedAt: { gte: $since } }
+      orderBy: { startedAt: { direction: desc, priority: 1 } }
+      limit: 10
+    ) {
+      ...RunSummaryFields
+      project {
+        id
+        name
+      }
+    }
+  }
+`);
+
+export const RetryTodoDocument = graphql(`
+  mutation RetryTodo($id: ID!, $reason: String) {
+    retryTodo(id: $id, reason: $reason)
   }
 `);

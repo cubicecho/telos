@@ -1,6 +1,6 @@
 import { Pressable, Text, View } from 'react-native';
 import { AiIgnoredBadge } from '@/components/domain/ai/ai-ignored-badge';
-import type { LiveRun } from '@/components/domain/ai/project-activity';
+import type { LiveRun, StuckTodo } from '@/components/domain/ai/project-activity';
 import { LiveDot } from '@/components/domain/ai/run-log';
 import { LabelBadge } from '@/components/domain/label/label-badge';
 import { DueBadge } from '@/components/domain/todo/due-badge';
@@ -11,6 +11,16 @@ import { cn, HOVER_REVEAL } from '@/lib/utils';
 import { DraggableCard } from './drag-surfaces';
 import type { LaneSummary } from './lane-badge';
 import { LanePicker } from './lane-picker';
+
+/** What the project's agents are doing to the board's cards, and what a person can do about it. */
+export interface BoardAi {
+  /** The run working each todo now, by todo id. */
+  live: ReadonlyMap<string, LiveRun>;
+  /** The todos a station gave up on or finished with, by todo id. */
+  stuck: ReadonlyMap<string, StuckTodo>;
+  onWatch: (todo: TodoSummary) => void;
+  onRetry: (todo: TodoSummary) => void;
+}
 
 /**
  * The card itself, without any knowledge of dragging — the board renders this
@@ -23,7 +33,9 @@ export function BoardCardBody({
   onMove,
   onEdit,
   live,
+  stuck,
   onWatch,
+  onRetry,
   className,
 }: {
   todo: TodoSummary;
@@ -32,7 +44,10 @@ export function BoardCardBody({
   onEdit?: () => void;
   /** The run working this todo now, when one is. */
   live?: LiveRun | undefined;
+  /** Why a station stopped on it, when one did and it waits on a person. */
+  stuck?: StuckTodo | undefined;
   onWatch?: (() => void) | undefined;
+  onRetry?: (() => void) | undefined;
   className?: string;
 }) {
   const done = todo.completedAt != null;
@@ -45,6 +60,7 @@ export function BoardCardBody({
         'group rounded-lg border border-border bg-card px-3 py-2.5 shadow-sm',
         todo.isBlocked && !done && 'opacity-70',
         live && 'border-green-600/60',
+        !live && stuck && 'border-amber-600/60',
         className,
       )}
     >
@@ -127,6 +143,23 @@ export function BoardCardBody({
             </Button>
           ) : null}
         </View>
+      ) : stuck ? (
+        <View className="mt-2 flex-row items-start gap-2">
+          <Text numberOfLines={2} className="min-w-0 flex-1 text-amber-700 text-xs dark:text-amber-400">
+            {stuck.reason ?? 'A station stopped on it.'}
+          </Text>
+          {onRetry ? (
+            <Button
+              variant="ghost"
+              size="xs"
+              className="-my-1 -mr-2"
+              aria-label={`Send “${todo.title}” round again`}
+              onPress={onRetry}
+            >
+              Retry
+            </Button>
+          ) : null}
+        </View>
       ) : null}
     </View>
   );
@@ -139,21 +172,34 @@ export function BoardCard({
   onMove,
   onEdit,
   live,
+  stuck,
   onWatch,
+  onRetry,
 }: {
   todo: TodoSummary;
   lanes: readonly LaneSummary[];
   onMove: (lane: LaneSummary) => void;
   onEdit: () => void;
   live?: LiveRun | undefined;
+  stuck?: StuckTodo | undefined;
   onWatch?: (() => void) | undefined;
+  onRetry?: (() => void) | undefined;
 }) {
   // A blocked card is not draggable — the same choice the row's checkbox makes,
   // disabling the affordance rather than letting it fail — but it stays a drop
   // target, so the cards around it can still be reordered over it.
   return (
     <DraggableCard id={todo.id} laneId={todo.lane?.id} locked={laneLock(todo) != null}>
-      <BoardCardBody todo={todo} lanes={lanes} onMove={onMove} onEdit={onEdit} live={live} onWatch={onWatch} />
+      <BoardCardBody
+        todo={todo}
+        lanes={lanes}
+        onMove={onMove}
+        onEdit={onEdit}
+        live={live}
+        stuck={stuck}
+        onWatch={onWatch}
+        onRetry={onRetry}
+      />
     </DraggableCard>
   );
 }

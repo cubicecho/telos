@@ -258,6 +258,7 @@ export default function ProjectScreen() {
                         lanes={lanes}
                         todos={todos}
                         live={activity.live}
+                        stuck={activity.stuck}
                       />
                     )}
                   </View>

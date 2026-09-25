@@ -1,10 +1,11 @@
-import { useQuery } from '@apollo/client';
+import { useMutation, useQuery } from '@apollo/client';
 import { useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
 import { DialogLayout } from '@/components/dialog-layout';
+import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { describeError } from '@/lib/errors';
-import { RunDocument } from '@/lib/graphql';
+import { CancelRunDocument, RunDocument } from '@/lib/graphql';
 import type { LiveRun } from './project-activity';
 import { describeRun, RUN_STATUS, RunLog, RunStatusBadge } from './run-log';
 import { RUN_POLL_MS } from './run-row';
@@ -47,6 +48,7 @@ export function WatchRunDialog({
   const run = query.data?.run;
   const running = run?.status === 'running';
   const { startPolling, stopPolling } = query;
+  const [cancelRun, cancelState] = useMutation(CancelRunDocument);
 
   useEffect(() => {
     if (open && running) startPolling(pollMs);
@@ -65,8 +67,26 @@ export function WatchRunDialog({
           ? `${run.lane?.name ?? 'A deleted lane'} · ${run.agent?.name ?? 'a deleted agent'} · ${describeRun(run)}`
           : 'Waiting for the run…'
       }
+      footer={
+        run && running ? (
+          run.cancelRequestedAt ? (
+            <Text className="text-muted-foreground text-sm">Stopping…</Text>
+          ) : (
+            <Button
+              variant="outline"
+              disabled={cancelState.loading}
+              onPress={() => cancelRun({ variables: { id: run.id } }).catch(() => undefined)}
+            >
+              Stop
+            </Button>
+          )
+        ) : undefined
+      }
       content={
         <View className="gap-3">
+          {cancelState.error ? (
+            <Text className="text-destructive text-sm">{describeError(cancelState.error)}</Text>
+          ) : null}
           {moved ? (
             <Text aria-live="polite" className="text-muted-foreground text-sm">
               {moved}

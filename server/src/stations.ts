@@ -150,3 +150,176 @@ export async function cancelRunsUnder(
       ${sql.join(narrow, sql` `)}
   `);
 }
+
+/** Where a todo stands with the stations, for a person reading the board. */
+export type StationState = 'attention' | 'running' | 'blocked' | 'queued' | 'parked' | 'done';
+
+export interface StationTodo {
+  todoId: string;
+  title: string;
+  projectId: string;
+  laneId: string | null;
+  state: StationState;
+  /** Why it is where it is, when that needs saying. */
+  reason: string | null;
+  /** Failed runs since a person last touched it. */
+  failures: number;
+  /** The run working it now, if one is. */
+  liveRunId: string | null;
+}
+
+export interface LaneTally {
+  projectId: string;
+  laneId: string;
+  done: number;
+}
+
+/**
+ * Every open todo in the user's AI projects, and where it stands: the same
+ * rules `readyTodos` applies, read back as a reason instead of a filter.
+ *
+ *   - running: a run holds it now
+ *   - parked: no station will ever pick it up where it is (no lane, no agent,
+ *     AI told to ignore it, an expand lane with nowhere to put what it makes)
+ *   - attention: a station gave up on it (more failures than the lane allows)
+ *     or finished with it and has nowhere to send it
+ *   - blocked: it waits on something unfinished
+ *   - queued: a station will start on it when there is room
+ *
+ * Done todos are only counted, per lane: there can be many, and none of them
+ * needs anything.
+ *
+ * @param db The database.
+ * @param userId Whose todos.
+ * @param projectId Narrows it to one project.
+ * @returns The open todos, in board order, and the done counts.
+ */
+export async function stationStates(
+  db: AnyDb,
+  userId: string,
+  projectId?: string | null,
+): Promise<{ todos: StationTodo[]; done: LaneTally[] }> {
+  const project = projectId ? sql`AND p.id = ${projectId}` : sql``;
+  const open = resultRows<{
+    todo_id: string;
+    title: string;
+    project_id: string;
+    lane_id: string | null;
+    lane_name: string | null;
+    has_agent: boolean;
+    ai_ignored: boolean;
+    barren_expand: boolean;
+    max_attempts: number | null;
+    failures: number;
+    finished_here: boolean;
+    last_failure: string | null;
+    blockers: string | null;
+    live_run_id: string | null;
+  }>(
+    await db.execute(sql`
+      WITH base AS (
+        SELECT
+          t.id, t.title, t.project_id, t.lane_id, t.ai_ignored, t.position, t.created_at,
+          l.name AS lane_name, l.position AS lane_position, l.agent_id IS NOT NULL AS has_agent,
+          (l.contract = 'expand' AND l.on_success_lane_id IS NULL) AS barren_expand,
+          l.max_attempts,
+          (SELECT max(e.at) FROM todo_events e WHERE e.todo_id = t.id AND e.actor_kind = 'user') AS touched,
+          coalesce(
+            (SELECT max(e.at) FROM todo_events e WHERE e.todo_id = t.id AND e.to_lane_id = l.id),
+            t.created_at
+          ) AS arrived
+        FROM todos t
+        JOIN projects p ON p.id = t.project_id
+        LEFT JOIN lanes l ON l.id = t.lane_id
+        WHERE t.user_id = ${userId} AND p.ai_enabled AND p.archived_at IS NULL
+          AND t.completed_at IS NULL AND NOT coalesce(l.is_done, false)
+          ${project}
+      )
+      SELECT
+        b.id AS todo_id, b.title, b.project_id, b.lane_id, b.lane_name,
+        coalesce(b.has_agent, false) AS has_agent, b.ai_ignored,
+        coalesce(b.barren_expand, false) AS barren_expand, b.max_attempts,
+        (
+          SELECT count(*)::int FROM runs r
+          WHERE r.todo_id = b.id AND (r.status = 'error' OR r.verdict = 'fail')
+            AND r.started_at > coalesce(b.touched, '-infinity'::timestamptz)
+        ) AS failures,
+        EXISTS (
+          SELECT 1 FROM runs r
+          WHERE r.todo_id = b.id AND r.lane_id = b.lane_id AND r.status = 'ok' AND r.started_at >= b.arrived
+        ) AS finished_here,
+        (
+          SELECT coalesce(r.error, r.output) FROM runs r
+          WHERE r.todo_id = b.id AND (r.status = 'error' OR r.verdict = 'fail')
+          ORDER BY r.started_at DESC LIMIT 1
+        ) AS last_failure,
+        (
+          SELECT string_agg(d2.title, ', ' ORDER BY d2.title) FROM todo_dependencies d
+          JOIN todos d2 ON d2.id = d.depends_on_todo_id
+          WHERE d.todo_id = b.id AND d2.completed_at IS NULL
+        ) AS blockers,
+        (
+          SELECT r.id FROM runs r
+          WHERE r.todo_id = b.id AND r.status = 'running' AND r.lease_expires_at > now()
+          ORDER BY r.started_at DESC LIMIT 1
+        ) AS live_run_id
+      FROM base b
+      ORDER BY b.project_id, b.lane_position NULLS LAST, b.position, b.created_at
+    `),
+  );
+
+  const todos = open.map((row): StationTodo => {
+    const [state, reason] = judge(row);
+    return {
+      todoId: row.todo_id,
+      title: row.title,
+      projectId: row.project_id,
+      laneId: row.lane_id,
+      state,
+      reason,
+      failures: Number(row.failures),
+      liveRunId: row.live_run_id,
+    };
+  });
+
+  const done = resultRows<{ project_id: string; lane_id: string; done: number }>(
+    await db.execute(sql`
+      SELECT t.project_id, t.lane_id, count(*)::int AS done
+      FROM todos t
+      JOIN projects p ON p.id = t.project_id
+      JOIN lanes l ON l.id = t.lane_id
+      WHERE t.user_id = ${userId} AND p.ai_enabled AND p.archived_at IS NULL
+        AND (t.completed_at IS NOT NULL OR l.is_done)
+        ${project}
+      GROUP BY t.project_id, t.lane_id
+    `),
+  ).map((row) => ({ projectId: row.project_id, laneId: row.lane_id, done: Number(row.done) }));
+
+  return { todos, done };
+}
+
+function judge(row: {
+  lane_id: string | null;
+  lane_name: string | null;
+  has_agent: boolean;
+  ai_ignored: boolean;
+  barren_expand: boolean;
+  max_attempts: number | null;
+  failures: number;
+  finished_here: boolean;
+  last_failure: string | null;
+  blockers: string | null;
+  live_run_id: string | null;
+}): [StationState, string | null] {
+  if (row.live_run_id) return ['running', null];
+  if (!row.lane_id) return ['parked', 'It is in no lane.'];
+  if (row.ai_ignored) return ['parked', 'AI is told to ignore it.'];
+  if (!row.has_agent) return ['parked', `${row.lane_name} has no agent.`];
+  if (row.barren_expand) return ['parked', `${row.lane_name} splits todos but has nowhere to put the pieces.`];
+  if (Number(row.failures) > (row.max_attempts ?? 0)) {
+    return ['attention', row.last_failure?.trim() || `It failed ${row.failures} times.`];
+  }
+  if (row.finished_here) return ['attention', `${row.lane_name} finished with it and has nowhere to send it.`];
+  if (row.blockers) return ['blocked', `Waiting on ${row.blockers}.`];
+  return ['queued', null];
+}

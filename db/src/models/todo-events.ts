@@ -5,7 +5,7 @@ import { type ActorKindValue, todoNotes } from './todo-notes.ts';
 import { todos } from './todos.ts';
 import { users } from './users.ts';
 
-export const TODO_EVENT_KINDS = ['create', 'move', 'complete', 'reopen', 'edit'] as const;
+export const TODO_EVENT_KINDS = ['create', 'move', 'complete', 'reopen', 'edit', 'retry'] as const;
 export type TodoEventKind = (typeof TODO_EVENT_KINDS)[number];
 
 // A todo's history. Nothing in the server inserts here: the `todos_history`
