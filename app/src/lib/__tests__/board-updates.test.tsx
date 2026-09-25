@@ -9,19 +9,17 @@ const project = (name: string) => ({
   request: { query: ProjectDocument, variables: { id: 'p1' } },
   result: {
     data: {
-      project: [
-        {
-          __typename: 'Project',
-          id: 'p1',
-          name,
-          description: null,
-          createdAt: '2026-09-25T10:00:00.000Z',
-          todoCount: 0,
-          openTodoCount: 0,
-          aiEnabled: false,
-          labels: [],
-        },
-      ],
+      project: {
+        __typename: 'Project',
+        id: 'p1',
+        name,
+        description: null,
+        createdAt: '2026-09-25T10:00:00.000Z',
+        todoCount: 0,
+        openTodoCount: 0,
+        aiEnabled: false,
+        labels: [],
+      },
     },
   },
 });
@@ -29,7 +27,7 @@ const project = (name: string) => ({
 function Watched() {
   useBoardUpdates('p1', 10);
   const { data } = useQuery(ProjectDocument, { variables: { id: 'p1' } });
-  return <p>{data?.project?.[0]?.name ?? 'loading'}</p>;
+  return <p>{data?.project?.name ?? 'loading'}</p>;
 }
 
 describe('useBoardUpdates', () => {
