@@ -1,13 +1,14 @@
 import { useQuery } from '@apollo/client';
 import { Link, usePathname } from 'expo-router';
-import { useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { useCallback, useState } from 'react';
+import { Platform, Pressable, Text, View } from 'react-native';
 import { Activity, LogOut } from '@/components/app-icons';
 import { useAttentionCount } from '@/components/domain/ai/ai-status';
 import { ProjectFormDialog } from '@/components/domain/project/project-form-dialog';
+import { TodoSearch, useSearchShortcut } from '@/components/domain/todo/todo-search';
 import { Sidebar as SidebarFrame, SidebarNavItem, SidebarSection } from '@/components/sidebar';
 import { Button } from '@/components/ui/button';
-import { Plus, Settings } from '@/components/ui/icons';
+import { Plus, Search, Settings } from '@/components/ui/icons';
 import { LoadState } from '@/components/ui/load-failure';
 import { useAi } from '@/lib/ai';
 import { clearToken } from '@/lib/auth';
@@ -18,6 +19,8 @@ export function Sidebar() {
   const pathname = usePathname();
   const projectsQuery = useQuery(ProjectsDocument);
   const [creating, setCreating] = useState(false);
+  const [searching, setSearching] = useState(false);
+  useSearchShortcut(useCallback(() => setSearching(true), []));
   const projects = projectsQuery.data?.projects ?? [];
   const ai = useAi();
   const attention = useAttentionCount();
@@ -78,6 +81,16 @@ export function Sidebar() {
         }
         footer={
           <>
+            <Pressable
+              role="button"
+              onPress={() => setSearching(true)}
+              aria-label="Search todos"
+              className="min-h-8 flex-row items-center gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-sidebar-accent"
+            >
+              <Search className="size-4 text-sidebar-foreground" />
+              <Text className="flex-1 text-sidebar-foreground text-sm">Search</Text>
+              {Platform.OS === 'web' ? <Text className="text-muted-foreground text-xs">Ctrl K</Text> : null}
+            </Pressable>
             {ai.on ? (
               <Link href="/stations" asChild>
                 <SidebarNavItem
@@ -106,6 +119,7 @@ export function Sidebar() {
         }
       />
       <ProjectFormDialog open={creating} onOpenChange={setCreating} />
+      <TodoSearch open={searching} onOpenChange={setSearching} />
     </>
   );
 }

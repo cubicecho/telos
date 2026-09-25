@@ -983,3 +983,19 @@ export const DeleteBoardTemplateDocument = graphql(`
     }
   }
 `);
+
+export const SearchTodosDocument = graphql(`
+  query SearchTodos($text: String!) {
+    todos(
+      where: { OR: [{ title: { iContains: $text } }, { notes: { iContains: $text } }] }
+      orderBy: { updatedAt: { direction: desc, priority: 1 } }
+      limit: 20
+    ) {
+      ...TodoFields
+      project {
+        id
+        name
+      }
+    }
+  }
+`);
