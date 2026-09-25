@@ -1,11 +1,14 @@
-import { useQuery } from '@apollo/client';
-import { useEffect } from 'react';
+import { useMutation, useQuery } from '@apollo/client';
+import { type ReactNode, useEffect, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import type { ArtifactFieldsFragment } from '@/__generated__/graphql';
 import { MessageSquare } from '@/components/app-icons';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Trash2 } from '@/components/ui/icons';
 import { LoadState } from '@/components/ui/load-failure';
-import { TodoRunsDocument } from '@/lib/graphql';
+import { describeError } from '@/lib/errors';
+import { DeleteArtifactDocument, TodoRunsDocument } from '@/lib/graphql';
 import { RUN_POLL_MS, RunRow } from './run-row';
 
 // A todo's runs — each time a station's agent worked it — and the artifacts
@@ -87,6 +90,11 @@ export function noteIdOf(artifact: Pick<ArtifactFieldsFragment, 'location'>): st
   return artifact.location.startsWith(NOTE_LOCATION) ? artifact.location.slice(NOTE_LOCATION.length) || null : null;
 }
 
+/**
+ * One artifact: a note on the card as a way into the thread, anything else as
+ * where it lives. Either can be taken off the board, which removes the link and
+ * leaves what it points at wherever it was stored.
+ */
 export function ArtifactRow({
   artifact,
   todoTitle,
@@ -96,46 +104,87 @@ export function ArtifactRow({
   todoTitle?: string;
   onOpenNote?: (noteId: string) => void;
 }) {
+  const [deleteArtifact, { loading: removing }] = useMutation(DeleteArtifactDocument);
+  const [error, setError] = useState<string | null>(null);
   const noteId = noteIdOf(artifact);
+  const label = noteId ? artifact.title || 'A note' : artifact.title || artifact.location;
+
+  async function remove() {
+    setError(null);
+    try {
+      await deleteArtifact({
+        variables: { id: artifact.id },
+        update(cache) {
+          cache.evict({ id: cache.identify({ __typename: 'Artifact', id: artifact.id }) });
+          cache.gc();
+        },
+      });
+    } catch (cause) {
+      setError(describeError(cause));
+    }
+  }
+
+  let body: ReactNode;
   if (noteId) {
     // A note is already on the card, so it is a way into the thread rather
     // than a location nobody can open.
-    const label = artifact.title || 'A note';
     const where = [todoTitle, 'Note on the card'].filter(Boolean).join(' · ');
-    return (
-      <View role="listitem">
-        <Pressable
-          role="link"
-          aria-label={`${label}, ${where}`}
-          disabled={!onOpenNote}
-          onPress={() => onOpenNote?.(noteId)}
-          className="flex-row items-center gap-2 rounded-lg border border-border px-3 py-2 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          <MessageSquare className="h-4 w-4 text-muted-foreground" />
-          <View className="min-w-0 flex-1 gap-0.5">
-            <Text numberOfLines={1} className="text-foreground text-sm">
-              {label}
-            </Text>
-            <Text numberOfLines={1} className="text-muted-foreground text-xs">
-              {where}
-            </Text>
-          </View>
-        </Pressable>
-      </View>
+    body = (
+      <Pressable
+        role="link"
+        aria-label={`${label}, ${where}`}
+        disabled={!onOpenNote}
+        onPress={() => onOpenNote?.(noteId)}
+        className="min-w-0 flex-1 flex-row items-center gap-2 rounded-sm hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <MessageSquare className="h-4 w-4 text-muted-foreground" />
+        <View className="min-w-0 flex-1 gap-0.5">
+          <Text numberOfLines={1} className="text-foreground text-sm">
+            {label}
+          </Text>
+          <Text numberOfLines={1} className="text-muted-foreground text-xs">
+            {where}
+          </Text>
+        </View>
+      </Pressable>
+    );
+  } else {
+    body = (
+      <>
+        <View className="min-w-0 flex-1 gap-0.5">
+          <Text numberOfLines={1} className="text-foreground text-sm">
+            {label}
+          </Text>
+          <Text numberOfLines={1} className="text-muted-foreground text-xs">
+            {[todoTitle, artifact.title ? artifact.location : null, artifact.mediaType].filter(Boolean).join(' · ')}
+          </Text>
+        </View>
+        <Badge variant="outline">{artifact.action}</Badge>
+        <Badge variant="secondary">{artifact.source}</Badge>
+      </>
     );
   }
+
   return (
-    <View role="listitem" className="flex-row items-center gap-2 rounded-lg border border-border px-3 py-2">
-      <View className="min-w-0 flex-1 gap-0.5">
-        <Text numberOfLines={1} className="text-foreground text-sm">
-          {artifact.title || artifact.location}
-        </Text>
-        <Text numberOfLines={1} className="text-muted-foreground text-xs">
-          {[todoTitle, artifact.title ? artifact.location : null, artifact.mediaType].filter(Boolean).join(' · ')}
-        </Text>
+    <View role="listitem" className="gap-1 rounded-lg border border-border px-3 py-2">
+      <View className="flex-row items-center gap-2">
+        {body}
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          className="hover:text-destructive"
+          disabled={removing}
+          aria-label={`Remove ${label} from the board`}
+          onPress={remove}
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
       </View>
-      <Badge variant="outline">{artifact.action}</Badge>
-      <Badge variant="secondary">{artifact.source}</Badge>
+      {error ? (
+        <Text className="text-destructive text-sm" aria-live="polite">
+          {error}
+        </Text>
+      ) : null}
     </View>
   );
 }

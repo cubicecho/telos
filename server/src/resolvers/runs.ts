@@ -171,6 +171,8 @@ const RUNS_SDL = parse(`
     cancelRun(id: ID!): Run!
     "Deletes a finished run and its log. What it did to the todo, its notes and history, stays."
     deleteRun(id: ID!): Boolean!
+    "Takes an artifact off the board: the link, not what it points at, which stays wherever it was stored. A person's only."
+    deleteArtifact(id: ID!): Boolean!
   }
 `);
 
@@ -800,6 +802,21 @@ export function applyRunsExtension(schema: GraphQLSchema): GraphQLSchema {
       throw new GraphQLError('Stop the run before deleting it.', { extensions: { code: 'CONFLICT' } });
     }
     await db.delete(dbSchema.runs).where(eq(dbSchema.runs.id, run.id));
+    return true;
+  };
+
+  // A person's, like watching a board: what a run made is theirs to tidy, and
+  // an agent that could remove it could hide what it did.
+  mutations.deleteArtifact.resolve = async (_parent: unknown, args: { id: string }, context: Context) => {
+    const userId = requireAuth(context);
+    if (context.actor.kind !== 'user') {
+      throw new GraphQLError('Only a person can remove an artifact.', { extensions: { code: 'FORBIDDEN' } });
+    }
+    const removed = await (context.db as AnyRow)
+      .delete(dbSchema.artifacts)
+      .where(and(eq(dbSchema.artifacts.id, args.id), eq(dbSchema.artifacts.userId, userId)))
+      .returning({ id: dbSchema.artifacts.id });
+    if (removed.length === 0) throw notFound('Artifact');
     return true;
   };
 

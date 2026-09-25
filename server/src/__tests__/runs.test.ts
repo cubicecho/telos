@@ -557,6 +557,28 @@ describe('what a run shows as it goes, and leaves behind', () => {
 
     const mutations = await board.person.expectOk(`query { __type(name: "Mutation") { fields { name } } }`);
     const names: string[] = mutations.__type.fields.map((field: { name: string }) => field.name);
-    expect(names.filter((name) => /artifact/i.test(name))).toEqual([]);
+    expect(names.filter((name) => /artifact/i.test(name))).toEqual(['deleteArtifact']);
+  });
+
+  it('lets the owner take an artifact off the board, and no one else', async () => {
+    const todoId = await board.addTodo('Write it');
+    const { runId } = await claim(todoId);
+    await finish(runId, {
+      status: 'ok',
+      output: 'Done.',
+      artifacts: [{ location: '/work/plan.md', source: 'declared' }],
+    });
+    const [artifact] = await db.select().from(dbSchema.artifacts);
+    const DELETE = `mutation ($id: ID!) { deleteArtifact(id: $id) }`;
+
+    const stranger = await createBoard(db, 'stranger@example.com');
+    expect((await stranger.person.expectError(DELETE, { id: artifact.id })).code).toBe('NOT_FOUND');
+    const agent = createClient(db, board.userId, { ai: true, actor: { kind: 'agent', userId: board.userId, runId } });
+    expect((await agent.expectError(DELETE, { id: artifact.id })).code).toBe('FORBIDDEN');
+    expect((await board.person.expectOk(DELETE, { id: artifact.id })).deleteArtifact).toBe(true);
+    expect(await db.select().from(dbSchema.artifacts)).toEqual([]);
+    expect((await board.person.expectError(DELETE, { id: artifact.id })).code).toBe('NOT_FOUND');
+    // The run that made it is untouched.
+    expect(await runsOf(todoId)).toHaveLength(1);
   });
 });

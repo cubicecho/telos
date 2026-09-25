@@ -475,6 +475,13 @@ export const DeleteRunDocument = graphql(`
   }
 `);
 
+/** Takes an artifact off the board. What it points at stays where it was stored. */
+export const DeleteArtifactDocument = graphql(`
+  mutation DeleteArtifact($id: ID!) {
+    deleteArtifact(id: $id)
+  }
+`);
+
 /** One run, for a view that follows it as it goes. */
 export const RunDocument = graphql(`
   query Run($id: UUID!) {

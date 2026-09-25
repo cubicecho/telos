@@ -2,7 +2,7 @@ import { MockedProvider } from '@apollo/client/testing';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { CancelRunDocument, DeleteRunDocument, TodoRunsDocument } from '@/lib/graphql';
+import { CancelRunDocument, DeleteArtifactDocument, DeleteRunDocument, TodoRunsDocument } from '@/lib/graphql';
 import { TodoRuns } from '../todo-runs';
 import { fullRun, run, runMock } from './run-fixtures';
 
@@ -201,5 +201,36 @@ describe('TodoRuns', () => {
     expect(screen.queryByText('detected')).not.toBeInTheDocument();
     await user.click(link);
     expect(onOpenNote).toHaveBeenCalledWith('n1');
+  });
+
+  it('takes an artifact off the board', async () => {
+    const user = userEvent.setup();
+    const remove = vi.fn(() => ({ data: { deleteArtifact: true } }));
+    show([
+      runs(
+        [],
+        [
+          {
+            __typename: 'Artifact',
+            id: 'x1',
+            location: 'quinton_lucas_bio.txt',
+            source: 'declared',
+            action: 'created',
+            serverSlug: null,
+            tool: null,
+            title: 'Biography',
+            description: null,
+            mediaType: 'text/plain',
+            sizeBytes: null,
+            createdAt: '2026-09-24T10:00:30.000Z',
+          },
+        ],
+      ),
+      { request: { query: DeleteArtifactDocument, variables: { id: 'x1' } }, result: remove },
+    ]);
+
+    await user.click(await screen.findByRole('button', { name: 'Remove Biography from the board' }));
+    await waitFor(() => expect(remove).toHaveBeenCalled());
+    await waitFor(() => expect(screen.queryByText('Biography')).not.toBeInTheDocument());
   });
 });

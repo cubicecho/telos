@@ -146,7 +146,8 @@ export const contextValues: NonNullable<BuildSchemaConfig['contextValues']> = {
  * `todos_history` trigger's, and history nobody can edit is the point of it.
  * `runs` belong to the runner's mutations (resolvers/runs.ts): a run is
  * claimed, renewed and finished, and a person may only ask one to stop.
- * `artifacts` are what a finished run reports, and only `finishRun` writes them.
+ * `artifacts` are what a finished run reports, and only `finishRun` writes them;
+ * a person may take one off the board (`deleteArtifact`), and nothing else.
  * `drafts` and their messages are a conversation (resolvers/drafts.ts): the
  * person says something and the runner answers, and neither is edited after.
  */
