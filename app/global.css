@@ -1,97 +1,24 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+/*
+  The palette comes from cubeui's `tokens` item (`cubeui-tokens.css`, generated —
+  do not edit it here; re-run `npx shadcn add @cubeui/tokens` to update it). It
+  brings Tailwind 4, NativeWind's theme, the light/dark tokens (sidebar included),
+  the `box-sizing` reset raw DOM controls need, and the `html.dark` /
+  `html.light` blocks that let the Settings theme picker beat the system
+  appearance: cubeui's `useThemePreference` (and the pre-paint script in
+  `public/index.html`) put one of those classes on <html>.
 
-@layer base {
-  /*
-    The shared palette, kept in step with the other cubicecho apps (see the
-    `index.css` those ship). They are on Tailwind v4 and state it in oklch;
-    NativeWind pins this app to v3, whose colour plumbing is
-    `hsl(var(--token))`, so the same colours are written here as HSL triples.
-    Same values, different notation — change one and change the other.
+  What follows is only what the registry does not cover: the page's own colours.
+*/
+@import "./cubeui-tokens.css";
 
-    Two dark tokens are the exception: `--border` and `--input` are white at 10%
-    and 15% there, and this app's tokens carry no alpha channel, so they are
-    composited over the dark background instead.
-  */
-  :root {
-    --background: 0 0% 100%;
-    --foreground: 0 0% 4%;
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 4%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 4%;
-    --primary: 0 0% 9%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 0 0% 96%;
-    --secondary-foreground: 0 0% 9%;
-    --muted: 0 0% 96%;
-    --muted-foreground: 0 0% 45%;
-    --accent: 0 0% 96%;
-    --accent-foreground: 0 0% 9%;
-    --destructive: 357 100% 45%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 90%;
-    --input: 0 0% 90%;
-    --ring: 0 0% 63%;
-    --sidebar: 0 0% 98%;
-    --sidebar-foreground: 0 0% 4%;
-    --sidebar-accent: 0 0% 96%;
-    --sidebar-accent-foreground: 0 0% 9%;
-    --sidebar-border: 0 0% 90%;
-    --radius: 0.625rem;
-  }
-
-  .dark {
-    --background: 0 0% 4%;
-    --foreground: 0 0% 98%;
-    --card: 0 0% 9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 0 0% 9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 90%;
-    --primary-foreground: 0 0% 9%;
-    --secondary: 0 0% 15%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 15%;
-    --muted-foreground: 0 0% 63%;
-    --accent: 0 0% 15%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 359 100% 70%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 14%;
-    --input: 0 0% 18%;
-    --ring: 0 0% 45%;
-    --sidebar: 0 0% 9%;
-    --sidebar-foreground: 0 0% 98%;
-    --sidebar-accent: 0 0% 15%;
-    --sidebar-accent-foreground: 0 0% 98%;
-    --sidebar-border: 0 0% 14%;
-  }
+html,
+body {
+  background-color: var(--background);
+  color: var(--foreground);
 }
 
-@layer base {
-  * {
-    @apply border-border;
-    scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
-    scrollbar-width: thin;
-  }
-  body {
-    @apply bg-background text-foreground font-sans;
-  }
-
-  ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
-  }
-  ::-webkit-scrollbar-track {
-    background: transparent;
-  }
-  ::-webkit-scrollbar-thumb {
-    background: hsl(var(--muted-foreground) / 0.3);
-    border-radius: 9999px;
-  }
-  ::-webkit-scrollbar-thumb:hover {
-    background: hsl(var(--muted-foreground) / 0.5);
-  }
+* {
+  border-color: var(--border);
+  scrollbar-color: color-mix(in srgb, var(--muted-foreground) 30%, transparent) transparent;
+  scrollbar-width: thin;
 }

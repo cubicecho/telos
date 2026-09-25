@@ -4,7 +4,7 @@
   "rsc": false,
   "tsx": true,
   "tailwind": {
-    "config": "tailwind.config.js",
+    "config": "",
     "css": "global.css",
     "baseColor": "neutral",
     "cssVariables": true,
@@ -19,5 +19,7 @@
     "lib": "@/lib",
     "hooks": "@/hooks"
   },
-  "registries": {}
+  "registries": {
+    "@cubeui": "https://cubicecho.github.io/cubeui/r/native/{name}.json"
+  }
 }

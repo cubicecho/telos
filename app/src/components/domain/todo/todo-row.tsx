@@ -1,23 +1,15 @@
 import { type ApolloCache, useMutation } from '@apollo/client';
-import { Pencil, Trash2 } from 'lucide-react';
 import { useState } from 'react';
+import { Pressable, Text, View, type ViewProps } from 'react-native';
 import { LabelBadge, type LabelSummary } from '@/components/domain/label/label-badge';
 import { LabelPicker } from '@/components/domain/label/label-picker';
 import { LaneBadge } from '@/components/domain/lane/lane-badge';
 import { LanePicker } from '@/components/domain/lane/lane-picker';
 import { useMoveTodo } from '@/components/domain/lane/use-move-todo';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { Pencil, Trash2 } from '@/components/ui/icons';
 import { bumpProjectCounts, type CachedLane, laneForCompletion, updateProjectTodos } from '@/lib/cache';
 import { describeError } from '@/lib/errors';
 import {
@@ -31,7 +23,7 @@ import {
 } from '@/lib/graphql';
 import { isTyping } from '@/lib/hotkeys';
 import { laneLock } from '@/lib/lanes';
-import { cn } from '@/lib/utils';
+import { cn, HOVER_REVEAL } from '@/lib/utils';
 import { DependencyPicker } from './dependency-picker';
 import { DueBadge } from './due-badge';
 import { TodoFormDialog } from './todo-form-dialog';
@@ -160,102 +152,107 @@ export function TodoRow({
     );
   }
 
+  function onRowKeyDown(event: KeyboardEvent) {
+    if (event.key !== 'e' || event.metaKey || event.ctrlKey || event.altKey) return;
+    if (isTyping(event.target)) return;
+    event.preventDefault();
+    setEditing(true);
+  }
+
   return (
     // `e` edits, scoped to the row rather than the document, because "the
     // focused todo" is a fact only the row knows. Any focused child counts —
     // the checkbox, the title, an action — since all of them are unambiguously
     // *this* todo. Radix portals its popovers out of here, so an open picker
-    // never sees it.
+    // never sees it. (`onKeyDown` is web-only; react-native-web forwards it to
+    // the `<div>`, and there is no hardware-key equivalent on device.)
     // `role="group"` because that is what the row is — a named cluster of
-    // controls acting on one todo — and it is what lets the key handler sit
-    // here without pretending the div is a control of its own. Not the
-    // `<fieldset>` the linter suggests: that groups form inputs under a legend,
-    // and this is a row of a list.
-    // biome-ignore lint/a11y/useSemanticElements: see above
-    <div
+    // controls acting on one todo.
+    <View
       role="group"
       aria-label={todo.title}
-      onKeyDown={(event) => {
-        if (event.key !== 'e' || event.metaKey || event.ctrlKey || event.altKey) return;
-        if (isTyping(event.target)) return;
-        event.preventDefault();
-        setEditing(true);
-      }}
-      className={cn('group rounded-lg border bg-card px-3 py-2.5', todo.isBlocked && !done && 'opacity-70')}
+      // Spread and cast because React Native's `ViewProps` does not declare the
+      // DOM keyboard props react-native-web forwards.
+      {...({ onKeyDown: onRowKeyDown } as ViewProps)}
+      className={cn(
+        'group rounded-lg border border-border bg-card px-3 py-2.5',
+        todo.isBlocked && !done && 'opacity-70',
+      )}
     >
-      <div className="flex items-start gap-3">
+      <View className="flex-row items-start gap-3">
         <Checkbox
           checked={done}
           // A blocked todo's checkbox is disabled rather than hidden: the row
           // still says why, and the affordance stays where the eye expects it.
           disabled={todo.isBlocked && !done}
-          onCheckedChange={(checked) => toggleDone(checked === true)}
-          aria-label={done ? `Reopen ${todo.title}` : `Complete ${todo.title}`}
+          onCheckedChange={toggleDone}
+          accessibilityLabel={done ? `Reopen ${todo.title}` : `Complete ${todo.title}`}
+          className="mt-0.5"
         />
 
-        <div className="min-w-0 flex-1">
-          {/* `leading-5` pins the first line's height to the checkbox's, so the
-              two agree even if a theme changes the base line height. */}
+        <View className="min-w-0 flex-1">
           {/* The lane sits with the title rather than below it, so the list
               reads as one line per todo and still says which column it is in. */}
-          <div className="flex items-start gap-2">
-            {/* A button rather than a <p>: the title is how a todo is opened,
+          <View className="flex-row items-start gap-2">
+            {/* Pressable rather than text: the title is how a todo is opened,
                 and until it was one it was not reachable by keyboard at all.
                 Styled flat so the row still reads as text — the affordance is
                 the hover underline and the focus ring, not a control. */}
-            <button
-              type="button"
-              onClick={() => setEditing(true)}
-              className={cn(
-                'min-w-0 flex-1 rounded-sm text-left text-sm leading-5 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1',
-                done && 'text-muted-foreground line-through',
-              )}
+            <Pressable
+              role="button"
+              onPress={() => setEditing(true)}
+              className="min-w-0 flex-1 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
             >
-              {todo.title}
-            </button>
+              <Text
+                className={cn(
+                  'text-foreground text-sm leading-5 hover:underline',
+                  done && 'text-muted-foreground line-through',
+                )}
+              >
+                {todo.title}
+              </Text>
+            </Pressable>
             <DueBadge dueAt={todo.dueAt} done={done} className="mt-px" />
             {todo.lane && !todo.lane.isDone ? <LaneBadge lane={todo.lane} className="mt-px" /> : null}
-          </div>
+          </View>
 
           {/* One line of the notes, because their presence is otherwise
               invisible — a todo with a paragraph behind it looks exactly like
               one without. */}
-          {todo.notes ? <p className="mt-1 truncate text-muted-foreground text-xs">{todo.notes}</p> : null}
+          {todo.notes ? (
+            <Text numberOfLines={1} className="mt-1 text-muted-foreground text-xs">
+              {todo.notes}
+            </Text>
+          ) : null}
 
           {todo.isBlocked && !done ? (
-            <p className="mt-1 text-muted-foreground text-xs">
+            <Text className="mt-1 text-muted-foreground text-xs">
               Blocked by {todo.blockedBy.map((blocker) => blocker.title).join(', ')}
-            </p>
+            </Text>
           ) : null}
 
           {todo.labels.length > 0 ? (
-            <div className="mt-2 flex flex-wrap gap-1">
+            <View className="mt-2 flex-row flex-wrap gap-1">
               {todo.labels.map((label) => (
                 <LabelBadge key={label.id} label={label} onRemove={() => toggleLabel(label, false)} />
               ))}
-            </div>
+            </View>
           ) : null}
 
           {actionError ? (
-            <p className="mt-1 text-destructive text-xs" aria-live="polite">
+            <Text className="mt-1 text-destructive text-xs" aria-live="polite">
               {actionError}
-            </p>
+            </Text>
           ) : null}
-        </div>
+        </View>
 
         {/* Every action the row offers, in one cluster that appears together on
-            hover. `has-[[data-state=open]]` keeps it visible while a picker's
-            popover is open: Radix renders that panel in a portal, so
-            `focus-within` alone would let the cluster fade out from under the
-            panel the reader is using. */}
-        <div className="flex h-5 shrink-0 items-center opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100 has-[[data-state=open]]:opacity-100">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 text-muted-foreground"
-            onClick={() => setEditing(true)}
-            aria-label={`Edit ${todo.title}`}
-          >
+            hover or focus (`HOVER_REVEAL` — always shown off web). An open
+            picker's popover is portalled, so the cluster may fade behind it;
+            the old `has-[[data-state=open]]` guard read a radix attribute that
+            react-native-web does not forward onto a `Pressable`. */}
+        <View className={cn('h-5 shrink-0 flex-row items-center focus-within:opacity-100', HOVER_REVEAL)}>
+          <Button variant="ghost" size="icon-xs" onPress={() => setEditing(true)} aria-label={`Edit ${todo.title}`}>
             <Pencil className="h-4 w-4" />
           </Button>
           <LanePicker
@@ -264,49 +261,37 @@ export function TodoRow({
             onSelect={moveToLane}
             lockedReason={laneLock(todo)}
             align="end"
-            className="h-8 w-8"
+            size="icon-xs"
           />
-          <LabelPicker attached={todo.labels} onToggle={toggleLabel} align="end" className="h-8 w-8" />
-          <DependencyPicker
-            todo={todo}
-            candidates={siblings}
-            onToggle={toggleDependency}
-            align="end"
-            className="h-8 w-8"
-          />
+          <LabelPicker attached={todo.labels} onToggle={toggleLabel} align="end" size="icon-xs" />
+          <DependencyPicker todo={todo} candidates={siblings} onToggle={toggleDependency} align="end" size="icon-xs" />
           <Button
             variant="ghost"
-            size="icon"
-            className="h-8 w-8 text-muted-foreground hover:text-destructive"
-            onClick={() => setConfirmingDelete(true)}
+            size="icon-xs"
+            className="hover:text-destructive"
+            onPress={() => setConfirmingDelete(true)}
             aria-label={`Delete ${todo.title}`}
           >
             <Trash2 className="h-4 w-4" />
           </Button>
-        </div>
-      </div>
+        </View>
+      </View>
 
       <TodoFormDialog open={editing} onOpenChange={setEditing} todo={todo} />
 
-      <AlertDialog open={confirmingDelete} onOpenChange={setConfirmingDelete}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete this todo?</AlertDialogTitle>
-            <AlertDialogDescription>
-              “{todo.title}” and any dependency links to it are removed. This cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={remove}
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </div>
+      <ConfirmDialog
+        open={confirmingDelete}
+        onOpenChange={setConfirmingDelete}
+        title="Delete this todo?"
+        description={`“${todo.title}” and any dependency links to it are removed. This cannot be undone.`}
+        confirmLabel="Delete"
+        onConfirm={() => {
+          // ConfirmDialog leaves closing to the caller; AlertDialogAction used
+          // to close on its own.
+          setConfirmingDelete(false);
+          void remove();
+        }}
+      />
+    </View>
   );
 }

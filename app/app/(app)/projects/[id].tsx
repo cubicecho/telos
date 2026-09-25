@@ -1,28 +1,34 @@
 import { useQuery } from '@apollo/client';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Columns3, List } from 'lucide-react';
-import { useCallback, useId, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import { Text, View } from 'react-native';
+import { Columns3, List } from '@/components/app-icons';
 import { Board } from '@/components/domain/lane/board';
-import { ProjectOverview } from '@/components/domain/project/project-overview';
+import { ProjectPage } from '@/components/domain/project/project-page';
 import { TodoComposer } from '@/components/domain/todo/todo-composer';
 import { TodoFilterBar } from '@/components/domain/todo/todo-filter-bar';
 import { TodoRow } from '@/components/domain/todo/todo-row';
 import type { TodoSummary } from '@/components/domain/todo/types';
+import { EmptyState } from '@/components/page';
+import { PageLayout } from '@/components/page-layout';
+import { SectionHeading } from '@/components/section-heading';
 import { Button } from '@/components/ui/button';
-import { LoadFailure } from '@/components/ui/load-failure';
-import { type Segment, SegmentedControl, segmentPanelProps } from '@/components/ui/segmented-control';
-import { Spinner } from '@/components/ui/spinner';
+import { CircleAlert } from '@/components/ui/icons';
+import type { InputHandle } from '@/components/ui/input';
+import { LoadFailure, LoadState } from '@/components/ui/load-failure';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { filterTodos, isFiltering, NO_FILTER, type TodoFilter } from '@/lib/filter-todos';
 import { ProjectDocument, ProjectLanesDocument, ProjectTodosDocument } from '@/lib/graphql';
-import { focusAndSelect, useHotkey } from '@/lib/hotkeys';
+import { useHotkey } from '@/lib/hotkeys';
 import { cn } from '@/lib/utils';
 
-type View = 'list' | 'board';
+type ProjectView = 'list' | 'board';
 
-const VIEWS: readonly Segment<View>[] = [
-  { value: 'list', label: 'List', icon: List },
-  { value: 'board', label: 'Board', icon: Columns3 },
-];
+/** Focus a field and select what is in it — so typing replaces. */
+function focusAndSelect(field: InputHandle | null): void {
+  field?.focus();
+  field?.select?.();
+}
 
 export default function ProjectScreen() {
   // The view and the filter both live in the URL rather than in state, for the
@@ -37,9 +43,8 @@ export default function ProjectScreen() {
     sort?: string;
   }>();
   const [showCompleted, setShowCompleted] = useState(false);
-  const tabs = useId();
-  const composerRef = useRef<HTMLInputElement>(null);
-  const filterRef = useRef<HTMLInputElement>(null);
+  const composerRef = useRef<InputHandle>(null);
+  const filterRef = useRef<InputHandle>(null);
 
   const filter: TodoFilter = useMemo(
     () => ({ text: q ?? '', labelId: label ?? null, sort: sort === 'due' ? 'due' : 'manual' }),
@@ -73,7 +78,12 @@ export default function ProjectScreen() {
       setFilter(NO_FILTER);
       return;
     }
-    if (document.activeElement === filterRef.current) filterRef.current?.blur();
+    // The field is behind an `InputHandle` now, which offers no identity to
+    // compare against and no `blur`, so this gives up whichever text field has
+    // focus. Escape inside the composer meaning "leave the field" is the same
+    // want, so the wider reach costs nothing.
+    const active = document.activeElement;
+    if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) active.blur();
   });
 
   // Three queries, three failures, and they are not the same failure: the
@@ -89,12 +99,7 @@ export default function ProjectScreen() {
     variables: { id: id as string },
     skip: !id,
   });
-  const {
-    data: todosData,
-    loading: todosLoading,
-    error: todosError,
-    refetch: refetchTodos,
-  } = useQuery(ProjectTodosDocument, {
+  const todosQuery = useQuery(ProjectTodosDocument, {
     variables: { projectId: id as string },
     skip: !id,
   });
@@ -107,12 +112,10 @@ export default function ProjectScreen() {
     skip: !id,
   });
 
+  // The title waits at its own height; nothing below it has anything to show
+  // until the project lands.
   if (projectLoading && !projectData) {
-    return (
-      <div className="flex h-full items-center justify-center">
-        <Spinner />
-      </div>
-    );
+    return <PageLayout width="prose" loading title={undefined} content={null} />;
   }
 
   // Ahead of the not-found message, which is a claim about the caller's own
@@ -121,23 +124,32 @@ export default function ProjectScreen() {
   // telling them nothing.
   if (projectError && !projectData) {
     return (
-      <div className="flex h-full items-center justify-center px-6">
-        <LoadFailure error={projectError} onRetry={refetchProject} />
-      </div>
+      <View className="flex-1 items-center justify-center px-6">
+        <LoadFailure error={projectError} onRetry={refetchProject} what="this project" />
+      </View>
     );
   }
 
   const project = projectData?.project;
   if (!project) {
     return (
-      <div className="flex h-full items-center justify-center px-6 text-center">
-        <p className="text-muted-foreground text-sm">That project doesn't exist, or isn't yours.</p>
-      </div>
+      <View className="flex-1 justify-center px-6">
+        <EmptyState
+          icon={CircleAlert}
+          title="Project not found"
+          description="That project doesn't exist, or isn't yours."
+          action={
+            <Button variant="outline" size="sm" onPress={() => router.replace('/')}>
+              Go to your projects
+            </Button>
+          }
+        />
+      </View>
     );
   }
 
-  const current: View = view === 'board' ? 'board' : 'list';
-  const all = (todosData?.todos ?? []) as TodoSummary[];
+  const current: ProjectView = view === 'board' ? 'board' : 'list';
+  const all = (todosQuery.data?.todos ?? []) as TodoSummary[];
   const lanes = lanesData?.lanes ?? [];
   // Filtered once, here, and handed to whichever view is showing — so the two
   // tabs cannot come to disagree about what the filter means.
@@ -154,84 +166,107 @@ export default function ProjectScreen() {
 
   return (
     // The board is as wide as its columns need; the list stays a column of
-    // readable width whatever the window does.
-    <div className={cn('mx-auto flex flex-col gap-6 px-6 py-8', current === 'board' ? 'max-w-full' : 'max-w-3xl')}>
-      <ProjectOverview project={project} />
+    // readable width whatever the window does. A `full` body brings no inset of
+    // its own, so the board's is added here.
+    <ProjectPage
+      project={project}
+      width={current === 'board' ? 'full' : 'prose'}
+      content={
+        <View className={cn('gap-6 pt-2 pb-6', current === 'board' && 'px-4')}>
+          {/* The composer and the filter sit between the tabs and their panels, and
+          serve both. */}
+          <Tabs
+            value={current}
+            onValueChange={(next) => router.setParams({ view: next })}
+            className="flex flex-col gap-6"
+          >
+            <TabsList aria-label="Project view" className="self-start">
+              <TabsTrigger value="list">
+                <List />
+                List
+              </TabsTrigger>
+              <TabsTrigger value="board">
+                <Columns3 />
+                Board
+              </TabsTrigger>
+            </TabsList>
 
-      <SegmentedControl
-        value={current}
-        segments={VIEWS}
-        label="Project view"
-        idPrefix={tabs}
-        onChange={(next) => router.setParams({ view: next })}
-      />
+            <TodoComposer ref={composerRef} projectId={project.id} nextPosition={nextPosition} lanes={lanes} />
 
-      <TodoComposer ref={composerRef} projectId={project.id} nextPosition={nextPosition} lanes={lanes} />
+            <TodoFilterBar ref={filterRef} filter={filter} onChange={setFilter} todos={all} matched={todos.length} />
 
-      <TodoFilterBar ref={filterRef} filter={filter} onChange={setFilter} todos={all} matched={todos.length} />
-
-      {todosLoading && all.length === 0 ? (
-        <Spinner />
-      ) : todosError && all.length === 0 ? (
-        <LoadFailure error={todosError} onRetry={refetchTodos} />
-      ) : current === 'board' ? (
-        <div {...segmentPanelProps(tabs, 'board')}>
-          {/* A board with no columns is not a board, and the todos being fine
-              does not make it one. */}
-          {lanesError && lanes.length === 0 ? (
-            <LoadFailure error={lanesError} onRetry={refetchLanes} />
-          ) : (
-            <Board projectId={project.id} lanes={lanes} todos={todos} />
-          )}
-        </div>
-      ) : (
-        <div {...segmentPanelProps(tabs, 'list')} className="flex flex-col gap-6">
-          <section className="flex flex-col gap-2">
-            {open.length === 0 ? (
-              <p className="text-muted-foreground text-sm">
-                {isFiltering(filter)
-                  ? 'Nothing open matches.'
-                  : all.length === 0
-                    ? 'No todos yet.'
-                    : 'Nothing open — everything is blocked or done.'}
-              </p>
+            {/* No `empty`: an empty project still has a board to show, and the
+            list's own empty line depends on the filter. The rungs only stand in
+            while there is no answer at all. */}
+            {todosQuery.data === undefined ? (
+              <LoadState query={todosQuery} what="the todos" count={all.length} />
             ) : (
-              open.map((todo) => (
-                <TodoRow key={todo.id} todo={todo} projectId={project.id} siblings={all} lanes={lanes} />
-              ))
+              <>
+                <TabsContent value="board" className="mt-0">
+                  {/* A board with no columns is not a board, and the todos being fine
+                  does not make it one. */}
+                  {lanesError && lanes.length === 0 ? (
+                    <LoadFailure error={lanesError} onRetry={refetchLanes} what="the board" />
+                  ) : (
+                    <Board projectId={project.id} lanes={lanes} todos={todos} />
+                  )}
+                </TabsContent>
+                <TabsContent value="list" className="mt-0">
+                  {/* The column is a view of its own: on web a display class on the
+                  panel itself would beat the `hidden` radix gives it when inactive. */}
+                  <View className="gap-6">
+                    <View className="gap-2">
+                      {open.length === 0 ? (
+                        <Text className="text-muted-foreground text-sm">
+                          {isFiltering(filter)
+                            ? 'Nothing open matches.'
+                            : all.length === 0
+                              ? 'No todos yet.'
+                              : 'Nothing open — everything is blocked or done.'}
+                        </Text>
+                      ) : (
+                        open.map((todo) => (
+                          <TodoRow key={todo.id} todo={todo} projectId={project.id} siblings={all} lanes={lanes} />
+                        ))
+                      )}
+                    </View>
+
+                    {blocked.length > 0 ? (
+                      <View role="region" aria-label="Blocked" className="gap-2">
+                        <SectionHeading variant="overline" level={2}>
+                          {`Blocked (${blocked.length})`}
+                        </SectionHeading>
+                        {blocked.map((todo) => (
+                          <TodoRow key={todo.id} todo={todo} projectId={project.id} siblings={all} lanes={lanes} />
+                        ))}
+                      </View>
+                    ) : null}
+
+                    {completed.length > 0 ? (
+                      <View className="gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="-ml-3 self-start text-muted-foreground"
+                          aria-expanded={showCompleted}
+                          onPress={() => setShowCompleted((shown) => !shown)}
+                        >
+                          {`${showCompleted ? 'Hide' : 'Show'} completed (${completed.length})`}
+                        </Button>
+                        {showCompleted
+                          ? completed.map((todo) => (
+                              <TodoRow key={todo.id} todo={todo} projectId={project.id} siblings={all} lanes={lanes} />
+                            ))
+                          : null}
+                      </View>
+                    ) : null}
+                  </View>
+                </TabsContent>
+              </>
             )}
-          </section>
-
-          {blocked.length > 0 ? (
-            <section className="flex flex-col gap-2">
-              <h2 className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
-                Blocked ({blocked.length})
-              </h2>
-              {blocked.map((todo) => (
-                <TodoRow key={todo.id} todo={todo} projectId={project.id} siblings={all} lanes={lanes} />
-              ))}
-            </section>
-          ) : null}
-
-          {completed.length > 0 ? (
-            <section className="flex flex-col gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="-ml-3 self-start text-muted-foreground"
-                onClick={() => setShowCompleted((shown) => !shown)}
-              >
-                {showCompleted ? 'Hide' : 'Show'} completed ({completed.length})
-              </Button>
-              {showCompleted
-                ? completed.map((todo) => (
-                    <TodoRow key={todo.id} todo={todo} projectId={project.id} siblings={all} lanes={lanes} />
-                  ))
-                : null}
-            </section>
-          ) : null}
-        </div>
-      )}
-    </div>
+          </Tabs>
+        </View>
+      }
+    />
   );
 }

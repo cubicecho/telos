@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { daysUntil, formatDueDate, fromDateInputValue, isOverdue, parseDate, toDateInputValue } from '../dates';
+import { daysUntil, formatDueDate, isOverdue, parseDate } from '../dates';
 
 // Every test pins `from` explicitly. A date helper that reads the wall clock is
 // a test that passes until the day it does not, and the interesting cases here
@@ -92,32 +92,5 @@ describe('formatDueDate', () => {
   it('answers nothing for a todo with no due date', () => {
     expect(formatDueDate(null, NOON)).toBeUndefined();
     expect(formatDueDate('not a date', NOON)).toBeUndefined();
-  });
-});
-
-describe('the date input round-trip', () => {
-  it('gives back the local day, not the UTC one', () => {
-    // Stored at 23:00 local on the 11th. Slicing the ISO string would open the
-    // picker on the 12th in any zone behind UTC, disagreeing with the badge.
-    const stored = local(2026, 9, 11, 23).toISOString();
-    expect(toDateInputValue(stored)).toBe('2026-09-11');
-  });
-
-  it('survives a round trip through the picker', () => {
-    const stored = local(2026, 9, 11, 23).toISOString();
-    const round = fromDateInputValue(toDateInputValue(stored));
-    expect(round).not.toBeNull();
-    expect(toDateInputValue(round)).toBe('2026-09-11');
-  });
-
-  it('reads an empty field as no due date', () => {
-    expect(toDateInputValue(null)).toBe('');
-    expect(toDateInputValue('not a date')).toBe('');
-    expect(fromDateInputValue('')).toBeNull();
-    expect(fromDateInputValue('not a date')).toBeNull();
-  });
-
-  it('pads single-digit months and days', () => {
-    expect(toDateInputValue(local(2026, 1, 5).toISOString())).toBe('2026-01-05');
   });
 });

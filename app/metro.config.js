@@ -10,7 +10,7 @@ if (!process.env.NODE_PATH?.split(path.delimiter).includes(localModules)) {
 }
 
 const { getDefaultConfig } = require('expo/metro-config');
-const { withNativeWind } = require('nativewind/metro');
+const { withNativewind } = require('nativewind/metro');
 
 const config = getDefaultConfig(__dirname);
 
@@ -18,4 +18,4 @@ const workspaceRoot = path.resolve(__dirname, '..');
 config.watchFolders = [workspaceRoot];
 config.resolver.nodeModulesPaths = [localModules, path.resolve(workspaceRoot, 'node_modules')];
 
-module.exports = withNativeWind(config, { input: './global.css' });
+module.exports = withNativewind(config);

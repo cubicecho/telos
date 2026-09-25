@@ -1,6 +1,9 @@
-import * as Popover from '@radix-ui/react-popover';
-import { Check, Link2 } from 'lucide-react';
+import { useState } from 'react';
+import { Pressable, Text } from 'react-native';
+import { Link2 } from '@/components/app-icons';
 import { Button } from '@/components/ui/button';
+import { Check } from '@/components/ui/icons';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import type { TodoSummary } from './types';
 
@@ -15,61 +18,65 @@ export function DependencyPicker({
   candidates,
   onToggle,
   align = 'start',
+  size = 'icon',
   className,
 }: {
   todo: TodoSummary;
   candidates: readonly TodoSummary[];
   onToggle: (dependsOnTodoId: string, add: boolean) => void;
   align?: 'start' | 'end';
+  /** The trigger's square, from `Button`'s icon ladder. */
+  size?: 'icon' | 'icon-sm' | 'icon-xs';
   className?: string;
 }) {
   const dependencyIds = new Set(todo.dependencies.map((dependency) => dependency.id));
   const options = candidates.filter((candidate) => candidate.id !== todo.id);
   const waiting = todo.dependencies.length;
+  // Controlled only so the trigger's `onPress` can open it: on web radix opens
+  // from `onClick`, which react-native-web's `Pressable` overwrites. Local
+  // patch until cubicecho/cubeui#123.
+  const [open, setOpen] = useState(false);
 
   return (
-    <Popover.Root>
-      <Popover.Trigger asChild>
-        {/* Icon only. The count the label used to carry survives as `title` and
-            as a lit icon — a todo that waits on something should not look
-            identical to one that waits on nothing. */}
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        {/* Icon only. The count the label used to carry survives in the
+            accessible name and as a lit icon — a todo that waits on something
+            should not look identical to one that waits on nothing. */}
         <Button
           variant="ghost"
-          size="icon"
-          className={cn(waiting > 0 ? 'text-foreground' : 'text-muted-foreground', className)}
+          size={size}
+          className={className}
           aria-label={waiting > 0 ? `Dependencies, waiting on ${waiting}` : 'Dependencies'}
-          title={waiting > 0 ? `Waits on ${waiting}` : 'Depends on…'}
+          onPress={() => setOpen(!open)}
         >
-          <Link2 className="h-4 w-4" />
+          <Link2 className={cn('h-4 w-4', waiting > 0 ? 'text-foreground' : 'text-muted-foreground')} />
         </Button>
-      </Popover.Trigger>
-      <Popover.Portal>
-        <Popover.Content
-          sideOffset={6}
-          align={align}
-          className="z-50 max-h-64 w-64 overflow-y-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
-        >
-          {options.length === 0 ? (
-            <p className="px-2 py-3 text-center text-muted-foreground text-sm">Nothing else in this project yet.</p>
-          ) : (
-            options.map((option) => {
-              const selected = dependencyIds.has(option.id);
-              return (
-                <button
-                  key={option.id}
-                  type="button"
-                  onClick={() => onToggle(option.id, !selected)}
-                  className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
-                >
-                  <span className="flex-1 truncate">{option.title}</span>
-                  {option.completedAt ? <span className="text-muted-foreground text-xs">done</span> : null}
-                  {selected ? <Check className="h-3.5 w-3.5" /> : null}
-                </button>
-              );
-            })
-          )}
-        </Popover.Content>
-      </Popover.Portal>
-    </Popover.Root>
+      </PopoverTrigger>
+      <PopoverContent align={align} className="max-h-64 w-64 overflow-y-auto p-1">
+        {options.length === 0 ? (
+          <Text className="px-2 py-3 text-center text-muted-foreground text-sm">Nothing else in this project yet.</Text>
+        ) : (
+          options.map((option) => {
+            const selected = dependencyIds.has(option.id);
+            return (
+              <Pressable
+                key={option.id}
+                role="checkbox"
+                aria-checked={selected}
+                onPress={() => onToggle(option.id, !selected)}
+                className="w-full flex-row items-center gap-2 rounded-sm px-2 py-1.5 hover:bg-accent"
+              >
+                <Text numberOfLines={1} className="flex-1 text-popover-foreground text-sm">
+                  {option.title}
+                </Text>
+                {option.completedAt ? <Text className="text-muted-foreground text-xs">done</Text> : null}
+                {selected ? <Check className="h-3.5 w-3.5" /> : null}
+              </Pressable>
+            );
+          })
+        )}
+      </PopoverContent>
+    </Popover>
   );
 }

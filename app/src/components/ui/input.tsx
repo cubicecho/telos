@@ -1,21 +1,58 @@
-import * as React from 'react';
+import { useImperativeHandle, useRef } from 'react';
+import { TextInput } from 'react-native';
+import {
+  INPUT_CLASS,
+  type InputHandle,
+  type InputProps,
+  type InputType,
+  NATIVE_INPUT_MODE,
+} from '@/components/ui/input-base';
 import { cn } from '@/lib/utils';
 
-export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {}
+function Input({
+  className,
+  type = 'text',
+  inputMode,
+  value,
+  defaultValue,
+  onChangeText,
+  onBlur,
+  onSubmitEditing,
+  placeholder,
+  maxLength,
+  disabled,
+  autoFocus,
+  id,
+  'aria-label': ariaLabel,
+  'aria-labelledby': ariaLabelledBy,
+  ref,
+}: InputProps) {
+  const inner = useRef<TextInput>(null);
+  useImperativeHandle<InputHandle, InputHandle>(ref, () => ({
+    focus: () => inner.current?.focus(),
+  }));
 
-const Input = React.forwardRef<HTMLInputElement, InputProps>(({ className, type, ...props }, ref) => {
   return (
-    <input
-      type={type}
-      className={cn(
-        'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:font-medium file:text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50',
-        className,
-      )}
-      ref={ref}
-      {...props}
+    <TextInput
+      ref={inner}
+      value={value}
+      defaultValue={defaultValue}
+      onChangeText={onChangeText}
+      onBlur={onBlur}
+      onSubmitEditing={onSubmitEditing}
+      placeholder={placeholder}
+      maxLength={maxLength}
+      editable={!disabled}
+      autoFocus={autoFocus}
+      id={id}
+      aria-label={ariaLabel}
+      aria-labelledby={ariaLabelledBy}
+      inputMode={inputMode ?? NATIVE_INPUT_MODE[type] ?? 'text'}
+      secureTextEntry={type === 'password'}
+      className={cn(INPUT_CLASS, disabled && 'opacity-50', className)}
     />
   );
-});
-Input.displayName = 'Input';
+}
 
+export type { InputHandle, InputProps, InputType };
 export { Input };

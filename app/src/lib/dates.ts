@@ -1,10 +1,10 @@
 /**
  * Due dates, as a reader wants to see them.
  *
- * No date library, deliberately: the whole of what this app does with a date is
- * say how far off it is and print it short, and `Intl` does both without adding
- * a dependency the rest of the repo does not have. `readable-text-color.ts` is
- * the precedent — a pure, dependency-free, unit-tested formatting module.
+ * `Intl` rather than date-fns, though date-fns arrives with cubeui's calendar:
+ * the whole of what this app does with a date is say how far off it is and print
+ * it short in the reader's locale, and `Intl` does both. `readable-text-color.ts`
+ * is the precedent — a pure, dependency-free, unit-tested formatting module.
  *
  * Everything here takes the ISO string the cache holds, because `app/codegen.ts`
  * maps `DateTime` to `string` on purpose: nothing in the client needs a `Date`
@@ -70,33 +70,4 @@ export function formatDueDate(iso: string | null | undefined, from: Date = new D
 export function formatDueDateLong(iso: string | null | undefined): string | undefined {
   const date = parseDate(iso);
   return date && FULL.format(date);
-}
-
-/**
- * An ISO instant as `yyyy-mm-dd` in the *local* zone, which is what
- * `<input type="date">` reads and writes.
- *
- * Not `toISOString().slice(0, 10)`: that is the UTC day, so a due date stored at
- * 23:00 local would open the picker on the day after the one the badge shows.
- */
-export function toDateInputValue(iso: string | null | undefined): string {
-  const date = parseDate(iso);
-  if (!date) return '';
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-}
-
-/**
- * A `yyyy-mm-dd` from the date picker as the ISO instant the server stores, or
- * null for a cleared field.
- *
- * Local midnight rather than UTC midnight, for the same reason as above: the day
- * the user picked is the day they must get back, in their own zone.
- */
-export function fromDateInputValue(value: string): string | null {
-  if (!value) return null;
-  const [year, month, day] = value.split('-').map(Number);
-  if (!year || !month || !day) return null;
-  const date = new Date(year, month - 1, day);
-  return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }

@@ -1,35 +1,16 @@
-import * as Popover from '@radix-ui/react-popover';
-import { ArrowDownWideNarrow, Check, Search, Tag, X } from 'lucide-react';
 import { forwardRef } from 'react';
+import { Text, View } from 'react-native';
+import { Tag } from '@/components/app-icons';
 import { Button } from '@/components/ui/button';
+import { ColorDot } from '@/components/ui/color-dot';
+import { Check, Search, X } from '@/components/ui/icons';
+import type { InputHandle } from '@/components/ui/input';
 import { Input } from '@/components/ui/input';
-import { isFiltering, labelsInUse, NO_FILTER, type TodoFilter, type TodoSort } from '@/lib/filter-todos';
+import { Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger } from '@/components/ui/menu';
+import { SegmentedButton, SegmentedGroup } from '@/components/ui/segmented';
+import { isFiltering, labelsInUse, NO_FILTER, type TodoFilter } from '@/lib/filter-todos';
 import { cn } from '@/lib/utils';
 import type { TodoSummary } from './types';
-
-/** One row of the label popover, shaped like `LabelPicker`'s so the two read alike. */
-function LabelOption({
-  onSelect,
-  selected,
-  children,
-}: {
-  onSelect: () => void;
-  selected: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <Popover.Close asChild>
-      <button
-        type="button"
-        onClick={onSelect}
-        className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
-      >
-        {children}
-        {selected ? <Check className="h-3.5 w-3.5 shrink-0" /> : null}
-      </button>
-    </Popover.Close>
-  );
-}
 
 /**
  * Finding a todo, which until now meant reading down the page.
@@ -45,7 +26,7 @@ function LabelOption({
  * The ref goes to the text field, so `/` can focus it from anywhere.
  */
 export const TodoFilterBar = forwardRef<
-  HTMLInputElement,
+  InputHandle,
   {
     filter: TodoFilter;
     onChange: (filter: TodoFilter) => void;
@@ -57,108 +38,88 @@ export const TodoFilterBar = forwardRef<
   const labels = labelsInUse(todos);
   const active = isFiltering(filter);
   const selected = labels.find((label) => label.id === filter.labelId);
+  const pickLabel = (labelId: string | null) => onChange({ ...filter, labelId });
+  const tick = (on: boolean) => (on ? <Check className="h-3.5 w-3.5" /> : null);
 
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative min-w-48 flex-1">
-          <Search className="-translate-y-1/2 pointer-events-none absolute top-1/2 left-2.5 h-4 w-4 text-muted-foreground" />
+    <View className="gap-2">
+      <View className="flex-row flex-wrap items-center gap-2">
+        <View className="relative min-w-48 flex-1 justify-center">
+          <Search className="pointer-events-none absolute left-2.5 z-10 h-4 w-4 text-muted-foreground" />
           <Input
             ref={ref}
             type="search"
+            aria-label="Filter todos by title or notes"
             value={filter.text}
             placeholder="Filter todos…  (press /)"
-            aria-label="Filter todos by title or notes"
-            onChange={(event) => onChange({ ...filter, text: event.target.value })}
+            onChangeText={(text) => onChange({ ...filter, text })}
             className="pl-8"
           />
-        </div>
+        </View>
 
-        <Popover.Root>
-          <Popover.Trigger asChild>
+        {/* One of N, and the menu closes on the pick. */}
+        <Menu>
+          <MenuTrigger asChild>
             <Button
               variant="outline"
               size="sm"
               className={cn('gap-2', selected && 'border-ring')}
               aria-label="Filter by label"
             >
-              {selected ? (
-                <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: selected.color }} />
-              ) : (
-                <Tag className="h-4 w-4" />
-              )}
+              {selected ? <ColorDot color={selected.color} size="sm" /> : <Tag className="h-4 w-4" />}
               {selected ? selected.name : 'Label'}
             </Button>
-          </Popover.Trigger>
-          <Popover.Portal>
-            <Popover.Content
-              sideOffset={6}
-              align="start"
-              className="z-50 w-56 rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
-            >
-              {labels.length === 0 ? (
-                <p className="px-2 py-3 text-center text-muted-foreground text-sm">
-                  No labels on this project's todos.
-                </p>
-              ) : (
-                <>
-                  <LabelOption
-                    onSelect={() => onChange({ ...filter, labelId: null })}
-                    selected={filter.labelId === null}
-                  >
-                    <span className="flex-1 truncate text-muted-foreground">Any label</span>
-                  </LabelOption>
-                  {labels.map((label) => (
-                    <LabelOption
-                      key={label.id}
-                      onSelect={() => onChange({ ...filter, labelId: label.id })}
-                      selected={filter.labelId === label.id}
-                    >
-                      <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: label.color }} />
-                      <span className="flex-1 truncate">{label.name}</span>
-                    </LabelOption>
-                  ))}
-                </>
-              )}
-            </Popover.Content>
-          </Popover.Portal>
-        </Popover.Root>
+          </MenuTrigger>
+          <MenuContent align="start" className="w-56">
+            {labels.length === 0 ? (
+              <Text className="px-2 py-3 text-center text-muted-foreground text-sm">
+                No labels on this project's todos.
+              </Text>
+            ) : (
+              <>
+                <MenuItem label="Any label" onSelect={() => pickLabel(null)} trailing={tick(filter.labelId === null)} />
+                <MenuSeparator />
+                {labels.map((label) => (
+                  <MenuItem
+                    key={label.id}
+                    icon={<ColorDot color={label.color} size="sm" />}
+                    label={label.name}
+                    onSelect={() => pickLabel(label.id)}
+                    trailing={tick(filter.labelId === label.id)}
+                  />
+                ))}
+              </>
+            )}
+          </MenuContent>
+        </Menu>
 
-        {/* Two states, so a toggle rather than a select — which is just as well,
-            since the repo has no select component and this does not justify one. */}
-        <Button
-          variant="outline"
-          size="sm"
-          className={cn('gap-2', filter.sort === 'due' && 'border-ring')}
-          aria-pressed={filter.sort === 'due'}
-          onClick={() => onChange({ ...filter, sort: nextSort(filter.sort) })}
+        <SegmentedGroup
+          aria-label="Sort"
+          value={filter.sort}
+          onValueChange={(sort) => onChange({ ...filter, sort: sort === 'due' ? 'due' : 'manual' })}
         >
-          <ArrowDownWideNarrow className="h-4 w-4" />
-          {filter.sort === 'due' ? 'By due date' : 'Manual order'}
-        </Button>
+          <SegmentedButton value="manual">Manual order</SegmentedButton>
+          <SegmentedButton value="due">By due date</SegmentedButton>
+        </SegmentedGroup>
 
         {active ? (
-          <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground" onClick={() => onChange(NO_FILTER)}>
+          <Button variant="ghost" size="sm" className="gap-2" onPress={() => onChange(NO_FILTER)}>
             <X className="h-4 w-4" />
             Clear
           </Button>
         ) : null}
-      </div>
+      </View>
 
       {/* Only while filtering. A count on an unfiltered list is noise, but on a
           filtered one it is the difference between "this project is empty" and
           "nothing here matches what you typed". */}
       {active ? (
-        <p className="text-muted-foreground text-xs" aria-live="polite">
+        <Text className="text-muted-foreground text-xs" aria-live="polite">
           {matched === 0
             ? 'No todos match.'
             : `${matched} of ${todos.length} ${todos.length === 1 ? 'todo' : 'todos'}.`}
-        </p>
+        </Text>
       ) : null}
-    </div>
+    </View>
   );
 });
-
-function nextSort(sort: TodoSort): TodoSort {
-  return sort === 'due' ? 'manual' : 'due';
-}

@@ -1,8 +1,6 @@
-import { RotateCw, TriangleAlert } from 'lucide-react';
-import { useState } from 'react';
-import { Button } from '@/components/ui/button';
+import type { ComponentProps } from 'react';
+import { QueryError, QueryState } from '@/components/query-state';
 import { describeError } from '@/lib/errors';
-import { cn } from '@/lib/utils';
 
 /**
  * What a screen shows when the data it needs did not arrive.
@@ -13,47 +11,54 @@ import { cn } from '@/lib/utils';
  * user's own data — and the offer to retry is the other half, because a
  * failure the reader can only respond to by reloading the whole app is barely
  * better than a blank page.
+ *
+ * cubeui's `QueryError`, worded through `describeError` so the reader sees
+ * "Your session has expired" rather than the transport's "Received status code
+ * 401". It is an alert, because it stands where the content the reader was
+ * waiting for should have been. `compact` is the form for a popover or the
+ * sidebar.
+ *
+ * This is the form for a screen about one thing — a project, the redirect to
+ * the first one. A list takes `LoadState`, which adds the loading and empty
+ * rungs.
  */
-export function LoadFailure({
-  error,
-  onRetry,
-  className,
-}: {
-  error: unknown;
-  /** Apollo's `refetch`. Its rejection is expected — a retry may fail too. */
-  onRetry?: () => unknown;
-  className?: string;
-}) {
-  const [retrying, setRetrying] = useState(false);
+export function LoadFailure(props: Omit<ComponentProps<typeof QueryError>, 'describe'>) {
+  return <QueryError describe={describeError} {...props} />;
+}
 
-  async function retry() {
-    if (!onRetry) return;
-    setRetrying(true);
-    try {
-      await onRetry();
-    } catch {
-      // Swallowed on purpose: the query's own `error` is what the screen
-      // reads, and it is already being rendered right here. Rethrowing would
-      // only turn a visible failure into an unhandled rejection as well.
-    } finally {
-      setRetrying(false);
-    }
-  }
+/** What `LoadState` reads off an Apollo `useQuery` result. */
+type ApolloResult = {
+  loading: boolean;
+  error?: unknown;
+  data?: unknown;
+  refetch: () => unknown;
+};
 
+/**
+ * cubeui's `QueryState` over an Apollo result: failed, loading, or empty,
+ * worded like `LoadFailure`, and nothing once there are rows.
+ *
+ * Pending and failed both mean *nothing to show*, not merely that a request is
+ * out or went wrong. Apollo keeps rendering what it had while it refetches, and
+ * a refetch that fails with the last good list still on screen should leave the
+ * list there: replacing it with an apology would take away the rows the reader
+ * was using, for a failure they did not ask about.
+ */
+export function LoadState({
+  query,
+  ...props
+}: Omit<ComponentProps<typeof QueryState>, 'describe' | 'query'> & { query: ApolloResult }) {
+  const nothing = query.data === undefined;
   return (
-    // `role="alert"` rather than a live region: this replaces the content the
-    // reader was waiting for, so it is worth interrupting for.
-    <div role="alert" className={cn('flex flex-col items-start gap-2 text-sm', className)}>
-      <p className="flex items-start gap-2 text-muted-foreground">
-        <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-destructive" aria-hidden />
-        <span>{describeError(error)}</span>
-      </p>
-      {onRetry ? (
-        <Button variant="outline" size="sm" className="gap-1.5" onClick={retry} disabled={retrying}>
-          <RotateCw className={cn('h-3.5 w-3.5', retrying && 'animate-spin')} aria-hidden />
-          {retrying ? 'Retrying…' : 'Retry'}
-        </Button>
-      ) : null}
-    </div>
+    <QueryState
+      query={{
+        isPending: query.loading && nothing,
+        isError: query.error != null && nothing,
+        error: query.error,
+        refetch: query.refetch,
+      }}
+      describe={describeError}
+      {...props}
+    />
   );
 }

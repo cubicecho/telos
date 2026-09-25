@@ -1,4 +1,5 @@
-import { Loader2 } from 'lucide-react';
+import { View } from 'react-native';
+import { LoaderCircle } from '@/components/ui/icons';
 import { cn } from '@/lib/utils';
 
 /**
@@ -6,17 +7,14 @@ import { cn } from '@/lib/utils';
  *
  * The icon stays `aria-hidden` — a spinning line is nothing to announce — and
  * the wrapper carries the word instead, so a screen reader hears "Loading"
- * rather than the silence every loading screen here used to be. `<output>` for
- * the wrapper because it is already `role="status"` with a polite live region,
- * which is exactly the pair wanted and one fewer attribute to keep true. The
- * label is visually hidden rather than absent: the animation is the sighted
- * half of the same message.
+ * rather than silence. `role="status"` is the polite live region `<output>`
+ * used to give for free; a `View` has no `<output>` to become, so the role and
+ * the name are spelled out, the same way cubeui's `RowSkeleton` does it.
  */
 export function Spinner({ className, label = 'Loading' }: { className?: string; label?: string }) {
   return (
-    <output className="inline-flex items-center">
-      <Loader2 className={cn('h-4 w-4 animate-spin text-muted-foreground', className)} aria-hidden />
-      <span className="sr-only">{label}</span>
-    </output>
+    <View role="status" aria-label={label} className="flex-row items-center">
+      <LoaderCircle className={cn('h-4 w-4 animate-spin text-muted-foreground', className)} aria-hidden />
+    </View>
   );
 }

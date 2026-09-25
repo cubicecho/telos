@@ -1,11 +1,9 @@
 import { useMutation } from '@apollo/client';
 import { useRouter } from 'expo-router';
-import { type FormEvent, useEffect, useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+import { useEffect } from 'react';
+import { useAppForm } from '@/components/app-form';
+import { Form } from '@/components/ui/form';
+import { FormDialog, FormDialogFooter } from '@/components/ui/form-dialog';
 import { describeError } from '@/lib/errors';
 import { CreateProjectDocument, ProjectDocument, ProjectsDocument, UpdateProjectDocument } from '@/lib/graphql';
 import { newId } from '@/lib/ids';
@@ -26,23 +24,27 @@ export function ProjectFormDialog({
   project?: ProjectDraft;
 }) {
   const router = useRouter();
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
   const [createProject, { loading: creating, error: createError }] = useMutation(CreateProjectDocument);
   const [updateProject, { loading: updating, error: updateError }] = useMutation(UpdateProjectDocument, {
     refetchQueries: [ProjectsDocument, ...(project ? [{ query: ProjectDocument, variables: { id: project.id } }] : [])],
   });
 
+  const form = useAppForm({
+    defaultValues: { name: '', description: '' },
+    onSubmit: ({ value }) => save(value),
+  });
+
+  // Reset from the project each time it opens, not on mount: the dialog
+  // outlives a cancel, so a reopened form must show what is stored rather than
+  // what was last typed and abandoned.
   useEffect(() => {
     if (!open) return;
-    setName(project?.name ?? '');
-    setDescription(project?.description ?? '');
-  }, [open, project]);
+    form.reset({ name: project?.name ?? '', description: project?.description ?? '' });
+  }, [open, project, form]);
 
-  async function onSubmit(event: FormEvent) {
-    event.preventDefault();
+  async function save({ name, description }: { name: string; description: string }) {
     const values = { name: name.trim(), description: description.trim() === '' ? null : description.trim() };
-    if (values.name === '') return;
+    if (creating || updating) return;
     try {
       if (project) {
         await updateProject({ variables: { id: project.id, set: values } });
@@ -89,43 +91,28 @@ export function ProjectFormDialog({
   const error = createError ?? updateError;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{project ? 'Edit project' : 'New project'}</DialogTitle>
-          <DialogDescription>A project is a list of todos. Nothing more, on purpose.</DialogDescription>
-        </DialogHeader>
-        <form onSubmit={onSubmit} className="flex flex-col gap-4">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="project-name">Name</Label>
-            <Input
-              id="project-name"
-              autoFocus
-              value={name}
-              placeholder="Kitchen renovation"
-              onChange={(event) => setName(event.target.value)}
-            />
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="project-description">Description</Label>
-            <Textarea
-              id="project-description"
-              value={description}
-              placeholder="Optional."
-              onChange={(event) => setDescription(event.target.value)}
-            />
-          </div>
-          {error ? <p className="text-destructive text-sm">{describeError(error)}</p> : null}
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={creating || updating || name.trim() === ''}>
-              {project ? 'Save' : 'Create'}
-            </Button>
-          </div>
-        </form>
-      </DialogContent>
-    </Dialog>
+    <FormDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title={project ? 'Edit project' : 'New project'}
+      description="A project is a list of todos. Nothing more, on purpose."
+    >
+      <form.AppForm>
+        <Form className="gap-4">
+          <form.AppField
+            name="name"
+            validators={{ onChange: ({ value }) => (value.trim() === '' ? 'Give the project a name.' : undefined) }}
+          >
+            {(field) => <field.InputField label="Name" autoFocus placeholder="Kitchen renovation" />}
+          </form.AppField>
+          <form.AppField name="description">
+            {(field) => <field.TextAreaField label="Description" placeholder="Optional." />}
+          </form.AppField>
+          <FormDialogFooter onCancel={() => onOpenChange(false)} error={error ? describeError(error) : null}>
+            <form.SubmitButton isEdit={project !== undefined} editLabel="Save" />
+          </FormDialogFooter>
+        </Form>
+      </form.AppForm>
+    </FormDialog>
   );
 }
