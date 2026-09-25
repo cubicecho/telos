@@ -1,8 +1,11 @@
 import { Pressable, Text, View } from 'react-native';
 import { AiIgnoredBadge } from '@/components/domain/ai/ai-ignored-badge';
+import type { LiveRun } from '@/components/domain/ai/project-activity';
+import { LiveDot } from '@/components/domain/ai/run-log';
 import { LabelBadge } from '@/components/domain/label/label-badge';
 import { DueBadge } from '@/components/domain/todo/due-badge';
 import type { TodoSummary } from '@/components/domain/todo/types';
+import { Button } from '@/components/ui/button';
 import { laneLock } from '@/lib/lanes';
 import { cn, HOVER_REVEAL } from '@/lib/utils';
 import { DraggableCard } from './drag-surfaces';
@@ -19,12 +22,17 @@ export function BoardCardBody({
   lanes,
   onMove,
   onEdit,
+  live,
+  onWatch,
   className,
 }: {
   todo: TodoSummary;
   lanes: readonly LaneSummary[];
   onMove?: (lane: LaneSummary) => void;
   onEdit?: () => void;
+  /** The run working this todo now, when one is. */
+  live?: LiveRun | undefined;
+  onWatch?: (() => void) | undefined;
   className?: string;
 }) {
   const done = todo.completedAt != null;
@@ -36,6 +44,7 @@ export function BoardCardBody({
       className={cn(
         'group rounded-lg border border-border bg-card px-3 py-2.5 shadow-sm',
         todo.isBlocked && !done && 'opacity-70',
+        live && 'border-green-600/60',
         className,
       )}
     >
@@ -98,6 +107,27 @@ export function BoardCardBody({
       ) : null}
 
       <AiIgnoredBadge ignored={todo.aiIgnored} className="mt-2" />
+
+      {live ? (
+        <View className="mt-2 flex-row items-center gap-2">
+          <LiveDot />
+          <Text numberOfLines={1} className="min-w-0 flex-1 text-muted-foreground text-xs">
+            {live.cancelRequestedAt ? 'Stopping' : 'Working'}
+            {live.agent ? ` · ${live.agent.name}` : ''}
+          </Text>
+          {onWatch ? (
+            <Button
+              variant="ghost"
+              size="xs"
+              className="-my-1 -mr-2"
+              aria-label={`Watch the agent work “${todo.title}”`}
+              onPress={onWatch}
+            >
+              Watch
+            </Button>
+          ) : null}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -108,18 +138,22 @@ export function BoardCard({
   lanes,
   onMove,
   onEdit,
+  live,
+  onWatch,
 }: {
   todo: TodoSummary;
   lanes: readonly LaneSummary[];
   onMove: (lane: LaneSummary) => void;
   onEdit: () => void;
+  live?: LiveRun | undefined;
+  onWatch?: (() => void) | undefined;
 }) {
   // A blocked card is not draggable — the same choice the row's checkbox makes,
   // disabling the affordance rather than letting it fail — but it stays a drop
   // target, so the cards around it can still be reordered over it.
   return (
     <DraggableCard id={todo.id} laneId={todo.lane?.id} locked={laneLock(todo) != null}>
-      <BoardCardBody todo={todo} lanes={lanes} onMove={onMove} onEdit={onEdit} />
+      <BoardCardBody todo={todo} lanes={lanes} onMove={onMove} onEdit={onEdit} live={live} onWatch={onWatch} />
     </DraggableCard>
   );
 }

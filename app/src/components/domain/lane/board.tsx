@@ -1,7 +1,9 @@
 import { useQuery } from '@apollo/client';
 import { useMemo, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
+import type { LiveRun } from '@/components/domain/ai/project-activity';
 import { StationDialog } from '@/components/domain/ai/station-dialog';
+import { WatchRunDialog } from '@/components/domain/ai/watch-run-dialog';
 import { TodoFormDialog } from '@/components/domain/todo/todo-form-dialog';
 import type { TodoSummary } from '@/components/domain/todo/types';
 import { useAi } from '@/lib/ai';
@@ -38,12 +40,15 @@ export function Board({
   aiEnabled = false,
   lanes,
   todos,
+  live,
 }: {
   projectId: string;
   /** The project's own AI switch. */
   aiEnabled?: boolean;
   lanes: readonly CachedLane[];
   todos: readonly TodoSummary[];
+  /** The runs working todos now, by todo id. The page polls it, for its header too. */
+  live?: ReadonlyMap<string, LiveRun> | undefined;
 }) {
   const [dragging, setDragging] = useState<TodoSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -61,6 +66,8 @@ export function Board({
   );
   const agents = stationsQuery.data?.agents ?? [];
   const [stationLane, setStationLane] = useState<CachedLane | null>(null);
+  const [watching, setWatching] = useState<TodoSummary | null>(null);
+  const shownLive = stationsOn ? live : undefined;
 
   const actions = useLaneActions(projectId);
   const moveTodo = useMoveTodo(projectId);
@@ -115,7 +122,7 @@ export function Board({
         onDragStart={onDragStart}
         onDrop={onDrop}
         onDragCancel={() => setDragging(null)}
-        overlay={dragging ? <BoardCardBody todo={dragging} lanes={lanes} /> : null}
+        overlay={dragging ? <BoardCardBody todo={dragging} lanes={lanes} live={shownLive?.get(dragging.id)} /> : null}
       >
         <ScrollView horizontal contentContainerClassName="flex-row items-start gap-3 pb-2">
           {lanes.map((lane) => (
@@ -134,6 +141,8 @@ export function Board({
               agentName={agents.find((agent) => agent.id === stations.get(lane.id)?.agentId)?.name}
               // Offered once the settings are in, so a save cannot overwrite them with defaults.
               onEditStation={stationsOn && stationsQuery.data ? () => setStationLane(lane) : undefined}
+              live={shownLive}
+              onWatch={shownLive ? setWatching : undefined}
             />
           ))}
           <LaneComposer onCreate={(name) => run(() => actions.createLane(name, lanes.length))} />
@@ -151,6 +160,18 @@ export function Board({
           board has moved on from it. */}
       {editing ? (
         <TodoFormDialog key={editing.id} open onOpenChange={(next) => !next && setEditing(null)} todo={editing} />
+      ) : null}
+
+      {/* Keyed by todo: the dialog follows the todo from run to run, and
+          stays open on the last one after the todo's run ends. */}
+      {watching ? (
+        <WatchRunDialog
+          key={watching.id}
+          open
+          onOpenChange={(next) => !next && setWatching(null)}
+          todoTitle={watching.title}
+          live={shownLive?.get(watching.id)}
+        />
       ) : null}
 
       {stationLane && stationsOn ? (

@@ -96,7 +96,9 @@ export const CLAIM = `mutation ($todoId: ID!, $laneId: ID!) {
     brief { projectName projectContext laneName contract lanePrompt title brief acceptance report why notes }
   }
 }`;
-export const HEARTBEAT = `mutation ($id: ID!, $events: [RunEventInput!]) { heartbeatRun(id: $id, events: $events) }`;
+export const HEARTBEAT = `mutation ($id: ID!, $events: [RunEventInput!], $prompt: RunPromptInput, $usage: RunUsageInput) {
+  heartbeatRun(id: $id, events: $events, prompt: $prompt, usage: $usage)
+}`;
 export const FINISH = `mutation ($id: ID!, $result: RunResultInput!) {
   finishRun(id: $id, result: $result) { id status verdict output error totalTokens }
 }`;

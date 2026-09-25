@@ -328,23 +328,24 @@ export const UpdateStationDocument = graphql(`
   }
 `);
 
-// A todo's runs and what they left behind. Read only by the todo dialog, and
-// only while AI is on for the account; the project's own switch comes back
-// with them, since the dialog is not otherwise told it.
+// Runs and what they left behind: a todo's, read by the todo dialog, and a
+// project's, read by its Runs and Artifacts views and the board's live marks.
+// Read only while AI is on for the account.
 
-export const RunFieldsFragment = graphql(`
-  fragment RunFields on Run {
+// A run's summary is what a list polls: no log, no prompts, no output, which
+// are the heavy parts. RunFields adds them, for a run someone has opened.
+export const RunSummaryFieldsFragment = graphql(`
+  fragment RunSummaryFields on Run {
     id
     status
     verdict
     contract
-    output
     error
     toolCalls
     promptTokens
     completionTokens
     totalTokens
-    events
+    model
     startedAt
     finishedAt
     cancelRequestedAt
@@ -356,6 +357,20 @@ export const RunFieldsFragment = graphql(`
       id
       name
     }
+    todo {
+      id
+      title
+    }
+  }
+`);
+
+export const RunFieldsFragment = graphql(`
+  fragment RunFields on Run {
+    ...RunSummaryFields
+    output
+    events
+    systemPrompt
+    userPrompt
   }
 `);
 
@@ -384,7 +399,7 @@ export const TodoRunsDocument = graphql(`
         aiEnabled
       }
       runs(orderBy: { startedAt: { direction: desc, priority: 1 } }) {
-        ...RunFields
+        ...RunSummaryFields
       }
       artifacts(orderBy: { createdAt: { direction: desc, priority: 1 } }) {
         ...ArtifactFields
@@ -396,7 +411,76 @@ export const TodoRunsDocument = graphql(`
 export const CancelRunDocument = graphql(`
   mutation CancelRun($id: ID!) {
     cancelRun(id: $id) {
+      ...RunSummaryFields
+    }
+  }
+`);
+
+export const DeleteRunDocument = graphql(`
+  mutation DeleteRun($id: ID!) {
+    deleteRun(id: $id)
+  }
+`);
+
+/** One run, for a view that follows it as it goes. */
+export const RunDocument = graphql(`
+  query Run($id: UUID!) {
+    run(where: { id: { eq: $id } }) {
       ...RunFields
+    }
+  }
+`);
+
+/** A project's runs, newest first, a page at a time, optionally of one status. */
+export const ProjectRunsDocument = graphql(`
+  query ProjectRuns($where: RunFilters!, $limit: Int!, $offset: Int!) {
+    runs(where: $where, orderBy: { startedAt: { direction: desc, priority: 1 } }, limit: $limit, offset: $offset) {
+      ...RunSummaryFields
+    }
+  }
+`);
+
+/**
+ * What a project's agents are doing now, and have spent since `since`: the
+ * board's live marks and the project header's figures, polled together.
+ */
+export const ProjectActivityDocument = graphql(`
+  query ProjectActivity($projectId: UUID!, $since: DateTime!) {
+    live: runs(where: { projectId: { eq: $projectId }, status: { eq: "running" } }) {
+      id
+      todoId
+      laneId
+      cancelRequestedAt
+      agent {
+        id
+        name
+      }
+    }
+    spent: runsAggregate(where: { projectId: { eq: $projectId }, startedAt: { gte: $since } }) {
+      count
+      sum {
+        promptTokens
+        completionTokens
+        totalTokens
+      }
+    }
+  }
+`);
+
+/** Everything a project's runs left behind, newest first, with the todo each is on. */
+export const ProjectArtifactsDocument = graphql(`
+  query ProjectArtifacts($projectId: UUID!, $limit: Int!, $offset: Int!) {
+    artifacts(
+      where: { projectId: { eq: $projectId } }
+      orderBy: { createdAt: { direction: desc, priority: 1 } }
+      limit: $limit
+      offset: $offset
+    ) {
+      ...ArtifactFields
+      todo {
+        id
+        title
+      }
     }
   }
 `);

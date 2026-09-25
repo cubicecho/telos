@@ -323,6 +323,14 @@ describe('the runner', () => {
     const kinds = run.events.map((event: dbSchema.RunEvent) => event.kind);
     expect(kinds).toEqual(expect.arrayContaining(['hook', 'tool_call', 'tool_result']));
     expect(run.events.find((event: dbSchema.RunEvent) => event.kind === 'hook')?.text).toContain('likes their plans');
+    // What the model said is in the log as it said it, one block, and what it was told is kept.
+    expect(
+      run.events.filter((event: dbSchema.RunEvent) => event.kind === 'output').map((e: dbSchema.RunEvent) => e.text),
+    ).toEqual(['Planned.']);
+    expect(kinds).toContain('turn');
+    expect(run.userPrompt).toContain('Plan it');
+    expect(run.systemPrompt).toBeTruthy();
+    expect(run.model).toBeTruthy();
     const made = await db.select().from(dbSchema.artifacts).where(eq(dbSchema.artifacts.todoId, todoId));
     expect(made).toEqual([
       expect.objectContaining({

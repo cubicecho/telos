@@ -451,6 +451,80 @@ describe('what a run shows as it goes, and leaves behind', () => {
     expect(read.runs[0].events).toHaveLength(500);
   });
 
+  it('joins what the model streams into one block across heartbeats', async () => {
+    const todoId = await board.addTodo('Write it');
+    const { runId } = await claim(todoId);
+    await runner.expectOk(HEARTBEAT, {
+      id: runId,
+      events: [
+        { kind: 'turn', text: '1' },
+        { kind: 'thinking', text: 'Hmm, ' },
+      ],
+    });
+    await runner.expectOk(HEARTBEAT, {
+      id: runId,
+      events: [
+        { kind: 'thinking', text: 'the plan first.' },
+        { kind: 'output', text: 'x'.repeat(20_000) },
+      ],
+    });
+    const [row] = await runsOf(todoId);
+    expect(row.events.map((event: dbSchema.RunEvent) => [event.kind, event.text?.length])).toEqual([
+      ['turn', 1],
+      ['thinking', 20],
+      ['output', 16_000],
+    ]);
+    expect(row.events[1].text).toBe('Hmm, the plan first.');
+    expect(row.events[2].text?.startsWith('…')).toBe(true);
+  });
+
+  it('keeps the model, the prompt once, and what the run has spent as it goes', async () => {
+    const todoId = await board.addTodo('Write it');
+    const { runId, agent } = await claim(todoId);
+    await runner.expectOk(HEARTBEAT, {
+      id: runId,
+      prompt: { system: 'You are careful.', user: 'Write it.' },
+      usage: { promptTokens: 100, completionTokens: 20, totalTokens: 120, toolCalls: 2 },
+    });
+    await runner.expectOk(HEARTBEAT, { id: runId, prompt: { system: 'Something else.', user: 'No.' } });
+    let [row] = await runsOf(todoId);
+    expect(row).toMatchObject({
+      model: agent.model,
+      systemPrompt: 'You are careful.',
+      userPrompt: 'Write it.',
+      totalTokens: 120,
+      toolCalls: 2,
+    });
+
+    // Stopped with nothing to report, it still says what it spent.
+    await finish(runId, { status: 'stopped' });
+    [row] = await runsOf(todoId);
+    expect(row).toMatchObject({ status: 'stopped', totalTokens: 120, promptTokens: 100 });
+  });
+
+  it('takes the prompt from the finish when no heartbeat carried it', async () => {
+    const todoId = await board.addTodo('Write it');
+    const { runId } = await claim(todoId);
+    await finish(runId, { status: 'ok', output: 'Done.', prompt: { system: 'S', user: 'U' } });
+    const [row] = await runsOf(todoId);
+    expect(row).toMatchObject({ systemPrompt: 'S', userPrompt: 'U' });
+  });
+
+  it('deletes a finished run for its owner, and refuses a live one', async () => {
+    const todoId = await board.addTodo('Write it');
+    const { runId } = await claim(todoId);
+    const DELETE = `mutation ($id: ID!) { deleteRun(id: $id) }`;
+    expect((await board.person.expectError(DELETE, { id: runId })).code).toBe('CONFLICT');
+    await finish(runId, { status: 'ok', output: 'Done.' });
+
+    const stranger = await createBoard(db, 'stranger@example.com');
+    expect((await stranger.person.expectError(DELETE, { id: runId })).code).toBe('NOT_FOUND');
+    expect((await board.person.expectOk(DELETE, { id: runId })).deleteRun).toBe(true);
+    expect(await runsOf(todoId)).toEqual([]);
+    // What it did stays: its report is still on the todo.
+    expect((await thread(todoId)).map((note: { kind: string }) => note.kind)).toEqual(['report']);
+  });
+
   it('records the artifacts a run reports, drops the malformed, and lists them on the todo', async () => {
     const todoId = await board.addTodo('Write it');
     const { runId } = await claim(todoId);

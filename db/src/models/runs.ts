@@ -21,12 +21,13 @@ export type RunVerdict = (typeof RUN_VERDICTS)[number];
 
 /**
  * One thing that happened in a run, as the runner reported it: a tool call, a
- * tool's answer, what a hook added, a notice. It is the live view's feed, so it
- * is small and flat, and `text` is cut short by the server.
+ * tool's answer, what a hook added, a notice, a turn beginning, or what the
+ * model thought and said as it streamed. It is the live view's feed, so it is
+ * small and flat, and `text` is cut short by the server.
  */
 export interface RunEvent {
   at: string;
-  /** tool_call, tool_result, hook, notice. */
+  /** tool_call, tool_result, hook, notice, turn, thinking, output. */
   kind: string;
   /** The tool or hook it concerns. */
   name?: string | null;
@@ -55,6 +56,12 @@ export const runs = pgTable(
     agentId: uuid('agent_id').references(() => agents.id, { onDelete: 'set null' }),
     // The lane's contract when the run was claimed, which is what its output is read against.
     contract: text('contract').$type<LaneContract>().notNull(),
+    // The agent's model when the run was claimed: the agent can change after.
+    model: text('model'),
+    // What the agent was told, exactly, as the runner built it. Reported once,
+    // at the run's first heartbeat, so a live run shows it too.
+    systemPrompt: text('system_prompt'),
+    userPrompt: text('user_prompt'),
     status: text('status').$type<RunStatus>().notNull().default('running'),
     verdict: text('verdict').$type<RunVerdict>().notNull().default('none'),
     output: text('output'),

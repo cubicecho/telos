@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { Text, TextInput, View } from 'react-native';
 import type { StationFieldsFragment } from '@/__generated__/graphql';
 import { Ellipsis } from '@/components/app-icons';
+import type { LiveRun } from '@/components/domain/ai/project-activity';
 import type { TodoSummary } from '@/components/domain/todo/types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -36,6 +37,8 @@ export function LaneColumn({
   station,
   agentName,
   onEditStation,
+  live,
+  onWatch,
 }: {
   lane: CachedLane;
   lanes: readonly CachedLane[];
@@ -53,6 +56,9 @@ export function LaneColumn({
   station?: StationFieldsFragment | null | undefined;
   agentName?: string | undefined;
   onEditStation?: (() => void) | undefined;
+  /** The runs working todos now, by todo id, while AI is on for the project. */
+  live?: ReadonlyMap<string, LiveRun> | undefined;
+  onWatch?: ((todo: TodoSummary) => void) | undefined;
 }) {
   const [renaming, setRenaming] = useState(false);
   const renameInput = useRef<TextInput>(null);
@@ -182,6 +188,8 @@ export function LaneColumn({
             lanes={lanes}
             onMove={(target) => onMove(todo, target)}
             onEdit={() => onEdit(todo)}
+            live={live?.get(todo.id)}
+            onWatch={onWatch ? () => onWatch(todo) : undefined}
           />
         ))}
         {todos.length === 0 ? <Text className="px-1 py-2 text-muted-foreground text-xs">Drop a todo here.</Text> : null}

@@ -2,31 +2,9 @@ import { MockedProvider } from '@apollo/client/testing';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { CancelRunDocument, TodoRunsDocument } from '@/lib/graphql';
+import { CancelRunDocument, DeleteRunDocument, TodoRunsDocument } from '@/lib/graphql';
 import { TodoRuns } from '../todo-runs';
-
-function run(id: string, status: string, extra: Record<string, unknown> = {}) {
-  return {
-    __typename: 'Run',
-    id,
-    status,
-    verdict: 'none',
-    contract: 'work',
-    output: null,
-    error: null,
-    toolCalls: 0,
-    promptTokens: 0,
-    completionTokens: 0,
-    totalTokens: 0,
-    events: [],
-    startedAt: '2026-09-24T10:00:00.000Z',
-    finishedAt: status === 'running' ? null : '2026-09-24T10:01:00.000Z',
-    cancelRequestedAt: null,
-    agent: { __typename: 'Agent', id: 'a1', name: 'Reviewer' },
-    lane: { __typename: 'Lane', id: 'l1', name: 'Review' },
-    ...extra,
-  };
-}
+import { fullRun, run, runMock } from './run-fixtures';
 
 function runs(rows: unknown[], artifacts: unknown[] = []) {
   return {
@@ -92,20 +70,72 @@ describe('TodoRuns', () => {
       data: { cancelRun: run('r1', 'running', { cancelRequestedAt: '2026-09-24T10:00:30.000Z' }) },
     }));
     show([
-      runs([
-        run('r1', 'running', {
-          events: [{ at: '2026-09-24T10:00:05.000Z', kind: 'tool_call', name: 'list_todos', ok: true }],
+      runs([run('r1', 'running')]),
+      runMock(
+        fullRun('r1', 'running', {
+          events: [{ at: '2026-09-24T10:00:05.000Z', kind: 'tool_call', name: 'list_todos', text: '{}' }],
         }),
-      ]),
+      ),
       { request: { query: CancelRunDocument, variables: { id: 'r1' } }, result: cancel },
     ]);
 
-    await user.click(await screen.findByRole('button', { name: /Review · Reviewer/ }));
-    expect(screen.getByRole('log', { name: 'Run log' })).toHaveTextContent('Called list_todos ✓');
+    await user.click(await screen.findByRole('button', { name: /^Review · Reviewer/ }));
+    expect(await screen.findByRole('log', { name: 'Run log' })).toHaveTextContent('→ list_todos({})');
 
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
     await waitFor(() => expect(cancel).toHaveBeenCalled());
     expect(await screen.findByText('Stopping…')).toBeInTheDocument();
+  });
+
+  it('draws the log the way it happened, and the prompts behind a disclosure', async () => {
+    const user = userEvent.setup();
+    show([
+      runs([run('r1', 'ok', { totalTokens: 10 })]),
+      runMock(
+        fullRun('r1', 'ok', {
+          output: 'Shipped.',
+          systemPrompt: 'You are a reviewer.',
+          userPrompt: 'Review “Write it”.',
+          events: [
+            { kind: 'turn', text: 'Turn 1' },
+            { kind: 'thinking', text: 'Look at the diff first.' },
+            { kind: 'tool_call', name: 'read_file', text: '{"path":"a.ts"}' },
+            { kind: 'tool_result', name: 'read_file', ok: false, text: 'ENOENT' },
+            { kind: 'output', text: 'Shipped.' },
+          ],
+        }),
+      ),
+    ]);
+
+    await user.click(await screen.findByRole('button', { name: /^Review · Reviewer/ }));
+    const log = await screen.findByRole('log', { name: 'Run log' });
+    expect(within(log).getByText('Turn 1')).toBeInTheDocument();
+    expect(within(log).getByText('Look at the diff first.')).toBeInTheDocument();
+    expect(log).toHaveTextContent('→ read_file({"path":"a.ts"})');
+    expect(log).toHaveTextContent('← read_file failed: ENOENT');
+    // The output streamed into the log, so it is not drawn twice.
+    expect(screen.getAllByText('Shipped.')).toHaveLength(1);
+
+    expect(screen.queryByText('You are a reviewer.')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /What it was told/ }));
+    expect(screen.getByText('You are a reviewer.')).toBeInTheDocument();
+    expect(screen.getByText('Model qwen3')).toBeInTheDocument();
+  });
+
+  it('deletes a finished run once confirmed, and offers no delete on a live one', async () => {
+    const user = userEvent.setup();
+    const remove = vi.fn(() => ({ data: { deleteRun: true } }));
+    show([
+      runs([run('r2', 'running'), run('r1', 'error', { error: 'Timed out' })]),
+      { request: { query: DeleteRunDocument, variables: { id: 'r1' } }, result: remove },
+    ]);
+
+    const items = await screen.findAllByRole('listitem');
+    expect(within(items[0]).queryByRole('button', { name: /Delete the run/ })).not.toBeInTheDocument();
+    await user.click(within(items[1]).getByRole('button', { name: /Delete the run/ }));
+    await user.click(await screen.findByRole('button', { name: 'Delete' }));
+    await waitFor(() => expect(remove).toHaveBeenCalled());
+    await waitFor(() => expect(screen.getAllByRole('listitem')).toHaveLength(1));
   });
 
   it('lists the artifacts', async () => {

@@ -97,12 +97,26 @@ const RUNS_SDL = parse(`
 
   "Something that happened in a run, for the live view."
   input RunEventInput {
-    "tool_call, tool_result, hook or notice."
+    "tool_call, tool_result, hook, notice, turn, thinking or output."
     kind: String!
     "The tool or hook it concerns."
     name: String
     ok: Boolean
     text: String
+  }
+
+  "What a run's agent was told, exactly."
+  input RunPromptInput {
+    system: String!
+    user: String!
+  }
+
+  "What a run has spent so far, counted from its start."
+  input RunUsageInput {
+    toolCalls: Int
+    promptTokens: Int!
+    completionTokens: Int!
+    totalTokens: Int!
   }
 
   "Something a run left behind: where it is, not what is in it."
@@ -134,6 +148,8 @@ const RUNS_SDL = parse(`
     todos: [ProposedTodoInput!]
     "What happened since the last heartbeat."
     events: [RunEventInput!]
+    "What the agent was told, when no heartbeat reported it."
+    prompt: RunPromptInput
     "What the run left behind."
     artifacts: [ArtifactInput!]
   }
@@ -147,11 +163,13 @@ const RUNS_SDL = parse(`
     "Starts a run of a ready todo at its station. Null when it is no longer ready. The runner's only."
     claimRun(todoId: ID!, laneId: ID!): RunClaim
     "Keeps a run's lease. True means stop: somebody asked, or AI was switched off. The runner's only."
-    heartbeatRun(id: ID!, events: [RunEventInput!]): Boolean!
+    heartbeatRun(id: ID!, events: [RunEventInput!], prompt: RunPromptInput, usage: RunUsageInput): Boolean!
     "Records what a run came to and moves its todo on. The runner's only."
     finishRun(id: ID!, result: RunResultInput!): Run!
     "Asks a running run to stop. The agent hears it on its next heartbeat."
     cancelRun(id: ID!): Run!
+    "Deletes a finished run and its log. What it did to the todo, its notes and history, stays."
+    deleteRun(id: ID!): Boolean!
   }
 `);
 
@@ -161,6 +179,15 @@ const OUTCOMES = new Set(['ok', 'error', 'stopped']);
 export const MAX_RUN_EVENTS = 500;
 /** The most of one event's text kept: enough to read, not a transcript. */
 const EVENT_TEXT_CHARS = 4000;
+/**
+ * The most of one streamed block kept — a turn's thinking, or its reply — which
+ * grows across heartbeats. The end is kept, since that is where a live view is.
+ */
+const STREAM_TEXT_CHARS = 16_000;
+/** The kinds that arrive a piece at a time and are joined into one block. */
+const STREAMED = new Set(['thinking', 'output']);
+/** The most of a prompt kept. */
+const PROMPT_CHARS = 64_000;
 /** The most artifacts one run may report. */
 const MAX_ARTIFACTS = 100;
 
@@ -353,14 +380,78 @@ interface ArtifactInput {
  */
 function withEvents(existing: dbSchema.RunEvent[] | null, incoming: RunEventInput[] | null | undefined) {
   const at = new Date().toISOString();
-  const added = (incoming ?? []).map((event) => ({
-    at,
-    kind: event.kind.slice(0, 40),
-    name: event.name?.slice(0, 200) ?? null,
-    ok: event.ok ?? null,
-    text: event.text?.slice(0, EVENT_TEXT_CHARS) ?? null,
-  }));
-  return [...(existing ?? []), ...added].slice(-MAX_RUN_EVENTS);
+  const events = [...(existing ?? [])];
+  for (const event of incoming ?? []) {
+    const kind = event.kind.slice(0, 40);
+    const last = events.at(-1);
+    // A block the model is still streaming carries on where the last
+    // heartbeat left it, rather than starting a new entry every few seconds.
+    if (STREAMED.has(kind) && last?.kind === kind) {
+      events[events.length - 1] = {
+        ...last,
+        text: keepEnd(`${last.text ?? ''}${event.text ?? ''}`, STREAM_TEXT_CHARS),
+      };
+      continue;
+    }
+    events.push({
+      at,
+      kind,
+      name: event.name?.slice(0, 200) ?? null,
+      ok: event.ok ?? null,
+      text: STREAMED.has(kind)
+        ? keepEnd(event.text ?? '', STREAM_TEXT_CHARS)
+        : (event.text?.slice(0, EVENT_TEXT_CHARS) ?? null),
+    });
+  }
+  return events.slice(-MAX_RUN_EVENTS);
+}
+
+/**
+ * The end of `text`, marked as cut when it was.
+ *
+ * @param text The whole.
+ * @param limit The most kept.
+ * @returns What fits.
+ */
+function keepEnd(text: string, limit: number): string {
+  return text.length <= limit ? text : `…${text.slice(-(limit - 1))}`;
+}
+
+/**
+ * The columns a heartbeat's prompt and usage set. The prompt is written once:
+ * it is what the run was told at its start, and no later report changes that.
+ *
+ * @param run The run as stored.
+ * @param prompt What the runner says the agent was told.
+ * @param usage What the runner says the run has spent.
+ * @returns Columns to set.
+ */
+function reported(run: AnyRow, prompt: RunPrompt | null | undefined, usage: RunUsage | null | undefined) {
+  return {
+    ...(prompt && run.systemPrompt == null && run.userPrompt == null
+      ? { systemPrompt: prompt.system.slice(0, PROMPT_CHARS), userPrompt: prompt.user.slice(0, PROMPT_CHARS) }
+      : {}),
+    ...(usage
+      ? {
+          promptTokens: Math.max(0, usage.promptTokens),
+          completionTokens: Math.max(0, usage.completionTokens),
+          totalTokens: Math.max(0, usage.totalTokens),
+          ...(usage.toolCalls == null ? {} : { toolCalls: Math.max(0, usage.toolCalls) }),
+        }
+      : {}),
+  };
+}
+
+interface RunPrompt {
+  system: string;
+  user: string;
+}
+
+interface RunUsage {
+  toolCalls?: number | null;
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
 }
 
 /**
@@ -410,16 +501,20 @@ interface RunResult {
   totalTokens?: number | null;
   todos?: ProposedTodo[] | null;
   events?: RunEventInput[] | null;
+  prompt?: RunPrompt | null;
   artifacts?: ArtifactInput[] | null;
 }
 
-/** The counters a result reports, as columns. */
-function spend(result: RunResult) {
+/**
+ * The counters a result reports, as columns. One it leaves out keeps what the
+ * heartbeats reported, so a run stopped mid-turn still says what it spent.
+ */
+function spend(run: AnyRow, result: RunResult) {
   return {
-    toolCalls: result.toolCalls ?? 0,
-    promptTokens: result.promptTokens ?? 0,
-    completionTokens: result.completionTokens ?? 0,
-    totalTokens: result.totalTokens ?? 0,
+    toolCalls: result.toolCalls ?? run.toolCalls ?? 0,
+    promptTokens: result.promptTokens ?? run.promptTokens ?? 0,
+    completionTokens: result.completionTokens ?? run.completionTokens ?? 0,
+    totalTokens: result.totalTokens ?? run.totalTokens ?? 0,
   };
 }
 
@@ -458,7 +553,14 @@ async function finish(context: Context, runId: string, result: RunResult): Promi
       const events = aiOff ? run.events : withEvents(run.events, result.events);
       const [stopped] = await tx
         .update(dbSchema.runs)
-        .set({ status: 'stopped', output, events, finishedAt: new Date(), ...spend(result) })
+        .set({
+          status: 'stopped',
+          output,
+          events,
+          finishedAt: new Date(),
+          ...spend(run, result),
+          ...(aiOff ? {} : reported(run, result.prompt, null)),
+        })
         .where(eq(dbSchema.runs.id, run.id))
         .returning();
       return stopped;
@@ -531,7 +633,8 @@ async function finish(context: Context, runId: string, result: RunResult): Promi
         output,
         error,
         finishedAt: new Date(),
-        ...spend(result),
+        ...spend(run, result),
+        ...reported(run, result.prompt, null),
       })
       .where(eq(dbSchema.runs.id, run.id))
       .returning();
@@ -608,6 +711,7 @@ export function applyRunsExtension(schema: GraphQLSchema): GraphQLSchema {
             laneId: lane.id,
             agentId: agent.id,
             contract: lane.contract,
+            model: agent.model,
             leaseExpiresAt: leaseFromNow(),
           })
           .returning();
@@ -630,7 +734,7 @@ export function applyRunsExtension(schema: GraphQLSchema): GraphQLSchema {
 
   mutations.heartbeatRun.resolve = async (
     _parent: unknown,
-    args: { id: string; events?: RunEventInput[] | null },
+    args: { id: string; events?: RunEventInput[] | null; prompt?: RunPrompt | null; usage?: RunUsage | null },
     context: Context,
   ) => {
     requireSystem(context);
@@ -641,14 +745,19 @@ export function applyRunsExtension(schema: GraphQLSchema): GraphQLSchema {
         await tx.update(dbSchema.runs).set({ cancelRequestedAt: new Date() }).where(eq(dbSchema.runs.id, run.id));
         return true;
       }
-      const events = aiOff ? run.events : withEvents(run.events, args.events);
+      if (aiOff) return true;
+      const events = withEvents(run.events, args.events);
+      const also = reported(run, args.prompt, args.usage);
       if (run.cancelRequestedAt) {
-        await tx.update(dbSchema.runs).set({ events }).where(eq(dbSchema.runs.id, run.id));
+        await tx
+          .update(dbSchema.runs)
+          .set({ events, ...also })
+          .where(eq(dbSchema.runs.id, run.id));
         return true;
       }
       await tx
         .update(dbSchema.runs)
-        .set({ leaseExpiresAt: leaseFromNow(), events })
+        .set({ leaseExpiresAt: leaseFromNow(), events, ...also })
         .where(eq(dbSchema.runs.id, run.id));
       return false;
     });
@@ -674,6 +783,22 @@ export function applyRunsExtension(schema: GraphQLSchema): GraphQLSchema {
       .where(eq(dbSchema.runs.id, run.id))
       .returning();
     return cancelled;
+  };
+
+  mutations.deleteRun.resolve = async (_parent: unknown, args: { id: string }, context: Context) => {
+    const userId = requireAuth(context);
+    const db = context.db as AnyRow;
+    const [run] = await db
+      .select({ id: dbSchema.runs.id, status: dbSchema.runs.status })
+      .from(dbSchema.runs)
+      .where(and(eq(dbSchema.runs.id, args.id), eq(dbSchema.runs.userId, userId)));
+    if (!run) throw notFound('Run');
+    // A live run is the runner's until it ends; cancel it first.
+    if (run.status === 'running') {
+      throw new GraphQLError('Stop the run before deleting it.', { extensions: { code: 'CONFLICT' } });
+    }
+    await db.delete(dbSchema.runs).where(eq(dbSchema.runs.id, run.id));
+    return true;
   };
 
   return extendedSchema;

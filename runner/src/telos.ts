@@ -25,7 +25,7 @@ export interface McpServerRow {
 
 /** Something that happened in a run, for the live view. */
 export interface RunEvent {
-  kind: 'tool_call' | 'tool_result' | 'hook' | 'notice';
+  kind: 'tool_call' | 'tool_result' | 'hook' | 'notice' | 'turn' | 'thinking' | 'output';
   name?: string | null;
   ok?: boolean | null;
   text?: string | null;
@@ -91,7 +91,31 @@ export interface RunResult {
   totalTokens?: number;
   todos?: ProposedTodo[];
   events?: RunEvent[];
+  /** What the agent was told, when no heartbeat got it there first. */
+  prompt?: RunPrompt;
   artifacts?: ArtifactDraft[];
+}
+
+/** What a run's agent was told. */
+export interface RunPrompt {
+  system: string;
+  user: string;
+}
+
+/** What a run has spent so far, from its start. */
+export interface RunUsage {
+  toolCalls?: number;
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+}
+
+/** What a heartbeat carries besides the lease: what happened since the last one. */
+export interface Beat {
+  events?: RunEvent[];
+  /** Sent until telos has it. */
+  prompt?: RunPrompt;
+  usage?: RunUsage;
 }
 
 /** The runner's calls into telos. An interface so a test can stand in for it. */
@@ -99,7 +123,7 @@ export interface Telos {
   queue(limit?: number): Promise<ReadyTodo[]>;
   claim(todoId: string, laneId: string): Promise<Claim | null>;
   /** True means stop. */
-  heartbeat(runId: string, events?: RunEvent[]): Promise<boolean>;
+  heartbeat(runId: string, beat?: Beat): Promise<boolean>;
   finish(runId: string, result: RunResult): Promise<void>;
 }
 
@@ -117,7 +141,9 @@ const CLAIM = `mutation ($todoId: ID!, $laneId: ID!) {
     }
   }
 }`;
-const HEARTBEAT = `mutation ($id: ID!, $events: [RunEventInput!]) { heartbeatRun(id: $id, events: $events) }`;
+const HEARTBEAT = `mutation ($id: ID!, $events: [RunEventInput!], $prompt: RunPromptInput, $usage: RunUsageInput) {
+  heartbeatRun(id: $id, events: $events, prompt: $prompt, usage: $usage)
+}`;
 const FINISH = `mutation ($id: ID!, $result: RunResultInput!) { finishRun(id: $id, result: $result) { id } }`;
 
 /** A GraphQL answer carrying errors, as one error. */
@@ -171,8 +197,15 @@ export function createTelos(options: { telosUrl: string; runnerKey: string; fetc
   return {
     queue: async (limit = 20) => (await request<{ runnerQueue: ReadyTodo[] }>(QUEUE, { limit })).runnerQueue,
     claim: async (todoId, laneId) => (await request<{ claimRun: Claim | null }>(CLAIM, { todoId, laneId })).claimRun,
-    heartbeat: async (runId, events = []) =>
-      (await request<{ heartbeatRun: boolean }>(HEARTBEAT, { id: runId, events })).heartbeatRun,
+    heartbeat: async (runId, beat = {}) =>
+      (
+        await request<{ heartbeatRun: boolean }>(HEARTBEAT, {
+          id: runId,
+          events: beat.events ?? [],
+          prompt: beat.prompt ?? null,
+          usage: beat.usage ?? null,
+        })
+      ).heartbeatRun,
     finish: async (runId, result) => {
       await request(FINISH, { id: runId, result });
     },

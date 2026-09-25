@@ -3,6 +3,8 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
 import { Columns3, List } from '@/components/app-icons';
+import { useProjectActivity } from '@/components/domain/ai/project-activity';
+import { ProjectArtifacts, ProjectRuns } from '@/components/domain/ai/project-runs';
 import { Board } from '@/components/domain/lane/board';
 import { ProjectPage } from '@/components/domain/project/project-page';
 import { TodoComposer } from '@/components/domain/todo/todo-composer';
@@ -14,16 +16,19 @@ import { EmptyState } from '@/components/page';
 import { PageLayout } from '@/components/page-layout';
 import { SectionHeading } from '@/components/section-heading';
 import { Button } from '@/components/ui/button';
-import { CircleAlert } from '@/components/ui/icons';
+import { CircleAlert, Play, Upload } from '@/components/ui/icons';
 import type { InputHandle } from '@/components/ui/input';
 import { LoadFailure, LoadState } from '@/components/ui/load-failure';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useAi } from '@/lib/ai';
 import { filterTodos, isFiltering, NO_FILTER, type TodoFilter } from '@/lib/filter-todos';
 import { ProjectDocument, ProjectLanesDocument, ProjectTodosDocument } from '@/lib/graphql';
 import { useHotkey } from '@/lib/hotkeys';
 import { cn } from '@/lib/utils';
 
-type ProjectView = 'list' | 'board';
+type ProjectView = 'list' | 'board' | 'runs' | 'artifacts';
+
+const VIEWS: readonly ProjectView[] = ['list', 'board', 'runs', 'artifacts'];
 
 /** Focus a field and select what is in it — so typing replaces. */
 function focusAndSelect(field: InputHandle | null): void {
@@ -87,6 +92,11 @@ export default function ProjectScreen() {
     if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) active.blur();
   });
 
+  // Asked for whatever the project's own switch says: runs are history, and a
+  // project whose AI is off still has what its agents did before.
+  const ai = useAi();
+  const activity = useProjectActivity(id as string, { skip: !id || !ai.on });
+
   // Three queries, three failures, and they are not the same failure: the
   // project not loading means there is no screen, while the todos or the lanes
   // not loading means the header is still right and only one panel is empty.
@@ -149,7 +159,11 @@ export default function ProjectScreen() {
     );
   }
 
-  const current: ProjectView = view === 'board' ? 'board' : 'list';
+  const requested = VIEWS.find((name) => name === view) ?? 'list';
+  // The AI views exist only while AI is on for the account; a link to one
+  // opened without it lands on the list.
+  const current: ProjectView = !ai.on && (requested === 'runs' || requested === 'artifacts') ? 'list' : requested;
+  const todoView = current === 'list' || current === 'board';
   const all = (todosQuery.data?.todos ?? []) as TodoSummary[];
   const lanes = lanesData?.lanes ?? [];
   // Filtered once, here, and handed to whichever view is showing — so the two
@@ -173,6 +187,7 @@ export default function ProjectScreen() {
     // inset of its own, so each part adds `px-4` to line up with the header.
     <ProjectPage
       project={project}
+      activity={ai.on && project.aiEnabled ? activity : undefined}
       content={
         <View className="gap-6 pt-2 pb-6">
           <Tabs
@@ -183,9 +198,19 @@ export default function ProjectScreen() {
             {/* The composer and the filter serve both views, so they sit above
             the switcher, which sits directly above what it switches. */}
             <View className={cn(PROSE_COLUMN, 'gap-6 px-4')}>
-              <TodoComposer ref={composerRef} projectId={project.id} nextPosition={nextPosition} lanes={lanes} />
-
-              <TodoFilterBar ref={filterRef} filter={filter} onChange={setFilter} todos={all} matched={todos.length} />
+              {/* Adding and filtering todos mean nothing over a list of runs. */}
+              {todoView ? (
+                <>
+                  <TodoComposer ref={composerRef} projectId={project.id} nextPosition={nextPosition} lanes={lanes} />
+                  <TodoFilterBar
+                    ref={filterRef}
+                    filter={filter}
+                    onChange={setFilter}
+                    todos={all}
+                    matched={todos.length}
+                  />
+                </>
+              ) : null}
 
               <TabsList aria-label="Project view" className="self-start">
                 <TabsTrigger value="list">
@@ -196,6 +221,18 @@ export default function ProjectScreen() {
                   <Columns3 />
                   Board
                 </TabsTrigger>
+                {ai.on ? (
+                  <>
+                    <TabsTrigger value="runs">
+                      <Play />
+                      Runs
+                    </TabsTrigger>
+                    <TabsTrigger value="artifacts">
+                      <Upload />
+                      Artifacts
+                    </TabsTrigger>
+                  </>
+                ) : null}
               </TabsList>
             </View>
 
@@ -215,10 +252,30 @@ export default function ProjectScreen() {
                     {lanesError && lanes.length === 0 ? (
                       <LoadFailure error={lanesError} onRetry={refetchLanes} what="the board" />
                     ) : (
-                      <Board projectId={project.id} aiEnabled={project.aiEnabled} lanes={lanes} todos={todos} />
+                      <Board
+                        projectId={project.id}
+                        aiEnabled={project.aiEnabled}
+                        lanes={lanes}
+                        todos={todos}
+                        live={activity.live}
+                      />
                     )}
                   </View>
                 </TabsContent>
+                {ai.on ? (
+                  <>
+                    <TabsContent value="runs" className="mt-0">
+                      <View className={cn(PROSE_COLUMN, 'px-4')}>
+                        {current === 'runs' ? <ProjectRuns projectId={project.id} activity={activity} /> : null}
+                      </View>
+                    </TabsContent>
+                    <TabsContent value="artifacts" className="mt-0">
+                      <View className={cn(PROSE_COLUMN, 'px-4')}>
+                        {current === 'artifacts' ? <ProjectArtifacts projectId={project.id} /> : null}
+                      </View>
+                    </TabsContent>
+                  </>
+                ) : null}
                 <TabsContent value="list" className="mt-0">
                   {/* The column is a view of its own: on web a display class on the
                   panel itself would beat the `hidden` radix gives it when inactive. */}

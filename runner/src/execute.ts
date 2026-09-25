@@ -17,7 +17,7 @@ import {
   RECORD_ARTIFACT_DEFINITION,
 } from './artifacts.ts';
 import { briefPrompt, proposedTodos, systemPromptFor } from './prompts.ts';
-import type { Claim, RunEvent, RunResult, Telos } from './telos.ts';
+import type { Beat, Claim, RunEvent, RunPrompt, RunResult, RunUsage, Telos } from './telos.ts';
 import { openTools } from './tools.ts';
 
 // One run, start to finish: open the agent's tools, run the loop, keep the
@@ -25,11 +25,13 @@ import { openTools } from './tools.ts';
 // decided here — finishRun reads the result against the lane.
 
 /**
- * How often a run renews its lease and sends what it has done since. Telos
- * gives a claim two minutes; this is often because it is also the live view's
- * refresh.
+ * How often a run sends what it has done since it last did: the live view's
+ * refresh. A beat with nothing to say is skipped until the lease wants one.
  */
-export const HEARTBEAT_MS = 10_000;
+export const HEARTBEAT_MS = 2_000;
+
+/** The longest a run goes without renewing its lease. Telos gives a claim two minutes. */
+export const LEASE_RENEW_MS = 10_000;
 
 /** Every hook's `{{host}}`, so a server shared with other hosts can tell them apart. */
 export const HOST = 'telos';
@@ -37,35 +39,89 @@ export const HOST = 'telos';
 /** The most of a tool's arguments or answer an event carries. Telos cuts again. */
 const EVENT_TEXT_CHARS = 2000;
 
+/** The most of a streamed block one beat carries; telos keeps the end of the whole. */
+const STREAM_TEXT_CHARS = 16_000;
+
+/** The kinds that arrive a token at a time and are joined into one block. */
+const STREAMED = new Set<RunEvent['kind']>(['thinking', 'output']);
+
 /**
- * What a run has done since it last told telos. The heartbeat and the finish
- * drain it; a heartbeat that fails puts its events back.
+ * What a run has done since it last told telos: its events, the prompt until
+ * telos has it, and what it has spent. The heartbeat and the finish drain it;
+ * a heartbeat that fails puts what it took back.
  */
-class EventFeed {
+export class EventFeed {
   #pending: RunEvent[] = [];
+  #prompt: RunPrompt | undefined;
+  #usage: RunUsage | undefined;
+  #usageSent = true;
+  #toolCalls = 0;
 
   push(event: RunEvent): void {
+    const last = this.#pending.at(-1);
+    if (STREAMED.has(event.kind)) {
+      // A token at a time is a block at a time by the time anyone reads it.
+      if (last?.kind === event.kind) {
+        last.text = `${last.text ?? ''}${event.text ?? ''}`.slice(-STREAM_TEXT_CHARS);
+        return;
+      }
+      this.#pending.push({ ...event, text: event.text ?? '' });
+      return;
+    }
     this.#pending.push({ ...event, text: event.text?.slice(0, EVENT_TEXT_CHARS) ?? null });
   }
 
-  drain(): RunEvent[] {
-    const drained = this.#pending;
-    this.#pending = [];
-    return drained;
+  /** What the agent was told; sent with every beat until one lands. */
+  prompt(prompt: RunPrompt): void {
+    this.#prompt = prompt;
   }
 
-  restore(events: RunEvent[]): void {
-    this.#pending = [...events, ...this.#pending];
+  /** Whether a beat now would say anything. */
+  get idle(): boolean {
+    return this.#pending.length === 0 && !this.#prompt && this.#usageSent;
+  }
+
+  drain(): Beat {
+    const beat: Beat = {
+      events: this.#pending,
+      ...(this.#prompt ? { prompt: this.#prompt } : {}),
+      ...(this.#usage && !this.#usageSent ? { usage: this.#usage } : {}),
+    };
+    this.#pending = [];
+    this.#prompt = undefined;
+    this.#usageSent = true;
+    return beat;
+  }
+
+  restore(beat: Beat): void {
+    this.#pending = [...(beat.events ?? []), ...this.#pending];
+    if (beat.prompt && !this.#prompt) this.#prompt = beat.prompt;
+    if (beat.usage) this.#usageSent = false;
   }
 
   /**
-   * The loop's events worth a watcher's time: tool traffic and notices. Tokens
-   * as they stream are left to the finish's output.
+   * The loop's events worth a watcher's time: tool traffic, notices, turns,
+   * what the model thinks and says as it streams, and what it has spent.
    *
    * @param event What agent-core emitted.
    */
   fromLoop(event: RunEventInput): void {
-    if (event.kind === 'tool-call' || event.kind === 'tool-result') {
+    if (event.kind === 'thinking' || event.kind === 'output') {
+      if (event.text) this.push({ kind: event.kind, text: event.text });
+    } else if (event.kind === 'turn') {
+      this.push({ kind: 'turn', text: event.text || null });
+    } else if (event.kind === 'usage') {
+      if (event.usage) {
+        this.#usage = {
+          toolCalls: this.#toolCalls,
+          promptTokens: event.usage.promptTokens,
+          completionTokens: event.usage.completionTokens,
+          totalTokens: event.usage.totalTokens,
+        };
+        this.#usageSent = false;
+      }
+    } else if (event.kind === 'tool-call' || event.kind === 'tool-result') {
+      if (event.kind === 'tool-call') this.#toolCalls++;
       this.push({
         kind: event.kind === 'tool-call' ? 'tool_call' : 'tool_result',
         name: event.name ?? null,
@@ -135,22 +191,34 @@ export async function execute(claim: Claim, options: ExecuteOptions): Promise<Ru
   let stopRequested = false;
   const feed = new EventFeed();
   const artifacts = new ArtifactLog();
+  const heartbeatMs = options.heartbeatMs ?? HEARTBEAT_MS;
+  let lastBeat = Date.now();
+  let beating = false;
   const beat = setInterval(() => {
-    const events = feed.drain();
-    options.telos.heartbeat(claim.runId, events).then(
-      (halt) => {
-        if (halt && !stopRequested) {
-          stopRequested = true;
-          log('telos asked this run to stop');
-          stop.abort(new Error('Stopped.'));
-        }
-      },
-      (error) => {
-        feed.restore(events);
-        log(`heartbeat failed: ${messageOf(error)}`);
-      },
-    );
-  }, options.heartbeatMs ?? HEARTBEAT_MS);
+    // One beat at a time, and none with nothing to say until the lease wants it.
+    if (beating || (feed.idle && Date.now() - lastBeat < Math.max(LEASE_RENEW_MS, heartbeatMs))) return;
+    beating = true;
+    const sent = feed.drain();
+    options.telos
+      .heartbeat(claim.runId, sent)
+      .then(
+        (halt) => {
+          lastBeat = Date.now();
+          if (halt && !stopRequested) {
+            stopRequested = true;
+            log('telos asked this run to stop');
+            stop.abort(new Error('Stopped.'));
+          }
+        },
+        (error) => {
+          feed.restore(sent);
+          log(`heartbeat failed: ${messageOf(error)}`);
+        },
+      )
+      .finally(() => {
+        beating = false;
+      });
+  }, heartbeatMs);
 
   let pool: McpPool | null = null;
   let result: RunResult;
@@ -187,7 +255,15 @@ export async function execute(claim: Claim, options: ExecuteOptions): Promise<Ru
   } finally {
     await pool?.shutdown().catch((error: unknown) => log(`closing tools failed: ${messageOf(error)}`));
   }
-  result = { ...result, events: feed.drain(), artifacts: artifacts.list() };
+  const last = feed.drain();
+  result = {
+    ...result,
+    events: last.events ?? [],
+    ...(last.prompt ? { prompt: last.prompt } : {}),
+    // A run that ended without a reply still spent what the loop last said.
+    ...(result.totalTokens == null && last.usage ? last.usage : {}),
+    artifacts: artifacts.list(),
+  };
 
   log(`${result.status}${result.error ? `: ${result.error}` : ''}`);
   try {
@@ -231,6 +307,8 @@ async function work(claim: Claim, pool: McpPool, options: WorkOptions): Promise<
   const { signal, log, feed, artifacts } = options;
   const { agent, brief } = claim;
   const prompt = briefPrompt(brief);
+  const system = systemPromptFor(brief, agent.systemPrompt);
+  feed.prompt({ system, user: prompt });
   const config = {
     baseUrl: agent.baseUrl,
     apiKey: agent.apiKey ?? '',
@@ -251,7 +329,7 @@ async function work(claim: Claim, pool: McpPool, options: WorkOptions): Promise<
 
   const loop = await runAgentLoop({
     config,
-    system: systemPromptFor(brief, agent.systemPrompt),
+    system,
     messages: [{ role: 'user', content: prompt }],
     tools: [...pool.tools(), RECORD_ARTIFACT_DEFINITION],
     ...(catalog ? { catalog, loaded: [RECORD_ARTIFACT] } : {}),

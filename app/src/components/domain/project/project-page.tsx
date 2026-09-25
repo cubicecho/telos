@@ -2,6 +2,7 @@ import { useMutation } from '@apollo/client';
 import { useRouter } from 'expo-router';
 import { type ReactNode, useState } from 'react';
 import { Text, View } from 'react-native';
+import { type ProjectActivity, ProjectActivityLine } from '@/components/domain/ai/project-activity';
 import { ProjectAiSwitch } from '@/components/domain/ai/project-ai-switch';
 import { LabelBadge, type LabelSummary } from '@/components/domain/label/label-badge';
 import { LabelPicker } from '@/components/domain/label/label-picker';
@@ -37,7 +38,16 @@ export interface ProjectOverviewData {
  * reading column. The dialogs and mutations behind the header's buttons live here with
  * them.
  */
-export function ProjectPage({ project, content }: { project: ProjectOverviewData; content: ReactNode }) {
+export function ProjectPage({
+  project,
+  content,
+  activity,
+}: {
+  project: ProjectOverviewData;
+  content: ReactNode;
+  /** What its agents are doing, while AI is on for the account and the project. */
+  activity?: ProjectActivity | undefined;
+}) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -120,6 +130,7 @@ export function ProjectPage({ project, content }: { project: ProjectOverviewData
           </View>
 
           <ProjectAiSwitch projectId={project.id} enabled={project.aiEnabled} />
+          {activity ? <ProjectActivityLine activity={activity} /> : null}
 
           {actionError ? (
             <Text className="text-destructive text-sm" aria-live="polite">
