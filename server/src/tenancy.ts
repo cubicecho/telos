@@ -1,6 +1,6 @@
 import * as dbSchema from '@telos/db/schema';
 import type { BuildSchemaConfig, RowScope } from '@vantreeseba/drizzle-graphql';
-import { and, eq, inArray, type SQL, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNull, type SQL, sql } from 'drizzle-orm';
 import { type Context, isAiActor } from './context.ts';
 import { requireAuth } from './resolvers/auth.ts';
 
@@ -70,6 +70,7 @@ function aiTodoIds(context: Context, userId: string) {
       and(
         eq(dbSchema.todos.userId, userId),
         eq(dbSchema.todos.aiIgnored, false),
+        isNull(dbSchema.todos.archivedAt),
         inArray(dbSchema.todos.projectId, aiProjectIds(context, userId)),
       ),
     );

@@ -270,10 +270,12 @@ describe('parent todos', () => {
     expect((await setParent(todoId, theirs)).errors?.[0].extensions?.code).toBe('NOT_FOUND');
   });
 
-  it('leaves the pieces standing when the parent is deleted', async () => {
+  it('leaves the pieces standing when the parent is deleted for good', async () => {
     const childId = (await client.expectOk(CREATE_TODO, { projectId, title: 'Piece' })).createTodo.id;
     await client.expectOk(UPDATE, { id: childId, set: { parentId: todoId } });
-    await client.expectOk(`mutation ($id: UUID!) { deleteTodo(where: { id: { eq: $id } }) { id } }`, { id: todoId });
+    await client.expectOk(`mutation ($id: UUID!) { deleteTodo(where: { id: { eq: $id } }, hard: true) { id } }`, {
+      id: todoId,
+    });
     const read = await client.expectOk(`query ($id: UUID!) { todo(where: { id: { eq: $id } }) { parent { id } } }`, {
       id: childId,
     });

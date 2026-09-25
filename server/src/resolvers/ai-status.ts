@@ -1,5 +1,5 @@
 import * as dbSchema from '@telos/db/schema';
-import { and, asc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { extendSchema, GraphQLError, type GraphQLObjectType, type GraphQLSchema, parse } from 'graphql';
 import { requireAi } from '../ai-gate.ts';
 import type { Context } from '../context.ts';
@@ -156,7 +156,7 @@ export function applyAiStatusExtension(schema: GraphQLSchema): GraphQLSchema {
     const [todo] = await db
       .select()
       .from(dbSchema.todos)
-      .where(and(eq(dbSchema.todos.id, args.id), eq(dbSchema.todos.userId, userId)));
+      .where(and(eq(dbSchema.todos.id, args.id), eq(dbSchema.todos.userId, userId), isNull(dbSchema.todos.archivedAt)));
     if (!todo) throw new GraphQLError('Todo not found', { extensions: { code: 'NOT_FOUND' } });
     if (!todo.laneId) {
       throw new GraphQLError('It is in no lane, so no station can take it.', {

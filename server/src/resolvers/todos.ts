@@ -1,5 +1,5 @@
 import * as dbSchema from '@telos/db/schema';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { extendSchema, GraphQLError, type GraphQLObjectType, type GraphQLSchema, parse } from 'graphql';
 import { assertNoCycle, assertNotBlocked } from '../blocking.ts';
 import { type Context, isAiActor } from '../context.ts';
@@ -48,7 +48,7 @@ async function loadOwnedTodo(context: Context, id: string): Promise<AnyRow> {
   const rows = await (context.db as AnyRow)
     .select()
     .from(dbSchema.todos)
-    .where(and(eq(dbSchema.todos.id, id), eq(dbSchema.todos.userId, userId)))
+    .where(and(eq(dbSchema.todos.id, id), eq(dbSchema.todos.userId, userId), isNull(dbSchema.todos.archivedAt)))
     .limit(1);
   if (rows.length === 0) {
     throw new GraphQLError('Todo not found', { extensions: { code: 'NOT_FOUND' } });

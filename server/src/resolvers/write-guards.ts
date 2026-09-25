@@ -260,7 +260,13 @@ export const onWrite: NonNullable<BuildSchemaConfig['onWrite']> = {
     // re-asserted over the caller's todos instead. The throw rolls the
     // transaction back, statement included.
     after: async ({ args, context, operation, tx }: WriteHookPayload) => {
-      if (operation === 'delete' || operation === 'restore') return;
+      if (operation === 'restore') return;
+      // Archiving a todo stops whatever agent is working it. A hard delete
+      // takes its runs with it.
+      if (operation === 'delete') {
+        if (!args.hard) await cancelRunsUnder(tx, { userId: requireAuth(context as Context), archivedTodos: true });
+        return;
+      }
       const created = operation === 'insert' || operation === 'upsert';
       const userId = requireAuth(context as Context);
       if (states(args, 'parentId')) await assertParentsSound(tx, userId);

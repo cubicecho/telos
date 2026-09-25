@@ -40,6 +40,11 @@ export const todos = pgTable(
     // most todos are not. Unlike completedAt this carries no invariant: no
     // lane, guard or count reads it, so it is safe for a plain update to set.
     dueAt: timestamp('due_at', { withTimezone: true }),
+    // Put away, not gone: set by `deleteTodo`, cleared by `restoreTodo`, and
+    // only `deleteTodo(hard: true)` removes the row. The generated reads hide
+    // archived todos (build-schema.ts `softDelete`); the hand-written SQL has
+    // to say so itself.
+    archivedAt: timestamp('archived_at', { withTimezone: true }),
     position: integer('position').notNull().default(0),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     // `$onUpdate` rather than a stamp at each call site. The hand-written
@@ -57,6 +62,7 @@ export const todos = pgTable(
     index('idx_todos_completed_at').on(t.completedAt),
     index('idx_todos_lane_id').on(t.laneId),
     index('idx_todos_parent_id').on(t.parentId),
+    index('idx_todos_archived_at').on(t.archivedAt),
     // Not yet load-bearing: the due-date sort runs in the client over the
     // project's already-fetched rows. It is here because the column is the
     // obvious thing to order or filter on server-side the moment a project

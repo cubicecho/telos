@@ -599,9 +599,46 @@ export const UpdateTodoDocument = graphql(`
   }
 `);
 
-export const DeleteTodoDocument = graphql(`
-  mutation DeleteTodo($id: UUID!) {
+// Deleting a todo archives it (the server's `softDelete`): out of every list
+// until restored. Only `hard: true` removes it.
+export const ArchiveTodoDocument = graphql(`
+  mutation ArchiveTodo($id: UUID!) {
     deleteTodo(where: { id: { eq: $id } }) {
+      id
+    }
+  }
+`);
+
+export const ArchivedTodosDocument = graphql(`
+  query ArchivedTodos($projectId: UUID!) {
+    todos(
+      where: { projectId: { eq: $projectId } }
+      deleted: ONLY
+      orderBy: { archivedAt: { direction: desc, priority: 1 } }
+    ) {
+      id
+      title
+      completedAt
+      archivedAt
+      lane {
+        id
+        name
+      }
+    }
+  }
+`);
+
+export const RestoreTodoDocument = graphql(`
+  mutation RestoreTodo($id: UUID!) {
+    restoreTodo(where: { id: { eq: $id } }) {
+      id
+    }
+  }
+`);
+
+export const DeleteTodoForGoodDocument = graphql(`
+  mutation DeleteTodoForGood($id: UUID!) {
+    deleteTodo(where: { id: { eq: $id } }, hard: true) {
       id
     }
   }

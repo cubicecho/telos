@@ -1,5 +1,5 @@
 import * as dbSchema from '@telos/db/schema';
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, eq, isNull } from 'drizzle-orm';
 import { extendSchema, GraphQLError, type GraphQLObjectType, type GraphQLSchema, parse } from 'graphql';
 import { assertNotBlocked } from '../blocking.ts';
 import type { Context } from '../context.ts';
@@ -116,7 +116,9 @@ export function applyLanesExtension(schema: GraphQLSchema): GraphQLSchema {
       const [todo] = await tx
         .select()
         .from(dbSchema.todos)
-        .where(and(eq(dbSchema.todos.id, args.id), eq(dbSchema.todos.userId, userId)))
+        .where(
+          and(eq(dbSchema.todos.id, args.id), eq(dbSchema.todos.userId, userId), isNull(dbSchema.todos.archivedAt)),
+        )
         .limit(1);
       if (!todo) throw new GraphQLError('Todo not found', { extensions: { code: 'NOT_FOUND' } });
 

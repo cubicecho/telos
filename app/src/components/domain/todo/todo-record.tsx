@@ -176,6 +176,10 @@ export function TodoHistory({ todoId, runs = [] }: { todoId: string; runs?: read
         return `Moved from ${laneName(event.fromLaneId)} to ${laneName(event.toLaneId)}`;
       case 'retry':
         return `Sent round ${laneName(event.toLaneId)} again`;
+      case 'archive':
+        return 'Archived';
+      case 'restore':
+        return 'Restored';
       case 'edit':
         return event.fields.length > 0 ? `Changed ${event.fields.map(fieldName).join(', ')}` : 'Edited';
       default:

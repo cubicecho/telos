@@ -83,6 +83,11 @@ export function createSchema(db: AnyDb, options: SchemaOptions) {
     // code instead of by someone remembering this comment.
     mapColumnType: (column) => (column.columnType === 'PgTimestamp' ? { input: GraphQLDateTime } : undefined),
     onWrite,
+    // Deleting a todo archives it: `restoreTodo` brings it back, and only
+    // `deleteTodo(hard: true)` removes it. `scope: 'root'` keeps an archived
+    // todo readable through the rows that point at it — a run, a note, a
+    // dependency — since history should still say what it was about.
+    softDelete: { todos: { column: 'archivedAt', hardDelete: true, scope: 'root' } },
     // better-auth's tables: sessions, key hashes and magic-link tokens. Only
     // better-auth reads or writes them (auth.ts), so they generate nothing.
     // Nor does the instance's settings row, which belongs to no user.

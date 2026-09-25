@@ -68,12 +68,12 @@ export async function readyTodos(
       JOIN users u ON u.id = t.user_id
       WHERE ${INSTANCE_AI_ON} AND u.ai_enabled AND p.ai_enabled AND NOT t.ai_ignored
         AND p.archived_at IS NULL
-        AND t.completed_at IS NULL AND NOT l.is_done
+        AND t.completed_at IS NULL AND t.archived_at IS NULL AND NOT l.is_done
         AND (l.contract <> 'expand' OR l.on_success_lane_id IS NOT NULL)
         ${sql.join(narrow, sql` `)}
         AND NOT EXISTS (
           SELECT 1 FROM todo_dependencies d JOIN todos b ON b.id = d.depends_on_todo_id
-          WHERE d.todo_id = t.id AND b.completed_at IS NULL
+          WHERE d.todo_id = t.id AND b.completed_at IS NULL AND b.archived_at IS NULL
         )
         AND NOT EXISTS (
           SELECT 1 FROM runs r
@@ -133,17 +133,18 @@ export async function expireLapsedRuns(db: AnyDb, where: { todoId: string; laneI
  *
  * @param db The database or transaction.
  * @param where Whose runs: everyone's (no user, for the instance switch), a user's, a
- *   project's, or those of todos AI now ignores.
+ *   project's, or those of todos AI now ignores or someone archived.
  * @returns Nothing.
  */
 export async function cancelRunsUnder(
   db: AnyDb,
-  where: { userId?: string; projectId?: string; ignoredTodos?: boolean },
+  where: { userId?: string; projectId?: string; ignoredTodos?: boolean; archivedTodos?: boolean },
 ): Promise<void> {
   const narrow: SQL[] = [];
   if (where.userId) narrow.push(sql`AND user_id = ${where.userId}`);
   if (where.projectId) narrow.push(sql`AND project_id = ${where.projectId}`);
   if (where.ignoredTodos) narrow.push(sql`AND todo_id IN (SELECT id FROM todos WHERE ai_ignored)`);
+  if (where.archivedTodos) narrow.push(sql`AND todo_id IN (SELECT id FROM todos WHERE archived_at IS NOT NULL)`);
   await db.execute(sql`
     UPDATE runs SET cancel_requested_at = now()
     WHERE status = 'running' AND cancel_requested_at IS NULL
@@ -232,7 +233,7 @@ export async function stationStates(
         JOIN projects p ON p.id = t.project_id
         LEFT JOIN lanes l ON l.id = t.lane_id
         WHERE t.user_id = ${userId} AND p.ai_enabled AND p.archived_at IS NULL
-          AND t.completed_at IS NULL AND NOT coalesce(l.is_done, false)
+          AND t.completed_at IS NULL AND t.archived_at IS NULL AND NOT coalesce(l.is_done, false)
           ${project}
       )
       SELECT
@@ -256,7 +257,7 @@ export async function stationStates(
         (
           SELECT string_agg(d2.title, ', ' ORDER BY d2.title) FROM todo_dependencies d
           JOIN todos d2 ON d2.id = d.depends_on_todo_id
-          WHERE d.todo_id = b.id AND d2.completed_at IS NULL
+          WHERE d.todo_id = b.id AND d2.completed_at IS NULL AND d2.archived_at IS NULL
         ) AS blockers,
         (
           SELECT r.id FROM runs r
@@ -289,7 +290,7 @@ export async function stationStates(
       JOIN projects p ON p.id = t.project_id
       JOIN lanes l ON l.id = t.lane_id
       WHERE t.user_id = ${userId} AND p.ai_enabled AND p.archived_at IS NULL
-        AND (t.completed_at IS NOT NULL OR l.is_done)
+        AND t.archived_at IS NULL AND (t.completed_at IS NOT NULL OR l.is_done)
         ${project}
       GROUP BY t.project_id, t.lane_id
     `),

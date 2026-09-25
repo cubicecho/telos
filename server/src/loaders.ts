@@ -1,6 +1,6 @@
 import * as dbSchema from '@telos/db/schema';
 import DataLoader from 'dataloader';
-import { inArray, sql } from 'drizzle-orm';
+import { and, inArray, isNull, sql } from 'drizzle-orm';
 import { findBlocked, findBlockers, type TodoRow } from './blocking.ts';
 
 // Per-request batching. The project screen is a list of todos each asking
@@ -27,7 +27,7 @@ async function findTodoCounts(db: AnyDb, projectIds: readonly string[]): Promise
       open: sql<number>`count(*) filter (where ${dbSchema.todos.completedAt} is null)::int`,
     })
     .from(dbSchema.todos)
-    .where(inArray(dbSchema.todos.projectId, [...projectIds]))
+    .where(and(inArray(dbSchema.todos.projectId, [...projectIds]), isNull(dbSchema.todos.archivedAt)))
     .groupBy(dbSchema.todos.projectId);
   for (const row of rows) {
     byProject.set(row.projectId, { total: Number(row.total), open: Number(row.open) });

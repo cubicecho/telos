@@ -1,5 +1,5 @@
 import * as dbSchema from '@telos/db/schema';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import { extendSchema, GraphQLError, type GraphQLObjectType, type GraphQLSchema, parse } from 'graphql';
 import { requireAi } from '../ai-gate.ts';
 import type { Context } from '../context.ts';
@@ -70,6 +70,7 @@ async function loadAiTodo(context: Context, userId: string, todoId: string): Pro
         eq(dbSchema.todos.id, todoId),
         eq(dbSchema.todos.userId, userId),
         eq(dbSchema.todos.aiIgnored, false),
+        isNull(dbSchema.todos.archivedAt),
         eq(dbSchema.projects.aiEnabled, true),
       ),
     );

@@ -1,6 +1,7 @@
 import { type ApolloCache, useMutation } from '@apollo/client';
 import { useState } from 'react';
 import { Pressable, Text, View, type ViewProps } from 'react-native';
+import { Archive } from '@/components/app-icons';
 import { AiIgnoredBadge } from '@/components/domain/ai/ai-ignored-badge';
 import { LabelBadge, type LabelSummary } from '@/components/domain/label/label-badge';
 import { LabelPicker } from '@/components/domain/label/label-picker';
@@ -9,15 +10,15 @@ import { LanePicker } from '@/components/domain/lane/lane-picker';
 import { useMoveTodo } from '@/components/domain/lane/use-move-todo';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { Pencil, Trash2 } from '@/components/ui/icons';
+import { Pencil } from '@/components/ui/icons';
 import { bumpProjectCounts, type CachedLane, laneForCompletion, updateProjectTodos } from '@/lib/cache';
 import { describeError } from '@/lib/errors';
 import {
   AddTodoDependencyDocument,
+  ArchivedTodosDocument,
+  ArchiveTodoDocument,
   AttachTodoLabelDocument,
   CompleteTodoDocument,
-  DeleteTodoDocument,
   DetachTodoLabelDocument,
   RemoveTodoDependencyDocument,
   ReopenTodoDocument,
@@ -41,7 +42,6 @@ export function TodoRow({
   siblings: readonly TodoSummary[];
   lanes: readonly CachedLane[];
 }) {
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [editing, setEditing] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
@@ -51,7 +51,7 @@ export function TodoRow({
   // list already holding it.
   const [completeTodo] = useMutation(CompleteTodoDocument);
   const [reopenTodo] = useMutation(ReopenTodoDocument);
-  const [deleteTodo] = useMutation(DeleteTodoDocument);
+  const [archiveTodo] = useMutation(ArchiveTodoDocument, { refetchQueries: [ArchivedTodosDocument] });
   const [attachLabel] = useMutation(AttachTodoLabelDocument);
   const [detachLabel] = useMutation(DetachTodoLabelDocument);
   const [addDependency] = useMutation(AddTodoDependencyDocument);
@@ -116,9 +116,9 @@ export function TodoRow({
     );
   }
 
-  function remove() {
+  function archive() {
     return run(() =>
-      deleteTodo({
+      archiveTodo({
         variables: { id: todo.id },
         optimisticResponse: { deleteTodo: { __typename: 'Todo', id: todo.id } },
         update(cache, { data }) {
@@ -267,33 +267,14 @@ export function TodoRow({
           />
           <LabelPicker attached={todo.labels} onToggle={toggleLabel} align="end" size="icon-xs" />
           <DependencyPicker todo={todo} candidates={siblings} onToggle={toggleDependency} align="end" size="icon-xs" />
-          <Button
-            variant="ghost"
-            size="icon-xs"
-            className="hover:text-destructive"
-            onPress={() => setConfirmingDelete(true)}
-            aria-label={`Delete ${todo.title}`}
-          >
-            <Trash2 className="h-4 w-4" />
+          {/* No confirmation: archiving is undone from the Archived view. */}
+          <Button variant="ghost" size="icon-xs" onPress={() => void archive()} aria-label={`Archive ${todo.title}`}>
+            <Archive className="h-4 w-4" />
           </Button>
         </View>
       </View>
 
       <TodoFormDialog open={editing} onOpenChange={setEditing} todo={todo} />
-
-      <ConfirmDialog
-        open={confirmingDelete}
-        onOpenChange={setConfirmingDelete}
-        title="Delete this todo?"
-        description={`“${todo.title}” and any dependency links to it are removed. This cannot be undone.`}
-        confirmLabel="Delete"
-        onConfirm={() => {
-          // ConfirmDialog leaves closing to the caller; AlertDialogAction used
-          // to close on its own.
-          setConfirmingDelete(false);
-          void remove();
-        }}
-      />
     </View>
   );
 }

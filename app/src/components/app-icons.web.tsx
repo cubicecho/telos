@@ -5,6 +5,8 @@
  */
 export {
   Activity,
+  Archive,
+  ArchiveRestore,
   Columns3,
   Ellipsis,
   Link2,

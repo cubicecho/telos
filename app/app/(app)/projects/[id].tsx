@@ -2,11 +2,12 @@ import { useQuery } from '@apollo/client';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
-import { Columns3, List } from '@/components/app-icons';
+import { Archive, Columns3, List } from '@/components/app-icons';
 import { useProjectActivity } from '@/components/domain/ai/project-activity';
 import { ProjectArtifacts, ProjectRuns } from '@/components/domain/ai/project-runs';
 import { Board } from '@/components/domain/lane/board';
 import { ProjectPage } from '@/components/domain/project/project-page';
+import { ArchivedTodos } from '@/components/domain/todo/archived-todos';
 import { TodoComposer } from '@/components/domain/todo/todo-composer';
 import { TodoFilterBar } from '@/components/domain/todo/todo-filter-bar';
 import { TodoRow } from '@/components/domain/todo/todo-row';
@@ -26,9 +27,9 @@ import { ProjectDocument, ProjectLanesDocument, ProjectTodosDocument } from '@/l
 import { useHotkey } from '@/lib/hotkeys';
 import { cn } from '@/lib/utils';
 
-type ProjectView = 'list' | 'board' | 'runs' | 'artifacts';
+type ProjectView = 'list' | 'board' | 'runs' | 'artifacts' | 'archived';
 
-const VIEWS: readonly ProjectView[] = ['list', 'board', 'runs', 'artifacts'];
+const VIEWS: readonly ProjectView[] = ['list', 'board', 'runs', 'artifacts', 'archived'];
 
 /** Focus a field and select what is in it — so typing replaces. */
 function focusAndSelect(field: InputHandle | null): void {
@@ -233,6 +234,10 @@ export default function ProjectScreen() {
                     </TabsTrigger>
                   </>
                 ) : null}
+                <TabsTrigger value="archived">
+                  <Archive />
+                  Archived
+                </TabsTrigger>
               </TabsList>
             </View>
 
@@ -277,6 +282,11 @@ export default function ProjectScreen() {
                     </TabsContent>
                   </>
                 ) : null}
+                <TabsContent value="archived" className="mt-0">
+                  <View className={cn(PROSE_COLUMN, 'px-4')}>
+                    {current === 'archived' ? <ArchivedTodos projectId={project.id} /> : null}
+                  </View>
+                </TabsContent>
                 <TabsContent value="list" className="mt-0">
                   {/* The column is a view of its own: on web a display class on the
                   panel itself would beat the `hidden` radix gives it when inactive. */}
