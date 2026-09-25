@@ -105,11 +105,14 @@ export const ProjectDocument = graphql(`
   }
 `);
 
+// The board's order is `position`; `createdAt` only breaks a tie. The highest
+// `priority` sorts first, so `position` has the higher one: the other way
+// round, a lane or card moved ahead of an older one snaps back on refetch.
 export const ProjectTodosDocument = graphql(`
   query ProjectTodos($projectId: UUID!) {
     todos(
       where: { projectId: { eq: $projectId } }
-      orderBy: { position: { direction: asc, priority: 1 }, createdAt: { direction: asc, priority: 2 } }
+      orderBy: { position: { direction: asc, priority: 2 }, createdAt: { direction: asc, priority: 1 } }
     ) {
       ...TodoFields
     }
@@ -120,7 +123,7 @@ export const ProjectLanesDocument = graphql(`
   query ProjectLanes($projectId: UUID!) {
     lanes(
       where: { projectId: { eq: $projectId } }
-      orderBy: { position: { direction: asc, priority: 1 }, createdAt: { direction: asc, priority: 2 } }
+      orderBy: { position: { direction: asc, priority: 2 }, createdAt: { direction: asc, priority: 1 } }
     ) {
       ...LaneFields
     }

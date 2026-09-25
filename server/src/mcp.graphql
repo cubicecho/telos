@@ -34,7 +34,7 @@ query todos(
 ) {
   todos(
     where: { projectId: { eq: $projectId } }
-    orderBy: { position: { direction: asc, priority: 1 }, createdAt: { direction: asc, priority: 2 } }
+    orderBy: { position: { direction: asc, priority: 2 }, createdAt: { direction: asc, priority: 1 } }
     limit: $limit
   ) {
     id
