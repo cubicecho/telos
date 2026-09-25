@@ -36,7 +36,13 @@ let board: Board;
 const servers: Server[] = [];
 const closers: Array<() => Promise<void>> = [];
 let telosUrl: string;
-let llm: { url: string; script: (messages: Array<{ role: string; content: unknown }>) => Reply | Promise<Reply> };
+let llm: {
+  url: string;
+  script: (
+    messages: Array<{ role: string; content: unknown }>,
+    tools: Array<{ function: { name: string } }>,
+  ) => Reply | Promise<Reply>;
+};
 
 beforeEach(async () => {
   db = await createTestDb();
@@ -108,7 +114,8 @@ async function serveLlm(): Promise<string> {
         res.writeHead(404).end();
         return;
       }
-      const reply = await llm.script(JSON.parse(body).messages);
+      const request = JSON.parse(body);
+      const reply = await llm.script(request.messages, request.tools ?? []);
       if ('fail' in reply) {
         res.writeHead(reply.fail, { 'content-type': 'application/json' });
         res.end(JSON.stringify({ error: { message: 'The model is on fire.' } }));
@@ -266,12 +273,14 @@ describe('the runner', () => {
   it('works a todo through its station, using telos through the run token', async () => {
     const todoId = await board.addTodo('Write it');
     const seen: string[] = [];
+    const offered: string[] = [];
     let step = 0;
-    llm.script = (messages) => {
+    llm.script = (messages, tools) => {
       seen.push(...messages.map((message) => String(message.content ?? '')));
+      offered.push(...tools.map((tool) => tool.function.name));
       step++;
       return step === 1
-        ? { tool: 'telos__add_todo_note', args: { todoId, body: 'Halfway there.' } }
+        ? { tool: 'telos__add_todo_note', args: { todoId, body: '## Halfway there.\nMore to come.' } }
         : { content: 'Wrote it.' };
     };
 
@@ -289,9 +298,49 @@ describe('the runner', () => {
     expect(
       thread.map((note: typeof dbSchema.todoNotes.$inferSelect) => [note.kind, note.body, note.actorKind, note.runId]),
     ).toEqual([
-      ['note', 'Halfway there.', 'agent', run.id],
+      ['note', '## Halfway there.\nMore to come.', 'agent', run.id],
       ['report', 'Wrote it.', 'agent', run.id],
     ]);
+    // With only the board to reach, there is nothing to record a file with.
+    expect(offered).toContain('telos__add_todo_note');
+    expect(offered).not.toContain('record_artifact');
+    // The note it left is kept as a link to it.
+    const made = await db.select().from(dbSchema.artifacts).where(eq(dbSchema.artifacts.todoId, todoId));
+    expect(made).toEqual([
+      expect.objectContaining({
+        location: `telos:note/${thread[0].id}`,
+        source: 'detected',
+        serverSlug: 'telos',
+        tool: 'add_todo_note',
+        title: 'Halfway there.',
+        mediaType: 'text/markdown',
+      }),
+    ]);
+  });
+
+  it('refuses to record a file no tool in the run wrote', async () => {
+    const desk = await serveTools('');
+    await db
+      .update(dbSchema.agents)
+      .set({ mcpServers: [{ id: 'desk', name: 'Desk', url: desk.url }] })
+      .where(eq(dbSchema.agents.id, board.agentId));
+    const todoId = await board.addTodo('Summarise it');
+    const told: string[] = [];
+    let step = 0;
+    llm.script = (messages, tools) => {
+      step++;
+      if (step === 1) {
+        expect(tools.map((tool) => tool.function.name)).toContain('record_artifact');
+        return { tool: 'record_artifact', args: { location: 'fs:///summary.md', title: 'Summary' } };
+      }
+      told.push(String(messages.at(-1)?.content ?? ''));
+      return { content: 'Here is the summary.' };
+    };
+
+    await cycle();
+
+    expect(told[0]).toContain('No tool call in this run stored fs:///summary.md');
+    expect(await db.select().from(dbSchema.artifacts).where(eq(dbSchema.artifacts.todoId, todoId))).toEqual([]);
   });
 
   it('runs the agent’s hooks, keeps what it made, and shows its work as it goes', async () => {

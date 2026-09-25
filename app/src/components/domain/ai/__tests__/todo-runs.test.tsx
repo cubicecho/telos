@@ -24,10 +24,10 @@ function runs(rows: unknown[], artifacts: unknown[] = []) {
 }
 
 // biome-ignore lint/suspicious/noExplicitAny: MockedProvider's mock array type
-function show(mocks: any[], pollMs?: number) {
+function show(mocks: any[], pollMs?: number, onOpenNote?: (noteId: string) => void) {
   render(
     <MockedProvider mocks={mocks}>
-      <TodoRuns todoId="t1" pollMs={pollMs} />
+      <TodoRuns todoId="t1" pollMs={pollMs} onOpenNote={onOpenNote} />
     </MockedProvider>,
   );
 }
@@ -165,5 +165,41 @@ describe('TodoRuns', () => {
     expect(screen.getByText('docs/plan.md · text/markdown')).toBeInTheDocument();
     expect(screen.getByText('created')).toBeInTheDocument();
     expect(screen.getByText('declared')).toBeInTheDocument();
+  });
+
+  it('shows a note the agent left as a link into the thread, not a location', async () => {
+    const user = userEvent.setup();
+    const onOpenNote = vi.fn();
+    show(
+      [
+        runs(
+          [],
+          [
+            {
+              __typename: 'Artifact',
+              id: 'x2',
+              location: 'telos:note/n1',
+              source: 'detected',
+              action: 'created',
+              serverSlug: 'telos',
+              tool: 'add_todo_note',
+              title: 'Findings',
+              description: null,
+              mediaType: 'text/markdown',
+              sizeBytes: 40,
+              createdAt: '2026-09-24T10:00:30.000Z',
+            },
+          ],
+        ),
+      ],
+      undefined,
+      onOpenNote,
+    );
+
+    const link = await screen.findByRole('link', { name: 'Findings, Note on the card' });
+    expect(screen.queryByText(/telos:note/)).not.toBeInTheDocument();
+    expect(screen.queryByText('detected')).not.toBeInTheDocument();
+    await user.click(link);
+    expect(onOpenNote).toHaveBeenCalledWith('n1');
   });
 });

@@ -40,17 +40,27 @@ import type { TodoSummary } from './types';
  * normalized by id, so the mutation's own result settles the row in the list,
  * on the board, and in every "Blocked by …" line that names it.
  */
+/** The dialog's tabs. `notes` is the one labelled Thread. */
+export type TodoTab = 'details' | 'notes' | 'history' | 'runs';
+
 export function TodoFormDialog({
   open,
   onOpenChange,
   todo,
+  initialTab = 'details',
+  focusNoteId = null,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   todo: TodoSummary;
+  /** The tab it opens on: Thread, say, when opened from a note an agent left. */
+  initialTab?: TodoTab;
+  /** A note to mark in the thread. */
+  focusNoteId?: string | null;
 }) {
   const ai = useAi();
-  const [tab, setTab] = useState('details');
+  const [tab, setTab] = useState<string>(initialTab);
+  const [focusedNote, setFocusedNote] = useState<string | null>(focusNoteId);
   // Asked only while the account's AI is on: off, the schema has no runs. The
   // answer carries the project's switch, which is what decides the tab.
   const runsQuery = useTodoRuns(todo.id, { skip: !ai.on });
@@ -81,9 +91,10 @@ export function TodoFormDialog({
   // last typed and abandoned.
   useEffect(() => {
     if (!open) return;
-    setTab('details');
+    setTab(initialTab);
+    setFocusedNote(focusNoteId);
     form.reset(initial);
-  }, [open, initial, form]);
+  }, [open, initial, form, initialTab, focusNoteId]);
 
   async function save(value: {
     title: string;
@@ -201,14 +212,20 @@ export function TodoFormDialog({
               </Form>
             </TabsContent>
             <TabsContent value="notes">
-              <TodoThread todoId={todo.id} />
+              <TodoThread todoId={todo.id} focusNoteId={focusedNote} />
             </TabsContent>
             <TabsContent value="history">
               <TodoHistory todoId={todo.id} runs={showRuns ? runsQuery.data?.todo?.runs : undefined} />
             </TabsContent>
             {showRuns ? (
               <TabsContent value="runs">
-                <TodoRuns todoId={todo.id} />
+                <TodoRuns
+                  todoId={todo.id}
+                  onOpenNote={(noteId) => {
+                    setFocusedNote(noteId);
+                    setTab('notes');
+                  }}
+                />
               </TabsContent>
             ) : null}
           </Tabs>

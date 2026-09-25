@@ -2,6 +2,8 @@ import { useQuery } from '@apollo/client';
 import { useState } from 'react';
 import { Text, View } from 'react-native';
 import type { RunFilters } from '@/__generated__/graphql';
+import { TodoFormDialog } from '@/components/domain/todo/todo-form-dialog';
+import type { TodoSummary } from '@/components/domain/todo/types';
 import { StatTile } from '@/components/stat-tile';
 import { Button } from '@/components/ui/button';
 import { LoadState } from '@/components/ui/load-failure';
@@ -133,6 +135,9 @@ export function ProjectArtifacts({ projectId }: { projectId: string }) {
     fetchPolicy: 'cache-and-network',
   });
   const artifacts = query.data?.artifacts ?? [];
+  // The todo a note artifact was opened from, and the note: its dialog opens on
+  // the thread with that note marked.
+  const [opened, setOpened] = useState<{ todo: TodoSummary; noteId: string } | null>(null);
 
   return (
     <View className="gap-2">
@@ -145,7 +150,14 @@ export function ProjectArtifacts({ projectId }: { projectId: string }) {
       {artifacts.length === 0 ? null : (
         <View role="list" aria-label="Artifacts" className="gap-1">
           {artifacts.map((artifact) => (
-            <ArtifactRow key={artifact.id} artifact={artifact} todoTitle={artifact.todo?.title} />
+            <ArtifactRow
+              key={artifact.id}
+              artifact={artifact}
+              todoTitle={artifact.todo?.title}
+              onOpenNote={(noteId) => {
+                if (artifact.todo) setOpened({ todo: artifact.todo, noteId });
+              }}
+            />
           ))}
         </View>
       )}
@@ -153,6 +165,17 @@ export function ProjectArtifacts({ projectId }: { projectId: string }) {
         <Button variant="outline" size="sm" className="self-start" onPress={() => setLimit(limit + RUNS_PAGE)}>
           Show more
         </Button>
+      ) : null}
+      {opened ? (
+        <TodoFormDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setOpened(null);
+          }}
+          todo={opened.todo}
+          initialTab="notes"
+          focusNoteId={opened.noteId}
+        />
       ) : null}
     </View>
   );

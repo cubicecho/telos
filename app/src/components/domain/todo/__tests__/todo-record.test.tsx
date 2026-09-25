@@ -106,4 +106,10 @@ describe('TodoThread', () => {
     expect(await screen.findByText('Reviewed and passed.')).toBeInTheDocument();
     expect(await screen.findByRole('button', { name: 'View run' })).toBeInTheDocument();
   });
+
+  it('marks the note it was opened at', async () => {
+    show(<TodoThread todoId="t1" focusNoteId="n1" />, [aiStateMock(true, true), record()]);
+    const note = (await screen.findByText('Reviewed and passed.')).closest('[role="listitem"]');
+    expect(note).toHaveAttribute('aria-current', 'true');
+  });
 });

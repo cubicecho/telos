@@ -13,12 +13,14 @@ import {
   ArtifactLog,
   declaredArtifact,
   detectArtifact,
+  noteArtifact,
   RECORD_ARTIFACT,
   RECORD_ARTIFACT_DEFINITION,
+  splitToolName,
 } from './artifacts.ts';
 import { briefPrompt, proposedTodos, systemPromptFor } from './prompts.ts';
 import type { Beat, Claim, RunEvent, RunPrompt, RunResult, RunUsage, Telos } from './telos.ts';
-import { openTools } from './tools.ts';
+import { openTools, TELOS_SERVER } from './tools.ts';
 
 // One run, start to finish: open the agent's tools, run the loop, keep the
 // lease, and tell telos what came of it. What happens to the todo is not
@@ -327,22 +329,36 @@ async function work(claim: Claim, pool: McpPool, options: WorkOptions): Promise<
       ? await preselect(config, agent.toolSelectModel, catalog, prompt, { signal, onNotice: log }).catch(() => [])
       : [];
 
+  // Only an agent with somewhere to store things besides the board is offered
+  // record_artifact: one with just telos has nothing to record, and would
+  // record its own answer as a file it never wrote.
+  const stores = catalog
+    ? catalog.some((server) => server.id !== TELOS_SERVER && server.tools.length > 0)
+    : pool.tools().some((tool) => splitToolName(tool.function.name).serverSlug !== TELOS_SERVER);
+
   const loop = await runAgentLoop({
     config,
     system,
     messages: [{ role: 'user', content: prompt }],
-    tools: [...pool.tools(), RECORD_ARTIFACT_DEFINITION],
-    ...(catalog ? { catalog, loaded: [RECORD_ARTIFACT] } : {}),
+    tools: stores ? [...pool.tools(), RECORD_ARTIFACT_DEFINITION] : pool.tools(),
+    ...(catalog ? { catalog, loaded: stores ? [RECORD_ARTIFACT] : [] } : {}),
     preselected,
     dispatch: async (call, callSignal) => {
-      if (call.name === RECORD_ARTIFACT) {
+      if (stores && call.name === RECORD_ARTIFACT) {
         const declared = declaredArtifact(call.args);
         if (!declared) throw new Error('record_artifact needs a location.');
+        if (!artifacts.seen(declared.location)) {
+          throw new Error(
+            `No tool call in this run stored ${declared.location}, so it was not recorded. ` +
+              'Record only what one of your tools wrote; your reply and notes are already on the todo.',
+          );
+        }
         artifacts.add(declared);
         return `Recorded ${declared.location}.`;
       }
       const answer = await pool.call(call.name, call.args, { signal: callSignal ?? signal });
-      artifacts.add(detectArtifact(call.name, call.args));
+      artifacts.witness(call.args, answer);
+      artifacts.add(detectArtifact(call.name, call.args) ?? noteArtifact(call.name, call.args, answer, claim.todoId));
       return answer;
     },
     signal,

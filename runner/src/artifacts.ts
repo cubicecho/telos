@@ -1,13 +1,18 @@
 import type OpenAI from 'openai';
+import { TELOS_SERVER } from './tools.ts';
 
 // Recognising what a run left behind. Pure: nothing here talks to telos, which
 // is told once, in the finish.
 //
-// Two ways in, and a run uses both. An agent that says what it made calls
-// `record_artifact` and is believed, title and all. An agent that forgets
-// still made the file, so every successful tool call is also read for the
-// shape of a write: a verb in the tool's name and a path in its arguments.
-// That half is a guess, and is sent as one (`source: 'detected'`).
+// Three ways in. An agent that says what it made calls `record_artifact`, and
+// is believed, title and all, as long as some tool call in the run carried
+// that location: a model left alone with only the board will otherwise
+// "save" its answer to a file it never wrote. An agent that forgets still
+// made the file, so every successful tool call is also read for the shape of
+// a write: a verb in the tool's name and a path in its arguments. That half is
+// a guess, and is sent as one (`source: 'detected'`). And a note the agent
+// adds to its own todo is kept as a link to that note (`telos:note/<id>`), so
+// the board can open the thread at it.
 
 export type ArtifactAction = 'created' | 'updated' | 'moved' | 'deleted';
 
@@ -31,10 +36,12 @@ export const RECORD_ARTIFACT_DEFINITION: OpenAI.ChatCompletionTool = {
   function: {
     name: RECORD_ARTIFACT,
     description:
-      'Attach something you produced to this todo, so the board lists it after the run: a file ' +
-      'you wrote, a page you published, an object you uploaded. Record where it lives, not what ' +
-      'is in it. Writes through a filesystem tool are noticed on their own; calling this adds the ' +
-      'title and description a person would want, and covers anything stored some other way.',
+      'Name something a tool call in this run stored outside the board, so the board lists it: a ' +
+      'file one of your tools wrote, a page it published, an object it uploaded. Only for a ' +
+      'location a tool was actually given or answered with; one that no tool call in this run ' +
+      'touched is refused. Your reply and your notes are already on the todo, so never record ' +
+      'them, and never invent a file to put them in. Writes through a filesystem tool are noticed ' +
+      'on their own; calling this adds the title and description a person would want.',
     parameters: {
       type: 'object',
       properties: {
@@ -94,7 +101,7 @@ export function splitToolName(name: string): { serverSlug: string; tool: string 
 export function detectArtifact(name: string, args: Record<string, unknown>): ArtifactDraft | null {
   const { serverSlug, tool } = splitToolName(name);
   // The telos door writes notes and requests, which are the board's own.
-  if (serverSlug === 'telos') return null;
+  if (serverSlug === TELOS_SERVER) return null;
   const verb = tool.split('__').at(-1)?.toLowerCase() ?? '';
   if (!WRITE_VERB.test(verb) || NOT_ARTIFACTS.has(verb)) return null;
 
@@ -143,12 +150,93 @@ export function declaredArtifact(args: Record<string, unknown>): ArtifactDraft |
   };
 }
 
+/** The scheme a note artifact's location starts with: `telos:note/<id>`. */
+export const NOTE_LOCATION = 'telos:note/';
+
+const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+
+/**
+ * The note an `add_todo_note` call left on the run's own todo, as a link to it.
+ * A note on some other todo is that todo's business, and is not kept here.
+ *
+ * @param name The qualified tool name.
+ * @param args The call's arguments.
+ * @param answer What the tool answered: the new note's id, as JSON.
+ * @param todoId The run's todo.
+ * @returns The draft, or null.
+ */
+export function noteArtifact(
+  name: string,
+  args: Record<string, unknown>,
+  answer: string,
+  todoId: string,
+): ArtifactDraft | null {
+  const { serverSlug, tool } = splitToolName(name);
+  if (serverSlug !== TELOS_SERVER || tool !== 'add_todo_note' || args.todoId !== todoId) return null;
+  const id = /"id"\s*:\s*"([^"]+)"/.exec(answer)?.[1];
+  if (!id || !UUID.test(id)) return null;
+  const body = typeof args.body === 'string' ? args.body : '';
+  const title = body
+    .split('\n')
+    .map((line) => line.replace(/^[#>*\-\s]+/, '').trim())
+    .find(Boolean);
+  return {
+    location: `${NOTE_LOCATION}${id}`,
+    source: 'detected',
+    action: 'created',
+    serverSlug,
+    tool,
+    title: title ? title.slice(0, 120) : null,
+    mediaType: 'text/markdown',
+    sizeBytes: Buffer.byteLength(body),
+  };
+}
+
+/** A location as it is compared: no scheme, no leading slashes, no trailing ones. */
+function bare(location: string): string {
+  return location
+    .trim()
+    .replace(/^[a-z][a-z0-9+.-]*:\/\//i, '')
+    .replace(/^\/+|\/+$/g, '');
+}
+
 /**
  * A run's artifacts, one per location. A declaration fills in what a detection
  * could not know, and a later action on the same location is the one kept.
  */
 export class ArtifactLog {
   readonly #byLocation = new Map<string, ArtifactDraft>();
+  /** Everything the run's tool calls were given and answered, to check a declaration against. */
+  readonly #witnessed: string[] = [];
+
+  /**
+   * Keeps what a tool call was given and answered, so a declaration naming it
+   * is believed.
+   *
+   * @param args The call's arguments.
+   * @param answer What it answered.
+   */
+  witness(args: Record<string, unknown>, answer: string): void {
+    const strings = (value: unknown): void => {
+      if (typeof value === 'string') this.#witnessed.push(bare(value));
+      else if (Array.isArray(value)) value.forEach(strings);
+      else if (value && typeof value === 'object') Object.values(value).forEach(strings);
+    };
+    strings(args);
+    this.#witnessed.push(answer);
+  }
+
+  /**
+   * Whether some tool call in the run was given or answered with `location`.
+   *
+   * @param location The path or URI a declaration names.
+   * @returns True when one was.
+   */
+  seen(location: string): boolean {
+    const wanted = bare(location);
+    if (!wanted) return false;
+    return this.#witnessed.some((text) => text === wanted || text.includes(wanted));
+  }
 
   add(draft: ArtifactDraft | null): void {
     if (!draft) return;

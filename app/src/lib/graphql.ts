@@ -528,7 +528,10 @@ export const ProjectActivityDocument = graphql(`
   }
 `);
 
-/** Everything a project's runs left behind, newest first, with the todo each is on. */
+/**
+ * Everything a project's runs left behind, newest first, with the todo each is
+ * on: the whole of it, so a note artifact can open that todo's dialog.
+ */
 export const ProjectArtifactsDocument = graphql(`
   query ProjectArtifacts($projectId: UUID!, $limit: Int!, $offset: Int!) {
     artifacts(
@@ -539,8 +542,7 @@ export const ProjectArtifactsDocument = graphql(`
     ) {
       ...ArtifactFields
       todo {
-        id
-        title
+        ...TodoFields
       }
     }
   }

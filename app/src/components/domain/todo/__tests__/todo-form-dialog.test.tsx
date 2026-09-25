@@ -1,9 +1,9 @@
 import { MockedProvider } from '@apollo/client/testing';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { format } from 'date-fns';
 import { describe, expect, it, vi } from 'vitest';
-import { AiStateDocument, TodoRunsDocument, UpdateTodoDocument } from '@/lib/graphql';
+import { AiStateDocument, TodoRecordDocument, TodoRunsDocument, UpdateTodoDocument } from '@/lib/graphql';
 import { TodoFormDialog } from '../todo-form-dialog';
 import type { TodoSummary } from '../types';
 
@@ -244,5 +244,76 @@ describe('TodoFormDialog', () => {
       </MockedProvider>,
     );
     expect(await screen.findByRole('tab', { name: 'Runs' })).toBeInTheDocument();
+  });
+
+  it('opens the thread at a note an agent left, from its artifact', async () => {
+    const user = userEvent.setup();
+    const todoRuns = {
+      request: { query: TodoRunsDocument, variables: { id: TODO.id } },
+      result: {
+        data: {
+          todo: {
+            __typename: 'Todo',
+            id: TODO.id,
+            project: { __typename: 'Project', id: 'p1', aiEnabled: true },
+            runs: [],
+            artifacts: [
+              {
+                __typename: 'Artifact',
+                id: 'x1',
+                location: 'telos:note/n1',
+                source: 'detected',
+                action: 'created',
+                serverSlug: 'telos',
+                tool: 'add_todo_note',
+                title: 'Findings',
+                description: null,
+                mediaType: 'text/markdown',
+                sizeBytes: 8,
+                createdAt: '2026-09-24T10:00:00.000Z',
+              },
+            ],
+          },
+        },
+      },
+    };
+    const note = (id: string, body: string) => ({
+      __typename: 'TodoNote',
+      id,
+      kind: 'note',
+      body,
+      actorKind: 'agent',
+      runId: null,
+      createdAt: '2026-09-24T10:00:00.000Z',
+    });
+    const record = {
+      request: { query: TodoRecordDocument, variables: { id: TODO.id } },
+      result: {
+        data: {
+          todo: {
+            __typename: 'Todo',
+            id: TODO.id,
+            thread: [note('n0', 'Starting.'), note('n1', 'Findings')],
+            history: [],
+            project: { __typename: 'Project', id: 'p1', lanes: [] },
+          },
+        },
+      },
+    };
+    render(
+      <MockedProvider mocks={[aiState(true, true), aiState(true, true), todoRuns, todoRuns, record]}>
+        <TodoFormDialog open onOpenChange={vi.fn()} todo={TODO} initialTab="runs" />
+      </MockedProvider>,
+    );
+
+    await user.click(await screen.findByRole('link', { name: /^Findings/ }));
+
+    expect(screen.getByRole('tab', { name: 'Thread' })).toHaveAttribute('aria-selected', 'true');
+    const thread = await screen.findByRole('list');
+    await within(thread).findByText('Starting.');
+    const marked = within(thread)
+      .getAllByRole('listitem')
+      .filter((item) => item.getAttribute('aria-current') === 'true');
+    expect(marked.map((item) => item.textContent)).toEqual([expect.stringContaining('Findings')]);
   });
 });

@@ -1,6 +1,6 @@
 import { useMutation, useQuery } from '@apollo/client';
 import { useState } from 'react';
-import { Text, View } from 'react-native';
+import { Platform, Text, View } from 'react-native';
 import type { RunSummaryFieldsFragment } from '@/__generated__/graphql';
 import { RunDialog } from '@/components/domain/ai/run-dialog';
 import { describeRun, RunStatusBadge } from '@/components/domain/ai/run-log';
@@ -13,6 +13,7 @@ import { useAi } from '@/lib/ai';
 import { formatTimestamp } from '@/lib/dates';
 import { describeError } from '@/lib/errors';
 import { CreateTodoNoteDocument, DeleteTodoNoteDocument, TodoRecordDocument } from '@/lib/graphql';
+import { cn } from '@/lib/utils';
 
 // A todo's record: the notes left on it and the history the database keeps of
 // it. Neither needs AI — a person's own notes and moves are recorded the same —
@@ -56,7 +57,23 @@ function useTodoRecord(todoId: string) {
   return useQuery(TodoRecordDocument, { variables: { id: todoId }, fetchPolicy: 'cache-and-network' });
 }
 
-export function TodoThread({ todoId }: { todoId: string }) {
+/**
+ * Brings a note into view, where the platform can: on the web a `View` is its
+ * element. Native opens the thread at the top, with the note marked.
+ */
+function scrollToNote(node: View | null) {
+  if (Platform.OS !== 'web' || !node) return;
+  (node as unknown as HTMLElement).scrollIntoView?.({ block: 'nearest' });
+}
+
+/**
+ * The notes on a todo, and a box to add one.
+ *
+ * @param props.todoId The todo.
+ * @param props.focusNoteId A note to mark and bring into view: the one an
+ *   artifact link was opened from.
+ */
+export function TodoThread({ todoId, focusNoteId }: { todoId: string; focusNoteId?: string | null }) {
   const record = useTodoRecord(todoId);
   const [body, setBody] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -98,7 +115,16 @@ export function TodoThread({ todoId }: { todoId: string }) {
       {notes.length === 0 ? null : (
         <View role="list" className="gap-2">
           {notes.map((note) => (
-            <View key={note.id} role="listitem" className="gap-1 rounded-lg border border-border px-3 py-2">
+            <View
+              key={note.id}
+              role="listitem"
+              ref={note.id === focusNoteId ? scrollToNote : undefined}
+              aria-current={note.id === focusNoteId ? true : undefined}
+              className={cn(
+                'gap-1 rounded-lg border px-3 py-2',
+                note.id === focusNoteId ? 'border-primary bg-accent' : 'border-border',
+              )}
+            >
               <View className="flex-row items-center gap-2">
                 <Text className="flex-1 text-muted-foreground text-xs">
                   {actorName(note.actorKind)} · {formatTimestamp(note.createdAt)}
