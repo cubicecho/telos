@@ -216,7 +216,7 @@ type RadioGroupItemProps = {
   /**
    * The picture over the label in a `card` tile, or the segment's face in `segmented`. Ignored by
    * `row`. On device an icon has no `currentColor` to inherit, so in `segmented` give it the
-   * checked segment's `text-primary-foreground` and the others' `text-muted-foreground` yourself.
+   * checked segment's `text-selection-foreground` and the others' `text-muted-foreground` yourself.
    */
   icon?: ReactNode | undefined;
   /**
@@ -280,11 +280,11 @@ function RadioGroupItem({
     <View
       className={cn(
         'h-4 w-4 shrink-0 items-center justify-center rounded-full border',
-        checked ? 'border-primary' : 'border-input',
+        checked ? 'border-selection' : 'border-input',
         group.invalid && 'border-destructive',
       )}
     >
-      {checked ? <View className="h-2 w-2 rounded-full bg-primary" /> : null}
+      {checked ? <View className="h-2 w-2 rounded-full bg-selection" /> : null}
     </View>
   );
 
@@ -316,14 +316,14 @@ function RadioGroupItem({
             ? cn(
                 'min-w-0 flex-1 flex-row items-center justify-center gap-1.5 rounded-sm px-3',
                 checked
-                  ? 'bg-primary text-primary-foreground'
+                  ? 'bg-selection text-selection-foreground'
                   : 'text-muted-foreground hover:bg-muted hover:text-foreground',
               )
             : card
               ? cn(
                   'min-w-0 flex-1 items-center gap-1.5 rounded-lg border p-3',
                   // The border alone says checked: a tinted fill takes the muted description under 4.5:1.
-                  checked ? 'border-primary bg-background' : 'border-input bg-background',
+                  checked ? 'border-selection bg-background' : 'border-input bg-background',
                   group.invalid && 'border-destructive',
                 )
               : 'flex-row items-start gap-3 rounded-sm',
@@ -341,7 +341,7 @@ function RadioGroupItem({
               id={labelId}
               className={cn(
                 'truncate text-sm font-medium',
-                checked ? 'text-primary-foreground' : 'text-muted-foreground',
+                checked ? 'text-selection-foreground' : 'text-muted-foreground',
               )}
             >
               {label}

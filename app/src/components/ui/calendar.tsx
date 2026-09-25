@@ -154,7 +154,7 @@ export function Calendar(props: CalendarProps) {
                     // A range's interior is a continuous band, so only its ends are
                     // rounded — the same shape react-day-picker draws.
                     place.middle ? 'bg-accent' : 'rounded-md',
-                    place.edge && 'bg-primary',
+                    place.edge && 'bg-selection',
                     off && 'opacity-30',
                   )}
                   // Seven per row, and `flex-wrap` needs a width it can measure.
@@ -166,7 +166,7 @@ export function Calendar(props: CalendarProps) {
                     className={cn(
                       'text-sm',
                       place.edge
-                        ? 'text-primary-foreground'
+                        ? 'text-selection-foreground'
                         : place.middle
                           ? 'text-accent-foreground'
                           : isSameMonth(day, shown)
