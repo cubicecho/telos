@@ -44,7 +44,7 @@ function notFound(what: string): GraphQLError {
 }
 
 /** A project of the caller's with AI on, or NOT_FOUND. */
-async function loadAiProject(context: Context, userId: string, projectId: string): Promise<AnyRow> {
+export async function loadAiProject(context: Context, userId: string, projectId: string): Promise<AnyRow> {
   const [project] = await (context.db as AnyRow)
     .select()
     .from(dbSchema.projects)
@@ -79,7 +79,7 @@ async function loadAiTodo(context: Context, userId: string, todoId: string): Pro
 }
 
 /** Below the lane's last card, so a new request queues behind what is there. */
-async function nextPosition(tx: AnyRow, projectId: string, laneId: string | null): Promise<number> {
+export async function nextPosition(tx: AnyRow, projectId: string, laneId: string | null): Promise<number> {
   const [row] = await tx
     .select({ max: sql<number | null>`max(${dbSchema.todos.position})` })
     .from(dbSchema.todos)

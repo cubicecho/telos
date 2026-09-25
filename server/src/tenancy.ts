@@ -41,6 +41,8 @@ export const USER_OWNED_TABLES = [
   'runs',
   'artifacts',
   'boardTemplates',
+  'drafts',
+  'draftMessages',
 ] as const;
 
 /** Every table drizzle-graphql will generate fields for. */
@@ -90,6 +92,9 @@ const AI_SCOPES: Partial<Record<(typeof USER_OWNED_TABLES)[number], RowScope<Con
   // Agents are the board's own machinery, configured by a person. Nothing
   // on the AI side has a reason to read them.
   agents: aiNarrowed(() => sql`false`),
+  // Drafts are a person's conversation with their own agent, not work yet.
+  drafts: aiNarrowed(() => sql`false`),
+  draftMessages: aiNarrowed(() => sql`false`),
   runs: aiNarrowed((context, table, userId) => inArray(table.todoId, aiTodoIds(context, userId))),
   artifacts: aiNarrowed((context, table, userId) => inArray(table.todoId, aiTodoIds(context, userId))),
   projects: aiNarrowed((_context, table) => eq(table.aiEnabled, true)),
@@ -142,8 +147,18 @@ export const contextValues: NonNullable<BuildSchemaConfig['contextValues']> = {
  * `runs` belong to the runner's mutations (resolvers/runs.ts): a run is
  * claimed, renewed and finished, and a person may only ask one to stop.
  * `artifacts` are what a finished run reports, and only `finishRun` writes them.
+ * `drafts` and their messages are a conversation (resolvers/drafts.ts): the
+ * person says something and the runner answers, and neither is edited after.
  */
-const WRITES_RESERVED = new Set<string>(['users', 'todoDependencies', 'todoEvents', 'runs', 'artifacts']);
+const WRITES_RESERVED = new Set<string>([
+  'users',
+  'todoDependencies',
+  'todoEvents',
+  'runs',
+  'artifacts',
+  'drafts',
+  'draftMessages',
+]);
 
 /**
  * Tables that can be added to and deleted from, but not rewritten. A note an

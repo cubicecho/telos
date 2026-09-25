@@ -131,6 +131,21 @@ export interface ProbeResult {
   error?: string | null;
 }
 
+/** A draft the runner has taken to answer. */
+export interface DraftClaim {
+  draftId: string;
+  agent: ClaimedAgent;
+  projectName: string;
+  projectDescription: string | null;
+  projectContext: string | null;
+  title: string;
+  brief: string;
+  messages: Array<{ role: 'user' | 'assistant'; content: string }>;
+}
+
+/** What the agent made of a draft: its reply and the title and brief now, or why it could not. */
+export type DraftAnswer = { reply: string; title: string; brief: string } | { error: string };
+
 /** The runner's calls into telos. An interface so a test can stand in for it. */
 export interface Telos {
   queue(limit?: number): Promise<ReadyTodo[]>;
@@ -141,16 +156,22 @@ export interface Telos {
   /** MCP server tests waiting to be made, now taken. */
   probes(): Promise<RunnerProbe[]>;
   finishProbe(id: string, result: ProbeResult): Promise<void>;
+  /** Drafts waiting on an answer. */
+  drafts(limit?: number): Promise<string[]>;
+  claimDraft(id: string): Promise<DraftClaim | null>;
+  finishDraft(id: string, answer: DraftAnswer): Promise<void>;
 }
 
 const QUEUE = `query ($limit: Int) { runnerQueue(limit: $limit) { todoId laneId projectId } }`;
+/** What the runner reads of an agent, for a run or a draft. */
+const AGENT_FIELDS = `
+  id name baseUrl model apiKey systemPrompt temperature maxTokens contextLength
+  maxToolIterations toolDiscovery toolSelectModel requestTimeoutSeconds maxRetries mcpServers
+`;
 const CLAIM = `mutation ($todoId: ID!, $laneId: ID!) {
   claimRun(todoId: $todoId, laneId: $laneId) {
     runId todoId token leaseExpiresAt
-    agent {
-      id name baseUrl model apiKey systemPrompt temperature maxTokens contextLength
-      maxToolIterations toolDiscovery toolSelectModel requestTimeoutSeconds maxRetries mcpServers
-    }
+    agent { ${AGENT_FIELDS} }
     brief {
       projectName projectDescription projectContext laneName contract lanePrompt
       title brief acceptance report why notes
@@ -162,6 +183,17 @@ const HEARTBEAT = `mutation ($id: ID!, $events: [RunEventInput!], $prompt: RunPr
 }`;
 const PROBES = `query { runnerProbes { id server } }`;
 const FINISH_PROBE = `mutation ($id: ID!, $result: ProbeResultInput!) { finishProbe(id: $id, result: $result) }`;
+const DRAFTS = `query ($limit: Int) { runnerDrafts(limit: $limit) }`;
+const CLAIM_DRAFT = `mutation ($id: ID!) {
+  claimDraft(id: $id) {
+    draftId projectName projectDescription projectContext title brief
+    agent { ${AGENT_FIELDS} }
+    messages { role content }
+  }
+}`;
+const FINISH_DRAFT = `mutation ($id: ID!, $reply: String, $title: String, $brief: String, $error: String) {
+  finishDraft(id: $id, reply: $reply, title: $title, brief: $brief, error: $error)
+}`;
 const FINISH = `mutation ($id: ID!, $result: RunResultInput!) { finishRun(id: $id, result: $result) { id } }`;
 
 /** A GraphQL answer carrying errors, as one error. */
@@ -230,6 +262,11 @@ export function createTelos(options: { telosUrl: string; runnerKey: string; fetc
     probes: async () => (await request<{ runnerProbes: RunnerProbe[] }>(PROBES, {})).runnerProbes,
     finishProbe: async (id, result) => {
       await request(FINISH_PROBE, { id, result });
+    },
+    drafts: async (limit = 20) => (await request<{ runnerDrafts: string[] }>(DRAFTS, { limit })).runnerDrafts,
+    claimDraft: async (id) => (await request<{ claimDraft: DraftClaim | null }>(CLAIM_DRAFT, { id })).claimDraft,
+    finishDraft: async (id, answer) => {
+      await request(FINISH_DRAFT, { id, ...answer });
     },
   };
 }

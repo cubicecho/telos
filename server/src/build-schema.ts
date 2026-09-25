@@ -7,6 +7,7 @@ import { applyAiSwitchesExtension } from './resolvers/ai-switches.ts';
 import { applyApiKeysExtension } from './resolvers/api-keys.ts';
 import { applyAuthExtension } from './resolvers/auth.ts';
 import { applyBoardTemplatesExtension } from './resolvers/board-templates.ts';
+import { applyDraftsExtension } from './resolvers/drafts.ts';
 import { applyLanesExtension } from './resolvers/lanes.ts';
 import { applyRequestsExtension } from './resolvers/requests.ts';
 import { applyRunsExtension } from './resolvers/runs.ts';
@@ -38,7 +39,7 @@ export interface SchemaOptions {
 }
 
 /** Tables that exist in the API only while the instance has AI on. */
-const AI_TABLES = ['agents', 'runs', 'artifacts'];
+const AI_TABLES = ['agents', 'runs', 'artifacts', 'drafts', 'draftMessages'];
 
 /** A lane's station settings, which mean nothing without agents. */
 const AI_LANE_COLUMNS = [
@@ -111,6 +112,7 @@ export function createSchema(db: AnyDb, options: SchemaOptions) {
     schema = applyRequestsExtension(schema);
     schema = applyAgentsExtension(schema);
     schema = applyRunsExtension(schema);
+    schema = applyDraftsExtension(schema);
     schema = applyAiStatusExtension(schema);
   }
   // Last, so it sees every mutation the extensions above added.

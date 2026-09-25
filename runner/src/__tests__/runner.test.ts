@@ -16,6 +16,7 @@ import { toHeaders } from '../../../server/src/auth.ts';
 import { createSchema } from '../../../server/src/build-schema.ts';
 import { mountMcp } from '../../../server/src/mcp.ts';
 import { createContextFactory } from '../../../server/src/request-context.ts';
+import { takeDrafts } from '../drafts.ts';
 import { startRunner } from '../embed.ts';
 import { type LoopOptions, tick } from '../loop.ts';
 import { takeTests } from '../probes.ts';
@@ -90,7 +91,8 @@ async function serveTelos(): Promise<string> {
 }
 
 /**
- * A chat-completions endpoint that streams whatever `llm.script` says.
+ * A chat-completions endpoint that answers whatever `llm.script` says:
+ * streamed, as a run asks, or whole, as a draft's single call does.
  *
  * @returns Its base URL.
  */
@@ -113,6 +115,20 @@ async function serveLlm(): Promise<string> {
         return;
       }
       calls++;
+      if (!JSON.parse(body).stream && 'content' in reply) {
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(
+          JSON.stringify({
+            id: `c${calls}`,
+            object: 'chat.completion',
+            created: 0,
+            model: 'tiny',
+            choices: [{ index: 0, message: { role: 'assistant', content: reply.content }, finish_reason: 'stop' }],
+            usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
+          }),
+        );
+        return;
+      }
       const chunk = (delta: unknown, finish: string | null) =>
         `data: ${JSON.stringify({
           id: `c${calls}`,
@@ -459,5 +475,68 @@ describe('the runner inside the server', () => {
     } finally {
       await runner.stop();
     }
+  });
+});
+
+describe('drafts', () => {
+  const START = `mutation ($projectId: ID!, $agentId: ID!, $message: String!) {
+    startDraft(projectId: $projectId, agentId: $agentId, message: $message) { id }
+  }`;
+  const READ = `query ($id: UUID!) {
+    draft(where: { id: { eq: $id } }) { title brief error waitingSince messages(orderBy: { createdAt: { direction: asc, priority: 1 } }) { role content } }
+  }`;
+
+  async function answerAll(): Promise<number> {
+    const running = new Map<string, Promise<unknown>>();
+    const taken = await takeDrafts(createTelos({ telosUrl, runnerKey: RUNNER_KEY }), 2, running, { log: () => {} });
+    await Promise.all(running.values());
+    return taken;
+  }
+
+  it('has the agent answer the conversation and rewrite the brief', async () => {
+    const seen: Array<{ role: string; content: unknown }> = [];
+    llm.script = (messages) => {
+      seen.push(...messages);
+      return {
+        content: JSON.stringify({ reply: 'Which export, CSV?', title: 'Faster export', brief: 'Speed up the export.' }),
+      };
+    };
+    const id = (
+      await board.person.expectOk(START, {
+        projectId: board.projectId,
+        agentId: board.agentId,
+        message: 'Export is slow',
+      })
+    ).startDraft.id;
+    expect(await answerAll()).toBe(1);
+
+    const draft = (await board.person.expectOk(READ, { id })).draft;
+    expect(draft).toMatchObject({
+      title: 'Faster export',
+      brief: 'Speed up the export.',
+      waitingSince: null,
+      error: null,
+    });
+    expect(draft.messages).toEqual([
+      { role: 'user', content: 'Export is slow' },
+      { role: 'assistant', content: 'Which export, CSV?' },
+    ]);
+    expect(String(seen[0].content)).toContain('turn a rough request into a todo');
+    expect(String(seen[0].content)).toContain('A test board.');
+    expect(String(seen[1].content)).toContain('Them: Export is slow');
+    // Nothing is left waiting.
+    expect(await answerAll()).toBe(0);
+  });
+
+  it('reports a model that cannot answer as the draft’s error', async () => {
+    llm.script = () => ({ content: 'no json here' });
+    const id = (
+      await board.person.expectOk(START, { projectId: board.projectId, agentId: board.agentId, message: 'Hello' })
+    ).startDraft.id;
+    await answerAll();
+    const draft = (await board.person.expectOk(READ, { id })).draft;
+    expect(draft.error).toMatch(/shape asked for/);
+    expect(draft.waitingSince).toBeNull();
+    expect(draft.messages).toHaveLength(1);
   });
 });

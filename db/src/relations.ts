@@ -75,6 +75,17 @@ export const relations = defineRelations(schema, (r) => ({
     artifacts: r.many.artifacts({ from: r.runs.id, to: r.artifacts.runId }),
   },
 
+  drafts: {
+    project: r.one.projects({ from: r.drafts.projectId, to: r.projects.id }),
+    agent: r.one.agents({ from: r.drafts.agentId, to: r.agents.id }),
+    todo: r.one.todos({ from: r.drafts.todoId, to: r.todos.id }),
+    messages: r.many.draftMessages({ from: r.drafts.id, to: r.draftMessages.draftId }),
+  },
+
+  draftMessages: {
+    draft: r.one.drafts({ from: r.draftMessages.draftId, to: r.drafts.id }),
+  },
+
   artifacts: {
     todo: r.one.todos({ from: r.artifacts.todoId, to: r.todos.id }),
     run: r.one.runs({ from: r.artifacts.runId, to: r.runs.id }),

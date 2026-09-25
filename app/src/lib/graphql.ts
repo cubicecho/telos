@@ -999,3 +999,88 @@ export const SearchTodosDocument = graphql(`
     }
   }
 `);
+
+// Drafts: talking a request over with an agent before it becomes a todo.
+// The runner answers, so an open draft polls while it waits.
+
+export const DraftFieldsFragment = graphql(`
+  fragment DraftFields on Draft {
+    id
+    projectId
+    agentId
+    title
+    brief
+    waitingSince
+    error
+    todoId
+    updatedAt
+  }
+`);
+
+export const DraftDocument = graphql(`
+  query Draft($id: UUID!) {
+    draft(where: { id: { eq: $id } }) {
+      ...DraftFields
+      agent {
+        id
+        name
+      }
+      messages(orderBy: { createdAt: { direction: asc, priority: 1 } }) {
+        id
+        role
+        content
+      }
+    }
+  }
+`);
+
+export const OpenDraftsDocument = graphql(`
+  query OpenDrafts($projectId: UUID!) {
+    drafts(
+      where: { projectId: { eq: $projectId }, todoId: { isNull: true } }
+      orderBy: { updatedAt: { direction: desc, priority: 1 } }
+      limit: 5
+    ) {
+      ...DraftFields
+    }
+  }
+`);
+
+export const StartDraftDocument = graphql(`
+  mutation StartDraft($projectId: ID!, $agentId: ID!, $message: String!) {
+    startDraft(projectId: $projectId, agentId: $agentId, message: $message) {
+      ...DraftFields
+    }
+  }
+`);
+
+export const SayToDraftDocument = graphql(`
+  mutation SayToDraft($id: ID!, $message: String!) {
+    sayToDraft(id: $id, message: $message) {
+      ...DraftFields
+    }
+  }
+`);
+
+export const StopDraftDocument = graphql(`
+  mutation StopDraft($id: ID!) {
+    stopDraft(id: $id) {
+      ...DraftFields
+    }
+  }
+`);
+
+export const MakeTodoFromDraftDocument = graphql(`
+  mutation MakeTodoFromDraft($id: ID!, $title: String, $brief: String) {
+    makeTodoFromDraft(id: $id, title: $title, brief: $brief) {
+      id
+      title
+    }
+  }
+`);
+
+export const DiscardDraftDocument = graphql(`
+  mutation DiscardDraft($id: ID!) {
+    discardDraft(id: $id)
+  }
+`);

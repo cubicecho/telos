@@ -31,6 +31,8 @@ describe('tenancy configuration', () => {
       'agents',
       'artifacts',
       'boardTemplates',
+      'draftMessages',
+      'drafts',
       'labels',
       'lanes',
       'projectLabels',

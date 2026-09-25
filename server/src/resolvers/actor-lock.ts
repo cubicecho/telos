@@ -18,7 +18,14 @@ export const AI_MUTATIONS = new Set(['submitRequest', 'cancelRequest', 'addTodoN
  * would refuse it anyway; this says so plainly, and keeps it that way for
  * mutations that do not ask for a user.
  */
-export const RUNNER_MUTATIONS = new Set(['claimRun', 'heartbeatRun', 'finishRun', 'finishProbe']);
+export const RUNNER_MUTATIONS = new Set([
+  'claimRun',
+  'heartbeatRun',
+  'finishRun',
+  'finishProbe',
+  'claimDraft',
+  'finishDraft',
+]);
 
 /**
  * Why `name` is closed to the caller, or null when it is open.

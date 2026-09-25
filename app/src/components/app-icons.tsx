@@ -6,6 +6,7 @@ import EllipsisSource from 'lucide-react-native/icons/ellipsis';
 import Link2Source from 'lucide-react-native/icons/link-2';
 import ListSource from 'lucide-react-native/icons/list';
 import LogOutSource from 'lucide-react-native/icons/log-out';
+import MessageSquareSource from 'lucide-react-native/icons/message-square';
 import TagSource from 'lucide-react-native/icons/tag';
 import { icon } from '@/components/ui/icons';
 
@@ -21,4 +22,5 @@ export const Ellipsis = icon(EllipsisSource);
 export const Link2 = icon(Link2Source);
 export const List = icon(ListSource);
 export const LogOut = icon(LogOutSource);
+export const MessageSquare = icon(MessageSquareSource);
 export const Tag = icon(TagSource);

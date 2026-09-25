@@ -2,8 +2,10 @@ import { useMutation } from '@apollo/client';
 import { useRouter } from 'expo-router';
 import { type ReactNode, useState } from 'react';
 import { Text, View } from 'react-native';
+import { MessageSquare } from '@/components/app-icons';
 import { type ProjectActivity, ProjectActivityLine } from '@/components/domain/ai/project-activity';
 import { ProjectAiSwitch } from '@/components/domain/ai/project-ai-switch';
+import { DraftDialog } from '@/components/domain/draft/draft-dialog';
 import { LabelBadge, type LabelSummary } from '@/components/domain/label/label-badge';
 import { LabelPicker } from '@/components/domain/label/label-picker';
 import { SaveTemplateDialog } from '@/components/domain/template/save-template-dialog';
@@ -12,6 +14,7 @@ import { PageLayout } from '@/components/page-layout';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Copy, Pencil, Trash2 } from '@/components/ui/icons';
+import { useAi } from '@/lib/ai';
 import { describeError } from '@/lib/errors';
 import {
   AttachProjectLabelDocument,
@@ -53,6 +56,9 @@ export function ProjectPage({
   const [editing, setEditing] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [savingTemplate, setSavingTemplate] = useState(false);
+  const [drafting, setDrafting] = useState(false);
+  const ai = useAi();
+  const canDraft = ai.on && project.aiEnabled;
   const [notice, setNotice] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
@@ -106,6 +112,19 @@ export function ProjectPage({
       action={
         <>
           <LabelPicker attached={project.labels} onToggle={toggleLabel} align="end" />
+          {canDraft ? (
+            <Button
+              variant="ghost"
+              size="icon"
+              onPress={() => {
+                setNotice(null);
+                setDrafting(true);
+              }}
+              aria-label="Talk a request over"
+            >
+              <MessageSquare className="h-4 w-4" />
+            </Button>
+          ) : null}
           <Button
             variant="ghost"
             size="icon"
@@ -174,6 +193,15 @@ export function ProjectPage({
             projectName={project.name}
             onSaved={(name) => setNotice(`Saved its lanes as the template “${name}”.`)}
           />
+
+          {canDraft ? (
+            <DraftDialog
+              open={drafting}
+              onOpenChange={setDrafting}
+              projectId={project.id}
+              onMade={(title) => setNotice(`Made the todo “${title}”.`)}
+            />
+          ) : null}
 
           <ConfirmDialog
             open={confirmingDelete}

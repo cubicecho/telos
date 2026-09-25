@@ -12,5 +12,6 @@ export {
   Link2,
   List,
   LogOut,
+  MessageSquare,
   Tag,
 } from 'lucide-react';

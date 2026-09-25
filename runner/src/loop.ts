@@ -1,3 +1,4 @@
+import { takeDrafts } from './drafts.ts';
 import { type ExecuteOptions, execute } from './execute.ts';
 import { takeTests } from './probes.ts';
 import type { Telos } from './telos.ts';
@@ -17,7 +18,7 @@ export interface LoopOptions extends Omit<ExecuteOptions, 'signal'> {
  * Claims and starts whatever is ready, up to the free slots.
  *
  * @param options How to reach telos and how much to take on.
- * @param running The runs in flight, by run id. Added to here.
+ * @param running What is in flight — runs by run id, drafts by `draft:<id>`. Added to here.
  * @param signal Stops the runs started.
  * @returns How many runs were started.
  */
@@ -60,8 +61,15 @@ export async function runLoop(options: LoopOptions, signal: AbortSignal): Promis
       log(`[runner] asking telos for MCP tests failed: ${error instanceof Error ? error.message : String(error)}`);
     }
     let started = 0;
+    // Drafts first: somebody is sitting there waiting for the answer. They
+    // share the runner's slots with runs.
     try {
-      started = await tick(options, running, signal);
+      started += await takeDrafts(options.telos, options.concurrency - running.size, running, { signal, log });
+    } catch (error) {
+      log(`[runner] asking telos for drafts failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    try {
+      started += await tick(options, running, signal);
     } catch (error) {
       log(`[runner] asking telos failed: ${error instanceof Error ? error.message : String(error)}`);
     }
@@ -83,6 +91,11 @@ export async function runLoop(options: LoopOptions, signal: AbortSignal): Promis
  */
 function pause(ms: number, signal: AbortSignal, running: Map<string, Promise<unknown>>): Promise<void> {
   return new Promise((resolve) => {
+    // A stop that came while the loop was busy has already fired its event.
+    if (signal.aborted) {
+      resolve();
+      return;
+    }
     const timer = setTimeout(done, ms);
     signal.addEventListener('abort', done, { once: true });
     for (const run of running.values()) run.finally(done);
