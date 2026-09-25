@@ -1,9 +1,11 @@
 import { useMutation } from '@apollo/client';
 import { useEffect, useMemo, useState } from 'react';
+import { Text } from 'react-native';
 import { useAppForm } from '@/components/app-form';
+import { DialogLayout } from '@/components/dialog-layout';
 import { TodoRuns, useTodoRuns } from '@/components/domain/ai/todo-runs';
+import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
-import { FormDialog, FormDialogFooter } from '@/components/ui/form-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAi } from '@/lib/ai';
 import { parseDate } from '@/lib/dates';
@@ -26,6 +28,11 @@ import type { TodoSummary } from './types';
  * tab, loaded only when opened. "AI ignores this" is the one AI field, drawn —
  * and sent — only while AI is on for the account. With AI on for the project
  * as well, a Runs tab shows what the stations' agents made of it.
+ *
+ * A `DialogLayout`, so the title and the Save stay put and only the body
+ * scrolls: a long thread or history would otherwise carry the whole dialog,
+ * title first, off the top of the screen. The form's provider wraps the whole
+ * dialog so the footer's Save can submit it.
  *
  * No `update` function, unusually for this app. The other todo mutations write
  * a cache updater because completing or deleting moves *other* rows — the
@@ -114,81 +121,99 @@ export function TodoFormDialog({
     onOpenChange(false);
   }
 
+  const details = tab === 'details';
+
   return (
-    <FormDialog
-      open={open}
-      onOpenChange={onOpenChange}
-      title="Edit todo"
-      description="Its lane, labels and dependencies are set from the row itself, where the rules about them live."
-      className="sm:max-w-[560px]"
-    >
-      <Tabs value={tab} onValueChange={setTab} className="gap-4">
-        <TabsList aria-label="Todo" className="self-start">
-          <TabsTrigger value="details">Details</TabsTrigger>
-          <TabsTrigger value="notes">Thread</TabsTrigger>
-          <TabsTrigger value="history">History</TabsTrigger>
-          {showRuns ? <TabsTrigger value="runs">Runs</TabsTrigger> : null}
-        </TabsList>
-        <TabsContent value="details">
-          <form.AppForm>
-            <Form className="gap-4">
-              <form.AppField
-                name="title"
-                validators={{ onChange: ({ value }) => (value.trim() === '' ? 'A todo needs a title.' : undefined) }}
-              >
-                {(field) => <field.InputField label="Title" autoFocus placeholder="Replace the tap" />}
-              </form.AppField>
-              <form.AppField name="notes">
-                {(field) => <field.TextAreaField label="Notes" placeholder="Optional." />}
-              </form.AppField>
-              <form.AppField name="acceptance">
-                {(field) => (
-                  <field.TextAreaField label="Acceptance criteria" placeholder="Optional. What done looks like." />
-                )}
-              </form.AppField>
-              {/* Date only: a picked day is committed at local midnight, so the day
+    <form.AppForm>
+      <DialogLayout
+        open={open}
+        onOpenChange={onOpenChange}
+        size="lg"
+        title="Edit todo"
+        description="Its lane, labels and dependencies are set from the row itself, where the rules about them live."
+        hasUnsavedChanges={() => !form.state.isDefaultValue}
+        footer={
+          details && error ? (
+            <Text role="alert" className="text-sm text-destructive">
+              {describeError(error)}
+            </Text>
+          ) : null
+        }
+        footerActions={(close) =>
+          details ? (
+            <>
+              <Button variant="outline" onPress={close}>
+                Cancel
+              </Button>
+              <form.SubmitButton isEdit editLabel="Save" />
+            </>
+          ) : null
+        }
+        content={
+          <Tabs value={tab} onValueChange={setTab} className="gap-4">
+            <TabsList aria-label="Todo" className="self-start">
+              <TabsTrigger value="details">Details</TabsTrigger>
+              <TabsTrigger value="notes">Thread</TabsTrigger>
+              <TabsTrigger value="history">History</TabsTrigger>
+              {showRuns ? <TabsTrigger value="runs">Runs</TabsTrigger> : null}
+            </TabsList>
+            <TabsContent value="details">
+              <Form className="gap-4">
+                <form.AppField
+                  name="title"
+                  validators={{ onChange: ({ value }) => (value.trim() === '' ? 'A todo needs a title.' : undefined) }}
+                >
+                  {(field) => <field.InputField label="Title" autoFocus placeholder="Replace the tap" />}
+                </form.AppField>
+                <form.AppField name="notes">
+                  {(field) => <field.TextAreaField label="Notes" placeholder="Optional." />}
+                </form.AppField>
+                <form.AppField name="acceptance">
+                  {(field) => (
+                    <field.TextAreaField label="Acceptance criteria" placeholder="Optional. What done looks like." />
+                  )}
+                </form.AppField>
+                {/* Date only: a picked day is committed at local midnight, so the day
                   the reader chose is the day they get back in their own zone. Clear
                   saves `null`, never the epoch, which is the path the server-side
                   scalar override exists to keep honest. */}
-              <form.AppField name="dueAt">
-                {(field) => (
-                  <field.DateTimeField
-                    label="Due"
-                    mode="date"
-                    placeholder="No due date"
-                    clearable
-                    description="Clear it from the calendar for no due date."
-                  />
-                )}
-              </form.AppField>
-              {ai.on ? (
-                <form.AppField name="aiIgnored">
+                <form.AppField name="dueAt">
                   {(field) => (
-                    <field.CheckboxField
-                      label="AI ignores this"
-                      description="No agent picks it up, and AI clients cannot read it."
+                    <field.DateTimeField
+                      label="Due"
+                      mode="date"
+                      placeholder="No due date"
+                      clearable
+                      description="Clear it from the calendar for no due date."
                     />
                   )}
                 </form.AppField>
-              ) : null}
-              <FormDialogFooter onCancel={() => onOpenChange(false)} error={error ? describeError(error) : null}>
-                <form.SubmitButton isEdit editLabel="Save" />
-              </FormDialogFooter>
-            </Form>
-          </form.AppForm>
-        </TabsContent>
-        <TabsContent value="notes">
-          <TodoThread todoId={todo.id} />
-        </TabsContent>
-        <TabsContent value="history">
-          <TodoHistory todoId={todo.id} runs={showRuns ? runsQuery.data?.todo?.runs : undefined} />
-        </TabsContent>
-        {showRuns ? (
-          <TabsContent value="runs">
-            <TodoRuns todoId={todo.id} />
-          </TabsContent>
-        ) : null}
-      </Tabs>
-    </FormDialog>
+                {ai.on ? (
+                  <form.AppField name="aiIgnored">
+                    {(field) => (
+                      <field.CheckboxField
+                        label="AI ignores this"
+                        description="No agent picks it up, and AI clients cannot read it."
+                      />
+                    )}
+                  </form.AppField>
+                ) : null}
+              </Form>
+            </TabsContent>
+            <TabsContent value="notes">
+              <TodoThread todoId={todo.id} />
+            </TabsContent>
+            <TabsContent value="history">
+              <TodoHistory todoId={todo.id} runs={showRuns ? runsQuery.data?.todo?.runs : undefined} />
+            </TabsContent>
+            {showRuns ? (
+              <TabsContent value="runs">
+                <TodoRuns todoId={todo.id} />
+              </TabsContent>
+            ) : null}
+          </Tabs>
+        }
+      />
+    </form.AppForm>
   );
 }
