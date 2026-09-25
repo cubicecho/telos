@@ -167,7 +167,7 @@ const RUNS_SDL = parse(`
     heartbeatRun(id: ID!, events: [RunEventInput!], prompt: RunPromptInput, usage: RunUsageInput): Boolean!
     "Records what a run came to and moves its todo on. The runner's only."
     finishRun(id: ID!, result: RunResultInput!): Run!
-    "Asks a running run to stop. The agent hears it on its next heartbeat."
+    "Asks a running run to stop, and tells AI to ignore its todo so no run starts on it again until that is switched off. The agent hears it on its next heartbeat."
     cancelRun(id: ID!): Run!
     "Deletes a finished run and its log. What it did to the todo, its notes and history, stays."
     deleteRun(id: ID!): Boolean!
@@ -781,12 +781,29 @@ export function applyRunsExtension(schema: GraphQLSchema): GraphQLSchema {
       .where(and(eq(dbSchema.runs.id, args.id), eq(dbSchema.runs.userId, userId)));
     if (!run) throw notFound('Run');
     if (run.status !== 'running' || run.cancelRequestedAt) return run;
-    const [cancelled] = await db
-      .update(dbSchema.runs)
-      .set({ cancelRequestedAt: new Date() })
-      .where(eq(dbSchema.runs.id, run.id))
-      .returning();
-    return cancelled;
+    return db.transaction(async (tx: AnyRow) => {
+      const [cancelled] = await tx
+        .update(dbSchema.runs)
+        .set({ cancelRequestedAt: new Date() })
+        .where(eq(dbSchema.runs.id, run.id))
+        .returning();
+      // Stopping a run means "not now", and the queue would otherwise hand the
+      // todo straight back to the same station. So AI is told to leave it alone,
+      // as the MCP door's cancelRequest does; switching that off again is the
+      // way back in, and the history says why it went on.
+      await stampActor(tx, context.actor, { reason: 'Its run was stopped.' });
+      await tx
+        .update(dbSchema.todos)
+        .set({ aiIgnored: true, updatedAt: new Date() })
+        .where(
+          and(
+            eq(dbSchema.todos.id, run.todoId),
+            eq(dbSchema.todos.userId, userId),
+            eq(dbSchema.todos.aiIgnored, false),
+          ),
+        );
+      return cancelled;
+    });
   };
 
   mutations.deleteRun.resolve = async (_parent: unknown, args: { id: string }, context: Context) => {

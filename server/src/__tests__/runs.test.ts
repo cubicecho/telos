@@ -1,5 +1,5 @@
 import * as dbSchema from '@telos/db/schema';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { resolveActor } from '../auth.ts';
 import type { Actor } from '../context.ts';
@@ -314,6 +314,28 @@ describe('stopping a run', () => {
     expect(run.status).toBe('stopped');
     expect((await todoRow(todoId)).laneId).toBe(board.lanes[0].id);
     expect(await thread(todoId)).toEqual([]);
+  });
+
+  it('tells AI to ignore the todo, so the station does not take it straight back', async () => {
+    const todoId = await board.addTodo('Write it');
+    const { runId } = await claim(todoId);
+    await board.person.expectOk(`mutation ($id: ID!) { cancelRun(id: $id) { id } }`, { id: runId });
+    await finish(runId, { status: 'stopped' });
+
+    expect((await todoRow(todoId)).aiIgnored).toBe(true);
+    expect((await queue()).map((ready) => ready.todoId)).not.toContain(todoId);
+    const [event] = await db
+      .select()
+      .from(dbSchema.todoEvents)
+      .where(and(eq(dbSchema.todoEvents.todoId, todoId), eq(dbSchema.todoEvents.kind, 'edit')));
+    expect(event).toMatchObject({ actorKind: 'user', reason: 'Its run was stopped.' });
+
+    // Switching it back off is the way back in.
+    await board.person.expectOk(
+      `mutation ($id: UUID!) { updateTodo(set: { aiIgnored: false }, where: { id: { eq: $id } }) { id } }`,
+      { id: todoId },
+    );
+    expect((await queue()).map((ready) => ready.todoId)).toContain(todoId);
   });
 
   it('happens when the project is closed to AI', async () => {
