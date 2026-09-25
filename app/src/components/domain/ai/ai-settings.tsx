@@ -33,7 +33,7 @@ export function AiSettings() {
   const [error, setError] = useState<string | null>(null);
 
   const adminSwitch = ai.admin && ai.available;
-  if (!ai.instance && !adminSwitch) return null;
+  if (!ai.settings) return null;
 
   async function toggleInstance(enabled: boolean) {
     setError(null);

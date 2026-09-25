@@ -11,6 +11,10 @@ import { AiStateDocument } from '@/lib/graphql';
  *   server offers AI at all (`available`; AI_ENABLED is not false).
  * - `account`: the person's own switch, in Settings. Off, only that switch shows.
  *
+ * `settings` is whether there is anything AI in Settings to show this person:
+ * the account's switch once the instance is on, or the instance's own switch
+ * for an admin.
+ *
  * `on` is both. Anything that is AI's (API keys, a project's switch, the
  * "AI ignores this" chip) is drawn only when it is true. A project's own switch
  * is a third layer, read from the project where it is needed.
@@ -24,5 +28,13 @@ export function useAi() {
   const instance = data?.authConfig.ai ?? false;
   const account = instance && (data?.users[0]?.aiEnabled ?? false);
   const admin = data?.users[0]?.isAdmin ?? false;
-  return { available, instance, admin, account, on: instance && account, userId: data?.users[0]?.id };
+  return {
+    available,
+    instance,
+    admin,
+    account,
+    on: instance && account,
+    settings: instance || (available && admin),
+    userId: data?.users[0]?.id,
+  };
 }
