@@ -1,3 +1,4 @@
+import type { ArtifactDraft } from './artifacts.ts';
 // The runner's whole view of telos: four operations over GraphQL, as the
 // system principal. The runner never touches the database; every rule about
 // what may run, and what a finished run does to a todo, is telos's.
@@ -16,6 +17,18 @@ export interface McpServerRow {
   args?: string[];
   headers?: Record<string, string>;
   env?: Record<string, string>;
+  /** This server's tools the model is not offered, for its hooks' use. */
+  hiddenTools?: string[];
+  /** Tool calls it wants made around a run: `ToolHook`s, as agent-mcp-pool reads them. */
+  hooks?: unknown[];
+}
+
+/** Something that happened in a run, for the live view. */
+export interface RunEvent {
+  kind: 'tool_call' | 'tool_result' | 'hook' | 'notice';
+  name?: string | null;
+  ok?: boolean | null;
+  text?: string | null;
 }
 
 export interface ClaimedAgent {
@@ -77,6 +90,8 @@ export interface RunResult {
   completionTokens?: number;
   totalTokens?: number;
   todos?: ProposedTodo[];
+  events?: RunEvent[];
+  artifacts?: ArtifactDraft[];
 }
 
 /** The runner's calls into telos. An interface so a test can stand in for it. */
@@ -84,7 +99,7 @@ export interface Telos {
   queue(limit?: number): Promise<ReadyTodo[]>;
   claim(todoId: string, laneId: string): Promise<Claim | null>;
   /** True means stop. */
-  heartbeat(runId: string): Promise<boolean>;
+  heartbeat(runId: string, events?: RunEvent[]): Promise<boolean>;
   finish(runId: string, result: RunResult): Promise<void>;
 }
 
@@ -102,7 +117,7 @@ const CLAIM = `mutation ($todoId: ID!, $laneId: ID!) {
     }
   }
 }`;
-const HEARTBEAT = `mutation ($id: ID!) { heartbeatRun(id: $id) }`;
+const HEARTBEAT = `mutation ($id: ID!, $events: [RunEventInput!]) { heartbeatRun(id: $id, events: $events) }`;
 const FINISH = `mutation ($id: ID!, $result: RunResultInput!) { finishRun(id: $id, result: $result) { id } }`;
 
 /** A GraphQL answer carrying errors, as one error. */
@@ -156,7 +171,8 @@ export function createTelos(options: { telosUrl: string; runnerKey: string; fetc
   return {
     queue: async (limit = 20) => (await request<{ runnerQueue: ReadyTodo[] }>(QUEUE, { limit })).runnerQueue,
     claim: async (todoId, laneId) => (await request<{ claimRun: Claim | null }>(CLAIM, { todoId, laneId })).claimRun,
-    heartbeat: async (runId) => (await request<{ heartbeatRun: boolean }>(HEARTBEAT, { id: runId })).heartbeatRun,
+    heartbeat: async (runId, events = []) =>
+      (await request<{ heartbeatRun: boolean }>(HEARTBEAT, { id: runId, events })).heartbeatRun,
     finish: async (runId, result) => {
       await request(FINISH, { id: runId, result });
     },

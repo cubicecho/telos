@@ -1,5 +1,8 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
+import { Server as McpServer } from '@modelcontextprotocol/sdk/server/index.js';
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import * as dbSchema from '@telos/db/schema';
 import { eq } from 'drizzle-orm';
 import express from 'express';
@@ -156,6 +159,51 @@ async function serveLlm(): Promise<string> {
 }
 
 /**
+ * An agent's own MCP server: a file tool to write with, and a memory tool its
+ * hook calls before every turn. Stateless, a server per request.
+ *
+ * @param recalled What the memory tool answers.
+ * @returns Its URL, and the files written through it.
+ */
+async function serveTools(recalled: string): Promise<{ url: string; written: Map<string, string> }> {
+  const written = new Map<string, string>();
+  const app = express();
+  app.post('/mcp', express.json(), async (req, res) => {
+    const server = new McpServer({ name: 'desk', version: '0' }, { capabilities: { tools: {} } });
+    server.setRequestHandler(ListToolsRequestSchema, async () => ({
+      tools: [
+        {
+          name: 'write_file',
+          description: 'Writes a file.',
+          inputSchema: {
+            type: 'object' as const,
+            properties: { path: { type: 'string' }, content: { type: 'string' } },
+            required: ['path', 'content'],
+          },
+        },
+        { name: 'recall', description: 'What you remember.', inputSchema: { type: 'object' as const, properties: {} } },
+      ],
+    }));
+    server.setRequestHandler(CallToolRequestSchema, async (request) => {
+      if (request.params.name === 'write_file') {
+        const args = request.params.arguments as { path: string; content: string };
+        written.set(args.path, args.content);
+        return { content: [{ type: 'text', text: 'Written.' }] };
+      }
+      return { content: [{ type: 'text', text: recalled }] };
+    });
+    const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+    res.on('close', () => {
+      void transport.close();
+      void server.close();
+    });
+    await server.connect(transport);
+    await transport.handleRequest(req, res, req.body);
+  });
+  return { url: `${await listen(app)}/mcp`, written };
+}
+
+/**
  * The runner's loop options against the test telos.
  *
  * @param overrides Anything to change.
@@ -225,6 +273,68 @@ describe('the runner', () => {
     ).toEqual([
       ['note', 'Halfway there.', 'agent', run.id],
       ['report', 'Wrote it.', 'agent', run.id],
+    ]);
+  });
+
+  it('runs the agent’s hooks, keeps what it made, and shows its work as it goes', async () => {
+    const desk = await serveTools('The owner likes their plans short.');
+    await db
+      .update(dbSchema.agents)
+      .set({
+        mcpServers: [
+          {
+            id: 'desk',
+            name: 'Desk',
+            url: desk.url,
+            hiddenTools: ['recall'],
+            hooks: [{ id: 'memory', on: 'beforeTurn', tool: 'recall', inject: true }],
+          },
+        ],
+      })
+      .where(eq(dbSchema.agents.id, board.agentId));
+    const todoId = await board.addTodo('Plan it');
+    const asked: string[] = [];
+    let step = 0;
+    llm.script = async (messages) => {
+      asked.push(messages.map((message) => String(message.content ?? '')).join('\n'));
+      step++;
+      if (step === 1) return { tool: 'desk__write_file', args: { path: '/work/plan.md', content: '# Plan' } };
+      if (step === 2) {
+        // Slow enough for a heartbeat to carry the write to telos mid-run.
+        await new Promise((resolve) => setTimeout(resolve, 200));
+        const [live] = await runsOf(todoId);
+        expect(live.status).toBe('running');
+        expect(live.events.map((event: dbSchema.RunEvent) => event.kind)).toContain('tool_call');
+        return {
+          tool: 'record_artifact',
+          args: { location: '/work/plan.md', title: 'The plan', description: 'What happens first.' },
+        };
+      }
+      return { content: 'Planned.' };
+    };
+
+    await cycle();
+
+    expect(desk.written.get('/work/plan.md')).toBe('# Plan');
+    expect(asked[0]).toContain('The owner likes their plans short.');
+    const [run] = await runsOf(todoId);
+    expect(run.status).toBe('ok');
+    const kinds = run.events.map((event: dbSchema.RunEvent) => event.kind);
+    expect(kinds).toEqual(expect.arrayContaining(['hook', 'tool_call', 'tool_result']));
+    expect(run.events.find((event: dbSchema.RunEvent) => event.kind === 'hook')?.text).toContain('likes their plans');
+    const made = await db.select().from(dbSchema.artifacts).where(eq(dbSchema.artifacts.todoId, todoId));
+    expect(made).toEqual([
+      expect.objectContaining({
+        location: '/work/plan.md',
+        source: 'declared',
+        action: 'created',
+        serverSlug: 'desk',
+        tool: 'write_file',
+        title: 'The plan',
+        mediaType: 'text/markdown',
+        sizeBytes: 6,
+        runId: run.id,
+      }),
     ]);
   });
 
