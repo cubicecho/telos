@@ -64,6 +64,8 @@ telos/
 │       ├── instance.ts      # The instance's AI switch, and its admins
 │       ├── run-tokens.ts    # Per-run tokens, and the runner's key check
 │       ├── loaders.ts       # Per-request DataLoaders
+│       ├── board-events.ts  # Relays the board_notify trigger's NOTIFYs to `boardChanged`
+│       ├── routes/          # /graphql over HTTP, and its socket for subscriptions
 │       ├── resolvers/       # SDL extensions for what CRUD cannot express
 │       └── __tests__/       # Server tests
 ├── db/

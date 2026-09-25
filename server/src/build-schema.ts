@@ -6,6 +6,7 @@ import { applyAiStatusExtension } from './resolvers/ai-status.ts';
 import { applyAiSwitchesExtension } from './resolvers/ai-switches.ts';
 import { applyApiKeysExtension } from './resolvers/api-keys.ts';
 import { applyAuthExtension } from './resolvers/auth.ts';
+import { applyBoardChangesExtension } from './resolvers/board-changes.ts';
 import { applyBoardTemplatesExtension } from './resolvers/board-templates.ts';
 import { applyDraftsExtension } from './resolvers/drafts.ts';
 import { applyLanesExtension } from './resolvers/lanes.ts';
@@ -106,6 +107,7 @@ export function createSchema(db: AnyDb, options: SchemaOptions) {
   schema = applyTodosExtension(schema);
   schema = applyLanesExtension(schema);
   schema = applyBoardTemplatesExtension(schema);
+  schema = applyBoardChangesExtension(schema);
   if (options.ai) {
     schema = applyApiKeysExtension(schema);
     schema = applyAiSwitchesExtension(schema);

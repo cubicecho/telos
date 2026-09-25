@@ -1084,3 +1084,12 @@ export const DiscardDraftDocument = graphql(`
     discardDraft(id: $id)
   }
 `);
+
+export const BoardChangedDocument = graphql(`
+  subscription BoardChanged($projectId: ID!) {
+    boardChanged(projectId: $projectId) {
+      projectId
+      table
+    }
+  }
+`);

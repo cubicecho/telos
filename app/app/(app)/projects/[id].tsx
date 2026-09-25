@@ -22,6 +22,7 @@ import type { InputHandle } from '@/components/ui/input';
 import { LoadFailure, LoadState } from '@/components/ui/load-failure';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAi } from '@/lib/ai';
+import { useBoardUpdates } from '@/lib/board-updates';
 import { filterTodos, isFiltering, NO_FILTER, type TodoFilter } from '@/lib/filter-todos';
 import { ProjectDocument, ProjectLanesDocument, ProjectTodosDocument } from '@/lib/graphql';
 import { useHotkey } from '@/lib/hotkeys';
@@ -97,6 +98,9 @@ export default function ProjectScreen() {
   // project whose AI is off still has what its agents did before.
   const ai = useAi();
   const activity = useProjectActivity(id as string, { skip: !id || !ai.on });
+
+  // What an agent, an MCP client or another tab changes shows up here too.
+  useBoardUpdates(id);
 
   // Three queries, three failures, and they are not the same failure: the
   // project not loading means there is no screen, while the todos or the lanes
