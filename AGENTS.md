@@ -72,6 +72,16 @@ telos/
 │       ├── schema.ts        # Barrel re-exporting models/
 │       ├── relations.ts     # defineRelations config (drives the GraphQL schema)
 │       └── index.ts         # DB singleton + re-exports
+├── runner/                  # @telos/runner — works the stations; talks to telos over HTTP only
+│   └── src/
+│       ├── index.ts         # Entry point; exits quietly unless AI_ENABLED=true
+│       ├── config.ts        # Env -> RunnerConfig
+│       ├── telos.ts         # The runner's GraphQL client (queue, claim, heartbeat, finish)
+│       ├── loop.ts          # Poll the queue, claim up to the concurrency, execute
+│       ├── execute.ts       # One run: agent-core's runAgentLoop over a per-run MCP pool
+│       ├── tools.ts         # The pool: telos's /mcp with the run token, plus the agent's servers
+│       ├── prompts.ts       # System prompts per contract, and the brief
+│       └── __tests__/       # End to end against a real telos and a scripted model
 ├── .agents/mvp-plan.md      # The plan this repo was built from
 ├── vitest.config.ts
 ├── biome.json
@@ -81,12 +91,12 @@ telos/
 ## Commands
 
 ```bash
-npm run dev              # server (3001) + Expo dev server (3000)
+npm run dev              # server (3001) + Expo dev server (3000) + runner (only with AI_ENABLED=true)
 npm run db:up            # Postgres on ${POSTGRES_BIND:-127.0.0.1}:5435
 npm run db:generate      # new migration from a schema change
 npm run db:migrate       # apply migrations
 npm run codegen          # GraphQL types for both server and app
-npm run check            # codegen + biome + tsc --noEmit, all three workspaces
+npm run check            # codegen + biome + tsc --noEmit, every workspace
 npm test                 # Vitest
 ```
 
@@ -168,6 +178,14 @@ only reports. A switch turned off (`ai-switches.ts`, `aiIgnored`) sets
 `cancelRequestedAt` on live runs, the next heartbeat tells the runner to stop,
 and a stopped run writes nothing. `agents.apiKey` is excluded from the schema;
 it is written with `setAgentApiKey` and read only by the runner, in a claim.
+
+**The runner never imports the server or the database.** Everything it knows
+comes from `runnerQueue` and `claimRun`, and everything it does goes back
+through `finishRun` or, for the agent, through `/mcp` with the run token; its
+tests import server code only to stand a real telos up. Each run gets its own
+MCP pool, because the telos server in it carries that run's token. Agents'
+stdio MCP servers are refused unless `RUNNER_ALLOW_STDIO=true`: an agent
+belongs to a user, and a command runs on the runner's host with its rights.
 
 **`scope` cannot reach a plain insert.** Any foreign key a caller can state gets
 checked in an `onWrite` hook in `server/src/resolvers/write-guards.ts`. A new

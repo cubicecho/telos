@@ -21,10 +21,33 @@ services:
       EXPOSE_MAGIC_LINK: ${EXPOSE_MAGIC_LINK:-false}
       # Off unless you want the AI surface at all. See "AI" in the README.
       AI_ENABLED: ${AI_ENABLED:-false}
+      # The key the runner signs in with. Only read while AI_ENABLED is on.
+      RUNNER_KEY: ${RUNNER_KEY:-}
       NODE_ENV: production
       PORT: 3001
     ports:
       - "${PORT:-3001}:3001"
+
+  # The runner works the board's stations. It is behind the `ai` profile, so
+  # `docker compose up` never starts it; `docker compose --profile ai up` does.
+  runner:
+    image: vantreeseba/telos-runner:latest
+    build:
+      context: .
+      target: runner
+    profiles: [ai]
+    restart: unless-stopped
+    depends_on:
+      - telos
+    environment:
+      AI_ENABLED: ${AI_ENABLED:-false}
+      TELOS_URL: http://telos:3001
+      # Required for the runner (it exits without one): openssl rand -hex 32
+      RUNNER_KEY: ${RUNNER_KEY:-}
+      RUNNER_CONCURRENCY: ${RUNNER_CONCURRENCY:-2}
+      RUNNER_POLL_SECONDS: ${RUNNER_POLL_SECONDS:-5}
+      # Leave off unless every user with AI on is someone you would hand a shell.
+      RUNNER_ALLOW_STDIO: ${RUNNER_ALLOW_STDIO:-false}
 
   postgres:
     image: postgres:17-alpine

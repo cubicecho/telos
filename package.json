@@ -3,15 +3,16 @@
   "version": "0.1.0",
   "private": true,
   "license": "MIT",
-  "description": "Telos — a self-hostable todo app. Projects, todos with dependencies, labels.",
+  "description": "Telos \u2014 a self-hostable todo app. Projects, todos with dependencies, labels.",
   "type": "module",
   "workspaces": [
     "app",
     "server",
-    "db"
+    "db",
+    "runner"
   ],
   "scripts": {
-    "dev": "concurrently \"npm run dev:server\" \"npm run dev:app\"",
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:app\" \"npm run dev:runner\"",
     "dev:app": "npm run dev -w @telos/app",
     "dev:server": "npm run dev -w @telos/server",
     "build": "npm run codegen && npm run build -w @telos/app",
@@ -24,7 +25,7 @@
     "check": "npm run codegen && npm run check:biome && npm run check:types",
     "check:biome": "biome check .",
     "check:fix": "biome check --write .",
-    "check:types": "tsc --noEmit -p db/tsconfig.json && tsc --noEmit -p server/tsconfig.json && tsc --noEmit -p app/tsconfig.json",
+    "check:types": "tsc --noEmit -p db/tsconfig.json && tsc --noEmit -p server/tsconfig.json && tsc --noEmit -p app/tsconfig.json && tsc --noEmit -p runner/tsconfig.json",
     "test": "vitest run",
     "test:watch": "vitest",
     "codegen": "npm run codegen:server && npm run codegen:app",
@@ -35,7 +36,8 @@
     "db:push": "npm run push -w @telos/db",
     "db:studio": "npm run studio -w @telos/db",
     "db:up": "docker compose -f docker-compose.dev.yml up -d",
-    "db:down": "docker compose -f docker-compose.dev.yml down"
+    "db:down": "docker compose -f docker-compose.dev.yml down",
+    "dev:runner": "npm run dev -w @telos/runner"
   },
   "overrides": {
     "graphql": "16.13.2",

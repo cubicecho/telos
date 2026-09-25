@@ -16,6 +16,27 @@ RUN npm ci
 ENV DATABASE_URL=postgres://build:build@127.0.0.1:5432/build
 RUN npm run codegen && npm run build:app
 
+# ── Runner (optional): `docker build --target runner` ─────────────────────────
+# The process that works the board's stations. Its own image, so an instance
+# without AI never carries the model client or the MCP pool.
+FROM node:24-alpine AS runner
+
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+COPY db/package.json db/
+COPY server/package.json server/
+COPY app/package.json app/
+COPY runner/package.json runner/
+RUN npm ci --omit=dev --workspace @telos/runner \
+ && npm cache clean --force
+
+COPY runner/src runner/src
+
+ENV NODE_ENV=production
+
+CMD ["node", "--experimental-strip-types", "runner/src/index.ts"]
+
 # ── Stage 2: runtime ──────────────────────────────────────────────────────────
 FROM node:24-alpine
 
@@ -28,6 +49,7 @@ COPY package.json package-lock.json ./
 COPY db/package.json db/
 COPY server/package.json server/
 COPY app/package.json app/
+COPY runner/package.json runner/
 RUN npm ci --omit=dev --include-workspace-root --workspace @telos/db --workspace @telos/server \
  && npm cache clean --force
 

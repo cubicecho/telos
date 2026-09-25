@@ -100,11 +100,46 @@ domain.
 | `PORT` | `3001` | Port the server listens on. |
 | `AUTH_MAGIC_LINK` | `true` | Set to `false` to sign in with an address alone, no link. |
 | `EXPOSE_MAGIC_LINK` | dev only | Return the magic link in the API response so the login page can show it. |
-| `AI_ENABLED` | `false` | The instance's AI switch. Off, there is no AI surface at all: no MCP endpoint, no API keys. |
+| `AI_ENABLED` | `false` | The instance's AI switch. Off, there is no AI surface at all: no MCP endpoint, no API keys, no agents, no runner. |
+| `RUNNER_KEY` | — | The key the runner signs in with. Set the same value on the server and the runner. |
+| `TELOS_URL` | `http://127.0.0.1:PORT` | Runner only: where it finds telos. |
+| `RUNNER_CONCURRENCY` | `2` | Runner only: the most runs it works at once. |
+| `RUNNER_POLL_SECONDS` | `5` | Runner only: how long it waits when nothing is ready. |
+| `RUNNER_ALLOW_STDIO` | `false` | Runner only: let agents name MCP servers it spawns as commands. |
 
 Telos ships no mail provider. With magic links on, the link is written to the
 server log, and that is the delivery channel — pipe the log somewhere you can
 read, or run with `AUTH_MAGIC_LINK=false`.
+
+## AI
+
+Telos is a board for people first, and AI is off unless you turn it on, at
+every level:
+
+1. **The instance**: `AI_ENABLED=true`. Off, the server has no `/mcp`, no API
+   keys, no agents and no runner, and the app shows none of it.
+2. **The account**: Settings → AI. Off, the account's API keys stop working and
+   nothing the runner does touches its rows.
+3. **The project**: its AI switch. Off, the project takes no requests and its
+   stations sit idle.
+4. **The todo**: "AI ignores this". The runner leaves it alone.
+
+With AI on there are two doors in. **`/mcp`** is for your own agents (Claude
+Code and the like): with an API key from Settings they can submit requests,
+read the board and add notes, but not move todos. **The runner** is telos's own
+worker. A lane with an agent is a *station*: the runner claims a todo there,
+has the agent work it, verify it, or split it into child todos, and telos moves
+it along the lane's arrows.
+
+```bash
+export AUTH_SECRET=$(openssl rand -hex 32) RUNNER_KEY=$(openssl rand -hex 32)
+AI_ENABLED=true docker compose --profile ai up --build
+```
+
+Agents talk to any OpenAI-compatible endpoint, so a local Ollama works. An
+agent's base URL and its MCP servers are fetched from the runner's host, so
+on a shared instance run the runner where it cannot reach anything private,
+and leave `RUNNER_ALLOW_STDIO` off.
 
 ## Before you expose it
 
@@ -138,11 +173,11 @@ npm install
 npm run db:up          # Postgres on 127.0.0.1:5435
 npm run db:migrate
 npm run codegen
-npm run dev            # API on 3001, Expo dev server on 3000
+npm run dev            # API on 3001, Expo dev server on 3000, runner if AI_ENABLED
 ```
 
-`npm run check` runs codegen, Biome and `tsc --noEmit` across all three
-workspaces; `npm test` runs the suite against an in-memory Postgres. See
+`npm run check` runs codegen, Biome and `tsc --noEmit` across every
+workspace; `npm test` runs the suite against an in-memory Postgres. See
 [AGENTS.md](AGENTS.md) for how the pieces fit together.
 
 If the server starts with `Cannot reach Postgres`, check whether your Docker
