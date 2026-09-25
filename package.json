@@ -25,7 +25,7 @@
     "check": "npm run codegen && npm run check:biome && npm run check:types",
     "check:biome": "biome check .",
     "check:fix": "biome check --write .",
-    "check:types": "tsc --noEmit -p db/tsconfig.json && tsc --noEmit -p server/tsconfig.json && tsc --noEmit -p app/tsconfig.json && tsc --noEmit -p runner/tsconfig.json",
+    "check:types": "tsc --noEmit -p db/tsconfig.json && tsc --noEmit -p server/tsconfig.json && tsc --noEmit -p app/tsconfig.json && tsc --noEmit -p runner/tsconfig.json && tsc --noEmit -p scripts/tsconfig.json",
     "test": "vitest run",
     "test:watch": "vitest",
     "codegen": "npm run codegen:server && npm run codegen:app",
@@ -37,7 +37,8 @@
     "db:studio": "npm run studio -w @telos/db",
     "db:up": "docker compose -f docker-compose.dev.yml up -d",
     "db:down": "docker compose -f docker-compose.dev.yml down",
-    "dev:runner": "npm run dev -w @telos/runner"
+    "dev:runner": "npm run dev -w @telos/runner",
+    "import:kanban": "node --experimental-strip-types --env-file-if-exists=.env scripts/import-kanban.ts"
   },
   "overrides": {
     "graphql": "16.13.2",

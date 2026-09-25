@@ -144,6 +144,55 @@ agent's base URL and its MCP servers are fetched from the runner's host, so
 on a shared instance run the runner where it cannot reach anything private,
 and leave `RUNNER_ALLOW_STDIO` off.
 
+## Coming from kanban_server
+
+Telos absorbs kanban_server's board. To bring one across, stop kanban_server
+and point the importer at its database: its `DATABASE_URL`, or its PGlite
+directory (`data/pg` by default). It writes to telos's `DATABASE_URL`, for the
+account you name, which has to exist already (sign in once first).
+A PGlite directory is opened with kanban_server's own PGlite, so run
+`npm install` in kanban_server first; its data is newer than telos's PGlite
+can read.
+
+```bash
+npm run import:kanban -- --from ../kanban_server/data/pg --user you@example.com --dry-run
+npm run import:kanban -- --from ../kanban_server/data/pg --user you@example.com
+```
+
+`--dry-run` does the whole import, prints what it would write and rolls it
+back. The import is one transaction: it lands whole or not at all.
+
+What comes across:
+
+- **Projects**, with their description and context. AI is **off** on every
+  imported project, whatever `autoRun` said, so importing never starts an
+  agent. Switch it on per project when you are ready.
+- **Lanes**, in order. kanban_server has no done flag, so the lane named
+  Done (or Complete, Finished, Shipped, Closed) becomes the done lane; a board
+  without one gets none, and you can mark one in telos. A lane's role becomes
+  its contract, the role's prompt and the lane's own are joined, and the
+  success and failure arrows, WIP limit and attempts carry over. A lane that
+  archived on success now sends to the done lane.
+- **Agents**, with settings they inherited from kanban_server's Settings
+  written onto them, and their MCP servers. An agent with the same name
+  already in telos is used as is rather than copied again.
+- **Cards** become todos, with body as notes, acceptance, parent, lane and
+  order. Cards in the done lane, and archived cards, arrive completed.
+- **Dependencies**, **notes** (note, report, verdict) and the **card history**,
+  as todo history.
+
+What does not: **runs** and their artifacts, **tasks** and their message
+threads, and **secrets**: no API keys, and no MCP server headers or env
+(where tokens live). The summary names each one left behind so you can
+re-enter it. It also lists any dependency it had to drop to keep telos's rules,
+such as a done card still waiting on an open one.
+
+A project whose name you already have is refused, and nothing is written.
+`--rename` imports it as "Name (kanban)" instead.
+
+Once imported and checked, kanban_server can be retired: telos has the board,
+and nothing reads the old database again.
+
 ## Before you expose it
 
 Registration is **open**: any address that completes a sign-in gets an account.
