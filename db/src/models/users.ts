@@ -1,4 +1,4 @@
-import { boolean, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { boolean, integer, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -11,6 +11,10 @@ export const users = pgTable('users', {
   // this user: their API keys are refused and no agent runs on their todos.
   // It only matters while the instance's own switch is on.
   aiEnabled: boolean('ai_enabled').notNull().default(false),
+  // How many days a finished run and its log are kept; null keeps them for
+  // good. Pruning (server/src/retention.ts) never takes a run the stations
+  // still count, so it changes what is kept, never what runs next.
+  runRetentionDays: integer('run_retention_days'),
   // An admin runs the instance: only an admin flips its switches. The first
   // account is made one (auth.ts); no client can write this.
   isAdmin: boolean('is_admin').notNull().default(false),

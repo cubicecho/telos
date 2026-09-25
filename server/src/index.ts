@@ -12,6 +12,7 @@ import express from 'express';
 import { magicLinkExposed, magicLinkRequired, runnerKey } from './config.ts';
 import { mountMcp } from './mcp.ts';
 import { createContextFactory } from './request-context.ts';
+import { startPruning } from './retention.ts';
 import { createGraphQLRouter } from './routes/graphql.ts';
 import { ai, auth, schema } from './schema.ts';
 import { createStaticHandler } from './static.ts';
@@ -44,6 +45,8 @@ try {
 }
 
 let runner: EmbeddedRunner | undefined;
+// Old runs go whenever AI does; without it there are none to prune.
+const stopPruning = ai ? startPruning(db) : undefined;
 
 const app = express();
 const httpServer = createServer(app);
@@ -81,6 +84,7 @@ httpServer.listen(PORT, '0.0.0.0', () => {
 for (const signal of ['SIGTERM', 'SIGINT'] as const) {
   process.once(signal, () => {
     void (async () => {
+      stopPruning?.();
       await runner?.stop().catch((error: unknown) => console.error('[runner] stop failed:', error));
       await mcp?.close().catch((error: unknown) => console.error('[mcp] close failed:', error));
       httpServer.close(() => process.exit(0));

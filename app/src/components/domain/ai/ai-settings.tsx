@@ -9,6 +9,7 @@ import { describeError } from '@/lib/errors';
 import { AiStateDocument, SetAiEnabledDocument, SetInstanceAiEnabledDocument } from '@/lib/graphql';
 import { AgentManager } from './agent-manager';
 import { ApiKeyManager } from './api-key-manager';
+import { RunRetention } from './run-retention';
 
 /**
  * The AI switches, and what they unlock: the API keys an MCP client signs in
@@ -112,6 +113,7 @@ export function AiSettings() {
         <>
           <ApiKeyManager />
           <AgentManager />
+          <RunRetention />
         </>
       ) : null}
     </>

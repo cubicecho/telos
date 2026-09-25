@@ -4,6 +4,7 @@ import { extendSchema, GraphQLError, type GraphQLObjectType, type GraphQLSchema,
 import { requireAi } from '../ai-gate.ts';
 import type { Context } from '../context.ts';
 import { isAdmin, setInstanceAi } from '../instance.ts';
+import { MAX_RETENTION_DAYS } from '../retention.ts';
 import { cancelRunsUnder } from '../stations.ts';
 import { requireSession } from './auth.ts';
 
@@ -33,6 +34,8 @@ const AI_SWITCHES_SDL = parse(`
     setAiEnabled(enabled: Boolean!): User!
     "Opens a project to agents, or closes it. Opening one needs the account's AI on."
     setProjectAiEnabled(projectId: ID!, enabled: Boolean!): Project!
+    "How many days finished runs are kept before they are pruned. Null keeps them for good."
+    setRunRetention(days: Int): User!
   }
 `);
 
@@ -78,6 +81,22 @@ export function applyAiSwitchesExtension(schema: GraphQLSchema): GraphQLSchema {
     if (!project) throw new GraphQLError('Project not found', { extensions: { code: 'NOT_FOUND' } });
     if (!args.enabled) await cancelRunsUnder(context.db, { userId, projectId: project.id });
     return project;
+  };
+
+  mutations.setRunRetention.resolve = async (_parent: unknown, args: { days?: number | null }, context: Context) => {
+    const userId = requireSession(context);
+    const days = args.days ?? null;
+    if (days !== null && (days < 1 || days > MAX_RETENTION_DAYS)) {
+      throw new GraphQLError(`Keep runs for 1 to ${MAX_RETENTION_DAYS} days, or for good.`, {
+        extensions: { code: 'BAD_USER_INPUT' },
+      });
+    }
+    const [user] = await (context.db as AnyRow)
+      .update(dbSchema.users)
+      .set({ runRetentionDays: days, updatedAt: new Date() })
+      .where(eq(dbSchema.users.id, userId))
+      .returning();
+    return user;
   };
 
   return extendedSchema;

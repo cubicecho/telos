@@ -1,0 +1,1 @@
+ALTER TABLE "users" ADD COLUMN "run_retention_days" integer;

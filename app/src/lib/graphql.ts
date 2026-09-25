@@ -183,6 +183,24 @@ export const SetAiEnabledDocument = graphql(`
   }
 `);
 
+export const RunRetentionDocument = graphql(`
+  query RunRetention {
+    users {
+      id
+      runRetentionDays
+    }
+  }
+`);
+
+export const SetRunRetentionDocument = graphql(`
+  mutation SetRunRetention($days: Int) {
+    setRunRetention(days: $days) {
+      id
+      runRetentionDays
+    }
+  }
+`);
+
 export const SetProjectAiEnabledDocument = graphql(`
   mutation SetProjectAiEnabled($projectId: ID!, $enabled: Boolean!) {
     setProjectAiEnabled(projectId: $projectId, enabled: $enabled) {
