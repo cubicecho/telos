@@ -129,7 +129,10 @@ Code and the like): with an API key from Settings they can submit requests,
 read the board and add notes, but not move todos. **The runner** is telos's own
 worker. A lane with an agent is a *station*: the runner claims a todo there,
 has the agent work it, verify it, or split it into child todos, and telos moves
-it along the lane's arrows.
+it along the lane's arrows. Each run keeps a log of its tool calls, which the
+todo shows as it goes, and a list of what it made: files it wrote, and anything
+the agent chose to record. An agent's MCP servers can carry hooks, for example
+a memory lookup injected before each turn.
 
 ```bash
 export AUTH_SECRET=$(openssl rand -hex 32) RUNNER_KEY=$(openssl rand -hex 32)

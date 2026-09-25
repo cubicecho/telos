@@ -79,7 +79,8 @@ telos/
 │       ├── telos.ts         # The runner's GraphQL client (queue, claim, heartbeat, finish)
 │       ├── loop.ts          # Poll the queue, claim up to the concurrency, execute
 │       ├── execute.ts       # One run: agent-core's runAgentLoop over a per-run MCP pool
-│       ├── tools.ts         # The pool: telos's /mcp with the run token, plus the agent's servers
+│       ├── tools.ts         # The pool: telos's /mcp with the run token, plus the agent's servers and hooks
+│       ├── artifacts.ts     # What a run made: record_artifact, and writes read off tool calls
 │       ├── prompts.ts       # System prompts per contract, and the brief
 │       └── __tests__/       # End to end against a real telos and a scripted model
 ├── .agents/mvp-plan.md      # The plan this repo was built from
@@ -186,6 +187,17 @@ tests import server code only to stand a real telos up. Each run gets its own
 MCP pool, because the telos server in it carries that run's token. Agents'
 stdio MCP servers are refused unless `RUNNER_ALLOW_STDIO=true`: an agent
 belongs to a user, and a command runs on the runner's host with its rights.
+
+**A run reports what it did; it never writes it.** The runner sends events
+(tool calls, tool results, hook notes, notices) with each heartbeat and the
+rest with `finishRun`, where they land in `runs.events`, capped at
+`MAX_RUN_EVENTS`. That is the live view: the app polls the run. Artifacts are
+what the run made, declared by the agent through the runner's own
+`record_artifact` tool or read off a write/edit/move/delete tool call, one per
+location; `finishRun` stores them in `artifacts`, a reserved table no client
+can write. A stopped run keeps its events but no artifacts. An agent's MCP
+servers may carry `hooks` (agent-mcp-pool's `ToolHook`) and `hiddenTools`;
+invalid hooks are dropped with a notice, and a failing hook never fails a run.
 
 **`scope` cannot reach a plain insert.** Any foreign key a caller can state gets
 checked in an `onWrite` hook in `server/src/resolvers/write-guards.ts`. A new
