@@ -7,6 +7,7 @@ import { PageLayout } from '@/components/page-layout';
 import { Section } from '@/components/section';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ThemePicker } from '@/components/ui/theme-picker';
+import { PALETTE_PREFERENCES } from '@/components/ui/theme-preference-base';
 import { useAi } from '@/lib/ai';
 
 type SettingsTab = 'general' | 'ai';
@@ -28,8 +29,8 @@ export default function SettingsScreen() {
       <Section
         surface="card"
         title="Theme"
-        description="System follows whatever your operating system is set to."
-        content={<ThemePicker />}
+        description="System follows whatever your operating system is set to. A dark-only palette, such as Monokai, keeps the page dark whatever the theme says."
+        content={<ThemePicker palettes={PALETTE_PREFERENCES} />}
       />
       {/* Its own section: the header's "New label" shares the list's state. */}
       <LabelManager />
@@ -41,7 +42,7 @@ export default function SettingsScreen() {
     <PageLayout
       width="prose"
       title="Settings"
-      description="Theme is kept on this device; everything else belongs to your account."
+      description="Theme and palette are kept on this device; everything else belongs to your account."
       content={
         <View className="py-6">
           {ai.settings ? (

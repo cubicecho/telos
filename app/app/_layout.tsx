@@ -3,7 +3,7 @@ import { type ErrorBoundaryProps, Stack } from 'expo-router';
 import { Text, View } from 'react-native';
 import { RouteError } from '@/components/route-error';
 import { Button } from '@/components/ui/button';
-import { useThemePreference } from '@/components/ui/theme-preference';
+import { PaletteProvider, useThemePreference } from '@/components/ui/theme-preference';
 import { client } from '@/lib/apollo';
 import { describeError } from '@/lib/errors';
 import '../global.css';
@@ -11,13 +11,17 @@ import '../global.css';
 export default function RootLayout() {
   // `public/index.html` has already painted the right theme; this keeps it that
   // way on every screen, not only Settings, and repaints a `system` user when
-  // the OS switches between light and dark.
+  // the OS switches between light and dark. On the web it applies the palette
+  // too; `PaletteProvider` is how a device gets it, and renders nothing more
+  // on the web.
   useThemePreference();
 
   return (
-    <ApolloProvider client={client}>
-      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: 'transparent' } }} />
-    </ApolloProvider>
+    <PaletteProvider>
+      <ApolloProvider client={client}>
+        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: 'transparent' } }} />
+      </ApolloProvider>
+    </PaletteProvider>
   );
 }
 
