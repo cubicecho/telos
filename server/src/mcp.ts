@@ -1,8 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { createHttpHandler, type McpHttpHandler } from '@cubicecho/graphql-mcp';
-import express, { type Express } from 'express';
+import express, { type Express, type Response } from 'express';
 import { type GraphQLSchema, Source } from 'graphql';
 import { toHeaders } from './auth.ts';
+import { instanceAiOn } from './instance.ts';
 import type { ContextFactory } from './request-context.ts';
 
 // The AI door: the same schema as /graphql, served as MCP tools to a client
@@ -33,26 +34,31 @@ export function createMcpHandler(schema: GraphQLSchema, contextFor: ContextFacto
 }
 
 /**
- * Mounts /mcp. With AI off it answers 404 itself rather than falling through
- * to the app's static fallback, which would hand an MCP client a web page.
+ * Mounts /mcp. With AI off, on the server or by the instance's switch, it
+ * answers 404 itself rather than falling through to the app's static fallback,
+ * which would hand an MCP client a web page.
  * Returns the handler, for closing on shutdown, or null when there is none.
  */
 export function mountMcp(
   app: Express,
-  options: { ai: boolean; schema: GraphQLSchema; contextFor: ContextFactory; version: string },
+  // biome-ignore lint/suspicious/noExplicitAny: db type varies by driver
+  options: { ai: boolean; db: any; schema: GraphQLSchema; contextFor: ContextFactory; version: string },
 ): McpHttpHandler | null {
+  const off = (res: Response): void => {
+    res.status(404).json({ error: 'AI is switched off on this server.' });
+  };
   if (!options.ai) {
-    app.all('/mcp', (_req, res) => {
-      res.status(404).json({ error: 'AI is switched off on this server.' });
-    });
+    app.all('/mcp', (_req, res) => off(res));
     return null;
   }
   const handler = createMcpHandler(options.schema, options.contextFor, options.version);
   app.all('/mcp', express.json({ limit: '1mb' }), (req, res, next) => {
-    handler(req, res).catch((error: unknown) => {
-      console.error('[mcp] request failed:', error);
-      next(error);
-    });
+    instanceAiOn(options.db)
+      .then((on) => (on ? handler(req, res) : off(res)))
+      .catch((error: unknown) => {
+        console.error('[mcp] request failed:', error);
+        next(error);
+      });
   });
   return handler;
 }

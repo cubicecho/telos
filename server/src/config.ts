@@ -56,12 +56,13 @@ export function appUrl(): string {
 }
 
 /**
- * The instance's AI switch, off unless `AI_ENABLED` says otherwise. Off, the
- * AI surface does not exist: no `/mcp`, no API keys, no AI fields in the
- * schema, and every account's own switch is moot.
+ * Whether this server offers AI at all, which it does unless `AI_ENABLED` is
+ * false. Offered, an admin turns it on or off in Settings (instance.ts), and it
+ * starts off. With `AI_ENABLED=false` the AI surface does not exist: no `/mcp`,
+ * no API keys, no AI fields in the schema, and no switch to flip.
  */
-export function aiEnabled(): boolean {
-  return envFlag(process.env.AI_ENABLED);
+export function aiAvailable(): boolean {
+  return !envDisabled(process.env.AI_ENABLED);
 }
 
 /**

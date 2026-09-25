@@ -5,9 +5,10 @@ import { AiStateDocument } from '@/lib/graphql';
  * Whether AI is on, as the app decides what to draw.
  *
  * Two switches, both off unless someone turned them on:
- * - `instance`: the server's AI_ENABLED. Off, the AI fields do not exist in its
- *   schema, so no AI surface is drawn and no AI document is ever sent — not even
- *   the account's switch.
+ * - `instance`: the instance's, which an admin flips in Settings. Off, no AI
+ *   surface is drawn and no AI document is sent — not even the account's
+ *   switch. Only an admin sees the instance's own switch, and only while the
+ *   server offers AI at all (`available`; AI_ENABLED is not false).
  * - `account`: the person's own switch, in Settings. Off, only that switch shows.
  *
  * `on` is both. Anything that is AI's (API keys, a project's switch, the
@@ -19,7 +20,9 @@ import { AiStateDocument } from '@/lib/graphql';
  */
 export function useAi() {
   const { data } = useQuery(AiStateDocument);
+  const available = data?.authConfig.aiAvailable ?? false;
   const instance = data?.authConfig.ai ?? false;
   const account = instance && (data?.users[0]?.aiEnabled ?? false);
-  return { instance, account, on: instance && account, userId: data?.users[0]?.id };
+  const admin = data?.users[0]?.isAdmin ?? false;
+  return { available, instance, admin, account, on: instance && account, userId: data?.users[0]?.id };
 }

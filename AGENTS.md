@@ -61,6 +61,7 @@ telos/
 │       ├── blocking.ts      # The dependency rules, in one place
 │       ├── lanes.ts         # The lane rules, in one place
 │       ├── stations.ts      # Which todos an agent may start on, and stopping runs
+│       ├── instance.ts      # The instance's AI switch, and its admins
 │       ├── run-tokens.ts    # Per-run tokens, and the runner's key check
 │       ├── loaders.ts       # Per-request DataLoaders
 │       ├── resolvers/       # SDL extensions for what CRUD cannot express
@@ -74,7 +75,7 @@ telos/
 │       └── index.ts         # DB singleton + re-exports
 ├── runner/                  # @telos/runner — works the stations; talks to telos over HTTP only
 │   └── src/
-│       ├── index.ts         # Entry point; exits quietly unless AI_ENABLED=true
+│       ├── index.ts         # Entry point; exits quietly without RUNNER_KEY or with AI_ENABLED=false
 │       ├── config.ts        # Env -> RunnerConfig
 │       ├── telos.ts         # The runner's GraphQL client (queue, claim, heartbeat, finish)
 │       ├── loop.ts          # Poll the queue, claim up to the concurrency, execute
@@ -95,7 +96,7 @@ telos/
 ## Commands
 
 ```bash
-npm run dev              # server (3001) + Expo dev server (3000) + runner (only with AI_ENABLED=true)
+npm run dev              # server (3001) + Expo dev server (3000) + runner (only with RUNNER_KEY set)
 npm run db:up            # Postgres on ${POSTGRES_BIND:-127.0.0.1}:5435
 npm run db:generate      # new migration from a schema change
 npm run db:migrate       # apply migrations
@@ -145,10 +146,15 @@ an `actor` (`context.ts`): `user` for a session, `apiKey` for an MCP client,
 `ctx.userId` is always `ctx.actor.userId` — null for `system`, so generated
 CRUD refuses the runner outright.
 
-**AI is off unless every switch says on.** `AI_ENABLED` (instance) decides
-whether the AI extensions are in the schema at all; `users.aiEnabled` (account)
-is asked by `ai-gate.ts` and by `resolveActor`, which refuses an API key whose
-owner has it off. Both default to off. An AI resolver calls `requireAi`, and
+**AI is off unless every switch says on.** `AI_ENABLED=false` removes the AI
+extensions from the schema at all; otherwise they are built, and the instance's
+switch (`instance_settings.aiEnabled`, `instance.ts`) decides at runtime. Only
+an admin (`users.isAdmin`; the first account to sign up) flips it, with
+`setInstanceAiEnabled`. It is read on every request, never cached: by
+`ai-gate.ts`, by `resolveActor` for API keys and run tokens, by `readyTodos`
+(`INSTANCE_AI_ON`), by `finishRun`/`heartbeatRun` and by `/mcp`. The runner's
+key still resolves with it off, so a heartbeat can say stop. `users.aiEnabled`
+(account) is asked by the same places. All of them default to off. An AI resolver calls `requireAi`, and
 answers NOT_FOUND rather than FORBIDDEN, because for someone who turned AI off
 the surface is not there. Key management needs a session (`requireSession`): a
 key cannot mint its own successor.
@@ -164,7 +170,7 @@ mutation and refuses AI all but `AI_MUTATIONS` (`submitRequest`,
 `cancelRequest`, `addTodoNote`). A new mutation is closed to AI until it is
 added there. The MCP door (`mcp.ts`) serves only the operations written in
 `mcp.graphql` — the tool list is the menu, the lock is the lock. `/mcp` is
-mounted only with `AI_ENABLED`, and is a 404 otherwise.
+a 404 unless the instance's switch is on.
 
 **Agents work the board only at stations, and only through the runner.** A
 lane with an `agentId` is a station: its `contract` (work, verdict, expand),

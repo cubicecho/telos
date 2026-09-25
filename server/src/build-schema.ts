@@ -1,4 +1,4 @@
-import { AUTH_TABLES } from '@telos/db/schema';
+import { AUTH_TABLES, SERVER_TABLES } from '@telos/db/schema';
 import { buildSchema, GraphQLDateTime } from '@vantreeseba/drizzle-graphql';
 import { applyActorLock } from './resolvers/actor-lock.ts';
 import { applyAgentsExtension } from './resolvers/agents.ts';
@@ -28,8 +28,9 @@ type AnyDb = any;
 // `typeNameMapper` in a second place that could disagree with the first.
 export interface SchemaOptions {
   /**
-   * The instance's AI switch (config.ts `aiEnabled`). Off, the AI extensions
-   * are never applied, so the schema has no AI fields for anyone to call.
+   * Whether the server offers AI (config.ts `aiAvailable`). Off, the AI
+   * extensions are never applied, so the schema has no AI fields for anyone to
+   * call. On, the instance's own switch still decides, per request.
    */
   ai: boolean;
 }
@@ -83,13 +84,14 @@ export function createSchema(db: AnyDb, options: SchemaOptions) {
     onWrite,
     // better-auth's tables: sessions, key hashes and magic-link tokens. Only
     // better-auth reads or writes them (auth.ts), so they generate nothing.
+    // Nor does the instance's settings row, which belongs to no user.
     //
     // An agent's API key is write-only: `setAgentApiKey` stores it and only
     // the runner's `claimRun` reads it back. With AI off, the agent machinery
     // is not in the schema at all.
     exclude: options.ai
-      ? { tables: [...AUTH_TABLES], columns: { agents: ['apiKey'] } }
-      : { tables: [...AUTH_TABLES, ...AI_TABLES], columns: { lanes: AI_LANE_COLUMNS } },
+      ? { tables: [...AUTH_TABLES, ...SERVER_TABLES], columns: { agents: ['apiKey'] } }
+      : { tables: [...AUTH_TABLES, ...SERVER_TABLES, ...AI_TABLES], columns: { lanes: AI_LANE_COLUMNS } },
   });
 
   let schema = applyAuthExtension(drizzleSchema, options);

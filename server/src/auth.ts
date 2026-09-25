@@ -7,6 +7,7 @@ import { bearer, magicLink } from 'better-auth/plugins';
 import { and, eq, gt, isNull } from 'drizzle-orm';
 import { appUrl, authSecret } from './config.ts';
 import type { Actor } from './context.ts';
+import { claimFirstAdmin, instanceAiOn } from './instance.ts';
 import { readRunToken, runnerKeyMatches } from './run-tokens.ts';
 
 // Sessions, magic links and API keys, all through better-auth. The server
@@ -48,6 +49,8 @@ export function createAuth(db: AnyDb) {
     // Every id column is a uuid, and existing users keep theirs.
     advanced: { database: { generateId: 'uuid' } },
     session: { expiresIn: SESSION_SECONDS },
+    // Whoever signs up first runs the instance.
+    databaseHooks: { user: { create: { after: async (user) => claimFirstAdmin(db, user.id) } } },
     plugins: [
       apiKey({ enableMetadata: true, defaultPrefix: API_KEY_PREFIX }),
       bearer(),
@@ -140,18 +143,21 @@ export async function mintApiKey(
 export const ANONYMOUS: Actor = { kind: 'anonymous', userId: null };
 
 export interface ActorOptions {
-  /** The instance's AI switch. Off, only a session resolves. */
+  /** Whether the server offers AI (config.ts `aiAvailable`). Off, only a session resolves. */
   ai: boolean;
   /** The runner's key (config.ts `runnerKey`). Unset, nobody is the system principal. */
   runnerKey?: string | null | undefined;
 }
 
 /**
- * Who a request is. The AI credentials resolve only while the instance has AI
- * on, and each is checked against the switches below it every time:
+ * Who a request is. The AI credentials resolve only while the server offers AI,
+ * and each is checked against the switches over it every time, the instance's
+ * own included:
  *
  * - `x-runner-key`: the runner, as the system principal. It owns no rows and
- *   may call only the runner's own mutations (resolvers/actor-lock.ts).
+ *   may call only the runner's own mutations (resolvers/actor-lock.ts). It
+ *   resolves with the instance switch off too, so it can hear that its runs
+ *   were stopped; the queue is empty then, and nothing can be claimed.
  * - `x-run-token`: an agent at work, for exactly as long as its run is live
  *   and its user, project and todo are all still open to AI.
  * - `x-api-key`: an MCP client, while its owner has AI on.
@@ -168,12 +174,12 @@ export async function resolveActor(auth: Auth, db: AnyDb, headers: Headers, opti
   const runToken = headers.get('x-run-token');
   if (runToken) {
     const runId = options.ai ? readRunToken(runToken) : null;
-    return runId ? await resolveRun(db, runId) : ANONYMOUS;
+    return runId && (await instanceAiOn(db)) ? await resolveRun(db, runId) : ANONYMOUS;
   }
 
   const key = headers.get('x-api-key');
   if (key) {
-    if (!options.ai) return ANONYMOUS;
+    if (!options.ai || !(await instanceAiOn(db))) return ANONYMOUS;
     const result = await auth.api.verifyApiKey({ body: { key } }).catch(() => null);
     if (!result?.valid || !result.key) return ANONYMOUS;
     const userId = result.key.referenceId;

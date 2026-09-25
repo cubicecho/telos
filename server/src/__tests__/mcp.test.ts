@@ -44,6 +44,7 @@ async function serve(ai = true): Promise<URL> {
   const { schema } = createSchema(db, { ai });
   const handler = mountMcp(app, {
     ai,
+    db,
     schema,
     contextFor: createContextFactory(db, authFor(db), { ai }),
     version: '0',

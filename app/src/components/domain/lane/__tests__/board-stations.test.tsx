@@ -15,8 +15,8 @@ function aiState(instance: boolean, account: boolean) {
     request: { query: AiStateDocument },
     result: {
       data: {
-        authConfig: { __typename: 'AuthConfig', ai: instance },
-        users: [{ __typename: 'User', id: 'u1', aiEnabled: account }],
+        authConfig: { __typename: 'AuthConfig', ai: instance, aiAvailable: instance },
+        users: [{ __typename: 'User', id: 'u1', aiEnabled: account, isAdmin: false }],
       },
     },
   };

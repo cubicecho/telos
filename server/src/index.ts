@@ -50,7 +50,7 @@ const { version } = JSON.parse(readFileSync(join(__dirname, '../package.json'), 
 
 app.use(cors());
 app.use('/graphql', await createGraphQLRouter(httpServer, contextFor));
-const mcp = mountMcp(app, { ai, schema, contextFor, version });
+const mcp = mountMcp(app, { ai, db, schema, contextFor, version });
 app.get('/healthz', (_req, res) => {
   res.json({ ok: true });
 });

@@ -19,9 +19,10 @@ services:
       # relay. See "Before you expose it" in the README.
       AUTH_MAGIC_LINK: ${AUTH_MAGIC_LINK:-true}
       EXPOSE_MAGIC_LINK: ${EXPOSE_MAGIC_LINK:-false}
-      # Off unless you want the AI surface at all. See "AI" in the README.
-      AI_ENABLED: ${AI_ENABLED:-false}
-      # The key the runner signs in with. Only read while AI_ENABLED is on.
+      # false removes AI entirely; otherwise an admin switches it on in Settings.
+      # See "AI" in the README.
+      AI_ENABLED: ${AI_ENABLED:-}
+      # The key the runner signs in with.
       RUNNER_KEY: ${RUNNER_KEY:-}
       NODE_ENV: production
       PORT: 3001
@@ -40,7 +41,7 @@ services:
     depends_on:
       - telos
     environment:
-      AI_ENABLED: ${AI_ENABLED:-false}
+      AI_ENABLED: ${AI_ENABLED:-}
       TELOS_URL: http://telos:3001
       # Required for the runner (it exits without one): openssl rand -hex 32
       RUNNER_KEY: ${RUNNER_KEY:-}

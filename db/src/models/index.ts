@@ -1,6 +1,7 @@
 export * from './agents.ts';
 export * from './artifacts.ts';
 export * from './auth.ts';
+export * from './instance-settings.ts';
 export * from './labels.ts';
 export * from './lanes.ts';
 export * from './project-labels.ts';

@@ -8,12 +8,14 @@ import { contextValues, scope } from '../tenancy.ts';
 // missing from it is readable across tenants, and nothing else in the codebase
 // would say so.
 
-// better-auth's tables are excluded from the schema outright (build-schema.ts),
-// so there is nothing generated for a scope to confine.
+// better-auth's tables and the instance's settings are excluded from the
+// schema outright (build-schema.ts), so there is nothing generated for a scope
+// to confine.
 const AUTH_TABLES: readonly string[] = dbSchema.AUTH_TABLES;
+const EXCLUDED: readonly string[] = [...AUTH_TABLES, ...dbSchema.SERVER_TABLES];
 
 const tableKeys = Object.entries(dbSchema)
-  .filter(([key, value]) => is(value, Table) && !AUTH_TABLES.includes(key))
+  .filter(([key, value]) => is(value, Table) && !EXCLUDED.includes(key))
   .map(([key]) => key);
 
 describe('tenancy configuration', () => {
@@ -54,7 +56,7 @@ describe('tenancy configuration', () => {
     // scope is keyed by the schema export name; getting this wrong silently
     // scopes nothing, since an unknown key is simply never consulted.
     for (const [key, value] of Object.entries(dbSchema)) {
-      if (!is(value, Table) || AUTH_TABLES.includes(key)) continue;
+      if (!is(value, Table) || EXCLUDED.includes(key)) continue;
       expect(Object.keys(scope)).toContain(key);
       expect(getTableName(value)).toBeTypeOf('string');
     }

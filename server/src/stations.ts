@@ -1,5 +1,6 @@
 import { type SQL, sql } from 'drizzle-orm';
 import { resultRows } from './blocking.ts';
+import { INSTANCE_AI_ON } from './instance.ts';
 
 // The station rules, in one place: which todos an agent may start on, and how
 // to stop what is running. A lane with an agent is a station; the runner asks
@@ -65,7 +66,7 @@ export async function readyTodos(
       JOIN agents a ON a.id = l.agent_id
       JOIN projects p ON p.id = t.project_id
       JOIN users u ON u.id = t.user_id
-      WHERE u.ai_enabled AND p.ai_enabled AND NOT t.ai_ignored
+      WHERE ${INSTANCE_AI_ON} AND u.ai_enabled AND p.ai_enabled AND NOT t.ai_ignored
         AND p.archived_at IS NULL
         AND t.completed_at IS NULL AND NOT l.is_done
         AND (l.contract <> 'expand' OR l.on_success_lane_id IS NOT NULL)
@@ -131,19 +132,21 @@ export async function expireLapsedRuns(db: AnyDb, where: { todoId: string; laneI
  * next heartbeat, and the run's token stops resolving at once.
  *
  * @param db The database or transaction.
- * @param where Whose runs: a user's, a project's, or those of todos AI now ignores.
+ * @param where Whose runs: everyone's (no user, for the instance switch), a user's, a
+ *   project's, or those of todos AI now ignores.
  * @returns Nothing.
  */
 export async function cancelRunsUnder(
   db: AnyDb,
-  where: { userId: string; projectId?: string; ignoredTodos?: boolean },
+  where: { userId?: string; projectId?: string; ignoredTodos?: boolean },
 ): Promise<void> {
   const narrow: SQL[] = [];
+  if (where.userId) narrow.push(sql`AND user_id = ${where.userId}`);
   if (where.projectId) narrow.push(sql`AND project_id = ${where.projectId}`);
   if (where.ignoredTodos) narrow.push(sql`AND todo_id IN (SELECT id FROM todos WHERE ai_ignored)`);
   await db.execute(sql`
     UPDATE runs SET cancel_requested_at = now()
-    WHERE user_id = ${where.userId} AND status = 'running' AND cancel_requested_at IS NULL
+    WHERE status = 'running' AND cancel_requested_at IS NULL
       ${sql.join(narrow, sql` `)}
   `);
 }

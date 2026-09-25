@@ -4,6 +4,7 @@ import { extendSchema, GraphQLError, type GraphQLObjectType, type GraphQLSchema,
 import { requireSystem } from '../ai-gate.ts';
 import { assertNoCycle, findBlocked } from '../blocking.ts';
 import type { Actor, Context } from '../context.ts';
+import { instanceAiOn } from '../instance.ts';
 import { findFirstOpenLaneId } from '../lanes.ts';
 import { stampActor } from '../provenance.ts';
 import { mintRunToken } from '../run-tokens.ts';
@@ -198,7 +199,7 @@ async function loadRunForUpdate(tx: AnyRow, runId: string) {
     .from(dbSchema.users)
     .where(eq(dbSchema.users.id, run.userId));
   const [lane] = run.laneId ? await tx.select().from(dbSchema.lanes).where(eq(dbSchema.lanes.id, run.laneId)) : [];
-  const aiOff = !user?.aiEnabled || !project?.aiEnabled || todo?.aiIgnored !== false;
+  const aiOff = !(await instanceAiOn(tx)) || !user?.aiEnabled || !project?.aiEnabled || todo?.aiIgnored !== false;
   return { run, todo, project, lane: lane ?? null, aiOff };
 }
 

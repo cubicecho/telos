@@ -100,7 +100,7 @@ domain.
 | `PORT` | `3001` | Port the server listens on. |
 | `AUTH_MAGIC_LINK` | `true` | Set to `false` to sign in with an address alone, no link. |
 | `EXPOSE_MAGIC_LINK` | dev only | Return the magic link in the API response so the login page can show it. |
-| `AI_ENABLED` | `false` | The instance's AI switch. Off, there is no AI surface at all: no MCP endpoint, no API keys, no agents, no runner. |
+| `AI_ENABLED` | — | Set to `false` to remove AI entirely: no MCP endpoint, no API keys, no agents, no switch in Settings. Otherwise an admin turns it on in Settings. |
 | `RUNNER_KEY` | — | The key the runner signs in with. Set the same value on the server and the runner. |
 | `TELOS_URL` | `http://127.0.0.1:PORT` | Runner only: where it finds telos. |
 | `RUNNER_CONCURRENCY` | `2` | Runner only: the most runs it works at once. |
@@ -116,8 +116,11 @@ read, or run with `AUTH_MAGIC_LINK=false`.
 Telos is a board for people first, and AI is off unless you turn it on, at
 every level:
 
-1. **The instance**: `AI_ENABLED=true`. Off, the server has no `/mcp`, no API
-   keys, no agents and no runner, and the app shows none of it.
+1. **The instance**: Settings → AI → "AI on this instance", which only an
+   admin sees. The first account to sign up is the admin. Off, the server's
+   `/mcp` is a 404, no account can use AI, and the app shows none of it. To
+   remove AI outright, so not even an admin can switch it on, set
+   `AI_ENABLED=false`.
 2. **The account**: Settings → AI. Off, the account's API keys stop working and
    nothing the runner does touches its rows.
 3. **The project**: its AI switch. Off, the project takes no requests and its
@@ -136,7 +139,8 @@ a memory lookup injected before each turn.
 
 ```bash
 export AUTH_SECRET=$(openssl rand -hex 32) RUNNER_KEY=$(openssl rand -hex 32)
-AI_ENABLED=true docker compose --profile ai up --build
+docker compose --profile ai up --build
+# then, signed in as the admin: Settings → AI → switch on the instance, then your account
 ```
 
 Agents talk to any OpenAI-compatible endpoint, so a local Ollama works. An
@@ -225,7 +229,7 @@ npm install
 npm run db:up          # Postgres on 127.0.0.1:5435
 npm run db:migrate
 npm run codegen
-npm run dev            # API on 3001, Expo dev server on 3000, runner if AI_ENABLED
+npm run dev            # API on 3001, Expo dev server on 3000, runner if RUNNER_KEY is set
 ```
 
 `npm run check` runs codegen, Biome and `tsc --noEmit` across every

@@ -145,19 +145,31 @@ export const MeDocument = graphql(`
   }
 `);
 
-// AI. The instance's switch (`authConfig.ai`) decides whether any of the
-// documents below exist in the server's schema at all: they are generated into
+// AI. Whether the server offers AI (`authConfig.aiAvailable`) decides whether
+// any of the documents below exist in its schema at all, and the instance's
+// switch (`authConfig.ai`) whether they do anything: they are generated into
 // the app's types regardless, so every screen that sends one checks `useAi`
-// first. Off, not one of them is sent.
+// first. Off, not one of them is sent, bar an admin's instance switch.
 
 export const AiStateDocument = graphql(`
   query AiState {
     authConfig {
       ai
+      aiAvailable
     }
     users {
       id
       aiEnabled
+      isAdmin
+    }
+  }
+`);
+
+export const SetInstanceAiEnabledDocument = graphql(`
+  mutation SetInstanceAiEnabled($enabled: Boolean!) {
+    setInstanceAiEnabled(enabled: $enabled) {
+      ai
+      aiAvailable
     }
   }
 `);

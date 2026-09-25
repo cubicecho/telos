@@ -2,16 +2,22 @@ import { MockedProvider } from '@apollo/client/testing';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
-import { AgentsDocument, AiStateDocument, ApiKeysDocument, SetAiEnabledDocument } from '@/lib/graphql';
+import {
+  AgentsDocument,
+  AiStateDocument,
+  ApiKeysDocument,
+  SetAiEnabledDocument,
+  SetInstanceAiEnabledDocument,
+} from '@/lib/graphql';
 import { AiSettings } from '../ai-settings';
 
-function aiState(instance: boolean, account: boolean) {
+function aiState(instance: boolean, account: boolean, { available = instance, admin = false } = {}) {
   return {
     request: { query: AiStateDocument },
     result: {
       data: {
-        authConfig: { __typename: 'AuthConfig', ai: instance },
-        users: [{ __typename: 'User', id: 'u1', aiEnabled: account }],
+        authConfig: { __typename: 'AuthConfig', ai: instance, aiAvailable: available },
+        users: [{ __typename: 'User', id: 'u1', aiEnabled: account, isAdmin: admin }],
       },
     },
   };
@@ -46,6 +52,41 @@ describe('AiSettings', () => {
     await new Promise((resolve) => setTimeout(resolve, 20));
     expect(screen.queryByText('AI')).not.toBeInTheDocument();
     expect(screen.queryByRole('switch')).not.toBeInTheDocument();
+  });
+
+  it('draws nothing for someone who is not an admin while the instance has AI switched off', async () => {
+    settings([aiState(false, false, { available: true })]);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(screen.queryByRole('switch')).not.toBeInTheDocument();
+  });
+
+  it('draws nothing for an admin either when the server offers no AI', async () => {
+    settings([aiState(false, false, { available: false, admin: true })]);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(screen.queryByRole('switch')).not.toBeInTheDocument();
+  });
+
+  it("gives an admin the instance's switch, and only that, while it is off", async () => {
+    settings([aiState(false, false, { available: true, admin: true })]);
+    expect(await screen.findByRole('switch', { name: 'AI on this instance' })).not.toBeChecked();
+    expect(screen.queryByRole('switch', { name: 'Use AI on this account' })).not.toBeInTheDocument();
+  });
+
+  it("turns the instance on and then offers the account's switch", async () => {
+    const user = userEvent.setup();
+    settings([
+      aiState(false, false, { available: true, admin: true }),
+      {
+        request: { query: SetInstanceAiEnabledDocument, variables: { enabled: true } },
+        result: { data: { setInstanceAiEnabled: { __typename: 'AuthConfig', ai: true, aiAvailable: true } } },
+      },
+      aiState(true, false, { admin: true }),
+    ]);
+
+    await user.click(await screen.findByRole('switch', { name: 'AI on this instance' }));
+
+    expect(await screen.findByRole('switch', { name: 'Use AI on this account' })).not.toBeChecked();
+    expect(screen.getByRole('switch', { name: 'AI on this instance' })).toBeChecked();
   });
 
   it('shows only the switch, and no keys, while the account has AI off', async () => {

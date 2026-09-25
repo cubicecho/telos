@@ -2,6 +2,7 @@ import { extendSchema, GraphQLError, type GraphQLObjectType, type GraphQLSchema,
 import { magicLinkUrl, requestMagicToken, signInDirectly, verifyMagicToken } from '../auth.ts';
 import { magicLinkExposed, magicLinkRequired } from '../config.ts';
 import type { Context } from '../context.ts';
+import { instanceAiOn } from '../instance.ts';
 import { createRateLimiter } from '../rate-limit.ts';
 
 // Five sign-in attempts per address per quarter hour. requestMagicLink is
@@ -31,8 +32,10 @@ const AUTH_SDL = parse(`
 
   "What this instance offers, readable before signing in."
   type AuthConfig {
-    "Whether the instance has AI at all (AI_ENABLED). Off, the app shows no AI surface."
+    "Whether AI is on for the instance: offered, and switched on by an admin. Off, the app shows no AI surface."
     ai: Boolean!
+    "Whether the server offers AI at all (AI_ENABLED is not false), so an admin has a switch to flip."
+    aiAvailable: Boolean!
   }
 
   extend type Query {
@@ -74,7 +77,10 @@ export function requireSession(ctx: Context): string {
 export function applyAuthExtension(schema: GraphQLSchema, options: { ai: boolean }): GraphQLSchema {
   const extendedSchema = extendSchema(schema, AUTH_SDL);
   const queryType = extendedSchema.getType('Query') as GraphQLObjectType;
-  queryType.getFields().authConfig.resolve = () => ({ ai: options.ai });
+  queryType.getFields().authConfig.resolve = async (_parent: unknown, _args: unknown, context: Context) => ({
+    ai: options.ai && (await instanceAiOn(context.db)),
+    aiAvailable: options.ai,
+  });
 
   const mutationType = extendedSchema.getType('Mutation') as GraphQLObjectType;
   const fields = mutationType.getFields();

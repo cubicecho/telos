@@ -2,15 +2,18 @@ import * as dbSchema from '@telos/db/schema';
 import { eq } from 'drizzle-orm';
 import { GraphQLError } from 'graphql';
 import type { Context } from './context.ts';
+import { instanceAiOn } from './instance.ts';
 import { requireAuth } from './resolvers/auth.ts';
 
-// The one question every AI resolver asks: is AI on for this caller? The
-// instance switch (AI_ENABLED) is answered earlier, when the schema is built:
-// with it off none of these resolvers exist. What is left is the account's.
+// The one question every AI resolver asks: is AI on for this caller? Whether
+// the server offers AI at all (AI_ENABLED) is answered earlier, when the schema
+// is built: with it off none of these resolvers exist. What is left is the
+// instance's switch and the account's.
 
-/** Whether the caller's account has AI switched on. */
+/** Whether the instance and the caller's account both have AI switched on. */
 export async function aiAllowed(ctx: Context): Promise<boolean> {
   const userId = requireAuth(ctx);
+  if (!(await instanceAiOn(ctx.db))) return false;
   const [user] = await ctx.db
     .select({ aiEnabled: dbSchema.users.aiEnabled })
     .from(dbSchema.users)
@@ -24,7 +27,7 @@ export async function aiAllowed(ctx: Context): Promise<boolean> {
  */
 export async function requireAi(ctx: Context): Promise<string> {
   if (!(await aiAllowed(ctx))) {
-    throw new GraphQLError('AI is switched off for this account', { extensions: { code: 'NOT_FOUND' } });
+    throw new GraphQLError('AI is switched off', { extensions: { code: 'NOT_FOUND' } });
   }
   return requireAuth(ctx);
 }

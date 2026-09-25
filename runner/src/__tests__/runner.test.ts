@@ -82,7 +82,7 @@ async function serveTelos(): Promise<string> {
     });
     res.json(result);
   });
-  const mcp = mountMcp(app, { ai: true, schema, contextFor, version: '0' });
+  const mcp = mountMcp(app, { ai: true, db, schema, contextFor, version: '0' });
   if (mcp) closers.push(() => mcp.close());
   return listen(app);
 }

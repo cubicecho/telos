@@ -9,6 +9,7 @@ import { type ExecutionResult, graphql } from 'graphql';
 import { type Auth, createAuth } from '../auth.ts';
 import { createSchema } from '../build-schema.ts';
 import type { Actor, Context } from '../context.ts';
+import { setInstanceAi } from '../instance.ts';
 import { createLoaders } from '../loaders.ts';
 
 // A throwaway in-memory Postgres per suite. `@telos/db` is deliberately never
@@ -22,10 +23,13 @@ const migrationsFolder = path.resolve(path.dirname(fileURLToPath(import.meta.url
 // biome-ignore lint/suspicious/noExplicitAny: db type varies by driver
 export type TestDb = any;
 
-export async function createTestDb(): Promise<TestDb> {
+export async function createTestDb(options: { instanceAi?: boolean } = {}): Promise<TestDb> {
   const client = new PGlite('memory://');
   const db = drizzle({ client, relations });
   await migrate(db as never, { migrationsFolder });
+  // On unless a test says otherwise: most tests are about what happens once
+  // AI is on, and the instance switch has tests of its own (instance-ai.test.ts).
+  await setInstanceAi(db, options.instanceAi ?? true);
   return db;
 }
 
