@@ -1,11 +1,15 @@
 import { useMutation, useQuery } from '@apollo/client';
 import { useState } from 'react';
 import { Text, View } from 'react-native';
+import type { RunSummaryFieldsFragment } from '@/__generated__/graphql';
+import { RunDialog } from '@/components/domain/ai/run-dialog';
+import { describeRun, RunStatusBadge } from '@/components/domain/ai/run-log';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Trash2 } from '@/components/ui/icons';
 import { LoadState } from '@/components/ui/load-failure';
 import { Textarea } from '@/components/ui/textarea';
+import { useAi } from '@/lib/ai';
 import { formatTimestamp } from '@/lib/dates';
 import { describeError } from '@/lib/errors';
 import { CreateTodoNoteDocument, DeleteTodoNoteDocument, TodoRecordDocument } from '@/lib/graphql';
@@ -28,6 +32,24 @@ const ACTOR_NAMES: Record<string, string> = {
 
 function actorName(kind: string): string {
   return ACTOR_NAMES[kind] ?? kind;
+}
+
+/**
+ * "View run", on a line a run wrote, while AI is on to read runs by. A run
+ * deleted since leaves the id behind, and the dialog says so.
+ */
+function ViewRun({ runId }: { runId: string | null | undefined }) {
+  const ai = useAi();
+  const [open, setOpen] = useState(false);
+  if (!ai.on || !runId) return null;
+  return (
+    <>
+      <Button variant="link" size="xs" className="h-auto self-start px-0" onPress={() => setOpen(true)}>
+        View run
+      </Button>
+      {open ? <RunDialog runId={runId} open onOpenChange={setOpen} /> : null}
+    </>
+  );
 }
 
 function useTodoRecord(todoId: string) {
@@ -97,6 +119,7 @@ export function TodoThread({ todoId }: { todoId: string }) {
                 </Button>
               </View>
               <Text className="text-foreground text-sm">{note.body}</Text>
+              <ViewRun runId={note.runId} />
             </View>
           ))}
         </View>
@@ -120,13 +143,28 @@ export function TodoThread({ todoId }: { todoId: string }) {
   );
 }
 
-export function TodoHistory({ todoId }: { todoId: string }) {
+type HistoryEvent = NonNullable<NonNullable<ReturnType<typeof useTodoRecord>['data']>['todo']>['history'][number];
+
+/** The history and the runs, one timeline, oldest first. */
+type Entry =
+  | { at: string; event: HistoryEvent; run?: never }
+  | { at: string; run: RunSummaryFieldsFragment; event?: never };
+
+/**
+ * What happened to a todo, in order. With `runs`, each time an agent worked
+ * it is a line of its own among the moves it caused.
+ */
+export function TodoHistory({ todoId, runs = [] }: { todoId: string; runs?: readonly RunSummaryFieldsFragment[] }) {
   const record = useTodoRecord(todoId);
   const events = record.data?.todo?.history ?? [];
+  const entries: Entry[] = [
+    ...events.map((event) => ({ at: event.at, event })),
+    ...runs.map((run) => ({ at: run.startedAt, run })),
+  ].sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
   const lanes = new Map((record.data?.todo?.project?.lanes ?? []).map((lane) => [lane.id, lane.name]));
   const laneName = (id: string | null | undefined) => (id ? (lanes.get(id) ?? 'a deleted lane') : 'no lane');
 
-  function describe(event: (typeof events)[number]): string {
+  function describe(event: HistoryEvent): string {
     switch (event.kind) {
       case 'create':
         return 'Created';
@@ -148,20 +186,35 @@ export function TodoHistory({ todoId }: { todoId: string }) {
       <LoadState
         query={record}
         what="the history"
-        count={events.length}
+        count={entries.length}
         empty={<Text className="text-muted-foreground text-sm">Nothing recorded yet.</Text>}
       />
-      {events.length === 0 ? null : (
+      {entries.length === 0 ? null : (
         <View role="list" className="gap-2">
-          {events.map((event) => (
-            <View key={event.id} role="listitem" className="gap-0.5 border-border border-l-2 pl-3">
-              <Text className="text-foreground text-sm">{describe(event)}</Text>
-              {event.reason ? <Text className="text-muted-foreground text-sm">“{event.reason}”</Text> : null}
-              <Text className="text-muted-foreground text-xs">
-                {actorName(event.actorKind)} · {formatTimestamp(event.at)}
-              </Text>
-            </View>
-          ))}
+          {entries.map(({ event, run }) =>
+            run ? (
+              <View key={run.id} role="listitem" className="gap-0.5 border-primary/40 border-l-2 pl-3">
+                <View className="flex-row items-center gap-2">
+                  <Text className="text-foreground text-sm">
+                    {run.agent?.name ?? 'A deleted agent'} worked it in {run.lane?.name ?? 'a deleted lane'}
+                  </Text>
+                  <RunStatusBadge status={run.status} />
+                </View>
+                {run.error ? <Text className="text-destructive text-sm">{run.error}</Text> : null}
+                <Text className="text-muted-foreground text-xs">{describeRun(run)}</Text>
+                <ViewRun runId={run.id} />
+              </View>
+            ) : (
+              <View key={event.id} role="listitem" className="gap-0.5 border-border border-l-2 pl-3">
+                <Text className="text-foreground text-sm">{describe(event)}</Text>
+                {event.reason ? <Text className="text-muted-foreground text-sm">“{event.reason}”</Text> : null}
+                <Text className="text-muted-foreground text-xs">
+                  {actorName(event.actorKind)} · {formatTimestamp(event.at)}
+                </Text>
+                <ViewRun runId={event.runId} />
+              </View>
+            ),
+          )}
         </View>
       )}
     </View>

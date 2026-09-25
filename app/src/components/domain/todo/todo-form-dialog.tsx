@@ -181,7 +181,7 @@ export function TodoFormDialog({
           <TodoThread todoId={todo.id} />
         </TabsContent>
         <TabsContent value="history">
-          <TodoHistory todoId={todo.id} />
+          <TodoHistory todoId={todo.id} runs={showRuns ? runsQuery.data?.todo?.runs : undefined} />
         </TabsContent>
         {showRuns ? (
           <TabsContent value="runs">

@@ -494,6 +494,7 @@ export const TodoNoteFieldsFragment = graphql(`
     kind
     body
     actorKind
+    runId
     createdAt
   }
 `);
@@ -512,6 +513,7 @@ export const TodoRecordDocument = graphql(`
         toLaneId
         fields
         actorKind
+        runId
         reason
         at
       }

@@ -1,4 +1,4 @@
-import { RunDocument } from '@/lib/graphql';
+import { AiStateDocument, RunDocument } from '@/lib/graphql';
 
 // Runs as the API answers them, for the tests of the views that draw them.
 
@@ -32,4 +32,17 @@ export function fullRun(id: string, status: string, extra: Record<string, unknow
 
 export function runMock(row: ReturnType<typeof fullRun>) {
   return { request: { query: RunDocument, variables: { id: row.id } }, result: { data: { run: row } } };
+}
+
+/** The AI switches as the app reads them: the instance's and the account's. */
+export function aiStateMock(instance: boolean, account: boolean) {
+  return {
+    request: { query: AiStateDocument },
+    result: {
+      data: {
+        authConfig: { __typename: 'AuthConfig', ai: instance, aiAvailable: instance },
+        users: [{ __typename: 'User', id: 'u1', aiEnabled: account, isAdmin: false }],
+      },
+    },
+  };
 }
