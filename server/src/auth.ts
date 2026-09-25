@@ -4,9 +4,10 @@ import * as dbSchema from '@telos/db/schema';
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { bearer, magicLink } from 'better-auth/plugins';
-import { eq } from 'drizzle-orm';
+import { and, eq, gt, isNull } from 'drizzle-orm';
 import { appUrl, authSecret } from './config.ts';
 import type { Actor } from './context.ts';
+import { readRunToken, runnerKeyMatches } from './run-tokens.ts';
 
 // Sessions, magic links and API keys, all through better-auth. The server
 // mounts none of better-auth's REST routes: the GraphQL mutations in
@@ -138,14 +139,38 @@ export async function mintApiKey(
 
 export const ANONYMOUS: Actor = { kind: 'anonymous', userId: null };
 
+export interface ActorOptions {
+  /** The instance's AI switch. Off, only a session resolves. */
+  ai: boolean;
+  /** The runner's key (config.ts `runnerKey`). Unset, nobody is the system principal. */
+  runnerKey?: string | null | undefined;
+}
+
 /**
- * Who a request is. An `x-api-key` wins over a session, and resolves only while
- * AI is on for both the instance (`ai`) and the key's owner: a key is the AI
- * door, and a user who turned AI off has closed it. A key that fails any check
- * is anonymous rather than an error, so the caller gets UNAUTHENTICATED from
- * the first field that needs a user.
+ * Who a request is. The AI credentials resolve only while the instance has AI
+ * on, and each is checked against the switches below it every time:
+ *
+ * - `x-runner-key`: the runner, as the system principal. It owns no rows and
+ *   may call only the runner's own mutations (resolvers/actor-lock.ts).
+ * - `x-run-token`: an agent at work, for exactly as long as its run is live
+ *   and its user, project and todo are all still open to AI.
+ * - `x-api-key`: an MCP client, while its owner has AI on.
+ *
+ * A credential that fails any check is anonymous rather than an error, so the
+ * caller gets UNAUTHENTICATED from the first field that needs a user.
  */
-export async function resolveActor(auth: Auth, db: AnyDb, headers: Headers, options: { ai: boolean }): Promise<Actor> {
+export async function resolveActor(auth: Auth, db: AnyDb, headers: Headers, options: ActorOptions): Promise<Actor> {
+  const runner = headers.get('x-runner-key');
+  if (runner) {
+    return options.ai && runnerKeyMatches(runner, options.runnerKey) ? { kind: 'system', userId: null } : ANONYMOUS;
+  }
+
+  const runToken = headers.get('x-run-token');
+  if (runToken) {
+    const runId = options.ai ? readRunToken(runToken) : null;
+    return runId ? await resolveRun(db, runId) : ANONYMOUS;
+  }
+
   const key = headers.get('x-api-key');
   if (key) {
     if (!options.ai) return ANONYMOUS;
@@ -168,6 +193,35 @@ export async function resolveActor(auth: Auth, db: AnyDb, headers: Headers, opti
   }
 
   return ANONYMOUS;
+}
+
+/**
+ * The agent working a run, while the run may still act: running, inside its
+ * lease, not asked to stop, and every AI switch over it still on.
+ *
+ * @param db The database.
+ * @param runId The run a token named.
+ * @returns The agent actor, or anonymous.
+ */
+async function resolveRun(db: AnyDb, runId: string): Promise<Actor> {
+  const [row] = await db
+    .select({ userId: dbSchema.runs.userId })
+    .from(dbSchema.runs)
+    .innerJoin(dbSchema.users, eq(dbSchema.users.id, dbSchema.runs.userId))
+    .innerJoin(dbSchema.projects, eq(dbSchema.projects.id, dbSchema.runs.projectId))
+    .innerJoin(dbSchema.todos, eq(dbSchema.todos.id, dbSchema.runs.todoId))
+    .where(
+      and(
+        eq(dbSchema.runs.id, runId),
+        eq(dbSchema.runs.status, 'running'),
+        gt(dbSchema.runs.leaseExpiresAt, new Date()),
+        isNull(dbSchema.runs.cancelRequestedAt),
+        eq(dbSchema.users.aiEnabled, true),
+        eq(dbSchema.projects.aiEnabled, true),
+        eq(dbSchema.todos.aiIgnored, false),
+      ),
+    );
+  return row ? { kind: 'agent', userId: row.userId, runId } : ANONYMOUS;
 }
 
 /** Express's header bag as a fetch `Headers`, which is what better-auth reads. */

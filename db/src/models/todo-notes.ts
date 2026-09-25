@@ -32,7 +32,8 @@ export const todoNotes = pgTable(
     // Stamped from the request (tenancy.ts), never stated by the caller.
     actorKind: text('actor_kind').$type<ActorKindValue>().notNull().default('user'),
     actorKeyId: uuid('actor_key_id'),
-    // The run that wrote it. No foreign key until runs exist.
+    // The run that wrote it. A plain id, as on todo_events: what a run said
+    // outlives the run's own row.
     runId: uuid('run_id'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },

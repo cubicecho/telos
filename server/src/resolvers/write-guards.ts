@@ -6,6 +6,7 @@ import { assertNoBlockedCompletions, resultRows } from '../blocking.ts';
 import type { Context } from '../context.ts';
 import { assertCompletionMatchesLane, assertEveryProjectHasLanes, realignLanes, seedMissingLanes } from '../lanes.ts';
 import { stampActor } from '../provenance.ts';
+import { cancelRunsUnder } from '../stations.ts';
 import { requireAuth } from './auth.ts';
 
 // A row scope confines reads, updates and deletes, but it cannot reach a plain
@@ -41,9 +42,12 @@ const todo: ForeignKey = { key: 'todoId', entity: 'Todo', parent: dbSchema.todos
 const label: ForeignKey = { key: 'labelId', entity: 'Label', parent: dbSchema.labels };
 const lane: ForeignKey = { key: 'laneId', entity: 'Lane', parent: dbSchema.lanes };
 const parentTodo: ForeignKey = { key: 'parentId', entity: 'Todo', parent: dbSchema.todos };
+const agent: ForeignKey = { key: 'agentId', entity: 'Agent', parent: dbSchema.agents };
+const onSuccessLane: ForeignKey = { key: 'onSuccessLaneId', entity: 'Lane', parent: dbSchema.lanes };
+const onFailureLane: ForeignKey = { key: 'onFailureLaneId', entity: 'Lane', parent: dbSchema.lanes };
 
 const FOREIGN_KEYS: Record<string, ForeignKey[]> = {
-  lanes: [project],
+  lanes: [project, agent, onSuccessLane, onFailureLane],
   todos: [project, lane, parentTodo],
   todoLabels: [todo, label],
   projectLabels: [project, label],
@@ -175,6 +179,24 @@ async function assertParentsSound(tx: AnyTable, userId: string): Promise<void> {
 }
 
 /**
+ * A station's arrows point within its own board. Checked over the caller's
+ * lanes after the write, like the other invariants here.
+ */
+async function assertArrowsInProject(tx: AnyTable, userId: string): Promise<void> {
+  const stray = resultRows(
+    await tx.execute(sql`
+      SELECT 1 FROM lanes l JOIN lanes target ON target.id IN (l.on_success_lane_id, l.on_failure_lane_id)
+      WHERE l.user_id = ${userId} AND target.project_id <> l.project_id
+      LIMIT 1
+    `),
+  );
+  if (stray.length === 0) return;
+  throw new GraphQLError('A lane can only send todos to lanes on its own board.', {
+    extensions: { code: 'BAD_USER_INPUT' },
+  });
+}
+
+/**
  * Which lane means done is `setDoneLane`'s to decide: moving the flag has to
  * move the todos with it, and a generated write would leave the board saying one
  * thing and the list another.
@@ -207,8 +229,9 @@ export const onWrite: NonNullable<BuildSchemaConfig['onWrite']> = {
     // completed todo outside the done lane, and can empty a project's board
     // entirely. Re-asserted here for the same reason it is on todos: the
     // invariant, not the statement, is what must hold.
-    after: async ({ context, tx }: WriteHookPayload) => {
+    after: async ({ args, context, tx }: WriteHookPayload) => {
       const userId = requireAuth(context as Context);
+      if (states(args, 'onSuccessLaneId', 'onFailureLaneId')) await assertArrowsInProject(tx, userId);
       await assertEveryProjectHasLanes(tx, userId);
       await realignLanes(tx, userId);
       await assertCompletionMatchesLane(tx, userId);
@@ -241,6 +264,8 @@ export const onWrite: NonNullable<BuildSchemaConfig['onWrite']> = {
       const created = operation === 'insert' || operation === 'upsert';
       const userId = requireAuth(context as Context);
       if (states(args, 'parentId')) await assertParentsSound(tx, userId);
+      // Ignoring a todo stops whatever agent is working it.
+      if (states(args, 'aiIgnored')) await cancelRunsUnder(tx, { userId, ignoredTodos: true });
       if (!created && !statesCompletion(args) && !statesLane(args)) return;
       if (marksComplete(args)) await assertNoBlockedCompletions(tx, userId);
       // A write that says what is done gets its lanes fixed to match; a write

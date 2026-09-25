@@ -15,6 +15,7 @@ export const relations = defineRelations(schema, (r) => ({
     user: r.one.users({ from: r.projects.userId, to: r.users.id }),
     todos: r.many.todos({ from: r.projects.id, to: r.todos.projectId }),
     lanes: r.many.lanes({ from: r.projects.id, to: r.lanes.projectId }),
+    runs: r.many.runs({ from: r.projects.id, to: r.runs.projectId }),
     labels: r.many.labels({
       from: r.projects.id.through(r.projectLabels.projectId),
       to: r.labels.id.through(r.projectLabels.labelId),
@@ -31,6 +32,7 @@ export const relations = defineRelations(schema, (r) => ({
     thread: r.many.todoNotes({ from: r.todos.id, to: r.todoNotes.todoId }),
     // Named `history` rather than `events`: it reads as what it is on a card.
     history: r.many.todoEvents({ from: r.todos.id, to: r.todoEvents.todoId }),
+    runs: r.many.runs({ from: r.todos.id, to: r.runs.todoId }),
     labels: r.many.labels({
       from: r.todos.id.through(r.todoLabels.todoId),
       to: r.labels.id.through(r.todoLabels.labelId),
@@ -53,6 +55,22 @@ export const relations = defineRelations(schema, (r) => ({
     user: r.one.users({ from: r.lanes.userId, to: r.users.id }),
     project: r.one.projects({ from: r.lanes.projectId, to: r.projects.id }),
     todos: r.many.todos({ from: r.lanes.id, to: r.todos.laneId }),
+    agent: r.one.agents({ from: r.lanes.agentId, to: r.agents.id }),
+    onSuccessLane: r.one.lanes({ from: r.lanes.onSuccessLaneId, to: r.lanes.id, alias: 'laneOnSuccess' }),
+    onFailureLane: r.one.lanes({ from: r.lanes.onFailureLaneId, to: r.lanes.id, alias: 'laneOnFailure' }),
+    runs: r.many.runs({ from: r.lanes.id, to: r.runs.laneId }),
+  },
+
+  agents: {
+    lanes: r.many.lanes({ from: r.agents.id, to: r.lanes.agentId }),
+    runs: r.many.runs({ from: r.agents.id, to: r.runs.agentId }),
+  },
+
+  runs: {
+    todo: r.one.todos({ from: r.runs.todoId, to: r.todos.id }),
+    lane: r.one.lanes({ from: r.runs.laneId, to: r.lanes.id }),
+    agent: r.one.agents({ from: r.runs.agentId, to: r.agents.id }),
+    project: r.one.projects({ from: r.runs.projectId, to: r.projects.id }),
   },
 
   labels: {

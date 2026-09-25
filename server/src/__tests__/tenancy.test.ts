@@ -26,10 +26,12 @@ describe('tenancy configuration', () => {
 
   it('finds the tables', () => {
     expect(tableKeys.sort()).toEqual([
+      'agents',
       'labels',
       'lanes',
       'projectLabels',
       'projects',
+      'runs',
       'todoDependencies',
       'todoEvents',
       'todoLabels',

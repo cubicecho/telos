@@ -1,6 +1,6 @@
 import * as dbSchema from '@telos/db/schema';
 import type { BuildSchemaConfig, RowScope } from '@vantreeseba/drizzle-graphql';
-import { and, eq, inArray, type SQL } from 'drizzle-orm';
+import { and, eq, inArray, type SQL, sql } from 'drizzle-orm';
 import { type Context, isAiActor } from './context.ts';
 import { requireAuth } from './resolvers/auth.ts';
 
@@ -37,6 +37,8 @@ export const USER_OWNED_TABLES = [
   'todoLabels',
   'todoNotes',
   'todoEvents',
+  'agents',
+  'runs',
 ] as const;
 
 /** Every table drizzle-graphql will generate fields for. */
@@ -82,6 +84,10 @@ function aiNarrowed(narrow: (context: Context, table: AnyTable, userId: string) 
 }
 
 const AI_SCOPES: Partial<Record<(typeof USER_OWNED_TABLES)[number], RowScope<Context>>> = {
+  // Agents are the board's own machinery, configured by a person. Nothing
+  // on the AI side has a reason to read them.
+  agents: aiNarrowed(() => sql`false`),
+  runs: aiNarrowed((context, table, userId) => inArray(table.todoId, aiTodoIds(context, userId))),
   projects: aiNarrowed((_context, table) => eq(table.aiEnabled, true)),
   lanes: aiNarrowed((context, table, userId) => inArray(table.projectId, aiProjectIds(context, userId))),
   projectLabels: aiNarrowed((context, table, userId) => inArray(table.projectId, aiProjectIds(context, userId))),
@@ -129,8 +135,10 @@ export const contextValues: NonNullable<BuildSchemaConfig['contextValues']> = {
  * insert would let a client write an edge without the cycle check, and a cycle
  * is a set of todos none of which can ever be completed. `todoEvents` is the
  * `todos_history` trigger's, and history nobody can edit is the point of it.
+ * `runs` belong to the runner's mutations (resolvers/runs.ts): a run is
+ * claimed, renewed and finished, and a person may only ask one to stop.
  */
-const WRITES_RESERVED = new Set<string>(['users', 'todoDependencies', 'todoEvents']);
+const WRITES_RESERVED = new Set<string>(['users', 'todoDependencies', 'todoEvents', 'runs']);
 
 /**
  * Tables that can be added to and deleted from, but not rewritten. A note an

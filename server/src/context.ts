@@ -8,7 +8,10 @@ import type { Loaders } from './loaders.ts';
  * - `user`: a person, signed in with a session.
  * - `apiKey`: an external client (an MCP host) holding one of a user's keys.
  *   It acts for that user, but only through the AI door.
- * - `agent` and `system`: the runner, which arrives in a later phase.
+ * - `agent`: an agent working a run, on the run's token. Acts for the run's
+ *   user, through the AI door, for as long as the run is live.
+ * - `system`: the runner itself. Owns nothing (`userId` is null) and may call
+ *   only the runner's mutations.
  * - `anonymous`: nobody. `userId` is null.
  */
 export type ActorKind = 'anonymous' | 'user' | 'apiKey' | 'agent' | 'system';

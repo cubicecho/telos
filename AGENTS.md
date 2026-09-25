@@ -60,6 +60,8 @@ telos/
 │       ├── tenancy.ts       # Row scope + server-owned columns, as buildSchema config
 │       ├── blocking.ts      # The dependency rules, in one place
 │       ├── lanes.ts         # The lane rules, in one place
+│       ├── stations.ts      # Which todos an agent may start on, and stopping runs
+│       ├── run-tokens.ts    # Per-run tokens, and the runner's key check
 │       ├── loaders.ts       # Per-request DataLoaders
 │       ├── resolvers/       # SDL extensions for what CRUD cannot express
 │       └── __tests__/       # Server tests
@@ -125,7 +127,9 @@ configures it (bearer sessions, magic links, API keys) over the tables in
 `db/src/models/auth.ts`, which `build-schema.ts` excludes from the generated
 schema. None of better-auth's REST routes are mounted. Every request resolves to
 an `actor` (`context.ts`): `user` for a session, `apiKey` for an MCP client,
-`anonymous` for nobody. `ctx.userId` is always `ctx.actor.userId`.
+`agent` for a run token, `system` for the runner, `anonymous` for nobody.
+`ctx.userId` is always `ctx.actor.userId` — null for `system`, so generated
+CRUD refuses the runner outright.
 
 **AI is off unless every switch says on.** `AI_ENABLED` (instance) decides
 whether the AI extensions are in the schema at all; `users.aiEnabled` (account)
@@ -147,6 +151,23 @@ mutation and refuses AI all but `AI_MUTATIONS` (`submitRequest`,
 added there. The MCP door (`mcp.ts`) serves only the operations written in
 `mcp.graphql` — the tool list is the menu, the lock is the lock. `/mcp` is
 mounted only with `AI_ENABLED`, and is a 404 otherwise.
+
+**Agents work the board only at stations, and only through the runner.** A
+lane with an `agentId` is a station: its `contract` (work, verdict, expand),
+`prompt`, `onSuccessLaneId`/`onFailureLaneId` arrows, `wipLimit` and
+`maxAttempts` say what happens there. The runner (`@telos/runner`, a separate
+process that never imports `@telos/db`) signs in with `x-runner-key` (the
+`RUNNER_KEY` env) as the `system` actor, which may call only
+`RUNNER_MUTATIONS` (`claimRun`, `heartbeatRun`, `finishRun`) and
+`runnerQueue`. What is ready is one SQL query, `readyTodos` in `stations.ts`,
+used by both the queue and the claim, and it checks every AI switch itself.
+`claimRun` returns a run token (`x-run-token`) the agent uses to reach `/mcp`
+as the `agent` actor, scoped to the run's owner, and only while the run is
+live. `finishRun` decides the verdict and the move on the server; the runner
+only reports. A switch turned off (`ai-switches.ts`, `aiIgnored`) sets
+`cancelRequestedAt` on live runs, the next heartbeat tells the runner to stop,
+and a stopped run writes nothing. `agents.apiKey` is excluded from the schema;
+it is written with `setAgentApiKey` and read only by the runner, in a claim.
 
 **`scope` cannot reach a plain insert.** Any foreign key a caller can state gets
 checked in an `onWrite` hook in `server/src/resolvers/write-guards.ts`. A new

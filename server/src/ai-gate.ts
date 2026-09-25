@@ -28,3 +28,13 @@ export async function requireAi(ctx: Context): Promise<string> {
   }
   return requireAuth(ctx);
 }
+
+/**
+ * Throws unless the caller is the runner. FORBIDDEN rather than NOT_FOUND: the
+ * runner's fields are in the schema whenever AI is on, and saying so costs
+ * nothing, where a person's AI surface is theirs to hide.
+ */
+export function requireSystem(ctx: Context): void {
+  if (ctx.actor.kind === 'system') return;
+  throw new GraphQLError('Only the runner may do this.', { extensions: { code: 'FORBIDDEN' } });
+}

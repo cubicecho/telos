@@ -1,4 +1,4 @@
-import { type Auth, resolveActor } from './auth.ts';
+import { type ActorOptions, type Auth, resolveActor } from './auth.ts';
 import type { Context } from './context.ts';
 import { createLoaders } from './loaders.ts';
 
@@ -11,7 +11,7 @@ type AnyDb = any;
  * Loaders are built per request: their batching is only ever valid within one
  * request, and their cache must not outlive it.
  */
-export function createContextFactory(db: AnyDb, auth: Auth, options: { ai: boolean }) {
+export function createContextFactory(db: AnyDb, auth: Auth, options: ActorOptions) {
   return async (headers: Headers): Promise<Context> => {
     const actor = await resolveActor(auth, db, headers, options);
     return { db, auth, userId: actor.userId, actor, loaders: createLoaders(db) };

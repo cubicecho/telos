@@ -8,7 +8,7 @@ import { db } from '@telos/db';
 import cors from 'cors';
 import { migrate } from 'drizzle-orm/postgres-js/migrator';
 import express from 'express';
-import { magicLinkExposed, magicLinkRequired } from './config.ts';
+import { magicLinkExposed, magicLinkRequired, runnerKey } from './config.ts';
 import { mountMcp } from './mcp.ts';
 import { createContextFactory } from './request-context.ts';
 import { createGraphQLRouter } from './routes/graphql.ts';
@@ -45,7 +45,7 @@ try {
 const app = express();
 const httpServer = createServer(app);
 const serveStatic = createStaticHandler(staticDir);
-const contextFor = createContextFactory(db, auth, { ai });
+const contextFor = createContextFactory(db, auth, { ai, runnerKey: runnerKey() });
 const { version } = JSON.parse(readFileSync(join(__dirname, '../package.json'), 'utf8')) as { version: string };
 
 app.use(cors());

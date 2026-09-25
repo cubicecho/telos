@@ -3,13 +3,14 @@ import { and, eq } from 'drizzle-orm';
 import { extendSchema, GraphQLError, type GraphQLObjectType, type GraphQLSchema, parse } from 'graphql';
 import { requireAi } from '../ai-gate.ts';
 import type { Context } from '../context.ts';
+import { cancelRunsUnder } from '../stations.ts';
 import { requireSession } from './auth.ts';
 
 // The account's and a project's AI switches. Only a person with a session
 // flips them — a key or an agent switching AI on for itself would defeat the
 // point — and only through here, never a generated write (write-guards.ts),
-// because switching off is also where whatever AI was doing gets stopped once
-// runs exist.
+// because switching off is also where whatever AI was doing gets stopped: its
+// running runs are asked to stop, and their tokens stop resolving at once.
 //
 // The switches nest: a project's only means anything while its owner's is on,
 // and switching the account off leaves each project's setting where it was, so
@@ -41,6 +42,7 @@ export function applyAiSwitchesExtension(schema: GraphQLSchema): GraphQLSchema {
       .set({ aiEnabled: args.enabled, updatedAt: new Date() })
       .where(eq(dbSchema.users.id, userId))
       .returning();
+    if (!args.enabled) await cancelRunsUnder(context.db, { userId });
     return user;
   };
 
@@ -59,6 +61,7 @@ export function applyAiSwitchesExtension(schema: GraphQLSchema): GraphQLSchema {
       .where(and(eq(dbSchema.projects.id, args.projectId), eq(dbSchema.projects.userId, userId)))
       .returning();
     if (!project) throw new GraphQLError('Project not found', { extensions: { code: 'NOT_FOUND' } });
+    if (!args.enabled) await cancelRunsUnder(context.db, { userId, projectId: project.id });
     return project;
   };
 

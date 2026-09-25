@@ -1,11 +1,13 @@
 import { AUTH_TABLES } from '@telos/db/schema';
 import { buildSchema, GraphQLDateTime } from '@vantreeseba/drizzle-graphql';
 import { applyActorLock } from './resolvers/actor-lock.ts';
+import { applyAgentsExtension } from './resolvers/agents.ts';
 import { applyAiSwitchesExtension } from './resolvers/ai-switches.ts';
 import { applyApiKeysExtension } from './resolvers/api-keys.ts';
 import { applyAuthExtension } from './resolvers/auth.ts';
 import { applyLanesExtension } from './resolvers/lanes.ts';
 import { applyRequestsExtension } from './resolvers/requests.ts';
+import { applyRunsExtension } from './resolvers/runs.ts';
 import { applyTodosExtension } from './resolvers/todos.ts';
 import { onWrite } from './resolvers/write-guards.ts';
 import { contextValues, features, scope } from './tenancy.ts';
@@ -31,6 +33,20 @@ export interface SchemaOptions {
    */
   ai: boolean;
 }
+
+/** Tables that exist in the API only while the instance has AI on. */
+const AI_TABLES = ['agents', 'runs'];
+
+/** A lane's station settings, which mean nothing without agents. */
+const AI_LANE_COLUMNS = [
+  'agentId',
+  'contract',
+  'prompt',
+  'onSuccessLaneId',
+  'onFailureLaneId',
+  'wipLimit',
+  'maxAttempts',
+];
 
 export function createSchema(db: AnyDb, options: SchemaOptions) {
   const { schema: drizzleSchema, entities } = buildSchema(db, {
@@ -67,7 +83,13 @@ export function createSchema(db: AnyDb, options: SchemaOptions) {
     onWrite,
     // better-auth's tables: sessions, key hashes and magic-link tokens. Only
     // better-auth reads or writes them (auth.ts), so they generate nothing.
-    exclude: { tables: [...AUTH_TABLES] },
+    //
+    // An agent's API key is write-only: `setAgentApiKey` stores it and only
+    // the runner's `claimRun` reads it back. With AI off, the agent machinery
+    // is not in the schema at all.
+    exclude: options.ai
+      ? { tables: [...AUTH_TABLES], columns: { agents: ['apiKey'] } }
+      : { tables: [...AUTH_TABLES, ...AI_TABLES], columns: { lanes: AI_LANE_COLUMNS } },
   });
 
   let schema = applyAuthExtension(drizzleSchema, options);
@@ -77,6 +99,8 @@ export function createSchema(db: AnyDb, options: SchemaOptions) {
     schema = applyApiKeysExtension(schema);
     schema = applyAiSwitchesExtension(schema);
     schema = applyRequestsExtension(schema);
+    schema = applyAgentsExtension(schema);
+    schema = applyRunsExtension(schema);
   }
   // Last, so it sees every mutation the extensions above added.
   schema = applyActorLock(schema);

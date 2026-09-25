@@ -63,3 +63,12 @@ export function appUrl(): string {
 export function aiEnabled(): boolean {
   return envFlag(process.env.AI_ENABLED);
 }
+
+/**
+ * The runner's key, which the runner sends as `x-runner-key` to act as the
+ * system principal (resolvers/runs.ts). Unset, nothing can claim a run, which
+ * is the right answer for an instance that runs no agents.
+ */
+export function runnerKey(): string | null {
+  return process.env.RUNNER_KEY?.trim() || null;
+}
