@@ -2,7 +2,7 @@ import { MockedProvider } from '@apollo/client/testing';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { AgentsDocument, CreateAgentDocument } from '@/lib/graphql';
+import { AgentModelsDocument, AgentsDocument, CreateAgentDocument } from '@/lib/graphql';
 import { AgentManager } from '../agent-manager';
 
 // Ids are minted on the client; pinning them is what lets the mock name the
@@ -107,5 +107,30 @@ describe('AgentManager', () => {
 
     expect(await screen.findByText('An agent needs a model.')).toBeInTheDocument();
     expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+
+  it('picks a model from what the endpoint lists, and takes its context length', async () => {
+    const user = userEvent.setup();
+    manager([
+      agents([AGENT]),
+      {
+        request: { query: AgentModelsDocument, variables: { baseUrl: 'http://localhost:11434/v1', agentId: 'a1' } },
+        result: {
+          data: {
+            agentModels: [
+              { __typename: 'AgentModel', id: 'llama3:8b', contextLength: 8192 },
+              { __typename: 'AgentModel', id: 'qwen3:14b', contextLength: null },
+            ],
+          },
+        },
+      },
+    ]);
+
+    await user.click(await screen.findByRole('button', { name: 'Edit Reviewer' }));
+    await user.click(screen.getByRole('button', { name: 'Pick from the endpoint’s models' }));
+    await user.click(await screen.findByRole('menuitem', { name: /llama3:8b/ }));
+
+    expect(screen.getByLabelText('Model')).toHaveValue('llama3:8b');
+    expect(screen.getByLabelText('Context length')).toHaveValue('8192');
   });
 });

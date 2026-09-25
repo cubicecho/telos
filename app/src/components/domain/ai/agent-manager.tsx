@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from '@apollo/client';
+import { useLazyQuery, useMutation, useQuery } from '@apollo/client';
 import { useEffect, useMemo, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import type { AgentFieldsFragment } from '@/__generated__/graphql';
@@ -9,9 +9,10 @@ import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Form } from '@/components/ui/form';
 import { FormDialog, FormDialogFooter } from '@/components/ui/form-dialog';
-import { Pencil, Plus, Trash2, X } from '@/components/ui/icons';
+import { ChevronDown, Pencil, Plus, Trash2, X } from '@/components/ui/icons';
 import { Input } from '@/components/ui/input';
 import { LoadState } from '@/components/ui/load-failure';
+import { Menu, MenuContent, MenuItem, MenuTrigger } from '@/components/ui/menu';
 import { Textarea } from '@/components/ui/textarea';
 import {
   type AgentDraft,
@@ -23,6 +24,7 @@ import {
 } from '@/lib/agents';
 import { describeError } from '@/lib/errors';
 import {
+  AgentModelsDocument,
   AgentsDocument,
   CreateAgentDocument,
   DeleteAgentDocument,
@@ -222,9 +224,23 @@ export function AgentFormDialog({
             <form.AppField name="baseUrl" validators={required('a base URL')}>
               {(field) => <field.InputField label="Base URL" type="url" placeholder="http://localhost:11434/v1" />}
             </form.AppField>
-            <form.AppField name="model" validators={required('a model')}>
-              {(field) => <field.InputField label="Model" placeholder="qwen3:14b" />}
-            </form.AppField>
+            <View className="flex-row items-end gap-2">
+              <View className="min-w-0 flex-1">
+                <form.AppField name="model" validators={required('a model')}>
+                  {(field) => <field.InputField label="Model" placeholder="qwen3:14b" />}
+                </form.AppField>
+              </View>
+              <ModelMenu
+                agentId={agent?.id ?? null}
+                baseUrl={() => form.getFieldValue('baseUrl')}
+                onPick={(model) => {
+                  form.setFieldValue('model', model.id);
+                  if (model.contextLength && !form.getFieldValue('contextLength').trim()) {
+                    form.setFieldValue('contextLength', String(model.contextLength));
+                  }
+                }}
+              />
+            </View>
             <form.AppField name="systemPrompt">
               {(field) => (
                 <field.TextAreaField label="System prompt" placeholder="Optional. Who the agent is, in any lane." />
@@ -271,6 +287,57 @@ export function AgentFormDialog({
         </Form>
       </form.AppForm>
     </FormDialog>
+  );
+}
+
+/**
+ * The models the base URL offers, asked for when the menu opens: the server
+ * reads the endpoint's `/models`, with the agent's stored key when it has one.
+ * Typing a model in is always still there, for an endpoint that lists nothing.
+ */
+function ModelMenu({
+  agentId,
+  baseUrl,
+  onPick,
+}: {
+  agentId: string | null;
+  baseUrl: () => string;
+  onPick: (model: { id: string; contextLength?: number | null }) => void;
+}) {
+  const [load, query] = useLazyQuery(AgentModelsDocument, { fetchPolicy: 'network-only' });
+  const models = query.data?.agentModels ?? [];
+
+  function opened(open: boolean) {
+    const url = baseUrl().trim();
+    if (open && url) void load({ variables: { baseUrl: url, agentId } }).catch(() => undefined);
+  }
+
+  let status: string | null = null;
+  if (!query.called) status = 'Give a base URL first.';
+  else if (query.loading) status = 'Asking the endpoint…';
+  else if (query.error) status = describeError(query.error);
+  else if (models.length === 0) status = 'It lists no models.';
+
+  return (
+    <Menu onOpenChange={opened}>
+      <MenuTrigger asChild>
+        <Button variant="outline" aria-label="Pick from the endpoint’s models">
+          Models
+          <ChevronDown className="h-4 w-4" />
+        </Button>
+      </MenuTrigger>
+      <MenuContent align="end" aria-label="Models" className="max-h-80 overflow-y-auto">
+        {status ? <MenuItem label={status} disabled /> : null}
+        {models.map((model) => (
+          <MenuItem
+            key={model.id}
+            label={model.id}
+            trailing={model.contextLength ? `${model.contextLength.toLocaleString()} ctx` : undefined}
+            onSelect={() => onPick(model)}
+          />
+        ))}
+      </MenuContent>
+    </Menu>
   );
 }
 

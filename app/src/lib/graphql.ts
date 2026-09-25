@@ -251,6 +251,15 @@ export const AgentFieldsFragment = graphql(`
   }
 `);
 
+export const AgentModelsDocument = graphql(`
+  query AgentModels($baseUrl: String!, $agentId: ID) {
+    agentModels(baseUrl: $baseUrl, agentId: $agentId) {
+      id
+      contextLength
+    }
+  }
+`);
+
 export const AgentsDocument = graphql(`
   query Agents {
     agents(orderBy: { name: { direction: asc, priority: 1 } }) {
