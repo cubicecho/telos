@@ -7,7 +7,7 @@ import { TodoRecordDocument } from '@/lib/graphql';
 import { aiStateMock, fullRun, run, runMock } from '../../ai/__tests__/run-fixtures';
 import { TodoHistory, TodoThread } from '../todo-record';
 
-function record() {
+function record(aiEnabled = true) {
   return {
     request: { query: TodoRecordDocument, variables: { id: 't1' } },
     result: {
@@ -55,6 +55,7 @@ function record() {
           project: {
             __typename: 'Project',
             id: 'p1',
+            aiEnabled,
             lanes: [
               { __typename: 'Lane', id: 'l1', name: 'Review' },
               { __typename: 'Lane', id: 'l2', name: 'Done' },
@@ -111,5 +112,12 @@ describe('TodoThread', () => {
     show(<TodoThread todoId="t1" focusNoteId="n1" />, [aiStateMock(true, true), record()]);
     const note = (await screen.findByText('Reviewed and passed.')).closest('[role="listitem"]');
     expect(note).toHaveAttribute('aria-current', 'true');
+  });
+
+  it('offers no run links on a project with AI off, even for notes a run wrote', async () => {
+    show(<TodoThread todoId="t1" />, [aiStateMock(true, true), record(false)]);
+    expect(await screen.findByText('Reviewed and passed.')).toBeInTheDocument();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(screen.queryByRole('button', { name: 'View run' })).not.toBeInTheDocument();
   });
 });

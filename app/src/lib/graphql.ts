@@ -589,6 +589,7 @@ export const TodoRecordDocument = graphql(`
       }
       project {
         id
+        aiEnabled
         lanes {
           id
           name

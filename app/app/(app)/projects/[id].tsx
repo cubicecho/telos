@@ -165,9 +165,11 @@ export default function ProjectScreen() {
   }
 
   const requested = VIEWS.find((name) => name === view) ?? 'list';
-  // The AI views exist only while AI is on for the account; a link to one
-  // opened without it lands on the list.
-  const current: ProjectView = !ai.on && (requested === 'runs' || requested === 'artifacts') ? 'list' : requested;
+  // The AI views exist only while AI is on for the account and this project; a
+  // link to one opened without it lands on the list. A project with AI off
+  // shows none of what its runs left, even from when it was on.
+  const aiHere = ai.on && project.aiEnabled;
+  const current: ProjectView = !aiHere && (requested === 'runs' || requested === 'artifacts') ? 'list' : requested;
   const todoView = current === 'list' || current === 'board';
   const all = (todosQuery.data?.todos ?? []) as TodoSummary[];
   const lanes = lanesData?.lanes ?? [];
@@ -192,7 +194,7 @@ export default function ProjectScreen() {
     // inset of its own, so each part adds `px-4` to line up with the header.
     <ProjectPage
       project={project}
-      activity={ai.on && project.aiEnabled ? activity : undefined}
+      activity={aiHere ? activity : undefined}
       content={
         <View className="gap-6 pt-2 pb-6">
           <Tabs
@@ -226,7 +228,7 @@ export default function ProjectScreen() {
                   <Columns3 />
                   Board
                 </TabsTrigger>
-                {ai.on ? (
+                {aiHere ? (
                   <>
                     <TabsTrigger value="runs">
                       <Play />
@@ -272,7 +274,7 @@ export default function ProjectScreen() {
                     )}
                   </View>
                 </TabsContent>
-                {ai.on ? (
+                {aiHere ? (
                   <>
                     <TabsContent value="runs" className="mt-0">
                       <View className={cn(PROSE_COLUMN, 'px-4')}>

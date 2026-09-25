@@ -39,10 +39,14 @@ function actorName(kind: string): string {
  * "View run", on a line a run wrote, while AI is on to read runs by. A run
  * deleted since leaves the id behind, and the dialog says so.
  */
-function ViewRun({ runId }: { runId: string | null | undefined }) {
+/**
+ * A link to the run a note or move came from, while AI is on for the account
+ * and for the todo's project: with the project's off, its runs are not shown.
+ */
+function ViewRun({ runId, projectAi }: { runId: string | null | undefined; projectAi: boolean }) {
   const ai = useAi();
   const [open, setOpen] = useState(false);
-  if (!ai.on || !runId) return null;
+  if (!ai.on || !projectAi || !runId) return null;
   return (
     <>
       <Button variant="link" size="xs" className="h-auto self-start px-0" onPress={() => setOpen(true)}>
@@ -82,6 +86,7 @@ export function TodoThread({ todoId, focusNoteId }: { todoId: string; focusNoteI
   const [deleteNote] = useMutation(DeleteTodoNoteDocument, refetch);
 
   const notes = record.data?.todo?.thread ?? [];
+  const projectAi = record.data?.todo?.project?.aiEnabled === true;
 
   async function add() {
     const trimmed = body.trim();
@@ -145,7 +150,7 @@ export function TodoThread({ todoId, focusNoteId }: { todoId: string; focusNoteI
                 </Button>
               </View>
               <Text className="text-foreground text-sm">{note.body}</Text>
-              <ViewRun runId={note.runId} />
+              <ViewRun runId={note.runId} projectAi={projectAi} />
             </View>
           ))}
         </View>
@@ -183,6 +188,7 @@ type Entry =
 export function TodoHistory({ todoId, runs = [] }: { todoId: string; runs?: readonly RunSummaryFieldsFragment[] }) {
   const record = useTodoRecord(todoId);
   const events = record.data?.todo?.history ?? [];
+  const projectAi = record.data?.todo?.project?.aiEnabled === true;
   const entries: Entry[] = [
     ...events.map((event) => ({ at: event.at, event })),
     ...runs.map((run) => ({ at: run.startedAt, run })),
@@ -234,7 +240,7 @@ export function TodoHistory({ todoId, runs = [] }: { todoId: string; runs?: read
                 </View>
                 {run.error ? <Text className="text-destructive text-sm">{run.error}</Text> : null}
                 <Text className="text-muted-foreground text-xs">{describeRun(run)}</Text>
-                <ViewRun runId={run.id} />
+                <ViewRun runId={run.id} projectAi={projectAi} />
               </View>
             ) : (
               <View key={event.id} role="listitem" className="gap-0.5 border-border border-l-2 pl-3">
@@ -243,7 +249,7 @@ export function TodoHistory({ todoId, runs = [] }: { todoId: string; runs?: read
                 <Text className="text-muted-foreground text-xs">
                   {actorName(event.actorKind)} · {formatTimestamp(event.at)}
                 </Text>
-                <ViewRun runId={event.runId} />
+                <ViewRun runId={event.runId} projectAi={projectAi} />
               </View>
             ),
           )}
