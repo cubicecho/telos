@@ -2,7 +2,13 @@ import { MockedProvider } from '@apollo/client/testing';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { AgentModelsDocument, AgentsDocument, CreateAgentDocument } from '@/lib/graphql';
+import {
+  AgentModelsDocument,
+  AgentsDocument,
+  CreateAgentDocument,
+  McpProbeDocument,
+  TestMcpServerDocument,
+} from '@/lib/graphql';
 import { AgentManager } from '../agent-manager';
 
 // Ids are minted on the client; pinning them is what lets the mock name the
@@ -132,5 +138,56 @@ describe('AgentManager', () => {
 
     expect(screen.getByLabelText('Model')).toHaveValue('llama3:8b');
     expect(screen.getByLabelText('Context length')).toHaveValue('8192');
+  });
+
+  it('tests a server through the runner and lists its tools, or says why not', async () => {
+    const user = userEvent.setup();
+    // What the form does not edit rides along, so the test is of the row as saved.
+    const server = { hiddenTools: ['secret'], id: 'docs', name: 'Docs', url: 'http://localhost:8080/mcp' };
+    const probe = (fields: object) => ({
+      __typename: 'McpProbe',
+      id: 'p1',
+      status: 'done',
+      ok: true,
+      tools: [],
+      error: null,
+      ...fields,
+    });
+    manager([
+      agents([{ ...AGENT, mcpServers: [server] }]),
+      {
+        request: { query: TestMcpServerDocument, variables: { server: JSON.stringify(server) } },
+        result: { data: { testMcpServer: { __typename: 'McpProbe', id: 'p1' } } },
+      },
+      {
+        request: { query: McpProbeDocument, variables: { id: 'p1' } },
+        result: {
+          data: {
+            mcpProbe: probe({
+              tools: [
+                { __typename: 'McpProbeTool', name: 'search', description: '' },
+                { __typename: 'McpProbeTool', name: 'fetch', description: '' },
+              ],
+            }),
+          },
+        },
+      },
+      {
+        request: { query: TestMcpServerDocument, variables: { server: JSON.stringify(server) } },
+        result: { data: { testMcpServer: { __typename: 'McpProbe', id: 'p2' } } },
+      },
+      {
+        request: { query: McpProbeDocument, variables: { id: 'p2' } },
+        result: { data: { mcpProbe: probe({ id: 'p2', ok: false, error: 'connect ECONNREFUSED' }) } },
+      },
+    ]);
+
+    await user.click(await screen.findByRole('button', { name: 'Edit Reviewer' }));
+    await user.click(screen.getByRole('button', { name: 'Test Docs' }));
+    expect(await screen.findByText('Reached. 2 tools: search, fetch')).toBeInTheDocument();
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Test Docs' })).toBeEnabled());
+    await user.click(screen.getByRole('button', { name: 'Test Docs' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('connect ECONNREFUSED');
   });
 });

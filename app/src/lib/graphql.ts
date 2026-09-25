@@ -251,6 +251,29 @@ export const AgentFieldsFragment = graphql(`
   }
 `);
 
+export const TestMcpServerDocument = graphql(`
+  mutation TestMcpServer($server: String!) {
+    testMcpServer(server: $server) {
+      id
+    }
+  }
+`);
+
+export const McpProbeDocument = graphql(`
+  query McpProbe($id: ID!) {
+    mcpProbe(id: $id) {
+      id
+      status
+      ok
+      tools {
+        name
+        description
+      }
+      error
+    }
+  }
+`);
+
 export const AgentModelsDocument = graphql(`
   query AgentModels($baseUrl: String!, $agentId: ID) {
     agentModels(baseUrl: $baseUrl, agentId: $agentId) {

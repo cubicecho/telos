@@ -1,5 +1,5 @@
 import type { ArtifactDraft } from './artifacts.ts';
-// The runner's whole view of telos: four operations over GraphQL, as the
+// The runner's whole view of telos: a handful of operations over GraphQL, as the
 // system principal. The runner never touches the database; every rule about
 // what may run, and what a finished run does to a todo, is telos's.
 
@@ -118,6 +118,19 @@ export interface Beat {
   usage?: RunUsage;
 }
 
+/** A test of an MCP server somebody asked for: the row, as JSON. */
+export interface RunnerProbe {
+  id: string;
+  server: string;
+}
+
+export interface ProbeResult {
+  ok: boolean;
+  tools: Array<{ name: string; description: string }>;
+  instructions?: string;
+  error?: string | null;
+}
+
 /** The runner's calls into telos. An interface so a test can stand in for it. */
 export interface Telos {
   queue(limit?: number): Promise<ReadyTodo[]>;
@@ -125,6 +138,9 @@ export interface Telos {
   /** True means stop. */
   heartbeat(runId: string, beat?: Beat): Promise<boolean>;
   finish(runId: string, result: RunResult): Promise<void>;
+  /** MCP server tests waiting to be made, now taken. */
+  probes(): Promise<RunnerProbe[]>;
+  finishProbe(id: string, result: ProbeResult): Promise<void>;
 }
 
 const QUEUE = `query ($limit: Int) { runnerQueue(limit: $limit) { todoId laneId projectId } }`;
@@ -144,6 +160,8 @@ const CLAIM = `mutation ($todoId: ID!, $laneId: ID!) {
 const HEARTBEAT = `mutation ($id: ID!, $events: [RunEventInput!], $prompt: RunPromptInput, $usage: RunUsageInput) {
   heartbeatRun(id: $id, events: $events, prompt: $prompt, usage: $usage)
 }`;
+const PROBES = `query { runnerProbes { id server } }`;
+const FINISH_PROBE = `mutation ($id: ID!, $result: ProbeResultInput!) { finishProbe(id: $id, result: $result) }`;
 const FINISH = `mutation ($id: ID!, $result: RunResultInput!) { finishRun(id: $id, result: $result) { id } }`;
 
 /** A GraphQL answer carrying errors, as one error. */
@@ -208,6 +226,10 @@ export function createTelos(options: { telosUrl: string; runnerKey: string; fetc
       ).heartbeatRun,
     finish: async (runId, result) => {
       await request(FINISH, { id: runId, result });
+    },
+    probes: async () => (await request<{ runnerProbes: RunnerProbe[] }>(PROBES, {})).runnerProbes,
+    finishProbe: async (id, result) => {
+      await request(FINISH_PROBE, { id, result });
     },
   };
 }

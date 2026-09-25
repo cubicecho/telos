@@ -1,8 +1,10 @@
 import * as dbSchema from '@telos/db/schema';
 import { and, eq } from 'drizzle-orm';
 import { extendSchema, GraphQLError, type GraphQLObjectType, type GraphQLSchema, parse } from 'graphql';
-import { requireAi } from '../ai-gate.ts';
+import { requireAi, requireSystem } from '../ai-gate.ts';
 import type { Context } from '../context.ts';
+import { askProbe, finishProbe, type McpProbe, readProbe, takeProbes } from '../mcp-probes.ts';
+import { markRunnerSeen } from '../runner-seen.ts';
 import { requireSession } from './auth.ts';
 
 // An agent's API key, which is write-only. The column is excluded from the
@@ -28,7 +30,47 @@ const AGENTS_SDL = parse(`
     contextLength: Int
   }
 
+  "A tool an MCP server offered when it was tested."
+  type McpProbeTool {
+    name: String!
+    description: String!
+  }
+
+  "A test of an MCP server, made by the runner."
+  type McpProbe {
+    id: ID!
+    "pending (waiting for the runner), testing, or done."
+    status: String!
+    ok: Boolean!
+    tools: [McpProbeTool!]!
+    "What the server says about itself, when it says anything."
+    instructions: String!
+    error: String
+  }
+
+  "A test waiting for the runner: the server row, as JSON."
+  type RunnerProbe {
+    id: ID!
+    server: String!
+  }
+
+  input McpProbeToolInput {
+    name: String!
+    description: String!
+  }
+
+  input ProbeResultInput {
+    ok: Boolean!
+    tools: [McpProbeToolInput!]!
+    instructions: String
+    error: String
+  }
+
   extend type Query {
+    "A test of an MCP server you asked for. Null once it is forgotten, after a couple of minutes."
+    mcpProbe(id: ID!): McpProbe
+    "The MCP server tests waiting to be made. The runner's only; taking them marks them taken."
+    runnerProbes: [RunnerProbe!]!
     """
     The models \`baseUrl\` offers, asked with \`agentId\`'s stored key when one is
     given. For picking a model while setting an agent up.
@@ -39,6 +81,10 @@ const AGENTS_SDL = parse(`
   extend type Mutation {
     "Stores an agent's API key, or clears it with null."
     setAgentApiKey(agentId: ID!, apiKey: String): Agent!
+    "Asks the runner to connect to an MCP server row (JSON, saved or not) and list its tools. Read the answer with mcpProbe."
+    testMcpServer(server: String!): McpProbe!
+    "Records what a test found. The runner's only."
+    finishProbe(id: ID!, result: ProbeResultInput!): Boolean!
   }
 `);
 
@@ -47,6 +93,47 @@ export const MODELS_TIMEOUT_MS = 5000;
 
 /** The most models returned: a picker, not an inventory. */
 const MODELS_LIMIT = 500;
+
+/** The longest server row a test takes: a row is a URL and a few headers. */
+const PROBE_SERVER_CHARS = 20_000;
+/** The most of a server's tools, and of each description, a test keeps. */
+const PROBE_TOOLS = 200;
+const PROBE_TEXT_CHARS = 1000;
+
+/**
+ * A server row a test can be made of, as JSON, or why not.
+ *
+ * @param json What was sent.
+ * @returns The row, re-serialized.
+ */
+function probeServer(json: string): string {
+  if (json.length > PROBE_SERVER_CHARS) throw badInput('That server is too long to test.');
+  let row: unknown;
+  try {
+    row = JSON.parse(json);
+  } catch {
+    throw badInput('The server is not JSON.');
+  }
+  const { id, url, command } = (row ?? {}) as Record<string, unknown>;
+  if (!row || typeof row !== 'object' || Array.isArray(row) || typeof id !== 'string' || !id) {
+    throw badInput('A server needs an id.');
+  }
+  if (typeof url === 'string' && url.trim()) {
+    const protocol = URL.canParse(url) ? new URL(url).protocol : '';
+    if (protocol !== 'http:' && protocol !== 'https:') throw badInput('The URL must be http or https.');
+  } else if (typeof command !== 'string' || !command.trim()) {
+    throw badInput('Give the server a URL or a command first.');
+  }
+  return JSON.stringify(row);
+}
+
+const cut = (text: string, chars: number) => (text.length > chars ? `${text.slice(0, chars - 1)}…` : text);
+
+/** A test as a person reads it: without whose it is or the row it tested. */
+function visibleProbe(probe: McpProbe) {
+  const { userId: _user, server: _server, askedAt: _at, ...visible } = probe;
+  return visible;
+}
 
 interface AgentModel {
   id: string;
@@ -132,6 +219,54 @@ export function applyAgentsExtension(schema: GraphQLSchema): GraphQLSchema {
       apiKey = row.apiKey;
     }
     return listModels(args.baseUrl, apiKey);
+  };
+
+  queries.mcpProbe.resolve = async (_parent: unknown, args: { id: string }, context: Context) => {
+    requireSession(context);
+    const userId = await requireAi(context);
+    const probe = readProbe(args.id, userId);
+    return probe ? visibleProbe(probe) : null;
+  };
+
+  queries.runnerProbes.resolve = (_parent: unknown, _args: unknown, context: Context) => {
+    requireSystem(context);
+    markRunnerSeen();
+    return takeProbes().map(({ id, server }) => ({ id, server }));
+  };
+
+  mutations.testMcpServer.resolve = async (_parent: unknown, args: { server: string }, context: Context) => {
+    // A person only, as with the models: it has a process dial where it is told.
+    requireSession(context);
+    const userId = await requireAi(context);
+    const probe = askProbe(userId, probeServer(args.server));
+    if (!probe) throw badInput('Some tests are still waiting; try again when they are done.');
+    return visibleProbe(probe);
+  };
+
+  mutations.finishProbe.resolve = (
+    _parent: unknown,
+    args: {
+      id: string;
+      result: {
+        ok: boolean;
+        tools: Array<{ name: string; description: string }>;
+        instructions?: string | null;
+        error?: string | null;
+      };
+    },
+    context: Context,
+  ) => {
+    requireSystem(context);
+    const { ok, tools, instructions, error } = args.result;
+    return finishProbe(args.id, {
+      ok,
+      tools: tools.slice(0, PROBE_TOOLS).map((tool) => ({
+        name: cut(tool.name, 200),
+        description: cut(tool.description, PROBE_TEXT_CHARS),
+      })),
+      instructions: cut(instructions ?? '', PROBE_TEXT_CHARS * 4),
+      error: ok ? null : cut(error || 'The server could not be reached.', PROBE_TEXT_CHARS),
+    });
   };
 
   // The generated resolvers never select an excluded column, so ask.

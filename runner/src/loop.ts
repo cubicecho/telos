@@ -1,4 +1,5 @@
 import { type ExecuteOptions, execute } from './execute.ts';
+import { takeTests } from './probes.ts';
 import type { Telos } from './telos.ts';
 
 // The runner's heartbeat as a process: ask telos what is ready, claim what it
@@ -53,6 +54,11 @@ export async function runLoop(options: LoopOptions, signal: AbortSignal): Promis
   const running = new Map<string, Promise<unknown>>();
   const log = options.log ?? console.log;
   while (!signal.aborted) {
+    try {
+      await takeTests(options.telos, options.allowStdio, log);
+    } catch (error) {
+      log(`[runner] asking telos for MCP tests failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
     let started = 0;
     try {
       started = await tick(options, running, signal);

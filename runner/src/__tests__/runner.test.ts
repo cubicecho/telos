@@ -18,6 +18,7 @@ import { mountMcp } from '../../../server/src/mcp.ts';
 import { createContextFactory } from '../../../server/src/request-context.ts';
 import { startRunner } from '../embed.ts';
 import { type LoopOptions, tick } from '../loop.ts';
+import { takeTests } from '../probes.ts';
 import { createTelos } from '../telos.ts';
 
 // The runner end to end: a real telos over HTTP (GraphQL for the runner, /mcp
@@ -414,6 +415,38 @@ describe('the runner', () => {
   it('is refused by telos without the right key', async () => {
     await board.addTodo('Write it');
     await expect(cycle(loopOptions({ telos: createTelos({ telosUrl, runnerKey: 'wrong' }) }))).rejects.toThrow();
+  });
+});
+
+describe('testing an MCP server', () => {
+  const ASK = `mutation ($server: String!) { testMcpServer(server: $server) { id } }`;
+  const READ = `query ($id: ID!) { mcpProbe(id: $id) { status ok tools { name } error } }`;
+
+  async function testOf(server: Record<string, unknown>, allowStdio = false) {
+    const { id } = (await board.person.expectOk(ASK, { server: JSON.stringify(server) })).testMcpServer;
+    await Promise.all(await takeTests(createTelos({ telosUrl, runnerKey: RUNNER_KEY }), allowStdio, () => {}));
+    return (await board.person.expectOk(READ, { id })).mcpProbe;
+  }
+
+  it('lists what a server offers', async () => {
+    const tools = await serveTools('');
+    expect(await testOf({ id: 'desk', url: tools.url })).toEqual({
+      status: 'done',
+      ok: true,
+      tools: [{ name: 'write_file' }, { name: 'recall' }],
+      error: null,
+    });
+  });
+
+  it('says why a server could not be reached', async () => {
+    const probe = await testOf({ id: 'gone', url: 'http://127.0.0.1:9/mcp' });
+    expect(probe).toMatchObject({ status: 'done', ok: false, tools: [] });
+    expect(probe.error).toBeTruthy();
+  });
+
+  it('will not run a command without RUNNER_ALLOW_STDIO', async () => {
+    const probe = await testOf({ id: 'local', command: 'echo' });
+    expect(probe).toMatchObject({ ok: false, error: expect.stringMatching(/RUNNER_ALLOW_STDIO/) });
   });
 });
 

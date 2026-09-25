@@ -4,7 +4,7 @@ import { newId } from '@/lib/ids';
 // An agent as its form holds it, and back. Numbers are typed as text and read
 // on the way out, so a cleared box means "use the runner's default" (null)
 // rather than zero; MCP servers are rows of text, with anything the form does
-// not edit (headers, env) carried through untouched.
+// not edit (headers, env, hooks) carried through untouched.
 
 /** One MCP server as its row in the form holds it. */
 export interface McpServerDraft {
@@ -14,7 +14,7 @@ export interface McpServerDraft {
   command: string;
   /** One argument per line, since an argument may itself contain spaces. */
   args: string;
-  /** `headers` and `env`, kept as they came so a save does not drop them. */
+  /** What the form does not edit (headers, env, hooks…), kept as it came so a save does not drop it. */
   kept: unknown;
 }
 
@@ -40,9 +40,14 @@ type StoredServer = {
   url?: unknown;
   command?: unknown;
   args?: unknown;
-  headers?: unknown;
-  env?: unknown;
+  [field: string]: unknown;
 };
+
+/** A stored row's fields the form does not edit. */
+function kept(server: StoredServer): Record<string, unknown> {
+  const { id: _id, name: _name, url: _url, command: _command, args: _args, ...rest } = server;
+  return rest;
+}
 
 const text = (value: unknown) => (typeof value === 'string' ? value : '');
 const numberText = (value: number | null | undefined) => (value == null ? '' : String(value));
@@ -72,10 +77,7 @@ export function toAgentDraft(agent: AgentFieldsFragment | null | undefined): Age
       url: text(server.url),
       command: text(server.command),
       args: Array.isArray(server.args) ? server.args.filter((arg) => typeof arg === 'string').join('\n') : '',
-      kept: {
-        ...(server.headers ? { headers: server.headers } : {}),
-        ...(server.env ? { env: server.env } : {}),
-      },
+      kept: kept(server),
     })),
   };
 }
@@ -102,20 +104,23 @@ export function fromAgentDraft(draft: AgentDraft): Omit<CreateAgentInput, 'id'> 
     // blank; the runner could do nothing with it.
     mcpServers: draft.mcpServers
       .filter((server) => server.url.trim() !== '' || server.command.trim() !== '')
-      .map((server) => {
-        const args = server.args
-          .split('\n')
-          .map((arg) => arg.trim())
-          .filter(Boolean);
-        return {
-          ...(server.kept as object),
-          id: server.id,
-          ...(server.name.trim() ? { name: server.name.trim() } : {}),
-          ...(server.url.trim() ? { url: server.url.trim() } : {}),
-          ...(server.command.trim() ? { command: server.command.trim() } : {}),
-          ...(args.length > 0 ? { args } : {}),
-        };
-      }),
+      .map(toStoredServer),
+  };
+}
+
+/** One server row as the agent stores it, and as the runner reads it. */
+export function toStoredServer(server: McpServerDraft): Record<string, unknown> {
+  const args = server.args
+    .split('\n')
+    .map((arg) => arg.trim())
+    .filter(Boolean);
+  return {
+    ...(server.kept as object),
+    id: server.id,
+    ...(server.name.trim() ? { name: server.name.trim() } : {}),
+    ...(server.url.trim() ? { url: server.url.trim() } : {}),
+    ...(server.command.trim() ? { command: server.command.trim() } : {}),
+    ...(args.length > 0 ? { args } : {}),
   };
 }
 

@@ -21,6 +21,7 @@ import {
   type McpServerDraft,
   numberRule,
   toAgentDraft,
+  toStoredServer,
 } from '@/lib/agents';
 import { describeError } from '@/lib/errors';
 import {
@@ -28,7 +29,9 @@ import {
   AgentsDocument,
   CreateAgentDocument,
   DeleteAgentDocument,
+  McpProbeDocument,
   SetAgentApiKeyDocument,
+  TestMcpServerDocument,
   UpdateAgentDocument,
 } from '@/lib/graphql';
 import { newId } from '@/lib/ids';
@@ -407,6 +410,7 @@ function McpServerList({
                 onChangeText={(args) => patch(server.id, { args })}
               />
             ) : null}
+            <McpServerTest server={server} label={label} />
           </View>
         );
       })}
@@ -419,6 +423,80 @@ function McpServerList({
         <Plus className="h-4 w-4" />
         Add MCP server
       </Button>
+    </View>
+  );
+}
+
+/** How often a test's answer is asked for while the runner makes it. */
+const PROBE_POLL_MS = 1000;
+
+/**
+ * Tests a server row as it stands, saved or not: the runner connects to it and
+ * lists its tools, so what is found is what a run would find.
+ */
+function McpServerTest({ server, label }: { server: McpServerDraft; label: string }) {
+  const [probeId, setProbeId] = useState<string | null>(null);
+  const [ask, asking] = useMutation(TestMcpServerDocument);
+  const query = useQuery(McpProbeDocument, {
+    variables: { id: probeId ?? '' },
+    skip: !probeId,
+    fetchPolicy: 'network-only',
+  });
+  const probe = query.data?.mcpProbe;
+  const done = !probeId || probe?.status === 'done' || (query.data && !probe);
+  const { startPolling, stopPolling } = query;
+  useEffect(() => {
+    if (done) stopPolling();
+    else startPolling(PROBE_POLL_MS);
+  }, [done, startPolling, stopPolling]);
+
+  async function test() {
+    setProbeId(null);
+    try {
+      const { data } = await ask({ variables: { server: JSON.stringify(toStoredServer(server)) } });
+      setProbeId(data?.testMcpServer.id ?? null);
+    } catch {
+      // Shown from the mutation's error.
+    }
+  }
+
+  const empty = !server.url.trim() && !server.command.trim();
+  let result: { text: string; failed: boolean } | null = null;
+  if (asking.error) result = { text: describeError(asking.error), failed: true };
+  else if (query.error) result = { text: describeError(query.error), failed: true };
+  else if (probeId && query.data && !probe) result = { text: 'The test was forgotten; try again.', failed: true };
+  else if (probe?.status === 'done' && !probe.ok)
+    result = { text: probe.error ?? 'It could not be reached.', failed: true };
+  else if (probe?.status === 'done') {
+    const names = probe.tools.map((tool) => tool.name);
+    result = {
+      text: names.length
+        ? `Reached. ${names.length} tool${names.length === 1 ? '' : 's'}: ${names.join(', ')}`
+        : 'Reached, but it offers no tools.',
+      failed: false,
+    };
+  } else if (probeId) result = { text: 'The runner is testing it…', failed: false };
+
+  return (
+    <View className="gap-1">
+      <Button
+        variant="outline"
+        size="sm"
+        className="self-start"
+        disabled={empty || asking.loading || !done}
+        aria-label={`Test ${label}`}
+        onPress={() => void test()}
+      >
+        Test
+      </Button>
+      {result ? (
+        <Text
+          role={result.failed ? 'alert' : 'status'}
+          className={result.failed ? 'text-destructive text-xs' : 'text-muted-foreground text-xs'}
+        >
+          {result.text}
+        </Text>
+      ) : null}
     </View>
   );
 }
