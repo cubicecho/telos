@@ -212,7 +212,10 @@ export function AgentFormDialog({
     >
       <form.AppForm>
         <Form className="gap-4">
-          <ScrollView className="max-h-[60vh]" contentContainerClassName="gap-4 pr-1">
+          {/* A scroll area clips what is drawn outside it, which a field's focus ring is: the
+          padding is room for the ring, and the negative margin keeps the fields lined up
+          with the dialog's title. */}
+          <ScrollView className="-m-1 max-h-[60vh]" contentContainerClassName="gap-4 p-1">
             <form.AppField name="name" validators={required('a name')}>
               {(field) => <field.InputField label="Name" autoFocus placeholder="Reviewer" />}
             </form.AppField>
