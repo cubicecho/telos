@@ -101,11 +101,10 @@ domain.
 | `AUTH_MAGIC_LINK` | `true` | Set to `false` to sign in with an address alone, no link. |
 | `EXPOSE_MAGIC_LINK` | dev only | Return the magic link in the API response so the login page can show it. |
 | `AI_ENABLED` | — | Set to `false` to remove AI entirely: no MCP endpoint, no API keys, no agents, no switch in Settings. Otherwise an admin turns it on in Settings. |
-| `RUNNER_KEY` | — | The key the runner signs in with. Set the same value on the server and the runner. |
-| `TELOS_URL` | `http://127.0.0.1:PORT` | Runner only: where it finds telos. |
-| `RUNNER_CONCURRENCY` | `2` | Runner only: the most runs it works at once. |
-| `RUNNER_POLL_SECONDS` | `5` | Runner only: how long it waits when nothing is ready. |
-| `RUNNER_ALLOW_STDIO` | `false` | Runner only: let agents name MCP servers it spawns as commands. |
+| `RUNNER_CONCURRENCY` | `2` | The most runs the runner works at once. |
+| `RUNNER_POLL_SECONDS` | `5` | How long the runner waits when nothing is ready. |
+| `RUNNER_ALLOW_STDIO` | `false` | Let agents name MCP servers the runner spawns as commands. |
+| `RUNNER_KEY` | made up at boot | Only for a second runner on another host (`runner/`, with `TELOS_URL`): set the same value on both. |
 
 Telos ships no mail provider. With magic links on, the link is written to the
 server log, and that is the delivery channel — pipe the log somewhere you can
@@ -137,16 +136,20 @@ todo shows as it goes, and a list of what it made: files it wrote, and anything
 the agent chose to record. An agent's MCP servers can carry hooks, for example
 a memory lookup injected before each turn.
 
+The runner is part of the server: it starts with it and signs itself in, so
+there is nothing to set up. Until AI is on it only checks, every few seconds,
+whether there is anything to do.
+
 ```bash
-export AUTH_SECRET=$(openssl rand -hex 32) RUNNER_KEY=$(openssl rand -hex 32)
-docker compose --profile ai up --build
+export AUTH_SECRET=$(openssl rand -hex 32)
+docker compose up --build
 # then, signed in as the admin: Settings → AI → switch on the instance, then your account
 ```
 
 Agents talk to any OpenAI-compatible endpoint, so a local Ollama works. An
-agent's base URL and its MCP servers are fetched from the runner's host, so
-on a shared instance run the runner where it cannot reach anything private,
-and leave `RUNNER_ALLOW_STDIO` off.
+agent's base URL and its MCP servers are fetched from the server's host, so on
+a shared instance keep it where it cannot reach anything private, and leave
+`RUNNER_ALLOW_STDIO` off.
 
 ## Coming from kanban_server
 
@@ -229,7 +232,7 @@ npm install
 npm run db:up          # Postgres on 127.0.0.1:5435
 npm run db:migrate
 npm run codegen
-npm run dev            # API on 3001, Expo dev server on 3000, runner if RUNNER_KEY is set
+npm run dev            # API (and its runner) on 3001, Expo dev server on 3000
 ```
 
 `npm run check` runs codegen, Biome and `tsc --noEmit` across every

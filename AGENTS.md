@@ -75,7 +75,8 @@ telos/
 │       └── index.ts         # DB singleton + re-exports
 ├── runner/                  # @telos/runner — works the stations; talks to telos over HTTP only
 │   └── src/
-│       ├── index.ts         # Entry point; exits quietly without RUNNER_KEY or with AI_ENABLED=false
+│       ├── embed.ts         # startRunner: how the server runs it, in its own process
+│       ├── index.ts         # Standalone entry, for a second runner on another host (needs RUNNER_KEY)
 │       ├── config.ts        # Env -> RunnerConfig
 │       ├── telos.ts         # The runner's GraphQL client (queue, claim, heartbeat, finish)
 │       ├── loop.ts          # Poll the queue, claim up to the concurrency, execute
@@ -96,7 +97,7 @@ telos/
 ## Commands
 
 ```bash
-npm run dev              # server (3001) + Expo dev server (3000) + runner (only with RUNNER_KEY set)
+npm run dev              # server (3001, runner included) + Expo dev server (3000)
 npm run db:up            # Postgres on ${POSTGRES_BIND:-127.0.0.1}:5435
 npm run db:generate      # new migration from a schema change
 npm run db:migrate       # apply migrations
@@ -175,9 +176,12 @@ a 404 unless the instance's switch is on.
 **Agents work the board only at stations, and only through the runner.** A
 lane with an `agentId` is a station: its `contract` (work, verdict, expand),
 `prompt`, `onSuccessLaneId`/`onFailureLaneId` arrows, `wipLimit` and
-`maxAttempts` say what happens there. The runner (`@telos/runner`, a separate
-process that never imports `@telos/db`) signs in with `x-runner-key` (the
-`RUNNER_KEY` env) as the `system` actor, which may call only
+`maxAttempts` say what happens there. The runner (`@telos/runner`, which never
+imports `@telos/db`) runs inside the server's process: `index.ts` starts it
+with `startRunner` whenever AI is included, handing it a key made up at boot
+(`config.ts` `runnerKey`; `RUNNER_KEY` fixes it, for a second runner elsewhere).
+It still talks to the server only over HTTP, and signs in with `x-runner-key`
+as the `system` actor, which may call only
 `RUNNER_MUTATIONS` (`claimRun`, `heartbeatRun`, `finishRun`) and
 `runnerQueue`. What is ready is one SQL query, `readyTodos` in `stations.ts`,
 used by both the queue and the claim, and it checks every AI switch itself.

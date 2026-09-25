@@ -5,6 +5,7 @@ import { createServer } from 'node:http';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { db } from '@telos/db';
+import { type EmbeddedRunner, startRunner } from '@telos/runner/embed';
 import cors from 'cors';
 import { migrate } from 'drizzle-orm/postgres-js/migrator';
 import express from 'express';
@@ -42,6 +43,8 @@ try {
   throw error;
 }
 
+let runner: EmbeddedRunner | undefined;
+
 const app = express();
 const httpServer = createServer(app);
 const serveStatic = createStaticHandler(staticDir);
@@ -60,6 +63,12 @@ httpServer.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Telos ready at http://localhost:${PORT}`);
   console.log(`   GraphQL at http://localhost:${PORT}/graphql`);
   if (mcp) console.log(`   MCP at http://localhost:${PORT}/mcp (API key in x-api-key)`);
+  // The runner comes with the server whenever AI does. Until an admin turns AI
+  // on in Settings its queue is empty and it only asks, every few seconds.
+  if (ai) {
+    runner = startRunner({ telosUrl: `http://127.0.0.1:${PORT}`, runnerKey: runnerKey() });
+    console.log('   Runner working the stations (idle until AI is on in Settings)');
+  }
   if (!magicLinkRequired()) {
     console.warn('⚠️  AUTH_MAGIC_LINK is off: any email address signs in without a link. Private networks only.');
   } else if (magicLinkExposed()) {
@@ -67,10 +76,12 @@ httpServer.listen(PORT, '0.0.0.0', () => {
   }
 });
 
-// Close open MCP streams before the HTTP server, so it is not left waiting on them.
+// Stop the runner first, while the server can still take its runs' reports,
+// then close open MCP streams, so the HTTP server is not left waiting on them.
 for (const signal of ['SIGTERM', 'SIGINT'] as const) {
   process.once(signal, () => {
     void (async () => {
+      await runner?.stop().catch((error: unknown) => console.error('[runner] stop failed:', error));
       await mcp?.close().catch((error: unknown) => console.error('[mcp] close failed:', error));
       httpServer.close(() => process.exit(0));
     })();

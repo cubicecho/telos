@@ -6,7 +6,7 @@
   "main": "./src/index.ts",
   "scripts": {
     "dev": "node --experimental-strip-types --env-file-if-exists=../.env --watch src/index.ts",
-    "build": "echo 'no server build needed — TypeScript runs directly'",
+    "build": "echo 'no server build needed \u2014 TypeScript runs directly'",
     "start": "node --experimental-strip-types src/index.ts",
     "clean": "rm -rf __generated__",
     "codegen": "node --experimental-strip-types --import=./src/preload-env.ts src/write_schema.ts && graphql-codegen-esm"
@@ -17,6 +17,7 @@
     "@better-auth/api-key": "^1.7.6",
     "@cubicecho/graphql-mcp": "^2.10.0",
     "@telos/db": "*",
+    "@telos/runner": "*",
     "@vantreeseba/drizzle-graphql": "^13.0.0",
     "better-auth": "^1.7.6",
     "cors": "^2.8.6",

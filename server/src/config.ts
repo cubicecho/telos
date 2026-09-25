@@ -1,3 +1,5 @@
+import { randomBytes } from 'node:crypto';
+
 /** Truthy env-var values: "1", "true", "yes" (case-insensitive). */
 export function envFlag(value: string | undefined): boolean {
   return ['1', 'true', 'yes'].includes((value ?? '').trim().toLowerCase());
@@ -67,9 +69,11 @@ export function aiAvailable(): boolean {
 
 /**
  * The runner's key, which the runner sends as `x-runner-key` to act as the
- * system principal (resolvers/runs.ts). Unset, nothing can claim a run, which
- * is the right answer for an instance that runs no agents.
+ * system principal (resolvers/runs.ts). The server runs its own runner and
+ * hands it this key, so by default it is made up at boot and never leaves the
+ * process. Set `RUNNER_KEY` only to let a runner on another host in as well.
  */
-export function runnerKey(): string | null {
-  return process.env.RUNNER_KEY?.trim() || null;
-}
+export const runnerKey: () => string = (() => {
+  const key = process.env.RUNNER_KEY?.trim() || randomBytes(32).toString('hex');
+  return () => key;
+})();

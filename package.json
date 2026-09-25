@@ -12,7 +12,7 @@
     "runner"
   ],
   "scripts": {
-    "dev": "concurrently \"npm run dev:server\" \"npm run dev:app\" \"npm run dev:runner\"",
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:app\"",
     "dev:app": "npm run dev -w @telos/app",
     "dev:server": "npm run dev -w @telos/server",
     "build": "npm run codegen && npm run build -w @telos/app",
@@ -37,7 +37,6 @@
     "db:studio": "npm run studio -w @telos/db",
     "db:up": "docker compose -f docker-compose.dev.yml up -d",
     "db:down": "docker compose -f docker-compose.dev.yml down",
-    "dev:runner": "npm run dev -w @telos/runner",
     "import:kanban": "node --experimental-strip-types --env-file-if-exists=.env scripts/import-kanban.ts"
   },
   "overrides": {

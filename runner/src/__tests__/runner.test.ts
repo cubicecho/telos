@@ -16,6 +16,7 @@ import { toHeaders } from '../../../server/src/auth.ts';
 import { createSchema } from '../../../server/src/build-schema.ts';
 import { mountMcp } from '../../../server/src/mcp.ts';
 import { createContextFactory } from '../../../server/src/request-context.ts';
+import { startRunner } from '../embed.ts';
 import { type LoopOptions, tick } from '../loop.ts';
 import { createTelos } from '../telos.ts';
 
@@ -405,5 +406,17 @@ describe('the runner', () => {
   it('is refused by telos without the right key', async () => {
     await board.addTodo('Write it');
     await expect(cycle(loopOptions({ telos: createTelos({ telosUrl, runnerKey: 'wrong' }) }))).rejects.toThrow();
+  });
+});
+
+describe('the runner inside the server', () => {
+  it('works the queue on its own from the key it is handed, and stops when asked', async () => {
+    const todoId = await board.addTodo('Write it');
+    const runner = startRunner({ telosUrl, runnerKey: RUNNER_KEY, env: {} });
+    try {
+      await expect.poll(async () => (await runsOf(todoId))[0]?.status, { timeout: 5000 }).toBe('ok');
+    } finally {
+      await runner.stop();
+    }
   });
 });

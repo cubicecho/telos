@@ -2,13 +2,13 @@ import { readConfig } from './config.ts';
 import { runLoop } from './loop.ts';
 import { createTelos } from './telos.ts';
 
-// The runner process: works the board's stations for every user who has AI on.
-// It needs TELOS_URL and RUNNER_KEY (the same key the server has). Whether any
+// A runner as its own process. The server already runs one of these inside
+// itself (embed.ts), so this is only for a second runner on another host: it
+// needs TELOS_URL and RUNNER_KEY, the same key set on the server. Whether any
 // work comes is the instance's switch, which an admin flips in Settings: with
-// it off the queue is empty and the runner idles. See the README's AI section.
+// it off the queue is empty and the runner idles.
 
-// `npm run dev` starts the runner beside the server every time; on a server
-// with AI removed, or with no key to sign in with, it bows out instead of failing.
+// Without AI on the server, or a key to sign in with, it bows out instead of failing.
 if (['0', 'false', 'no'].includes((process.env.AI_ENABLED ?? '').trim().toLowerCase())) {
   console.log('[runner] AI_ENABLED is false; nothing to do.');
   process.exit(0);
