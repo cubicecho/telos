@@ -7,7 +7,8 @@
     <meta name="color-scheme" content="light dark" />
     <title>%WEB_TITLE%</title>
     <!--
-      Expo's default template, plus the theme applied before first paint.
+      Expo's default template, plus the theme and palette applied before first
+      paint.
 
       This file exists only for that script. `app/+html.tsx` is the documented
       place for it, but Expo only renders that under static output; with
@@ -22,7 +23,7 @@
     -->
     <script>
       (function(){try{var o=localStorage.getItem("telos_theme");if(o!==null){if(localStorage.getItem("cubeui-theme")===null)localStorage.setItem("cubeui-theme",o);localStorage.removeItem("telos_theme")}}catch(e){}})();
-      (function(){try{var p=localStorage.getItem("cubeui-theme");var d=p==="dark"||(p!=="light"&&matchMedia("(prefers-color-scheme: dark)").matches);var c=document.documentElement.classList;c.toggle("dark",d);c.toggle("light",p==="light")}catch(e){}})();
+      (function(){try{var s=localStorage,p=s.getItem("cubeui-theme"),q=s.getItem("cubeui-palette"),k=["monokai"].indexOf(q)>=0,d=k||p==="dark"||(p!=="light"&&matchMedia("(prefers-color-scheme: dark)").matches),e=document.documentElement,c=e.classList;c.toggle("dark",d);c.toggle("light",!k&&p==="light");if(["monokai"].indexOf(q)>=0)e.setAttribute("data-palette",q)}catch(e){}})();
     </script>
     <!-- The `react-native-web` recommended style reset: https://necolas.github.io/react-native-web/docs/setup/#root-element -->
     <style id="expo-reset">

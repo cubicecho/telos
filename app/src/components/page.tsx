@@ -1,6 +1,7 @@
 import { Children, type ReactNode } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import { PageHeader, type PageHeaderProps } from '@/components/page-header';
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import type { IconComponent } from '@/components/ui/icons-base';
 import { cn } from '@/lib/utils';
 
@@ -67,24 +68,83 @@ export function CardGrid({ className, children }: { className?: string; children
 }
 
 type EmptyStateProps = {
-  icon: IconComponent;
   title: string;
-  description?: ReactNode;
   action?: ReactNode;
-};
+  /** The root. Mostly for an inset: `px-2` lines the `compact` line up with a sidebar's rows. */
+  className?: string | undefined;
+} & (
+  | {
+      /**
+       * The one muted line that stands in for a short list *inside* something else — a card, a
+       * sidebar section, a popover: "No labels yet." Off, it is the centred block that stands in
+       * for a whole list or page. On, it keeps the left edge of what it sits in, draws no icon
+       * bubble and no padding past a `py-2`, and takes no `description` and no `level`: a line
+       * inside a region that already has its heading is never what a screen reader lands on. The
+       * same word, for the same place, as `QueryState`'s `compact` — whose `empty` it usually is.
+       */
+      compact?: false | undefined;
+      icon: IconComponent;
+      description?: ReactNode;
+      /**
+       * Makes the title a heading of this rank. Leave it off for an empty list inside a page that
+       * already has its heading. Set it when the empty state *is* the page — a first run, a
+       * record that was not found, a link that did not work — so a screen reader has a heading to
+       * land on: `1` for a whole screen, `2` or `3` under a title that is already there. The text
+       * is the same size at every level, as on `Section`: pick the rank by where it sits, not by
+       * how it looks.
+       */
+      level?: 1 | 2 | 3 | undefined;
+    }
+  | {
+      compact: true;
+      /** Optional here: drawn inline before the text, at the text's size, with no bubble. */
+      icon?: IconComponent | undefined;
+      description?: never;
+      level?: never;
+    }
+);
 
-/** The centred icon / title / description / action shown when a list is empty. */
-export function EmptyState({ icon: Icon, title, description, action }: EmptyStateProps) {
+/**
+ * The centred icon / title / description / action shown when a list is empty — or, at
+ * `compact`, the one muted line shown when a short list inside a card or sidebar is.
+ *
+ * The block is drawn by `@cubeui/empty`'s parts, so shadcn's compound `Empty` and this one-line
+ * form are the same empty state. The compact line is its own: it has none of their parts.
+ *
+ * The heading is `role="heading"` + `aria-level`, the same as `Section`'s: a heading on device,
+ * where VoiceOver and TalkBack navigate by it, and on the web a `<span>` carrying the rank, since
+ * the rank is a prop and the compiler writes the tag once. Two arms rather than a spread `role`,
+ * so a title with no `level` stays plain text on both platforms.
+ *
+ * The compact line wraps rather than truncates: "No servers yet. Add one to give the agent some
+ * tools." is a sentence someone has to read, and the action drops under it on a narrow column.
+ */
+export function EmptyState({ icon: Icon, title, description, action, level, compact, className }: EmptyStateProps) {
+  if (compact) {
+    return (
+      <View className={cn('w-full flex-row flex-wrap items-center gap-x-2 gap-y-1 py-2', className)}>
+        {Icon ? <Icon className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden /> : null}
+        <Text className="shrink text-sm text-muted-foreground">{title}</Text>
+        {action}
+      </View>
+    );
+  }
   return (
-    <View className="w-full items-center gap-3 py-10">
-      <View className="rounded-full bg-muted p-3">
-        <Icon className="h-6 w-6 text-muted-foreground" />
-      </View>
-      <View className="items-center">
-        <Text className="font-medium text-sm text-foreground">{title}</Text>
-        {description ? <Text className="text-center text-sm text-muted-foreground">{description}</Text> : null}
-      </View>
+    <Empty className={className}>
+      <EmptyHeader>
+        <EmptyMedia variant="icon">
+          <Icon />
+        </EmptyMedia>
+        {level === undefined ? (
+          <EmptyTitle>{title}</EmptyTitle>
+        ) : (
+          <EmptyTitle role="heading" aria-level={level}>
+            {title}
+          </EmptyTitle>
+        )}
+        {description ? <EmptyDescription>{description}</EmptyDescription> : null}
+      </EmptyHeader>
       {action}
-    </View>
+    </Empty>
   );
 }
