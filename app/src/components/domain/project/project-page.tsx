@@ -6,11 +6,12 @@ import { type ProjectActivity, ProjectActivityLine } from '@/components/domain/a
 import { ProjectAiSwitch } from '@/components/domain/ai/project-ai-switch';
 import { LabelBadge, type LabelSummary } from '@/components/domain/label/label-badge';
 import { LabelPicker } from '@/components/domain/label/label-picker';
+import { SaveTemplateDialog } from '@/components/domain/template/save-template-dialog';
 import { PROSE_COLUMN } from '@/components/header-content-footer';
 import { PageLayout } from '@/components/page-layout';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { Pencil, Trash2 } from '@/components/ui/icons';
+import { Copy, Pencil, Trash2 } from '@/components/ui/icons';
 import { describeError } from '@/lib/errors';
 import {
   AttachProjectLabelDocument,
@@ -51,6 +52,8 @@ export function ProjectPage({
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [savingTemplate, setSavingTemplate] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
   // Attaching a label returns the project with its labels selected exactly as
@@ -103,6 +106,17 @@ export function ProjectPage({
       action={
         <>
           <LabelPicker attached={project.labels} onToggle={toggleLabel} align="end" />
+          <Button
+            variant="ghost"
+            size="icon"
+            onPress={() => {
+              setNotice(null);
+              setSavingTemplate(true);
+            }}
+            aria-label="Save lanes as a template"
+          >
+            <Copy className="h-4 w-4" />
+          </Button>
           <Button variant="ghost" size="icon" onPress={() => setEditing(true)} aria-label="Edit project">
             <Pencil className="h-4 w-4" />
           </Button>
@@ -137,6 +151,11 @@ export function ProjectPage({
               {actionError}
             </Text>
           ) : null}
+          {notice ? (
+            <Text className="text-muted-foreground text-sm" aria-live="polite">
+              {notice}
+            </Text>
+          ) : null}
 
           {/* Only the badges, so no row is drawn for a project that has none. */}
           {project.labels.length > 0 ? (
@@ -148,6 +167,13 @@ export function ProjectPage({
           ) : null}
 
           <ProjectFormDialog open={editing} onOpenChange={setEditing} project={project} />
+          <SaveTemplateDialog
+            open={savingTemplate}
+            onOpenChange={setSavingTemplate}
+            projectId={project.id}
+            projectName={project.name}
+            onSaved={(name) => setNotice(`Saved its lanes as the template “${name}”.`)}
+          />
 
           <ConfirmDialog
             open={confirmingDelete}

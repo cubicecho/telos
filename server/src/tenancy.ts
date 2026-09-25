@@ -40,6 +40,7 @@ export const USER_OWNED_TABLES = [
   'agents',
   'runs',
   'artifacts',
+  'boardTemplates',
 ] as const;
 
 /** Every table drizzle-graphql will generate fields for. */

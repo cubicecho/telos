@@ -2,6 +2,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { View } from 'react-native';
 import { AiSettings } from '@/components/domain/ai/ai-settings';
 import { LabelManager } from '@/components/domain/label/label-manager';
+import { TemplateManager } from '@/components/domain/template/template-manager';
 import { PageLayout } from '@/components/page-layout';
 import { Section } from '@/components/section';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -32,6 +33,7 @@ export default function SettingsScreen() {
       />
       {/* Its own section: the header's "New label" shares the list's state. */}
       <LabelManager />
+      <TemplateManager />
     </View>
   );
 

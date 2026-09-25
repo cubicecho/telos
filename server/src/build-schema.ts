@@ -6,6 +6,7 @@ import { applyAiStatusExtension } from './resolvers/ai-status.ts';
 import { applyAiSwitchesExtension } from './resolvers/ai-switches.ts';
 import { applyApiKeysExtension } from './resolvers/api-keys.ts';
 import { applyAuthExtension } from './resolvers/auth.ts';
+import { applyBoardTemplatesExtension } from './resolvers/board-templates.ts';
 import { applyLanesExtension } from './resolvers/lanes.ts';
 import { applyRequestsExtension } from './resolvers/requests.ts';
 import { applyRunsExtension } from './resolvers/runs.ts';
@@ -103,6 +104,7 @@ export function createSchema(db: AnyDb, options: SchemaOptions) {
   let schema = applyAuthExtension(drizzleSchema, options);
   schema = applyTodosExtension(schema);
   schema = applyLanesExtension(schema);
+  schema = applyBoardTemplatesExtension(schema);
   if (options.ai) {
     schema = applyApiKeysExtension(schema);
     schema = applyAiSwitchesExtension(schema);

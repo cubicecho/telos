@@ -947,3 +947,39 @@ export const RetryTodoDocument = graphql(`
     retryTodo(id: $id, reason: $reason)
   }
 `);
+
+export const BoardTemplatesDocument = graphql(`
+  query BoardTemplates {
+    boardTemplates(orderBy: { name: { direction: asc, priority: 1 } }) {
+      id
+      name
+      lanes
+    }
+  }
+`);
+
+export const SaveBoardTemplateDocument = graphql(`
+  mutation SaveBoardTemplate($projectId: ID!, $name: String!) {
+    saveBoardTemplate(projectId: $projectId, name: $name) {
+      id
+      name
+      lanes
+    }
+  }
+`);
+
+export const ApplyBoardTemplateDocument = graphql(`
+  mutation ApplyBoardTemplate($projectId: ID!, $templateId: ID!) {
+    applyBoardTemplate(projectId: $projectId, templateId: $templateId) {
+      id
+    }
+  }
+`);
+
+export const DeleteBoardTemplateDocument = graphql(`
+  mutation DeleteBoardTemplate($id: UUID!) {
+    deleteBoardTemplate(where: { id: { eq: $id } }) {
+      id
+    }
+  }
+`);

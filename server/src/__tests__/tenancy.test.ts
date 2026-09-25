@@ -30,6 +30,7 @@ describe('tenancy configuration', () => {
     expect(tableKeys.sort()).toEqual([
       'agents',
       'artifacts',
+      'boardTemplates',
       'labels',
       'lanes',
       'projectLabels',
