@@ -1,9 +1,13 @@
-import { useState } from 'react';
+import { useQuery } from '@apollo/client';
+import { useMemo, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
+import { StationDialog } from '@/components/domain/ai/station-dialog';
 import { TodoFormDialog } from '@/components/domain/todo/todo-form-dialog';
 import type { TodoSummary } from '@/components/domain/todo/types';
+import { useAi } from '@/lib/ai';
 import type { CachedLane } from '@/lib/cache';
 import { describeError } from '@/lib/errors';
+import { ProjectStationsDocument } from '@/lib/graphql';
 import { todosInLane } from '@/lib/lanes';
 import { BoardCardBody } from './board-card';
 import { DragBoard } from './drag-surfaces';
@@ -24,13 +28,20 @@ import { useMoveTodo } from './use-move-todo';
  * Dragging is the obvious gesture and reaches only a pointer, so every move it
  * offers is also a menu item: each card carries "Move to", each column header
  * carries its own actions.
+ *
+ * With AI on for the account and the project, a column can also be a station,
+ * and its settings are read here in a query of their own: the columns do not
+ * exist in the schema otherwise, so `LaneFields` cannot carry them.
  */
 export function Board({
   projectId,
+  aiEnabled = false,
   lanes,
   todos,
 }: {
   projectId: string;
+  /** The project's own AI switch. */
+  aiEnabled?: boolean;
   lanes: readonly CachedLane[];
   todos: readonly TodoSummary[];
 }) {
@@ -40,6 +51,16 @@ export function Board({
   // only ever one can be open, and mounting dozens would cost a Radix portal
   // each for a surface nobody has asked for yet.
   const [editing, setEditing] = useState<TodoSummary | null>(null);
+
+  const ai = useAi();
+  const stationsOn = ai.on && aiEnabled;
+  const stationsQuery = useQuery(ProjectStationsDocument, { variables: { projectId }, skip: !stationsOn });
+  const stations = useMemo(
+    () => new Map((stationsQuery.data?.lanes ?? []).map((row) => [row.id, row])),
+    [stationsQuery.data],
+  );
+  const agents = stationsQuery.data?.agents ?? [];
+  const [stationLane, setStationLane] = useState<CachedLane | null>(null);
 
   const actions = useLaneActions(projectId);
   const moveTodo = useMoveTodo(projectId);
@@ -109,6 +130,10 @@ export function Board({
               onReorder={(delta) => run(() => actions.moveLane(lanes, lane, delta))}
               onToggleDone={() => run(() => actions.toggleDoneLane(lane))}
               onDelete={() => run(() => actions.deleteLane(lane))}
+              station={stationsOn ? (stations.get(lane.id) ?? null) : undefined}
+              agentName={agents.find((agent) => agent.id === stations.get(lane.id)?.agentId)?.name}
+              // Offered once the settings are in, so a save cannot overwrite them with defaults.
+              onEditStation={stationsOn && stationsQuery.data ? () => setStationLane(lane) : undefined}
             />
           ))}
           <LaneComposer onCreate={(name) => run(() => actions.createLane(name, lanes.length))} />
@@ -126,6 +151,18 @@ export function Board({
           board has moved on from it. */}
       {editing ? (
         <TodoFormDialog key={editing.id} open onOpenChange={(next) => !next && setEditing(null)} todo={editing} />
+      ) : null}
+
+      {stationLane && stationsOn ? (
+        <StationDialog
+          key={stationLane.id}
+          open
+          onOpenChange={(next) => !next && setStationLane(null)}
+          lane={stationLane}
+          lanes={lanes}
+          station={stations.get(stationLane.id) ?? null}
+          agents={agents}
+        />
       ) : null}
     </View>
   );

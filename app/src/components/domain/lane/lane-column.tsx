@@ -1,10 +1,12 @@
 import { useRef, useState } from 'react';
 import { Text, TextInput, View } from 'react-native';
+import type { StationFieldsFragment } from '@/__generated__/graphql';
 import { Ellipsis } from '@/components/app-icons';
 import type { TodoSummary } from '@/components/domain/todo/types';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { Check, ChevronLeft, ChevronRight, CircleCheck, Pencil, Trash2 } from '@/components/ui/icons';
+import { Check, ChevronLeft, ChevronRight, CircleCheck, Pencil, Settings, Trash2 } from '@/components/ui/icons';
 import { INPUT_CLASS } from '@/components/ui/input-base';
 import { Menu, MenuContent, MenuItem, MenuTrigger } from '@/components/ui/menu';
 import type { CachedLane } from '@/lib/cache';
@@ -31,6 +33,9 @@ export function LaneColumn({
   onReorder,
   onToggleDone,
   onDelete,
+  station,
+  agentName,
+  onEditStation,
 }: {
   lane: CachedLane;
   lanes: readonly CachedLane[];
@@ -41,6 +46,13 @@ export function LaneColumn({
   onReorder: (delta: number) => void;
   onToggleDone: () => void;
   onDelete: () => void;
+  /**
+   * The lane's station settings: `undefined` while AI is off for the project,
+   * when a lane cannot be a station and the menu does not offer it.
+   */
+  station?: StationFieldsFragment | null | undefined;
+  agentName?: string | undefined;
+  onEditStation?: (() => void) | undefined;
 }) {
   const [renaming, setRenaming] = useState(false);
   const renameInput = useRef<TextInput>(null);
@@ -92,6 +104,11 @@ export function LaneColumn({
             >
               {lane.name}
             </Text>
+            {station?.agentId ? (
+              <Badge variant="secondary" aria-label={`Station, worked by ${agentName ?? 'an agent'}`}>
+                Station
+              </Badge>
+            ) : null}
             <Text className="shrink-0 text-muted-foreground text-xs tabular-nums">{todos.length}</Text>
           </>
         )}
@@ -124,6 +141,9 @@ export function LaneColumn({
               icon={<Check className={cn('h-3.5 w-3.5', !lane.isDone && 'opacity-0')} />}
               onSelect={onToggleDone}
             />
+            {onEditStation ? (
+              <MenuItem label="Station…" icon={<Settings className="h-3.5 w-3.5" />} onSelect={onEditStation} />
+            ) : null}
             <MenuItem
               label="Move left"
               icon={<ChevronLeft className="h-3.5 w-3.5" />}

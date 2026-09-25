@@ -7,11 +7,12 @@ import { Switch } from '@/components/ui/switch';
 import { useAi } from '@/lib/ai';
 import { describeError } from '@/lib/errors';
 import { SetAiEnabledDocument } from '@/lib/graphql';
+import { AgentManager } from './agent-manager';
 import { ApiKeyManager } from './api-key-manager';
 
 /**
  * The account's AI switch, and what it unlocks: the API keys an MCP client
- * signs in with.
+ * signs in with, and the agents the board's stations hand work to.
  *
  * Drawn only when the instance has AI at all. Off at the account, it is the one
  * AI thing on the page — no keys, no project switches, no chips anywhere else —
@@ -70,7 +71,12 @@ export function AiSettings() {
           </View>
         }
       />
-      {ai.on ? <ApiKeyManager /> : null}
+      {ai.on ? (
+        <>
+          <ApiKeyManager />
+          <AgentManager />
+        </>
+      ) : null}
     </>
   );
 }

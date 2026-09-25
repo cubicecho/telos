@@ -3,7 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { format } from 'date-fns';
 import { describe, expect, it, vi } from 'vitest';
-import { AiStateDocument, UpdateTodoDocument } from '@/lib/graphql';
+import { AiStateDocument, TodoRunsDocument, UpdateTodoDocument } from '@/lib/graphql';
 import { TodoFormDialog } from '../todo-form-dialog';
 import type { TodoSummary } from '../types';
 
@@ -212,5 +212,37 @@ describe('TodoFormDialog', () => {
     await user.click(screen.getByRole('button', { name: 'Save' }));
 
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
+  });
+  it('shows the Runs tab only when the project has AI on as well as the account', async () => {
+    const todoRuns = (aiEnabled: boolean) => ({
+      request: { query: TodoRunsDocument, variables: { id: TODO.id } },
+      result: {
+        data: {
+          todo: {
+            __typename: 'Todo',
+            id: TODO.id,
+            project: { __typename: 'Project', id: 'p1', aiEnabled },
+            runs: [],
+            artifacts: [],
+          },
+        },
+      },
+    });
+
+    const first = render(
+      <MockedProvider mocks={[aiState(true, true), todoRuns(false)]}>
+        <TodoFormDialog open onOpenChange={vi.fn()} todo={TODO} />
+      </MockedProvider>,
+    );
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(screen.queryByRole('tab', { name: 'Runs' })).not.toBeInTheDocument();
+    first.unmount();
+
+    render(
+      <MockedProvider mocks={[aiState(true, true), todoRuns(true), todoRuns(true)]}>
+        <TodoFormDialog open onOpenChange={vi.fn()} todo={TODO} />
+      </MockedProvider>,
+    );
+    expect(await screen.findByRole('tab', { name: 'Runs' })).toBeInTheDocument();
   });
 });

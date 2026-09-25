@@ -208,7 +208,7 @@ export default function ProjectScreen() {
                   {lanesError && lanes.length === 0 ? (
                     <LoadFailure error={lanesError} onRetry={refetchLanes} what="the board" />
                   ) : (
-                    <Board projectId={project.id} lanes={lanes} todos={todos} />
+                    <Board projectId={project.id} aiEnabled={project.aiEnabled} lanes={lanes} todos={todos} />
                   )}
                 </TabsContent>
                 <TabsContent value="list" className="mt-0">

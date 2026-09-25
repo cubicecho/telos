@@ -216,6 +216,179 @@ export const DeleteApiKeyDocument = graphql(`
   }
 `);
 
+// Agents, and the lanes they work as stations. `apiKey` is not in the schema:
+// it is written with `setAgentApiKey`, and all that comes back is `hasApiKey`.
+
+export const AgentFieldsFragment = graphql(`
+  fragment AgentFields on Agent {
+    id
+    name
+    baseUrl
+    model
+    systemPrompt
+    temperature
+    maxTokens
+    contextLength
+    maxToolIterations
+    toolDiscovery
+    toolSelectModel
+    requestTimeoutSeconds
+    maxRetries
+    mcpServers
+    hasApiKey
+  }
+`);
+
+export const AgentsDocument = graphql(`
+  query Agents {
+    agents(orderBy: { name: { direction: asc, priority: 1 } }) {
+      ...AgentFields
+    }
+  }
+`);
+
+export const CreateAgentDocument = graphql(`
+  mutation CreateAgent($values: CreateAgentInput!) {
+    createAgent(values: $values) {
+      ...AgentFields
+    }
+  }
+`);
+
+export const UpdateAgentDocument = graphql(`
+  mutation UpdateAgent($id: UUID!, $set: UpdateAgentInput!) {
+    updateAgent(set: $set, where: { id: { eq: $id } }) {
+      ...AgentFields
+    }
+  }
+`);
+
+export const DeleteAgentDocument = graphql(`
+  mutation DeleteAgent($id: UUID!) {
+    deleteAgent(where: { id: { eq: $id } }) {
+      id
+    }
+  }
+`);
+
+export const SetAgentApiKeyDocument = graphql(`
+  mutation SetAgentApiKey($agentId: ID!, $apiKey: String) {
+    setAgentApiKey(agentId: $agentId, apiKey: $apiKey) {
+      id
+      hasApiKey
+    }
+  }
+`);
+
+// The station columns exist only while the instance has AI, so they are not
+// in `LaneFields` — every board would ask for fields the server does not have.
+// Read on their own, they land on the same normalized `Lane` rows.
+export const StationFieldsFragment = graphql(`
+  fragment StationFields on Lane {
+    id
+    agentId
+    contract
+    prompt
+    onSuccessLaneId
+    onFailureLaneId
+    wipLimit
+    maxAttempts
+  }
+`);
+
+export const ProjectStationsDocument = graphql(`
+  query ProjectStations($projectId: UUID!) {
+    lanes(where: { projectId: { eq: $projectId } }) {
+      ...StationFields
+    }
+    agents(orderBy: { name: { direction: asc, priority: 1 } }) {
+      id
+      name
+    }
+  }
+`);
+
+export const UpdateStationDocument = graphql(`
+  mutation UpdateStation($id: UUID!, $set: UpdateLaneInput!) {
+    updateLane(set: $set, where: { id: { eq: $id } }) {
+      ...StationFields
+    }
+  }
+`);
+
+// A todo's runs and what they left behind. Read only by the todo dialog, and
+// only while AI is on for the account; the project's own switch comes back
+// with them, since the dialog is not otherwise told it.
+
+export const RunFieldsFragment = graphql(`
+  fragment RunFields on Run {
+    id
+    status
+    verdict
+    contract
+    output
+    error
+    toolCalls
+    promptTokens
+    completionTokens
+    totalTokens
+    events
+    startedAt
+    finishedAt
+    cancelRequestedAt
+    agent {
+      id
+      name
+    }
+    lane {
+      id
+      name
+    }
+  }
+`);
+
+export const ArtifactFieldsFragment = graphql(`
+  fragment ArtifactFields on Artifact {
+    id
+    location
+    source
+    action
+    serverSlug
+    tool
+    title
+    description
+    mediaType
+    sizeBytes
+    createdAt
+  }
+`);
+
+export const TodoRunsDocument = graphql(`
+  query TodoRuns($id: UUID!) {
+    todo(where: { id: { eq: $id } }) {
+      id
+      project {
+        id
+        aiEnabled
+      }
+      runs(orderBy: { startedAt: { direction: desc, priority: 1 } }) {
+        ...RunFields
+      }
+      artifacts(orderBy: { createdAt: { direction: desc, priority: 1 } }) {
+        ...ArtifactFields
+      }
+    }
+  }
+`);
+
+export const CancelRunDocument = graphql(`
+  mutation CancelRun($id: ID!) {
+    cancelRun(id: $id) {
+      ...RunFields
+    }
+  }
+`);
+
 // A todo's record: its notes thread and the history the database trigger
 // writes. Read only by the todo dialog, so neither is in `TodoFields`.
 

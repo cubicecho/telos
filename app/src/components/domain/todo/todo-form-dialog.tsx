@@ -1,6 +1,7 @@
 import { useMutation } from '@apollo/client';
 import { useEffect, useMemo, useState } from 'react';
 import { useAppForm } from '@/components/app-form';
+import { TodoRuns, useTodoRuns } from '@/components/domain/ai/todo-runs';
 import { Form } from '@/components/ui/form';
 import { FormDialog, FormDialogFooter } from '@/components/ui/form-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -23,7 +24,8 @@ import type { TodoSummary } from './types';
  *
  * Beside the form, the todo's record: its notes thread and its history, each a
  * tab, loaded only when opened. "AI ignores this" is the one AI field, drawn —
- * and sent — only while AI is on for the account.
+ * and sent — only while AI is on for the account. With AI on for the project
+ * as well, a Runs tab shows what the stations' agents made of it.
  *
  * No `update` function, unusually for this app. The other todo mutations write
  * a cache updater because completing or deleting moves *other* rows — the
@@ -42,6 +44,10 @@ export function TodoFormDialog({
 }) {
   const ai = useAi();
   const [tab, setTab] = useState('details');
+  // Asked only while the account's AI is on: off, the schema has no runs. The
+  // answer carries the project's switch, which is what decides the tab.
+  const runsQuery = useTodoRuns(todo.id, { skip: !ai.on });
+  const showRuns = ai.on && runsQuery.data?.todo?.project?.aiEnabled === true;
   const [updateTodo, { error }] = useMutation(UpdateTodoDocument);
   // The todo as the form holds it, and so the form's defaults as well as what
   // it resets to. Both matter: TanStack re-applies `defaultValues` whenever they
@@ -121,6 +127,7 @@ export function TodoFormDialog({
           <TabsTrigger value="details">Details</TabsTrigger>
           <TabsTrigger value="notes">Thread</TabsTrigger>
           <TabsTrigger value="history">History</TabsTrigger>
+          {showRuns ? <TabsTrigger value="runs">Runs</TabsTrigger> : null}
         </TabsList>
         <TabsContent value="details">
           <form.AppForm>
@@ -176,6 +183,11 @@ export function TodoFormDialog({
         <TabsContent value="history">
           <TodoHistory todoId={todo.id} />
         </TabsContent>
+        {showRuns ? (
+          <TabsContent value="runs">
+            <TodoRuns todoId={todo.id} />
+          </TabsContent>
+        ) : null}
       </Tabs>
     </FormDialog>
   );

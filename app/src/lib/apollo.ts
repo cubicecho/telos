@@ -60,7 +60,17 @@ const replace = { merge: false } as const;
 
 const cache = new InMemoryCache({
   typePolicies: {
-    Todo: { fields: { blockedBy: replace, dependencies: replace, dependents: replace, labels: replace } },
+    Todo: {
+      fields: {
+        blockedBy: replace,
+        dependencies: replace,
+        dependents: replace,
+        labels: replace,
+        runs: replace,
+        artifacts: replace,
+      },
+    },
+    Run: { fields: { artifacts: replace } },
     Project: { fields: { labels: replace, todos: replace, lanes: replace } },
     Lane: { fields: { todos: replace } },
     Label: { fields: { todos: replace, projects: replace } },

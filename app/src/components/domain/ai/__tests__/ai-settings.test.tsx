@@ -2,7 +2,7 @@ import { MockedProvider } from '@apollo/client/testing';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
-import { AiStateDocument, ApiKeysDocument, SetAiEnabledDocument } from '@/lib/graphql';
+import { AgentsDocument, AiStateDocument, ApiKeysDocument, SetAiEnabledDocument } from '@/lib/graphql';
 import { AiSettings } from '../ai-settings';
 
 function aiState(instance: boolean, account: boolean) {
@@ -28,6 +28,7 @@ const KEY = {
 };
 
 const keys = { request: { query: ApiKeysDocument }, result: { data: { apiKeys: [KEY] } } };
+const agents = { request: { query: AgentsDocument }, result: { data: { agents: [] } } };
 
 // biome-ignore lint/suspicious/noExplicitAny: MockedProvider's mock array type
 function settings(mocks: any[]) {
@@ -53,7 +54,7 @@ describe('AiSettings', () => {
     expect(screen.queryByText('API keys')).not.toBeInTheDocument();
   });
 
-  it('turns AI on and then lists the keys', async () => {
+  it('turns AI on and then lists the keys and the agents', async () => {
     const user = userEvent.setup();
     settings([
       aiState(true, false),
@@ -62,11 +63,13 @@ describe('AiSettings', () => {
         result: { data: { setAiEnabled: { __typename: 'User', id: 'u1', aiEnabled: true } } },
       },
       keys,
+      agents,
     ]);
 
     await user.click(await screen.findByRole('switch', { name: 'Use AI on this account' }));
 
     expect(await screen.findByText('API keys')).toBeInTheDocument();
     await waitFor(() => expect(screen.getByText('Claude Code')).toBeInTheDocument());
+    expect(await screen.findByText('No agents yet.')).toBeInTheDocument();
   });
 });
