@@ -35,7 +35,7 @@ export interface SchemaOptions {
 }
 
 /** Tables that exist in the API only while the instance has AI on. */
-const AI_TABLES = ['agents', 'runs'];
+const AI_TABLES = ['agents', 'runs', 'artifacts'];
 
 /** A lane's station settings, which mean nothing without agents. */
 const AI_LANE_COLUMNS = [

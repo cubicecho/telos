@@ -39,6 +39,7 @@ export const USER_OWNED_TABLES = [
   'todoEvents',
   'agents',
   'runs',
+  'artifacts',
 ] as const;
 
 /** Every table drizzle-graphql will generate fields for. */
@@ -88,6 +89,7 @@ const AI_SCOPES: Partial<Record<(typeof USER_OWNED_TABLES)[number], RowScope<Con
   // on the AI side has a reason to read them.
   agents: aiNarrowed(() => sql`false`),
   runs: aiNarrowed((context, table, userId) => inArray(table.todoId, aiTodoIds(context, userId))),
+  artifacts: aiNarrowed((context, table, userId) => inArray(table.todoId, aiTodoIds(context, userId))),
   projects: aiNarrowed((_context, table) => eq(table.aiEnabled, true)),
   lanes: aiNarrowed((context, table, userId) => inArray(table.projectId, aiProjectIds(context, userId))),
   projectLabels: aiNarrowed((context, table, userId) => inArray(table.projectId, aiProjectIds(context, userId))),
@@ -137,8 +139,9 @@ export const contextValues: NonNullable<BuildSchemaConfig['contextValues']> = {
  * `todos_history` trigger's, and history nobody can edit is the point of it.
  * `runs` belong to the runner's mutations (resolvers/runs.ts): a run is
  * claimed, renewed and finished, and a person may only ask one to stop.
+ * `artifacts` are what a finished run reports, and only `finishRun` writes them.
  */
-const WRITES_RESERVED = new Set<string>(['users', 'todoDependencies', 'todoEvents', 'runs']);
+const WRITES_RESERVED = new Set<string>(['users', 'todoDependencies', 'todoEvents', 'runs', 'artifacts']);
 
 /**
  * Tables that can be added to and deleted from, but not rewritten. A note an

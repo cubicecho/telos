@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { check, index, integer, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
+import { check, index, integer, jsonb, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 
 import { agents } from './agents.ts';
 import { type LaneContract, lanes } from './lanes.ts';
@@ -18,6 +18,21 @@ export type RunStatus = (typeof RUN_STATUSES)[number];
 /** A verdict lane's ruling. `none` for every other kind of run. */
 export const RUN_VERDICTS = ['none', 'pass', 'fail'] as const;
 export type RunVerdict = (typeof RUN_VERDICTS)[number];
+
+/**
+ * One thing that happened in a run, as the runner reported it: a tool call, a
+ * tool's answer, what a hook added, a notice. It is the live view's feed, so it
+ * is small and flat, and `text` is cut short by the server.
+ */
+export interface RunEvent {
+  at: string;
+  /** tool_call, tool_result, hook, notice. */
+  kind: string;
+  /** The tool or hook it concerns. */
+  name?: string | null;
+  ok?: boolean | null;
+  text?: string | null;
+}
 
 // One agent working one todo in one lane. Written only by the server — the
 // runner claims, renews and finishes a run through resolvers/runs.ts, and a
@@ -48,6 +63,9 @@ export const runs = pgTable(
     promptTokens: integer('prompt_tokens').notNull().default(0),
     completionTokens: integer('completion_tokens').notNull().default(0),
     totalTokens: integer('total_tokens').notNull().default(0),
+    // What the run did as it went, appended by each heartbeat and the finish.
+    // Capped (resolvers/runs.ts), so a chatty agent cannot grow a row forever.
+    events: jsonb('events').$type<RunEvent[]>().notNull().default([]),
     // A running run whose lease has passed is abandoned: its runner died.
     // The next claim of its todo marks it `error` and starts again.
     leaseExpiresAt: timestamp('lease_expires_at', { withTimezone: true }).notNull(),

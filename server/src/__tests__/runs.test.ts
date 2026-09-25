@@ -417,3 +417,72 @@ describe('who may do what', () => {
     expect(stray.code).toBe('BAD_USER_INPUT');
   });
 });
+
+async function runsOf(todoId: string) {
+  return db.select().from(dbSchema.runs).where(eq(dbSchema.runs.todoId, todoId));
+}
+
+describe('what a run shows as it goes, and leaves behind', () => {
+  it('keeps the events each heartbeat and the finish report, newest last and capped', async () => {
+    const todoId = await board.addTodo('Write it');
+    const { runId } = await claim(todoId);
+    const events = (count: number, from = 0) =>
+      Array.from({ length: count }, (_, at) => ({ kind: 'tool_call', name: 'fs__write', text: `call ${from + at}` }));
+
+    await runner.expectOk(HEARTBEAT, { id: runId, events: events(3) });
+    await runner.expectOk(HEARTBEAT, { id: runId, events: [{ kind: 'notice', text: 'x'.repeat(10_000) }] });
+    let [row] = await runsOf(todoId);
+    expect(row.events.map((event: dbSchema.RunEvent) => event.kind)).toEqual([
+      'tool_call',
+      'tool_call',
+      'tool_call',
+      'notice',
+    ]);
+    expect(row.events[3].text).toHaveLength(4000);
+
+    await finish(runId, { status: 'ok', output: 'Done.', events: events(600, 3) });
+    [row] = await runsOf(todoId);
+    expect(row.events).toHaveLength(500);
+    expect(row.events.at(-1)?.text).toBe('call 602');
+
+    const read = await board.person.expectOk(`query ($id: UUID!) { runs(where: { id: { eq: $id } }) { events } }`, {
+      id: runId,
+    });
+    expect(read.runs[0].events).toHaveLength(500);
+  });
+
+  it('records the artifacts a run reports, drops the malformed, and lists them on the todo', async () => {
+    const todoId = await board.addTodo('Write it');
+    const { runId } = await claim(todoId);
+    await finish(runId, {
+      status: 'error',
+      error: 'Ran out of turns.',
+      artifacts: [
+        { location: '/work/plan.md', source: 'declared', title: 'The plan', mediaType: 'text/markdown' },
+        { location: '/work/draft.md', source: 'detected', action: 'updated', serverSlug: 'fs', tool: 'write_file' },
+        { location: '  ', source: 'declared' },
+        { location: '/work/x', source: 'guessed' },
+      ],
+    });
+
+    const read = await board.person.expectOk(
+      `query ($id: UUID!) { todos(where: { id: { eq: $id } }) { artifacts(orderBy: { location: { direction: asc, priority: 1 } }) { location source action title runId } } }`,
+      { id: todoId },
+    );
+    expect(read.todos[0].artifacts).toEqual([
+      { location: '/work/draft.md', source: 'detected', action: 'updated', title: null, runId },
+      { location: '/work/plan.md', source: 'declared', action: 'created', title: 'The plan', runId },
+    ]);
+  });
+
+  it('keeps nothing a stopped run made, and no one but the server writes artifacts', async () => {
+    const todoId = await board.addTodo('Write it');
+    const { runId } = await claim(todoId);
+    await finish(runId, { status: 'stopped', artifacts: [{ location: '/work/plan.md', source: 'declared' }] });
+    expect(await db.select().from(dbSchema.artifacts)).toEqual([]);
+
+    const mutations = await board.person.expectOk(`query { __type(name: "Mutation") { fields { name } } }`);
+    const names: string[] = mutations.__type.fields.map((field: { name: string }) => field.name);
+    expect(names.filter((name) => /artifact/i.test(name))).toEqual([]);
+  });
+});

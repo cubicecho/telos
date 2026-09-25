@@ -94,6 +94,31 @@ const RUNS_SDL = parse(`
     dependsOn: [String!]
   }
 
+  "Something that happened in a run, for the live view."
+  input RunEventInput {
+    "tool_call, tool_result, hook or notice."
+    kind: String!
+    "The tool or hook it concerns."
+    name: String
+    ok: Boolean
+    text: String
+  }
+
+  "Something a run left behind: where it is, not what is in it."
+  input ArtifactInput {
+    location: String!
+    "declared (the agent said so) or detected (read off a tool call)."
+    source: String!
+    "created, updated, moved or deleted."
+    action: String
+    serverSlug: String
+    tool: String
+    title: String
+    description: String
+    mediaType: String
+    sizeBytes: Int
+  }
+
   "What a run came to."
   input RunResultInput {
     "ok, error or stopped."
@@ -106,6 +131,10 @@ const RUNS_SDL = parse(`
     totalTokens: Int
     "For an expand station: the todos the agent broke this one into."
     todos: [ProposedTodoInput!]
+    "What happened since the last heartbeat."
+    events: [RunEventInput!]
+    "What the run left behind."
+    artifacts: [ArtifactInput!]
   }
 
   extend type Query {
@@ -117,7 +146,7 @@ const RUNS_SDL = parse(`
     "Starts a run of a ready todo at its station. Null when it is no longer ready. The runner's only."
     claimRun(todoId: ID!, laneId: ID!): RunClaim
     "Keeps a run's lease. True means stop: somebody asked, or AI was switched off. The runner's only."
-    heartbeatRun(id: ID!): Boolean!
+    heartbeatRun(id: ID!, events: [RunEventInput!]): Boolean!
     "Records what a run came to and moves its todo on. The runner's only."
     finishRun(id: ID!, result: RunResultInput!): Run!
     "Asks a running run to stop. The agent hears it on its next heartbeat."
@@ -126,6 +155,13 @@ const RUNS_SDL = parse(`
 `);
 
 const OUTCOMES = new Set(['ok', 'error', 'stopped']);
+
+/** The most events a run keeps: the newest, since a live view reads the end. */
+export const MAX_RUN_EVENTS = 500;
+/** The most of one event's text kept: enough to read, not a transcript. */
+const EVENT_TEXT_CHARS = 4000;
+/** The most artifacts one run may report. */
+const MAX_ARTIFACTS = 100;
 
 /** A verdict station's answer fails the todo when it opens with FAIL. Anything else passes. */
 const FAILS = /^\s*FAIL\b/i;
@@ -288,6 +324,81 @@ interface ProposedTodo {
   dependsOn?: string[] | null;
 }
 
+interface RunEventInput {
+  kind: string;
+  name?: string | null;
+  ok?: boolean | null;
+  text?: string | null;
+}
+
+interface ArtifactInput {
+  location: string;
+  source: string;
+  action?: string | null;
+  serverSlug?: string | null;
+  tool?: string | null;
+  title?: string | null;
+  description?: string | null;
+  mediaType?: string | null;
+  sizeBytes?: number | null;
+}
+
+/**
+ * A run's events with `incoming` added, stamped now, cut to size.
+ *
+ * @param existing What the run already has.
+ * @param incoming What the runner just reported.
+ * @returns The events to store.
+ */
+function withEvents(existing: dbSchema.RunEvent[] | null, incoming: RunEventInput[] | null | undefined) {
+  const at = new Date().toISOString();
+  const added = (incoming ?? []).map((event) => ({
+    at,
+    kind: event.kind.slice(0, 40),
+    name: event.name?.slice(0, 200) ?? null,
+    ok: event.ok ?? null,
+    text: event.text?.slice(0, EVENT_TEXT_CHARS) ?? null,
+  }));
+  return [...(existing ?? []), ...added].slice(-MAX_RUN_EVENTS);
+}
+
+/**
+ * The artifacts a result reports, as rows. Anything without a location, or
+ * with a source or action the board does not know, is dropped rather than
+ * failing the finish: a run's work is not undone by a malformed receipt.
+ *
+ * @param run The run.
+ * @param reported What the runner reported.
+ * @returns Rows to insert.
+ */
+function artifactRows(run: AnyRow, reported: ArtifactInput[] | null | undefined) {
+  const sources: readonly string[] = dbSchema.ARTIFACT_SOURCES;
+  const actions: readonly string[] = dbSchema.ARTIFACT_ACTIONS;
+  return (reported ?? [])
+    .filter(
+      (artifact) =>
+        artifact.location?.trim() &&
+        sources.includes(artifact.source) &&
+        (!artifact.action || actions.includes(artifact.action)),
+    )
+    .slice(0, MAX_ARTIFACTS)
+    .map((artifact) => ({
+      userId: run.userId,
+      projectId: run.projectId,
+      todoId: run.todoId,
+      runId: run.id,
+      location: artifact.location.trim(),
+      source: artifact.source as dbSchema.ArtifactSource,
+      action: (artifact.action ?? 'created') as dbSchema.ArtifactAction,
+      serverSlug: artifact.serverSlug || null,
+      tool: artifact.tool || null,
+      title: artifact.title?.trim() || null,
+      description: artifact.description?.trim() || null,
+      mediaType: artifact.mediaType || null,
+      sizeBytes: artifact.sizeBytes ?? null,
+    }));
+}
+
 interface RunResult {
   status: string;
   output?: string | null;
@@ -297,6 +408,8 @@ interface RunResult {
   completionTokens?: number | null;
   totalTokens?: number | null;
   todos?: ProposedTodo[] | null;
+  events?: RunEventInput[] | null;
+  artifacts?: ArtifactInput[] | null;
 }
 
 /** The counters a result reports, as columns. */
@@ -340,9 +453,11 @@ async function finish(context: Context, runId: string, result: RunResult): Promi
     const output = result.output?.trim() || null;
 
     if (result.status === 'stopped' || run.cancelRequestedAt || aiOff || !todo) {
+      // A run stopped by a switch keeps nothing it said after the switch.
+      const events = aiOff ? run.events : withEvents(run.events, result.events);
       const [stopped] = await tx
         .update(dbSchema.runs)
-        .set({ status: 'stopped', output, finishedAt: new Date(), ...spend(result) })
+        .set({ status: 'stopped', output, events, finishedAt: new Date(), ...spend(result) })
         .where(eq(dbSchema.runs.id, run.id))
         .returning();
       return stopped;
@@ -401,9 +516,15 @@ async function finish(context: Context, runId: string, result: RunResult): Promi
       });
     }
 
+    // What it made exists whatever became of the run, so a failed run's files
+    // are listed too.
+    const artifacts = artifactRows(run, result.artifacts);
+    if (artifacts.length > 0) await tx.insert(dbSchema.artifacts).values(artifacts);
+
     const [finished] = await tx
       .update(dbSchema.runs)
       .set({
+        events: withEvents(run.events, result.events),
         status: passed || verdict === 'fail' ? 'ok' : 'error',
         verdict,
         output,
@@ -506,7 +627,11 @@ export function applyRunsExtension(schema: GraphQLSchema): GraphQLSchema {
     }
   };
 
-  mutations.heartbeatRun.resolve = async (_parent: unknown, args: { id: string }, context: Context) => {
+  mutations.heartbeatRun.resolve = async (
+    _parent: unknown,
+    args: { id: string; events?: RunEventInput[] | null },
+    context: Context,
+  ) => {
     requireSystem(context);
     return (context.db as AnyRow).transaction(async (tx: AnyRow) => {
       const { run, aiOff } = await loadRunForUpdate(tx, args.id);
@@ -515,8 +640,15 @@ export function applyRunsExtension(schema: GraphQLSchema): GraphQLSchema {
         await tx.update(dbSchema.runs).set({ cancelRequestedAt: new Date() }).where(eq(dbSchema.runs.id, run.id));
         return true;
       }
-      if (run.cancelRequestedAt) return true;
-      await tx.update(dbSchema.runs).set({ leaseExpiresAt: leaseFromNow() }).where(eq(dbSchema.runs.id, run.id));
+      const events = aiOff ? run.events : withEvents(run.events, args.events);
+      if (run.cancelRequestedAt) {
+        await tx.update(dbSchema.runs).set({ events }).where(eq(dbSchema.runs.id, run.id));
+        return true;
+      }
+      await tx
+        .update(dbSchema.runs)
+        .set({ leaseExpiresAt: leaseFromNow(), events })
+        .where(eq(dbSchema.runs.id, run.id));
       return false;
     });
   };

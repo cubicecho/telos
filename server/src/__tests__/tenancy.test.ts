@@ -27,6 +27,7 @@ describe('tenancy configuration', () => {
   it('finds the tables', () => {
     expect(tableKeys.sort()).toEqual([
       'agents',
+      'artifacts',
       'labels',
       'lanes',
       'projectLabels',

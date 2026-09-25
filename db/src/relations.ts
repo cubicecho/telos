@@ -33,6 +33,7 @@ export const relations = defineRelations(schema, (r) => ({
     // Named `history` rather than `events`: it reads as what it is on a card.
     history: r.many.todoEvents({ from: r.todos.id, to: r.todoEvents.todoId }),
     runs: r.many.runs({ from: r.todos.id, to: r.runs.todoId }),
+    artifacts: r.many.artifacts({ from: r.todos.id, to: r.artifacts.todoId }),
     labels: r.many.labels({
       from: r.todos.id.through(r.todoLabels.todoId),
       to: r.labels.id.through(r.todoLabels.labelId),
@@ -71,6 +72,13 @@ export const relations = defineRelations(schema, (r) => ({
     lane: r.one.lanes({ from: r.runs.laneId, to: r.lanes.id }),
     agent: r.one.agents({ from: r.runs.agentId, to: r.agents.id }),
     project: r.one.projects({ from: r.runs.projectId, to: r.projects.id }),
+    artifacts: r.many.artifacts({ from: r.runs.id, to: r.artifacts.runId }),
+  },
+
+  artifacts: {
+    todo: r.one.todos({ from: r.artifacts.todoId, to: r.todos.id }),
+    run: r.one.runs({ from: r.artifacts.runId, to: r.runs.id }),
+    project: r.one.projects({ from: r.artifacts.projectId, to: r.projects.id }),
   },
 
   labels: {

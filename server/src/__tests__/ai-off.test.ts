@@ -122,6 +122,7 @@ describe('an instance with AI off', () => {
       mutation: __type(name: "Mutation") { fields { name } }
       agent: __type(name: "Agent") { name }
       run: __type(name: "Run") { name }
+      artifact: __type(name: "Artifact") { name }
       lane: __type(name: "Lane") { fields { name } }
     }`);
     const names = (type: { fields: Array<{ name: string }> }) => type.fields.map((field) => field.name);
@@ -131,6 +132,7 @@ describe('an instance with AI off', () => {
     expect(names(schema.mutation)).not.toContain('setAgentApiKey');
     expect(schema.agent).toBeNull();
     expect(schema.run).toBeNull();
+    expect(schema.artifact).toBeNull();
     expect(names(schema.lane)).not.toContain('agentId');
     expect(names(schema.lane)).not.toContain('onSuccessLaneId');
   });
