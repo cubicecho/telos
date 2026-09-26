@@ -1,3 +1,10 @@
+# [1.3.0](https://github.com/cubicecho/telos/compare/v1.2.0...v1.3.0) (2026-09-26)
+
+
+### Features
+
+* **app:** pick a palette in Settings ([823b1e7](https://github.com/cubicecho/telos/commit/823b1e78ca280433ff816c9a4dfc8fd281bc8847))
+
 # [1.2.0](https://github.com/cubicecho/telos/compare/v1.1.0...v1.2.0) (2026-09-25)
 
 
