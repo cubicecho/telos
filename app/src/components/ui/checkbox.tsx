@@ -29,12 +29,12 @@ function Checkbox({
       onBlur={onBlur}
       className={cn(
         CHECKBOX_CLASS,
-        checked ? 'border-primary bg-primary' : 'border-input bg-background',
+        checked ? 'border-selection bg-selection' : 'border-input bg-background',
         disabled && 'opacity-50',
         className,
       )}
     >
-      {checked && <Check className="h-3 w-3 text-primary-foreground" />}
+      {checked && <Check className="h-3 w-3 text-selection-foreground" />}
     </Pressable>
   );
 }

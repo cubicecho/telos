@@ -89,6 +89,7 @@ export function Section({
         >
           <View className="min-w-0 flex-1">
             {title ? (
+              // biome-ignore lint/a11y/useSemanticElements: React Native has no heading element; role="heading" is the cross-platform form
               <Text
                 testID="section-title"
                 nativeID={titleId}

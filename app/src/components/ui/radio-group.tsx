@@ -8,12 +8,14 @@ type Focusable = React.ElementRef<typeof Pressable>;
 /** The web's key event, narrowed to the two members used — the same shape on both halves. */
 type KeyEvent = { key: string; preventDefault: () => void };
 
+type RadioGroupVariant = 'row' | 'card' | 'segmented';
+
 type RadioGroupContextValue = {
   value: string | undefined;
   tabStop: string | undefined;
   disabled: boolean;
   invalid: boolean;
-  variant: 'row' | 'card';
+  variant: RadioGroupVariant;
   select: (value: string) => void;
   move: (from: string, event: KeyEvent) => void;
   register: (value: string, ref: React.RefObject<Focusable | null>, disabled: boolean) => void;
@@ -46,9 +48,14 @@ type RadioGroupProps = {
   /**
    * `row` (the default): a circle, a label and an optional description per option, stacked.
    * `card`: a bordered tile per option, icon over label, sharing a row.
+   * `segmented`: one framed, input-height row of equal segments, full width. Each segment shows
+   * its `icon`, its `label`, or both; an icon-only segment is named by its `aria-label`.
    */
-  variant?: 'row' | 'card' | undefined;
-  /** How the options are laid out. Defaults to `vertical` for `row` and `horizontal` for `card`. */
+  variant?: RadioGroupVariant | undefined;
+  /**
+   * How the options are laid out. Defaults to `vertical` for `row` and `horizontal` for `card`.
+   * `segmented` is always one row and ignores it.
+   */
   orientation?: 'vertical' | 'horizontal' | undefined;
   /** Whether the arrow keys wrap from the last option to the first. On by default. */
   loop?: boolean | undefined;
@@ -153,6 +160,15 @@ function RadioGroup({
   const order = enabled();
   const tabStop = value !== undefined && order.includes(value) ? value : order[0];
   const horizontal = (orientation ?? (variant === 'card' ? 'horizontal' : 'vertical')) === 'horizontal';
+  const layout =
+    variant === 'segmented'
+      ? cn(
+          'h-10 w-full flex-row gap-1 rounded-md border bg-background p-1',
+          ariaInvalid === true ? 'border-destructive' : 'border-input',
+        )
+      : horizontal
+        ? 'flex-row flex-wrap gap-3'
+        : 'gap-3';
 
   return (
     <RadioGroupContext.Provider
@@ -183,7 +199,7 @@ function RadioGroup({
               'aria-required': ariaRequired,
             }
           : {})}
-        className={cn(horizontal ? 'flex-row flex-wrap gap-3' : 'gap-3', className)}
+        className={cn(layout, className)}
       >
         {children}
       </View>
@@ -195,13 +211,21 @@ type RadioGroupItemProps = {
   value: string;
   /** The option's name. Left out, the item is the bare circle, for a caller's own `<Label>`. */
   label?: ReactNode | undefined;
-  /** A line under the label: what picking this one means. */
+  /** A line under the label: what picking this one means. Not drawn by `segmented`. */
   description?: ReactNode | undefined;
-  /** The picture over the label in a `card` tile. Ignored by `row`. */
+  /**
+   * The picture over the label in a `card` tile, or the segment's face in `segmented`. Ignored by
+   * `row`. On device an icon has no `currentColor` to inherit, so in `segmented` give it the
+   * checked segment's `text-selection-foreground` and the others' `text-muted-foreground` yourself.
+   */
   icon?: ReactNode | undefined;
   /**
    * A hover hint — the web's `title` — and the accessibility hint on device. For the one extra
    * sentence a tile has no room for; say anything a user needs to choose in `description`.
+   *
+   * An icon-only `segmented` option with no `hint` uses its `aria-label` as the web tooltip, so the
+   * name a screen reader hears is also what a pointer sees on hover. Device has no hover, so there
+   * it is the name alone, with no hint repeating it.
    */
   hint?: string | undefined;
   /** The DOM's name for `hint`, accepted so a shadcn call site ports unchanged. `hint` wins. */
@@ -243,18 +267,24 @@ function RadioGroupItem({
   const checked = group.value === value;
   const disabled = group.disabled || itemDisabled;
   const card = group.variant === 'card';
+  const segmented = group.variant === 'segmented';
+  // The bare circle is for a caller's own `<Label>`; a segment is never one.
+  const bare = label === undefined && !segmented;
+  const tooltip = hint ?? (segmented && label === undefined ? ariaLabel : undefined);
+  // A segment has no room for a description and draws none, so it points at none either.
   const describedBy =
-    [description ? descriptionId : null, ariaDescribedByProp ?? null].filter(Boolean).join(' ') || undefined;
+    [description && !segmented ? descriptionId : null, ariaDescribedByProp ?? null].filter(Boolean).join(' ') ||
+    undefined;
 
   const circle = (
     <View
       className={cn(
         'h-4 w-4 shrink-0 items-center justify-center rounded-full border',
-        checked ? 'border-primary' : 'border-input',
+        checked ? 'border-selection' : 'border-input',
         group.invalid && 'border-destructive',
       )}
     >
-      {checked ? <View className="h-2 w-2 rounded-full bg-primary" /> : null}
+      {checked ? <View className="h-2 w-2 rounded-full bg-selection" /> : null}
     </View>
   );
 
@@ -275,27 +305,49 @@ function RadioGroupItem({
             tabIndex: group.tabStop === value ? (0 as const) : (-1 as const),
             onKeyDown: (event: KeyEvent) => group.move(value, event),
             'aria-describedby': describedBy,
-            title: hint,
+            title: tooltip,
           }
         : {})}
       className={cn(
         'ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-        label === undefined
+        bare
           ? 'rounded-full'
-          : card
+          : segmented
             ? cn(
-                'min-w-0 flex-1 items-center gap-1.5 rounded-lg border p-3',
-                // The border alone says checked: a tinted fill takes the muted description under 4.5:1.
-                checked ? 'border-primary bg-background' : 'border-input bg-background',
-                group.invalid && 'border-destructive',
+                'min-w-0 flex-1 flex-row items-center justify-center gap-1.5 rounded-sm px-3',
+                checked
+                  ? 'bg-selection text-selection-foreground'
+                  : 'text-muted-foreground hover:bg-muted hover:text-foreground',
               )
-            : 'flex-row items-start gap-3 rounded-sm',
+            : card
+              ? cn(
+                  'min-w-0 flex-1 items-center gap-1.5 rounded-lg border p-3',
+                  // The border alone says checked: a tinted fill takes the muted description under 4.5:1.
+                  checked ? 'border-selection bg-background' : 'border-input bg-background',
+                  group.invalid && 'border-destructive',
+                )
+              : 'flex-row items-start gap-3 rounded-sm',
         disabled && 'opacity-50',
         className,
       )}
     >
-      {label === undefined ? (
+      {bare ? (
         circle
+      ) : segmented ? (
+        <>
+          {icon ? <View className="items-center justify-center">{icon}</View> : null}
+          {label !== undefined ? (
+            <Text
+              id={labelId}
+              className={cn(
+                'truncate text-sm font-medium',
+                checked ? 'text-selection-foreground' : 'text-muted-foreground',
+              )}
+            >
+              {label}
+            </Text>
+          ) : null}
+        </>
       ) : card ? (
         <>
           {icon ? <View className="items-center justify-center">{icon}</View> : null}

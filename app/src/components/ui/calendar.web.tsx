@@ -13,18 +13,18 @@ import 'react-day-picker/style.css';
  * declares these on `.rdp-root` unlayered, and an unlayered rule beats everything in
  * `@layer utilities`, so a `[--rdp-accent-color:…]` class would lose in a DOM app. And this file
  * is what renders on both paths, a DOM app on `tokens.web.css` and an Expo web app on
- * `cubeui-tokens.css`, which define the same `--primary` and `--accent`.
+ * `cubeui-tokens.css`, which define the same `--selection`, `--primary` and `--accent`.
  */
 const THEME = {
-  '--rdp-accent-color': 'var(--primary)',
+  '--rdp-accent-color': 'var(--selection)',
   '--rdp-accent-background-color': 'var(--accent)',
   '--rdp-today-color': 'var(--primary)',
   '--rdp-range_middle-background-color': 'var(--accent)',
   '--rdp-range_middle-color': 'var(--accent-foreground)',
-  '--rdp-range_start-color': 'var(--primary-foreground)',
-  '--rdp-range_start-date-background-color': 'var(--primary)',
-  '--rdp-range_end-color': 'var(--primary-foreground)',
-  '--rdp-range_end-date-background-color': 'var(--primary)',
+  '--rdp-range_start-color': 'var(--selection-foreground)',
+  '--rdp-range_start-date-background-color': 'var(--selection)',
+  '--rdp-range_end-color': 'var(--selection-foreground)',
+  '--rdp-range_end-date-background-color': 'var(--selection)',
 } as CSSProperties;
 
 /** What `DayPicker` takes beyond the shared contract, passed through as it is. */

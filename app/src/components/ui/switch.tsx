@@ -10,6 +10,7 @@ function Switch({
   disabled,
   onBlur,
   accessibilityLabel,
+  'aria-labelledby': ariaLabelledBy,
   className,
 }: SwitchProps) {
   // Controlled when `checked` is passed and self-driving otherwise, the way radix's is.
@@ -20,6 +21,7 @@ function Switch({
       role="switch"
       aria-checked={checked}
       aria-label={accessibilityLabel}
+      aria-labelledby={ariaLabelledBy}
       disabled={disabled}
       onPress={() => {
         setCheckedState(!checked);
@@ -28,7 +30,7 @@ function Switch({
       onBlur={onBlur}
       className={cn(
         SWITCH_TRACK_CLASS,
-        checked ? 'bg-primary' : 'bg-input',
+        checked ? 'bg-selection' : 'bg-input',
         // `disabled:` never applies to a Pressable — apply the state directly.
         disabled && 'opacity-50',
         className,

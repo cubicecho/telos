@@ -95,7 +95,7 @@ export function StatTile({
   const classes = cn(
     'min-w-0 gap-1 p-4',
     onPress !== undefined && PRESSABLE,
-    toggle && selected && 'border-primary bg-accent',
+    toggle && selected && 'border-selection bg-accent',
     className,
   );
 

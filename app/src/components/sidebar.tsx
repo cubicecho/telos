@@ -15,6 +15,22 @@ import { cn } from '@/lib/utils';
  */
 const STACK = Platform.select({ web: 'flex flex-col', default: undefined });
 
+/**
+ * Hidden under the breakpoint, shown from it up. `flex` is what the root is on both platforms: a
+ * compiled view is a flex column by its reset, and every view on device is one already.
+ *
+ * Literal classes rather than a composed one, per rule 3: Tailwind's scanner reads source text, so
+ * `` `${bp}:flex` `` names a class that is never generated. It is a media query in the stylesheet,
+ * not one in JavaScript, so the first paint is already right — no frame with the rail drawn and
+ * then taken away.
+ */
+const HIDE_BELOW = {
+  sm: 'hidden sm:flex',
+  md: 'hidden md:flex',
+  lg: 'hidden lg:flex',
+  xl: 'hidden xl:flex',
+} as const;
+
 export type SidebarProps = {
   /** The body: sections, rows, whatever the rail lists. The only part that scrolls. */
   content: ReactNode;
@@ -32,6 +48,18 @@ export type SidebarProps = {
    * `start` (the default) draws it on the right, facing the content.
    */
   side?: 'start' | 'end' | undefined;
+  /**
+   * Under this width the sidebar is not drawn at all; from it up, it is. For a rail that has no
+   * room on a phone, where the page puts its furniture in a bar of its own instead. Absent, it is
+   * drawn at every width.
+   *
+   * Hidden is `display: none`, so it leaves the accessibility tree too, rather than staying a
+   * landmark with nothing visible in it.
+   *
+   * Inside a `SidebarLayout`, pass `sidebarHideBelow` to the layout instead: it hides the pane at
+   * the same breakpoint and draws the bar that stands in for the rail, from the one value.
+   */
+  hideBelow?: keyof typeof HIDE_BELOW | undefined;
   /** The scrolling body, for restoring a scroll position — see `HeaderContentFooter`. */
   contentRef?: HeaderContentFooterProps['contentRef'];
   /** On the root. A different width is a `w-*` here. */
@@ -57,6 +85,13 @@ export type SidebarProps = {
  *
  * It needs a height, like any sticky chassis: `h-full`, so the ancestors up to the viewport have
  * to give it one or the body grows instead of scrolling.
+ *
+ * **`hideBelow` is its narrow-width answer.** A rail is not a pane that stacks, so under a phone's
+ * width it goes rather than landing on top of the page. `hidden md:flex` in `className` did the
+ * same only while the root's display came from a class merged before the caller's; these are the
+ * same two classes, owned here. Inside a `SidebarLayout` the layout's `sidebarHideBelow` is the
+ * same switch one level up — it hides the pane rather than leaving an empty one, and draws the
+ * bar that stands in for the rail under the same breakpoint.
  */
 export function Sidebar({
   content,
@@ -64,6 +99,7 @@ export function Sidebar({
   footer,
   label,
   side = 'start',
+  hideBelow,
   contentRef,
   className,
   headerClassName,
@@ -81,6 +117,7 @@ export function Sidebar({
       className={cn(
         'h-full w-64 min-h-0 shrink-0 border-sidebar-border bg-sidebar',
         side === 'start' ? 'border-r' : 'border-l',
+        hideBelow ? HIDE_BELOW[hideBelow] : undefined,
         className,
       )}
     >
@@ -100,7 +137,27 @@ export function Sidebar({
   );
 }
 
-export type SidebarSectionProps = {
+/**
+ * A section is a navigation landmark (`as="nav"`, which `label` can name) or it is not, and a
+ * `label` with no landmark to name is a type error rather than a name nothing reads.
+ */
+type SidebarSectionLandmarkProps =
+  | {
+      /**
+       * `nav` makes the section a navigation landmark — `<nav>` on the web, `role="navigation"` on
+       * device — so a screen reader's landmark jump reaches its rows. For the sections that are
+       * the app's navigation; a list of recent items or pinned searches stays out of it.
+       */
+      as: 'nav';
+      /**
+       * What the landmark is called — "Main", "Projects". Absent, the `title` names it; give one
+       * when there is no title, or when two navigation sections would otherwise share a name.
+       */
+      label?: string | undefined;
+    }
+  | { as?: undefined; label?: never };
+
+export type SidebarSectionProps = SidebarSectionLandmarkProps & {
   /** The overline over the rows. A short noun — "Projects", "Pinned". */
   title?: ReactNode | undefined;
   /**
@@ -141,8 +198,15 @@ export type SidebarSectionProps = {
  *
  * No list is drawn when there are no rows, so an empty or loading section is the title and its
  * `status` and nothing else — not an empty `<ul>` announced as "list, 0 items".
+ *
+ * **`as="nav"` makes it the navigation landmark.** `Sidebar` is a complementary `<aside>`, and
+ * nothing in a sidebar of links is otherwise navigation, so a landmark jump never reached the rows
+ * and every app wrapped the section in a hand-written `<nav aria-label>`. The whole section is the
+ * landmark — title, status and list — named by the title unless `label` says otherwise.
  */
 export function SidebarSection({
+  as,
+  label,
   title,
   content,
   status,
@@ -153,13 +217,15 @@ export function SidebarSection({
 }: SidebarSectionProps) {
   const titleId = React.useId();
   const rows = React.Children.toArray(content);
+  const sectionClassName = cn('min-w-0 gap-1', className);
 
-  return (
-    <View testID="sidebar-section" className={cn('min-w-0 gap-1', className)}>
+  const body = (
+    <>
       {title || action ? (
         <View testID="sidebar-section-heading" className="min-h-8 min-w-0 flex-row items-center gap-2 px-2">
           <View className="min-w-0 flex-1">
             {title ? (
+              // biome-ignore lint/a11y/useSemanticElements: React Native has no heading element; role="heading" is the cross-platform form
               <Text
                 testID="sidebar-section-title"
                 nativeID={titleId}
@@ -201,92 +267,248 @@ export function SidebarSection({
           ))}
         </View>
       ) : null}
+    </>
+  );
+
+  // Two roots written out rather than one with a chosen role: the compiler picks the tag from the
+  // role, and a role it cannot read is one it refuses.
+  if (as === 'nav') {
+    return (
+      <View
+        role="navigation"
+        testID="sidebar-section"
+        {...(label ? { 'aria-label': label } : title ? { 'aria-labelledby': titleId } : {})}
+        className={sectionClassName}
+      >
+        {body}
+      </View>
+    );
+  }
+
+  return (
+    <View testID="sidebar-section" className={sectionClassName}>
+      {body}
     </View>
   );
 }
 
-export type SidebarNavItemProps = Omit<React.ComponentProps<typeof Pressable>, 'children' | 'className' | 'style'> & {
-  /** Where the row goes. The `<a href>` on the web; a router `Link` wrapping it supplies it too. */
-  href: string;
+type PressableProps = React.ComponentProps<typeof Pressable>;
+
+/**
+ * A row's status: words, and the glyph that stands for them. An object rather than a node because
+ * the words have to reach the row's accessible name on device, and a node's text cannot be read
+ * back out into an `accessibilityLabel`.
+ */
+export type SidebarNavItemStatus = {
+  /** What is read, and what is drawn when there is no `icon`. */
+  label: string;
+  /** What is drawn instead of the label. Decorative: the label is what a screen reader hears. */
+  icon?: ReactNode | undefined;
+};
+
+/** Off the screen and still read. `sr-only` is a clip, which the device does not have. */
+const SR_ONLY = Platform.select({
+  web: 'sr-only',
+  default: 'absolute -m-px h-px w-px overflow-hidden',
+});
+
+/** What both forms of the row take. */
+type SidebarNavItemBaseProps = Omit<PressableProps, 'children' | 'className' | 'style'> & {
   /** What the row is called. Truncated to one line, never wrapped. */
   label: string;
   /** Before the label. Pass a bare `<Folder />`; the row sizes and colours it. */
   icon?: ReactNode | undefined;
   /** At the far end: how many things are behind the row. */
   count?: number | string | undefined;
-  /** The row for the page on screen — filled, and `aria-current="page"`. */
-  active?: boolean | undefined;
+  /**
+   * What state the row's thing is in — "MCP on", "offline", "draft" — drawn before the `count`.
+   * `label` is required because it is what is read: the row's name becomes "Work, MCP on, 2". With
+   * an `icon` the icon is what is seen and the label is read only; without one the label is drawn,
+   * small and muted. `SidebarSection`'s `status` is the same word for the section's own state.
+   */
+  status?: SidebarNavItemStatus | undefined;
   // Re-declared rather than inherited, for `exactOptionalPropertyTypes` — see `segmented.tsx`.
   className?: string | undefined;
 };
 
+/** The row that goes somewhere, and says where itself. */
+type SidebarNavItemLinkProps = {
+  /** Where the row goes. The `<a href>` on the web. */
+  href: string;
+  /** The row for the page on screen — filled, and `aria-current="page"`. */
+  active?: boolean | undefined;
+};
+
 /**
- * One row of a sidebar: a link with an optional icon, a label that truncates, and an optional
- * count, filled from `sidebar-accent` when it is the current page and on hover.
+ * The row that goes somewhere a router link wrapping it names — TanStack's `createLink`, or
+ * expo-router's `<Link href asChild>`. Both hand the row its `href` and its press handler at
+ * render, so writing either here as well is the destination said twice, and two copies that can
+ * drift: the `<a href>` middle-click opens and the route the click goes to.
+ *
+ * No handler of its own for the same reason: a row with no `href` that *does* take one is the
+ * button below, and a row with both `onPress` and `active` is neither.
+ */
+type SidebarNavItemRouterLinkProps = {
+  href?: undefined;
+  /** The row for the page on screen — filled, and `aria-current="page"`. */
+  active?: boolean | undefined;
+  onPress?: never;
+};
+
+/**
+ * The row that does something — Sign out. No `href`, so no `active`: a button is never the page
+ * on screen, and `aria-current` on one would say it was.
+ */
+type SidebarNavItemButtonProps = {
+  href?: never;
+  active?: never;
+  /** What the row does. Required: it is what tells a button row from a router's link row. */
+  onPress: NonNullable<React.ComponentProps<typeof Pressable>['onPress']>;
+};
+
+/**
+ * A row is a link (`href`, and `active` for the current page), a link whose router supplies the
+ * `href`, or a button (`onPress`, never `active`). `onPress` is what tells the last two apart, so
+ * `active` on a button is a type error rather than a row that is quietly half of each.
+ */
+export type SidebarNavItemProps = SidebarNavItemBaseProps &
+  (SidebarNavItemLinkProps | SidebarNavItemRouterLinkProps | SidebarNavItemButtonProps);
+
+/** The row's box, the same for both forms — the classes a hand-drawn Sign out row used to copy. */
+function rowClassName(active: boolean, className: string | undefined) {
+  return cn(
+    'min-h-8 min-w-0 flex-row items-center gap-2 rounded-md px-2 py-1.5 transition-colors',
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring',
+    // The web half's icons size from here, as a `Button`'s do; device's from the context below.
+    '[&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0',
+    active
+      ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+      : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+    className,
+  );
+}
+
+type SidebarNavItemBodyProps = {
+  label: string;
+  icon: ReactNode | undefined;
+  count: number | string | undefined;
+  status: SidebarNavItemStatus | undefined;
+  active: boolean;
+};
+
+/** What is inside the row, the same for both forms: icon, label, status, count. */
+function SidebarNavItemBody({ label, icon, count, status, active }: SidebarNavItemBodyProps) {
+  // Native inherits no colour, so the label, the count and the icon each carry it. The active
+  // count takes the row's foreground rather than muted: muted on the accent fill is under 4.5:1.
+  const text = active ? 'text-sidebar-accent-foreground' : 'text-sidebar-foreground';
+  const muted = active ? 'text-sidebar-accent-foreground' : 'text-muted-foreground';
+
+  return (
+    <>
+      {icon ? <IconClassContext.Provider value={cn('size-4 shrink-0', text)}>{icon}</IconClassContext.Provider> : null}
+      <Text
+        testID="sidebar-nav-item-label"
+        className={cn('min-w-0 flex-1 truncate text-sm', active && 'font-medium', text)}
+      >
+        {label}
+      </Text>
+      {status?.icon ? (
+        <View testID="sidebar-nav-item-status-icon" aria-hidden className="shrink-0">
+          <IconClassContext.Provider value={cn('size-4 shrink-0', muted)}>{status.icon}</IconClassContext.Provider>
+        </View>
+      ) : null}
+      {/* With an icon the words are read and not seen: a clip, as a loading page title's is. */}
+      {status ? (
+        <Text testID="sidebar-nav-item-status" className={cn('shrink-0 text-xs', status.icon ? SR_ONLY : muted)}>
+          {status.label}
+        </Text>
+      ) : null}
+      {count === undefined ? null : (
+        <Text testID="sidebar-nav-item-count" className={cn('shrink-0 text-xs tabular-nums', muted)}>
+          {count}
+        </Text>
+      )}
+    </>
+  );
+}
+
+/**
+ * One row of a sidebar: a link with an optional icon, a label that truncates, an optional
+ * `status` and an optional count, filled from `sidebar-accent` when it is the current page and on
+ * hover.
  *
  * Wrap it in the router's own link rather than passing a router to it:
  *
  * ```tsx
  * <Link href={`/projects/${id}`} asChild>
- *   <SidebarNavItem href={`/projects/${id}`} label={name} active={id === current} />
+ *   <SidebarNavItem label={name} active={id === current} />
  * </Link>
+ *
+ * const SidebarLink = createLink(SidebarNavItem); // TanStack Router
+ * <SidebarLink to="/" label="Documents" active={isCurrent} />
  * ```
  *
- * `Link asChild` clones its child with the press handler, and this forwards the ref and every prop
- * it does not name to the `Pressable`, which is what lets the clone land. On a DOM app whose router
- * link has no `asChild`, pass the router's click handler as `onClick` — react-router's
- * `useLinkClickHandler`, TanStack's `createLink` — and the `<a href>` is already there.
+ * `Link asChild` clones its child with the `href` and the press handler, and `createLink` renders
+ * it with both; this forwards the ref and every prop it does not name to the `Pressable`, which is
+ * what lets them land. So neither passes `href` to the row — the router's is the one destination,
+ * and the row is a real `<a href>` all the same. A router that hands out only a click handler —
+ * react-router's `useLinkClickHandler` — passes it as `onClick` beside the row's own `href`.
  *
  * `role="link"` is what makes it a link on both platforms: TalkBack and VoiceOver say "link", and
  * the compiler emits an `<a>`. The current page is said twice, for the same reason `segmented`
  * says its pill twice — `accessibilityState` on device, `aria-current="page"` on the web, which is
  * the one spelling a web screen reader reads and the one react-native-web would have dropped.
+ *
+ * **With `onPress` and no `href` it is a button** — `onClick` on the web, and no `active`.
+ * That is the footer's Sign out: drawn like the Settings row above it, but it does something
+ * rather than going somewhere, so it is `role="button"` on device and a `<button type="button">`
+ * on the web, and never carries `aria-current`. What decides the element is the `href` the row
+ * *renders* with, so a router's row is a link however it was written; a row written with neither
+ * and no router around it has nowhere to go and nothing to do, and is drawn as an inert button.
+ *
+ * ```tsx
+ * <SidebarNavItem label="Sign out" icon={<LogOut />} onPress={signOut} />
+ * ```
  */
 const SidebarNavItem = React.forwardRef<React.ElementRef<typeof Pressable>, SidebarNavItemProps>(
-  ({ href, label, icon, count, active = false, className, ...props }, ref) => {
-    // Native inherits no colour, so the label, the count and the icon each carry it. The active
-    // count takes the row's foreground rather than muted: muted on the accent fill is under 4.5:1.
-    const text = active ? 'text-sidebar-accent-foreground' : 'text-sidebar-foreground';
+  ({ href, label, icon, count, status, active = false, className, ...props }, ref) => {
+    // Two elements written out rather than one with a chosen role: the compiler picks the tag from
+    // the role, and a button and a link do not share a prop list anyway.
+    if (href === undefined) {
+      return (
+        <Pressable
+          ref={ref}
+          role="button"
+          className={rowClassName(false, className)}
+          {...(Platform.OS === 'web'
+            ? {}
+            : {
+                accessibilityLabel: [label, status?.label, count].filter((part) => part !== undefined).join(', '),
+              })}
+          {...props}
+        >
+          <SidebarNavItemBody label={label} icon={icon} count={count} status={status} active={false} />
+        </Pressable>
+      );
+    }
 
     return (
       <Pressable
         ref={ref}
         role="link"
         accessibilityState={{ selected: active }}
-        // React Native has no `href` and no `aria-current`; the web has both, and needs both.
-        {...(Platform.OS === 'web' ? ({ href, 'aria-current': active ? 'page' : undefined } as const) : {})}
-        className={cn(
-          'min-h-8 min-w-0 flex-row items-center gap-2 rounded-md px-2 py-1.5 transition-colors',
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring',
-          // The web half's icons size from here, as a `Button`'s do; device's from the context below.
-          '[&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0',
-          active
-            ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-            : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
-          className,
-        )}
+        // React Native has no `href` and no `aria-current`; the web has both, and needs both. The
+        // web names the row from the text inside it; device reads a pressable as one element, so
+        // its name is joined here — before `props`, so a caller's own label still wins.
+        {...(Platform.OS === 'web'
+          ? ({ href, 'aria-current': active ? 'page' : undefined } as const)
+          : {
+              accessibilityLabel: [label, status?.label, count].filter((part) => part !== undefined).join(', '),
+            })}
+        className={rowClassName(active, className)}
         {...props}
       >
-        {icon ? (
-          <IconClassContext.Provider value={cn('size-4 shrink-0', text)}>{icon}</IconClassContext.Provider>
-        ) : null}
-        <Text
-          testID="sidebar-nav-item-label"
-          className={cn('min-w-0 flex-1 truncate text-sm', active && 'font-medium', text)}
-        >
-          {label}
-        </Text>
-        {count === undefined ? null : (
-          <Text
-            testID="sidebar-nav-item-count"
-            className={cn(
-              'shrink-0 text-xs tabular-nums',
-              active ? 'text-sidebar-accent-foreground' : 'text-muted-foreground',
-            )}
-          >
-            {count}
-          </Text>
-        )}
+        <SidebarNavItemBody label={label} icon={icon} count={count} status={status} active={active} />
       </Pressable>
     );
   },

@@ -41,7 +41,9 @@
  * half that renders a radix part renders a raw `<button>` — a tab trigger, a dialog's close — and
  * the user-agent sheet gives it a `2px outset` border, a grey fill, and a colour and font of its
  * own rather than inherited ones: an inactive tab ignored its list's `text-muted-foreground` and
- * drew outset. Nothing sets a page font either, so a raw `<label>` drew in the browser's serif.
+ * drew outset. It keeps the user-agent padding too, `1px 6px` in Chrome, so the switch's thumb sat
+ * 6px in from its track's edge and `translate-x-4` pushed it out past the other end (#175).
+ * Nothing sets a page font either, so a raw `<label>` drew in the browser's serif.
  * The font is react-native-web's own stack, which every `Text` already wears.
  *
  * Unlayered and specificity zero, like the line above, so any utility still overrides it. That
@@ -64,6 +66,7 @@
  */
 :where(button) {
   border: 0 solid;
+  padding: 0;
   background-color: transparent;
   color: inherit;
   font: inherit;
@@ -94,6 +97,8 @@
   --muted-foreground: #737373;
   --accent: #f5f5f5;
   --accent-foreground: #171717;
+  --selection: #2563eb;
+  --selection-foreground: #ffffff;
   --destructive: #e7000b;
   --destructive-foreground: #ffffff;
   --border: #e5e5e5;
@@ -148,6 +153,8 @@
     --muted-foreground: #a1a1a1;
     --accent: #404040;
     --accent-foreground: #fafafa;
+    --selection: #60a5fa;
+    --selection-foreground: #0a0a0a;
     --destructive: #ff6467;
     --destructive-foreground: #0a0a0a;
     --border: rgba(255, 255, 255, 0.1);
@@ -198,6 +205,8 @@
   --muted-foreground: #a1a1a1;
   --accent: #404040;
   --accent-foreground: #fafafa;
+  --selection: #60a5fa;
+  --selection-foreground: #0a0a0a;
   --destructive: #ff6467;
   --destructive-foreground: #0a0a0a;
   --border: rgba(255, 255, 255, 0.1);
@@ -228,6 +237,8 @@
   --muted-foreground: #737373;
   --accent: #f5f5f5;
   --accent-foreground: #171717;
+  --selection: #2563eb;
+  --selection-foreground: #ffffff;
   --destructive: #e7000b;
   --destructive-foreground: #ffffff;
   --border: #e5e5e5;
@@ -241,6 +252,44 @@
   --sidebar-accent-foreground: #171717;
   --sidebar-border: #e5e5e5;
   --sidebar-ring: #a1a1a1;
+}
+
+/*
+ * The palettes beside the default, for Expo web: the same `data-palette` blocks the DOM build has,
+ * in the same `:is()` as the two above and after them, so a palette wins on document order. On
+ * device the compiler drops these too, and a palette reaches the variables through
+ * `PaletteProvider` instead; `tokens-dark.test.mjs` holds that they compile to nothing.
+ */
+:is(html[data-palette="monokai"]) {
+  --background: #272822;
+  --foreground: #f8f8f2;
+  --card: #2d2e27;
+  --card-foreground: #f8f8f2;
+  --popover: #3e3d32;
+  --popover-foreground: #f8f8f2;
+  --primary: #a6e22e;
+  --primary-foreground: #272822;
+  --secondary: #3e3d32;
+  --secondary-foreground: #f8f8f2;
+  --muted: #3e3d32;
+  --muted-foreground: #b3ad93;
+  --accent: #49483e;
+  --accent-foreground: #f8f8f2;
+  --selection: #ae81ff;
+  --selection-foreground: #272822;
+  --destructive: #ff6188;
+  --destructive-foreground: #272822;
+  --border: #49483e;
+  --input: #57564a;
+  --ring: #66d9ef;
+  --sidebar: #1e1f1c;
+  --sidebar-foreground: #f8f8f2;
+  --sidebar-primary: #ae81ff;
+  --sidebar-primary-foreground: #272822;
+  --sidebar-accent: #3e3d32;
+  --sidebar-accent-foreground: #f8f8f2;
+  --sidebar-border: #49483e;
+  --sidebar-ring: #66d9ef;
 }
 
 @theme inline {
@@ -262,6 +311,8 @@
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
+  --color-selection: var(--selection);
+  --color-selection-foreground: var(--selection-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);

@@ -1,20 +1,32 @@
-import { View } from 'react-native';
+import { useEffect, useRef } from 'react';
+import { Animated, Easing } from 'react-native';
 import { LoaderCircle } from '@/components/ui/icons';
+import { SPIN_DURATION, type SpinnerProps, spinnerClass } from '@/components/ui/spinner-base';
 import { cn } from '@/lib/utils';
 
-/**
- * Waiting, said out loud as well as drawn.
- *
- * The icon stays `aria-hidden` — a spinning line is nothing to announce — and
- * the wrapper carries the word instead, so a screen reader hears "Loading"
- * rather than silence. `role="status"` is the polite live region `<output>`
- * used to give for free; a `View` has no `<output>` to become, so the role and
- * the name are spelled out, the same way cubeui's `RowSkeleton` does it.
- */
-export function Spinner({ className, label = 'Loading' }: { className?: string; label?: string }) {
+export type { SpinnerProps };
+
+export function Spinner({ label = 'Loading', className }: SpinnerProps) {
+  const turn = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.timing(turn, {
+        toValue: 1,
+        duration: SPIN_DURATION,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [turn]);
+
+  const rotate = turn.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
+
   return (
-    <View role="status" aria-label={label} className="flex-row items-center">
-      <LoaderCircle className={cn('h-4 w-4 animate-spin text-muted-foreground', className)} aria-hidden />
-    </View>
+    <Animated.View role="status" aria-label={label} style={{ alignSelf: 'flex-start', transform: [{ rotate }] }}>
+      <LoaderCircle className={cn(spinnerClass, className)} aria-hidden />
+    </Animated.View>
   );
 }

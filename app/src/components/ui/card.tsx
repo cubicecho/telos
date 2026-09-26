@@ -65,15 +65,30 @@ const CardHeader = React.forwardRef<React.ElementRef<typeof View>, ViewProps>(({
 ));
 CardHeader.displayName = 'CardHeader';
 
-const CardTitle = React.forwardRef<React.ElementRef<typeof Text>, TextProps>(({ className, ...props }, ref) => (
-  <Text
-    ref={ref}
-    role="heading"
-    aria-level={3}
-    className={cn('text-2xl font-semibold leading-none tracking-tight text-card-foreground', className)}
-    {...props}
-  />
-));
+type CardTitleProps = TextProps & {
+  /**
+   * Which heading the title is, `1 | 2 | 3`. The default, 3, is shadcn's and every card's that sits
+   * under a page title; a card that *is* the page — a sign-in, a token gate — is the page's `1`.
+   * The size does not follow it: the rank says where the card sits, not how big its title looks.
+   */
+  level?: 1 | 2 | 3 | undefined;
+};
+
+const CARD_TITLE = 'text-2xl font-semibold leading-none tracking-tight text-card-foreground';
+
+// One arm per level because the compiler emits `<h1>`–`<h3>` from a *literal* `aria-level`; a level
+// held in a variable would be a tag chosen at runtime, which it refuses (see `page-header.tsx`).
+const CardTitle = React.forwardRef<React.ElementRef<typeof Text>, CardTitleProps>(
+  ({ className, level = 3, ...props }, ref) => {
+    if (level === 1) {
+      return <Text ref={ref} role="heading" aria-level={1} className={cn(CARD_TITLE, className)} {...props} />;
+    }
+    if (level === 2) {
+      return <Text ref={ref} role="heading" aria-level={2} className={cn(CARD_TITLE, className)} {...props} />;
+    }
+    return <Text ref={ref} role="heading" aria-level={3} className={cn(CARD_TITLE, className)} {...props} />;
+  },
+);
 CardTitle.displayName = 'CardTitle';
 
 const CardDescription = React.forwardRef<React.ElementRef<typeof Text>, TextProps>(({ className, ...props }, ref) => (
