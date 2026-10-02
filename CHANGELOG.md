@@ -1,3 +1,11 @@
+# [1.6.0](https://github.com/cubicecho/telos/compare/v1.5.0...v1.6.0) (2026-10-02)
+
+
+### Features
+
+* **app:** a setup checklist for getting AI running ([a34f94e](https://github.com/cubicecho/telos/commit/a34f94e15cff2f13e7c64fd78a5ef4c7a3ef163e)), closes [#27](https://github.com/cubicecho/telos/issues/27)
+* **server:** aiSetup says what is in place for a first run ([e058b5e](https://github.com/cubicecho/telos/commit/e058b5ee97ea77aeebf933752434978c68fc65e1)), closes [#27](https://github.com/cubicecho/telos/issues/27)
+
 # [1.5.0](https://github.com/cubicecho/telos/compare/v1.4.0...v1.5.0) (2026-10-02)
 
 
