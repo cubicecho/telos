@@ -1,18 +1,23 @@
 import { useMutation, useQuery } from '@apollo/client';
 import { useState } from 'react';
 import { Platform, Text, View } from 'react-native';
-import type { RunSummaryFieldsFragment } from '@/__generated__/graphql';
+import type { RunSummaryFieldsFragment, TodoNoteFieldsFragment } from '@/__generated__/graphql';
 import { RunDialog } from '@/components/domain/ai/run-dialog';
 import { describeRun, RunStatusBadge } from '@/components/domain/ai/run-log';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Trash2 } from '@/components/ui/icons';
+import { Pencil, Trash2 } from '@/components/ui/icons';
 import { LoadState } from '@/components/ui/load-failure';
 import { Textarea } from '@/components/ui/textarea';
 import { useAi } from '@/lib/ai';
 import { formatTimestamp } from '@/lib/dates';
 import { describeError } from '@/lib/errors';
-import { CreateTodoNoteDocument, DeleteTodoNoteDocument, TodoRecordDocument } from '@/lib/graphql';
+import {
+  CreateTodoNoteDocument,
+  DeleteTodoNoteDocument,
+  EditTodoNoteDocument,
+  TodoRecordDocument,
+} from '@/lib/graphql';
 import { cn } from '@/lib/utils';
 
 // A todo's record: the notes left on it and the history the database keeps of
@@ -70,6 +75,123 @@ function scrollToNote(node: View | null) {
   (node as unknown as HTMLElement).scrollIntoView?.({ block: 'nearest' });
 }
 
+/** A note someone wrote, as against a report or a verdict a run returned. */
+const PLAIN_NOTE = 'note';
+
+/** Who signs what a person writes here. */
+const SIGNED_BY_PERSON = 'user';
+
+// Which notes offer what. The server decides (resolvers/notes.ts); this only
+// keeps a button off a note it would refuse. A person rewrites what they wrote,
+// and may clear any plain note off their board. What a run reported stays.
+
+function canEdit(note: TodoNoteFieldsFragment): boolean {
+  return note.kind === PLAIN_NOTE && note.actorKind === SIGNED_BY_PERSON;
+}
+
+function canDelete(note: TodoNoteFieldsFragment): boolean {
+  return note.kind === PLAIN_NOTE;
+}
+
+/**
+ * One note on the thread: who wrote it and when, whether it was edited since,
+ * and the buttons its reader may use on it.
+ *
+ * @param props.note - The note.
+ * @param props.focused - Whether to mark it and bring it into view.
+ * @param props.projectAi - Whether the todo's project has AI on.
+ * @param props.onEdit - Saves a new body. Resolves true when it was saved.
+ * @param props.onDelete - Removes the note.
+ */
+function ThreadNote({
+  note,
+  focused,
+  projectAi,
+  onEdit,
+  onDelete,
+}: {
+  note: TodoNoteFieldsFragment;
+  focused: boolean;
+  projectAi: boolean;
+  onEdit: (id: string, body: string) => Promise<boolean>;
+  onDelete: (id: string) => Promise<void>;
+}) {
+  const ai = useAi();
+  const [draft, setDraft] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  async function save() {
+    if (draft === null) {
+      return;
+    }
+    setSaving(true);
+    const saved = await onEdit(note.id, draft.trim());
+    setSaving(false);
+    if (saved) {
+      setDraft(null);
+    }
+  }
+
+  return (
+    <View
+      role="listitem"
+      ref={focused ? scrollToNote : undefined}
+      aria-current={focused ? true : undefined}
+      className={cn('gap-1 rounded-lg border px-3 py-2', focused ? 'border-primary bg-accent' : 'border-border')}
+    >
+      <View className="flex-row items-center gap-2">
+        <Text className="flex-1 text-muted-foreground text-xs">
+          {actorName(note.actorKind)} · {formatTimestamp(note.createdAt)}
+          {note.editedAt ? ` · edited ${formatTimestamp(note.editedAt)}` : ''}
+        </Text>
+        {note.kind === PLAIN_NOTE ? null : (
+          <Badge variant="secondary" className="self-center">
+            {note.kind}
+          </Badge>
+        )}
+        {canEdit(note) && draft === null ? (
+          <Button variant="ghost" size="icon-sm" aria-label="Edit note" onPress={() => setDraft(note.body)}>
+            <Pencil className="h-4 w-4" />
+          </Button>
+        ) : null}
+        {canDelete(note) ? (
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="hover:text-destructive"
+            aria-label="Delete note"
+            onPress={() => onDelete(note.id)}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        ) : null}
+      </View>
+      {draft === null ? (
+        <Text className="text-foreground text-sm">{note.body}</Text>
+      ) : (
+        <View className="gap-2">
+          <Textarea value={draft} onChangeText={setDraft} aria-label="Note" rows={3} />
+          {/* The thread is read when a run is claimed, so one under way has the old wording. */}
+          {ai.on && projectAi ? (
+            <Text className="text-muted-foreground text-xs">
+              An edit reaches only the runs that start after it. A run already under way keeps what it read.
+            </Text>
+          ) : null}
+          <View className="flex-row justify-end gap-2">
+            <Button variant="ghost" size="sm" disabled={saving} onPress={() => setDraft(null)}>
+              Cancel
+            </Button>
+            <Button size="sm" disabled={saving || draft.trim() === ''} onPress={save}>
+              Save note
+            </Button>
+          </View>
+        </View>
+      )}
+      <ViewRun runId={note.runId} projectAi={projectAi} />
+    </View>
+  );
+}
+
 /**
  * The notes on a todo, and a box to add one.
  *
@@ -83,6 +205,7 @@ export function TodoThread({ todoId, focusNoteId }: { todoId: string; focusNoteI
   const [error, setError] = useState<string | null>(null);
   const refetch = { refetchQueries: [{ query: TodoRecordDocument, variables: { id: todoId } }] };
   const [createNote, { loading: adding }] = useMutation(CreateTodoNoteDocument, refetch);
+  const [editNote] = useMutation(EditTodoNoteDocument);
   const [deleteNote] = useMutation(DeleteTodoNoteDocument, refetch);
 
   const notes = record.data?.todo?.thread ?? [];
@@ -97,6 +220,17 @@ export function TodoThread({ todoId, focusNoteId }: { todoId: string; focusNoteI
       setBody('');
     } catch (cause) {
       setError(describeError(cause));
+    }
+  }
+
+  async function edit(id: string, edited: string): Promise<boolean> {
+    setError(null);
+    try {
+      await editNote({ variables: { id, body: edited } });
+      return true;
+    } catch (cause) {
+      setError(describeError(cause));
+      return false;
     }
   }
 
@@ -120,38 +254,14 @@ export function TodoThread({ todoId, focusNoteId }: { todoId: string; focusNoteI
       {notes.length === 0 ? null : (
         <View role="list" className="gap-2">
           {notes.map((note) => (
-            <View
+            <ThreadNote
               key={note.id}
-              role="listitem"
-              ref={note.id === focusNoteId ? scrollToNote : undefined}
-              aria-current={note.id === focusNoteId ? true : undefined}
-              className={cn(
-                'gap-1 rounded-lg border px-3 py-2',
-                note.id === focusNoteId ? 'border-primary bg-accent' : 'border-border',
-              )}
-            >
-              <View className="flex-row items-center gap-2">
-                <Text className="flex-1 text-muted-foreground text-xs">
-                  {actorName(note.actorKind)} · {formatTimestamp(note.createdAt)}
-                </Text>
-                {note.kind === 'note' ? null : (
-                  <Badge variant="secondary" className="self-center">
-                    {note.kind}
-                  </Badge>
-                )}
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  className="hover:text-destructive"
-                  aria-label="Delete note"
-                  onPress={() => remove(note.id)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </View>
-              <Text className="text-foreground text-sm">{note.body}</Text>
-              <ViewRun runId={note.runId} projectAi={projectAi} />
-            </View>
+              note={note}
+              focused={note.id === focusNoteId}
+              projectAi={projectAi}
+              onEdit={edit}
+              onDelete={remove}
+            />
           ))}
         </View>
       )}
@@ -162,8 +272,6 @@ export function TodoThread({ todoId, focusNoteId }: { todoId: string; focusNoteI
         </Text>
       ) : null}
 
-      {/* Notes are never edited, only added and deleted: the thread is a
-          record, and a note an agent acted on should still say what it said. */}
       <View className="gap-2">
         <Textarea value={body} onChangeText={setBody} placeholder="Add a note…" rows={3} />
         <Button size="sm" className="self-end" disabled={adding || body.trim() === ''} onPress={add}>
