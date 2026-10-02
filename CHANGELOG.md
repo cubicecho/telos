@@ -1,3 +1,12 @@
+# [1.8.0](https://github.com/cubicecho/telos/compare/v1.7.0...v1.8.0) (2026-10-02)
+
+
+### Features
+
+* **app:** the station form offers archiving as an answer to success ([b6afa91](https://github.com/cubicecho/telos/commit/b6afa9189ae452937ea974177fc1106764e00cf0))
+* **scripts:** the kanban import carries archive-on-success across ([463c99d](https://github.com/cubicecho/telos/commit/463c99df74f79e1382a2fded2c104d5e5d4e80a2))
+* **server:** a station can archive a todo on success ([629822c](https://github.com/cubicecho/telos/commit/629822cef4decace47cacb2f7830f9b26f5d283e))
+
 # [1.7.0](https://github.com/cubicecho/telos/compare/v1.6.0...v1.7.0) (2026-10-02)
 
 
