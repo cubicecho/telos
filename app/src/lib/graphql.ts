@@ -231,6 +231,7 @@ export const ApiKeyFieldsFragment = graphql(`
     createdAt
     lastRequest
     expiresAt
+    toolsOff
   }
 `);
 
@@ -256,6 +257,25 @@ export const CreateApiKeyDocument = graphql(`
 export const DeleteApiKeyDocument = graphql(`
   mutation DeleteApiKey($id: ID!) {
     deleteApiKey(id: $id)
+  }
+`);
+
+// The MCP door's tools, in the order a client is shown them, for a key's switches.
+export const McpToolsDocument = graphql(`
+  query McpTools {
+    mcpTools {
+      name
+      description
+      writes
+    }
+  }
+`);
+
+export const SetApiKeyToolsDocument = graphql(`
+  mutation SetApiKeyTools($id: ID!, $off: [String!]!) {
+    setApiKeyTools(id: $id, off: $off) {
+      ...ApiKeyFields
+    }
   }
 `);
 
