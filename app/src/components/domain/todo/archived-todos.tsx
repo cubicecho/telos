@@ -1,5 +1,5 @@
-import { useMutation, useQuery } from '@apollo/client';
-import { useState } from 'react';
+import { type DocumentNode, useMutation, useQuery } from '@apollo/client';
+import { type ComponentProps, type ReactNode, useState } from 'react';
 import { Text, View } from 'react-native';
 import { ArchiveRestore } from '@/components/app-icons';
 import { Button } from '@/components/ui/button';
@@ -24,18 +24,53 @@ interface Archived {
   title: string;
 }
 
+/** An archived todo as a list of them draws it. */
+export interface ArchivedTodo extends Archived {
+  completedAt?: string | null | undefined;
+  archivedAt?: string | null | undefined;
+  lane?: { name: string } | null | undefined;
+  /** Its project, named only in a list across projects. */
+  project?: { name: string } | null | undefined;
+}
+
 export function ArchivedTodos({ projectId }: { projectId: string }) {
   const query = useQuery(ArchivedTodosDocument, { variables: { projectId }, fetchPolicy: 'cache-and-network' });
-  const todos = query.data?.todos ?? [];
+  return (
+    <ArchivedTodoList
+      query={query}
+      todos={query.data?.todos ?? []}
+      // A restored todo lands back in the lists and the counts, so both refetch.
+      onRestore={[ArchivedTodosDocument, ProjectTodosDocument, ProjectDocument]}
+      onDelete={[ArchivedTodosDocument]}
+    />
+  );
+}
+
+/**
+ * Archived todos, each with its way back and its way out: a project's, or the
+ * account's. The caller reads them and says which of its queries a restore or a
+ * delete leaves stale.
+ */
+export function ArchivedTodoList({
+  query,
+  todos,
+  onRestore,
+  onDelete,
+  footer,
+}: {
+  query: ComponentProps<typeof LoadState>['query'];
+  todos: readonly ArchivedTodo[];
+  /** The queries to read again once a todo is restored. */
+  onRestore: DocumentNode[];
+  /** The queries to read again once a todo is deleted for good. */
+  onDelete: DocumentNode[];
+  /** Under the list: a way to more of it. */
+  footer?: ReactNode;
+}) {
   const [error, setError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<Archived | null>(null);
-  // A restored todo lands back in the lists and the counts, so both refetch.
-  const [restoreTodo, restoreState] = useMutation(RestoreTodoDocument, {
-    refetchQueries: [ArchivedTodosDocument, ProjectTodosDocument, ProjectDocument],
-  });
-  const [deleteForGood, deleteState] = useMutation(DeleteTodoForGoodDocument, {
-    refetchQueries: [ArchivedTodosDocument],
-  });
+  const [restoreTodo, restoreState] = useMutation(RestoreTodoDocument, { refetchQueries: onRestore });
+  const [deleteForGood, deleteState] = useMutation(DeleteTodoForGoodDocument, { refetchQueries: onDelete });
   const busy = restoreState.loading || deleteState.loading;
 
   async function run(action: () => Promise<unknown>) {
@@ -72,6 +107,7 @@ export function ArchivedTodos({ projectId }: { projectId: string }) {
                 <Text className="text-foreground text-sm">{todo.title}</Text>
                 <Text className="text-muted-foreground text-xs">
                   {[
+                    todo.project?.name,
                     todo.archivedAt ? `Archived ${formatTimestamp(todo.archivedAt)}` : null,
                     todo.lane?.name,
                     todo.completedAt ? 'done' : null,
@@ -104,6 +140,7 @@ export function ArchivedTodos({ projectId }: { projectId: string }) {
           ))}
         </View>
       ) : null}
+      {footer}
 
       <ConfirmDialog
         open={deleting !== null}

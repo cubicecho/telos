@@ -1048,6 +1048,120 @@ export const RunTodoDocument = graphql(`
   }
 `);
 
+// The account's activity: what its agents did, spent and left behind across
+// every project it owns. The lists are the generated ones with no project named,
+// which are the account's own already; each row says which project it is from.
+
+/** The account's runs, newest first, a page at a time, optionally of one status. */
+export const AccountRunsDocument = graphql(`
+  query AccountRuns($where: RunFilters, $limit: Int!, $offset: Int!) {
+    runs(where: $where, orderBy: { startedAt: { direction: desc, priority: 1 } }, limit: $limit, offset: $offset) {
+      ...RunSummaryFields
+      project {
+        id
+        name
+      }
+    }
+  }
+`);
+
+/**
+ * Everything the account's runs left behind, newest first. The todo is the
+ * whole of it, so a note artifact can open that todo's dialog; an artifact
+ * whose todo is gone has none.
+ */
+export const AccountArtifactsDocument = graphql(`
+  query AccountArtifacts($limit: Int!, $offset: Int!) {
+    artifacts(orderBy: { createdAt: { direction: desc, priority: 1 } }, limit: $limit, offset: $offset) {
+      ...ArtifactFields
+      project {
+        id
+        name
+      }
+      todo {
+        ...TodoFields
+      }
+    }
+  }
+`);
+
+/** The account's archived todos, the latest put away first, a page at a time. */
+export const AccountArchivedTodosDocument = graphql(`
+  query AccountArchivedTodos($limit: Int!, $offset: Int!) {
+    todos(
+      deleted: ONLY
+      orderBy: { archivedAt: { direction: desc, priority: 1 } }
+      limit: $limit
+      offset: $offset
+    ) {
+      id
+      title
+      completedAt
+      archivedAt
+      lane {
+        id
+        name
+      }
+      project {
+        id
+        name
+      }
+    }
+  }
+`);
+
+export const SpendLineFieldsFragment = graphql(`
+  fragment SpendLineFields on SpendLine {
+    id
+    name
+    runs
+    draftReplies
+    promptTokens
+    completionTokens
+    totalTokens
+  }
+`);
+
+/** What the account's runs spent since `since`, by project and by agent. */
+export const AccountSpendDocument = graphql(`
+  query AccountSpend($since: DateTime!) {
+    accountSpend(since: $since) {
+      since
+      keptSince
+      retentionDays
+      total {
+        ...SpendLineFields
+      }
+      byProject {
+        ...SpendLineFields
+      }
+      byAgent {
+        ...SpendLineFields
+      }
+    }
+  }
+`);
+
+/** The todos, across projects, that are out of attempts or whose last run errored. */
+export const AccountAttentionDocument = graphql(`
+  query AccountAttention {
+    accountAttention {
+      todoId
+      title
+      projectId
+      projectName
+      laneId
+      laneName
+      outOfAttempts
+      errored
+      reason
+      runId
+      attempts
+      maxAttempts
+    }
+  }
+`);
+
 export const BoardTemplatesDocument = graphql(`
   query BoardTemplates {
     boardTemplates(orderBy: { name: { direction: asc, priority: 1 } }) {
