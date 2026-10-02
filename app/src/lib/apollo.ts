@@ -112,6 +112,7 @@ const cache = new InMemoryCache({
         agents: replace,
         drafts: replace,
         boardTemplates: replace,
+        lanePresets: replace,
       },
     },
     Todo: {
@@ -130,6 +131,7 @@ const cache = new InMemoryCache({
     Draft: { fields: { messages: replace, runs: replace } },
     Project: { fields: { labels: replace, todos: replace, lanes: replace } },
     Lane: { fields: { todos: replace } },
+    LanePreset: { fields: { lanes: replace } },
     Label: { fields: { todos: replace, projects: replace } },
   },
 });

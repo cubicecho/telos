@@ -6,6 +6,7 @@ import {
   AgentsDocument,
   AiStateDocument,
   ApiKeysDocument,
+  LanePresetsDocument,
   SetAiEnabledDocument,
   SetInstanceAiEnabledDocument,
 } from '@/lib/graphql';
@@ -35,6 +36,7 @@ const KEY = {
 
 const keys = { request: { query: ApiKeysDocument }, result: { data: { apiKeys: [KEY] } } };
 const agents = { request: { query: AgentsDocument }, result: { data: { agents: [] } } };
+const presets = { request: { query: LanePresetsDocument }, result: { data: { lanePresets: [] } } };
 
 // biome-ignore lint/suspicious/noExplicitAny: MockedProvider's mock array type
 function settings(mocks: any[]) {
@@ -95,7 +97,7 @@ describe('AiSettings', () => {
     expect(screen.queryByText('API keys')).not.toBeInTheDocument();
   });
 
-  it('turns AI on and then lists the keys and the agents', async () => {
+  it('turns AI on and then lists the keys, the agents and the lane presets', async () => {
     const user = userEvent.setup();
     settings([
       aiState(true, false),
@@ -105,6 +107,7 @@ describe('AiSettings', () => {
       },
       keys,
       agents,
+      presets,
     ]);
 
     await user.click(await screen.findByRole('switch', { name: 'Use AI on this account' }));
@@ -112,5 +115,6 @@ describe('AiSettings', () => {
     expect(await screen.findByText('API keys')).toBeInTheDocument();
     await waitFor(() => expect(screen.getByText('Claude Code')).toBeInTheDocument());
     expect(await screen.findByText('No agents yet.')).toBeInTheDocument();
+    expect(await screen.findByText('No presets yet.')).toBeInTheDocument();
   });
 });
