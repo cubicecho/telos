@@ -42,6 +42,7 @@ export const USER_OWNED_TABLES = [
   'runs',
   'artifacts',
   'boardTemplates',
+  'lanePresets',
   'drafts',
   'draftMessages',
 ] as const;
@@ -97,6 +98,9 @@ const AI_SCOPES: Partial<Record<(typeof USER_OWNED_TABLES)[number], RowScope<Con
   // Drafts are a person's conversation with their own agent, not work yet.
   drafts: aiNarrowed(() => sql`false`),
   draftMessages: aiNarrowed(() => sql`false`),
+  // Presets are how a person sets their stations up, as agents are. What one
+  // says reaches a run through its brief, which the server writes.
+  lanePresets: aiNarrowed(() => sql`false`),
   // By todo, so a draft's runs, which have none, are hidden as drafts are.
   runs: aiNarrowed((context, table, userId) => inArray(table.todoId, aiTodoIds(context, userId))),
   // By todo as well, so one whose todo was deleted is a person's to see.

@@ -13,6 +13,7 @@ import { applyBoardChangesExtension } from './resolvers/board-changes.ts';
 import { applyBoardTemplatesExtension } from './resolvers/board-templates.ts';
 import { applyCardMarksExtension } from './resolvers/card-marks.ts';
 import { applyDraftsExtension } from './resolvers/drafts.ts';
+import { applyLanePresetsExtension } from './resolvers/lane-presets.ts';
 import { applyLanesExtension } from './resolvers/lanes.ts';
 import { applyNotesExtension } from './resolvers/notes.ts';
 import { applyRequestsExtension } from './resolvers/requests.ts';
@@ -46,7 +47,7 @@ export interface SchemaOptions {
 }
 
 /** Tables that exist in the API only while the instance has AI on. */
-const AI_TABLES = ['agents', 'mcpServers', 'runs', 'artifacts', 'drafts', 'draftMessages'];
+const AI_TABLES = ['agents', 'mcpServers', 'runs', 'artifacts', 'drafts', 'draftMessages', 'lanePresets'];
 
 /** A lane's station settings, which mean nothing without agents. */
 const AI_LANE_COLUMNS = [
@@ -58,6 +59,8 @@ const AI_LANE_COLUMNS = [
   'archiveOnSuccess',
   'wipLimit',
   'maxAttempts',
+  'presetId',
+  'presetOverrides',
 ];
 
 export function createSchema(db: AnyDb, options: SchemaOptions) {
@@ -126,6 +129,7 @@ export function createSchema(db: AnyDb, options: SchemaOptions) {
     schema = applyRunsExtension(schema);
     schema = applyArtifactsExtension(schema);
     schema = applyDraftsExtension(schema);
+    schema = applyLanePresetsExtension(schema);
     schema = applySessionDeletesExtension(schema);
     schema = applyAiStatusExtension(schema);
     schema = applyAiSetupExtension(schema);

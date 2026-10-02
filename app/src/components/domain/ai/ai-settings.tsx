@@ -9,6 +9,7 @@ import { describeError } from '@/lib/errors';
 import { AiStateDocument, SetAiEnabledDocument, SetInstanceAiEnabledDocument } from '@/lib/graphql';
 import { AgentManager } from './agent-manager';
 import { ApiKeyManager } from './api-key-manager';
+import { LanePresetManager } from './lane-preset-manager';
 import { McpServerManager } from './mcp-server-manager';
 import { RunRetention } from './run-retention';
 
@@ -116,6 +117,7 @@ export function AiSettings() {
           <ApiKeyManager />
           <AgentManager />
           <McpServerManager />
+          <LanePresetManager />
           <RunRetention />
         </>
       ) : null}

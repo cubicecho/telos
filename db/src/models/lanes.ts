@@ -5,6 +5,7 @@ import {
   check,
   index,
   integer,
+  jsonb,
   pgTable,
   text,
   timestamp,
@@ -13,6 +14,7 @@ import {
 } from 'drizzle-orm/pg-core';
 
 import { agents } from './agents.ts';
+import { lanePresets, type PresetField } from './lane-presets.ts';
 import { projects } from './projects.ts';
 import { users } from './users.ts';
 
@@ -68,6 +70,12 @@ export const lanes = pgTable(
     // it up and leaves it for a person. The count starts over whenever a
     // person moves it.
     maxAttempts: integer('max_attempts').notNull().default(3),
+    // The preset this lane follows, if any. While it follows one, `contract`,
+    // `wipLimit` and `maxAttempts` are the preset's unless `presetOverrides`
+    // names them, and `prompt` is what this lane adds after the preset's. The
+    // `lanes_follow_preset` trigger keeps the columns so.
+    presetId: uuid('preset_id').references(() => lanePresets.id, { onDelete: 'set null' }),
+    presetOverrides: jsonb('preset_overrides').$type<PresetField[]>().notNull().default([]),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -77,6 +85,7 @@ export const lanes = pgTable(
     index('idx_lanes_agent_id').on(t.agentId),
     index('idx_lanes_on_success_lane_id').on(t.onSuccessLaneId),
     index('idx_lanes_on_failure_lane_id').on(t.onFailureLaneId),
+    index('idx_lanes_preset_id').on(t.presetId),
     check('ck_lanes_contract', sql`${t.contract} in ('work', 'verdict', 'expand')`),
     check('ck_lanes_wip_limit', sql`${t.wipLimit} > 0`),
     check('ck_lanes_max_attempts', sql`${t.maxAttempts} >= 0`),

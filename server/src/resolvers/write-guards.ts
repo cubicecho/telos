@@ -45,9 +45,10 @@ const parentTodo: ForeignKey = { key: 'parentId', entity: 'Todo', parent: dbSche
 const agent: ForeignKey = { key: 'agentId', entity: 'Agent', parent: dbSchema.agents };
 const onSuccessLane: ForeignKey = { key: 'onSuccessLaneId', entity: 'Lane', parent: dbSchema.lanes };
 const onFailureLane: ForeignKey = { key: 'onFailureLaneId', entity: 'Lane', parent: dbSchema.lanes };
+const preset: ForeignKey = { key: 'presetId', entity: 'Lane preset', parent: dbSchema.lanePresets };
 
 const FOREIGN_KEYS: Record<string, ForeignKey[]> = {
-  lanes: [project, agent, onSuccessLane, onFailureLane],
+  lanes: [project, agent, onSuccessLane, onFailureLane, preset],
   todos: [project, lane, parentTodo],
   todoLabels: [todo, label],
   projectLabels: [project, label],
@@ -250,6 +251,52 @@ function assertDoneFlagUntouched(args: Parameters<typeof writtenRows>[0]): void 
   });
 }
 
+const PRESET_FIELDS: readonly unknown[] = dbSchema.PRESET_FIELDS;
+const LANE_CONTRACTS: readonly unknown[] = dbSchema.LANE_CONTRACTS;
+/** The longest name a lane preset may have. */
+const MAX_PRESET_NAME = 100;
+
+/**
+ * What a lane keeps of its own is a list of a preset's fields, and nothing
+ * else: the `lanes_follow_preset` trigger reads it to decide what to copy.
+ */
+function assertPresetOverridesKnown(args: Parameters<typeof writtenRows>[0]): void {
+  for (const row of writtenRows(args)) {
+    if (!('presetOverrides' in row)) continue;
+    const overrides = row.presetOverrides;
+    if (Array.isArray(overrides) && overrides.every((field) => PRESET_FIELDS.includes(field))) continue;
+    throw new GraphQLError(
+      `presetOverrides lists the preset fields a lane keeps its own value for: any of ${dbSchema.PRESET_FIELDS.join(', ')}.`,
+      { extensions: { code: 'BAD_USER_INPUT' } },
+    );
+  }
+}
+
+/**
+ * A preset's own values, checked here so the refusal says what to change
+ * rather than which constraint fired.
+ */
+function assertPresetValuesFit(args: Parameters<typeof writtenRows>[0]): void {
+  const badInput = (message: string) => new GraphQLError(message, { extensions: { code: 'BAD_USER_INPUT' } });
+  for (const row of writtenRows(args)) {
+    if ('name' in row) {
+      const name = typeof row.name === 'string' ? row.name.trim() : '';
+      if (name === '' || name.length > MAX_PRESET_NAME || name !== row.name) {
+        throw badInput(`Name the preset, in ${MAX_PRESET_NAME} characters or fewer, with no space at either end.`);
+      }
+    }
+    if ('contract' in row && !LANE_CONTRACTS.includes(row.contract)) {
+      throw badInput(`A preset's contract is one of ${dbSchema.LANE_CONTRACTS.join(', ')}.`);
+    }
+    if ('wipLimit' in row && (!Number.isInteger(row.wipLimit) || (row.wipLimit as number) < 1)) {
+      throw badInput('A preset needs a WIP limit of 1 or more.');
+    }
+    if ('maxAttempts' in row && (!Number.isInteger(row.maxAttempts) || (row.maxAttempts as number) < 0)) {
+      throw badInput('A preset needs 0 or more attempts.');
+    }
+  }
+}
+
 /** What a slug is made of: it is the prefix of every tool the server offers. */
 const SERVER_SLUG = /^[A-Za-z0-9_-]+$/;
 /** The slug of the board's own door, which every run has already. */
@@ -302,6 +349,32 @@ async function assertServersSound(tx: AnyTable, userId: string, rows: Row[], ins
   }
 }
 
+/**
+ * A preset's name is the only thing a person picks it by, so two of the same
+ * name are refused in words. The unique constraint is what holds it; this is
+ * what says so.
+ */
+async function assertPresetNamesFree(tx: AnyTable, userId: string, args: WriteHookPayload['args']): Promise<void> {
+  const names = [
+    ...new Set(
+      writtenRows(args)
+        .map((row) => row.name)
+        .filter((name): name is string => typeof name === 'string'),
+    ),
+  ];
+  if (names.length === 0) return;
+  const taken: Array<{ id: string; name: string }> = await tx
+    .select({ id: dbSchema.lanePresets.id, name: dbSchema.lanePresets.name })
+    .from(dbSchema.lanePresets)
+    .where(and(eq(dbSchema.lanePresets.userId, userId), inArray(dbSchema.lanePresets.name, names)));
+  // An update that names the preset it is renaming is not a clash with itself.
+  const renamed: unknown = args.where?.id?.eq;
+  const clash = taken.find((row) => row.id !== renamed);
+  if (clash) {
+    throw new GraphQLError(`You already have a preset called "${clash.name}".`, { extensions: { code: 'CONFLICT' } });
+  }
+}
+
 function badServer(message: string): GraphQLError {
   return new GraphQLError(message, { extensions: { code: 'BAD_USER_INPUT' } });
 }
@@ -333,6 +406,7 @@ export const onWrite: NonNullable<BuildSchemaConfig['onWrite']> = {
   lanes: {
     before: async ({ args, context, tx }: WriteHookPayload) => {
       assertDoneFlagUntouched(args);
+      assertPresetOverridesKnown(args);
       // Deleting a lane moves its todos (see `after`), which is history.
       await stampActor(tx, (context as Context).actor);
       await assertForeignKeysOwned(tx, requireAuth(context as Context), writtenRows(args), FOREIGN_KEYS.lanes);
@@ -344,7 +418,11 @@ export const onWrite: NonNullable<BuildSchemaConfig['onWrite']> = {
     after: async ({ args, context, tx }: WriteHookPayload) => {
       const userId = requireAuth(context as Context);
       if (states(args, 'onSuccessLaneId', 'onFailureLaneId')) await assertArrowsInProject(tx, userId);
-      if (states(args, 'archiveOnSuccess', 'onSuccessLaneId', 'contract')) await assertArchiveOnSuccessFits(tx, userId);
+      // Following a preset, or putting a field back to it, can change the
+      // contract without the write naming it.
+      if (states(args, 'archiveOnSuccess', 'onSuccessLaneId', 'contract', 'presetId', 'presetOverrides')) {
+        await assertArchiveOnSuccessFits(tx, userId);
+      }
       await assertEveryProjectHasLanes(tx, userId);
       await realignLanes(tx, userId);
       await assertCompletionMatchesLane(tx, userId);
@@ -356,6 +434,20 @@ export const onWrite: NonNullable<BuildSchemaConfig['onWrite']> = {
   mcpServers: {
     before: async ({ args, context, operation, tx }: WriteHookPayload) =>
       assertServersSound(tx, requireAuth(context as Context), writtenRows(args), operation === 'insert'),
+  },
+  lanePresets: {
+    before: async ({ args, context, operation, tx }: WriteHookPayload) => {
+      if (operation === 'delete') return;
+      assertPresetValuesFit(args);
+      await assertPresetNamesFree(tx, requireAuth(context as Context), args);
+    },
+    // An edit reaches every lane that follows the preset (the
+    // `lane_presets_reach_lanes` trigger), so what a lane's own write is held
+    // to is held here too.
+    after: async ({ context, operation, tx }: WriteHookPayload) => {
+      if (operation === 'delete') return;
+      await assertArchiveOnSuccessFits(tx, requireAuth(context as Context));
+    },
   },
   projects: {
     before: async ({ args }: WriteHookPayload) => assertAiSwitchUntouched(args),

@@ -182,7 +182,22 @@ lane with an `agentId` is a station: its `contract` (work, verdict, expand),
 a pass: `finishRun` completes the todo, puts it in the done lane and archives
 it in one write, as the run. It is that or a success arrow, never both, and not
 for an `expand` station; the lane write guard (`assertArchiveOnSuccessFits`)
-holds both and says what to change. The runner (`@telos/runner`, which never
+holds both and says what to change. A station may follow a **lane preset**
+(`lane_presets`, the account's, managed in Settings → AI): `lanes.presetId`
+and `lanes.presetOverrides`, the list of the preset's fields (`contract`,
+`wipLimit`, `maxAttempts`) the lane keeps its own value for. The lane's columns
+always hold the values in force, kept so by the `lanes_follow_preset` trigger
+(a write that changes a followed field without naming `presetOverrides` adds
+the field to it), and an edited preset touches its lanes so the trigger reads
+it again; so nothing that reads a lane needs to know about presets. The
+prompt is never an override: `lanes.prompt` is what the lane adds after the
+preset's, and `briefFor` in `resolvers/runs.ts` joins the two for a run.
+Deleting a preset copies it into its lanes and into board templates that name
+it, in the same statement (`copy_lane_preset_before_delete`).
+`saveLaneAsPreset` makes a preset of a lane and has it follow it. A board
+template's lane names a preset by `presetId` rather than copying its prompt.
+Presets are AI surface: hidden from AI actors, closed to them and the runner.
+The runner (`@telos/runner`, which never
 imports `@telos/db`) runs inside the server's process: `index.ts` starts it
 with `startRunner` whenever AI is included, handing it a key made up at boot
 (`config.ts` `runnerKey`; `RUNNER_KEY` fixes it, for a second runner elsewhere).

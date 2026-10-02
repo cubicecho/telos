@@ -143,7 +143,12 @@ worker. A lane with an agent is a *station*: the runner claims a todo there,
 has the agent work it, verify it, or split it into child todos, and telos moves
 it along the lane's arrows. A station can archive what passes instead of
 moving it: the todo is completed and leaves the board, for a pipeline whose
-finished work nobody needs to see in a column. It claims by itself in a project with auto-run on,
+finished work nobody needs to see in a column. Stations that do the same job
+can follow one **lane preset** (Settings → AI): its contract, prompt, WIP limit
+and attempts. A lane keeps its own value for any field it overrides and follows
+the preset for the rest, and its own prompt is added after the preset's. A
+preset lists the lanes following it and what each overrides; deleting it copies
+its values into them first. It claims by itself in a project with auto-run on,
 and only the todos you asked for in one with it off. Each run keeps a log of its tool calls, which the
 todo shows as it goes, and a list of what it made: files it wrote, and anything
 the agent chose to record. What was made for a todo outlives it: delete the

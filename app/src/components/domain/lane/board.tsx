@@ -225,6 +225,7 @@ export function Board({
           lanes={lanes}
           station={stations.get(stationLane.id) ?? null}
           agents={agents}
+          presets={stationsQuery.data?.lanePresets ?? []}
         />
       ) : null}
     </View>
