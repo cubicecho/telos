@@ -6,6 +6,9 @@ import { useAi } from '@/lib/ai';
 import { describeError } from '@/lib/errors';
 import { SetProjectAiEnabledDocument, SetProjectAutoRunDocument } from '@/lib/graphql';
 
+/** What follows a project's switches at once, where it is on screen: the board's cards and the setup checklist. */
+const FOLLOWS_THE_SWITCHES: readonly (string | undefined)[] = ['ProjectActivity', 'AiSetup'];
+
 /**
  * A project's own AI switch, the third of the three. Drawn only when the
  * instance and the account both have AI on; otherwise the project shows nothing
@@ -14,7 +17,10 @@ import { SetProjectAiEnabledDocument, SetProjectAutoRunDocument } from '@/lib/gr
  */
 export function ProjectAiSwitch({ projectId, enabled }: { projectId: string; enabled: boolean }) {
   const ai = useAi();
-  const [setEnabled, { loading }] = useMutation(SetProjectAiEnabledDocument);
+  const [setEnabled, { loading }] = useMutation(SetProjectAiEnabledDocument, {
+    refetchQueries: 'active',
+    onQueryUpdated: (query) => FOLLOWS_THE_SWITCHES.includes(query.queryName),
+  });
   const [error, setError] = useState<string | null>(null);
 
   if (!ai.on) return null;
@@ -62,11 +68,11 @@ export function ProjectAiSwitch({ projectId, enabled }: { projectId: string; ena
 export function ProjectAutoRunSwitch({ projectId, enabled }: { projectId: string; enabled: boolean }) {
   const ai = useAi();
   // The board's cards say which todos wait to be run, so they follow the switch
-  // now rather than at the next poll. By name among the active ones: the switch
-  // is also drawn where nothing holds the project's activity.
+  // now rather than at the next poll, and so does the setup checklist. By name
+  // among the active ones: the switch is also drawn where neither is.
   const [setEnabled, { loading }] = useMutation(SetProjectAutoRunDocument, {
     refetchQueries: 'active',
-    onQueryUpdated: (query) => query.queryName === 'ProjectActivity',
+    onQueryUpdated: (query) => FOLLOWS_THE_SWITCHES.includes(query.queryName),
   });
   const [error, setError] = useState<string | null>(null);
 

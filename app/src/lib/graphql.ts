@@ -938,6 +938,21 @@ export const AiStatusDocument = graphql(`
   }
 `);
 
+/** What is in place for a first run, for the setup checklist. */
+export const AiSetupDocument = graphql(`
+  query AiSetup {
+    aiSetup {
+      agent
+      station
+      stationProjectIds
+      projectAi
+      request
+      started
+      runnerSeenAt
+    }
+  }
+`);
+
 /** Just how many todos need a person, for the sidebar. */
 export const AiAttentionDocument = graphql(`
   query AiAttention {

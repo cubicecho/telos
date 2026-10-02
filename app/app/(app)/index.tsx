@@ -2,6 +2,7 @@ import { useQuery } from '@apollo/client';
 import { Redirect } from 'expo-router';
 import { useState } from 'react';
 import { View } from 'react-native';
+import { AiSetupChecklist } from '@/components/domain/ai/ai-setup-checklist';
 import { ProjectFormDialog } from '@/components/domain/project/project-form-dialog';
 import { EmptyState } from '@/components/page';
 import { Button } from '@/components/ui/button';
@@ -38,13 +39,17 @@ export default function HomeScreen() {
   if (first) return <Redirect href={`/projects/${first.id}`} />;
 
   return (
-    <View className="flex-1 justify-center px-6">
+    <View className="flex-1 justify-center gap-6 px-6">
       <EmptyState
         icon={Plus}
         title="Nothing here yet"
         description="A project holds a list of todos. Start with one."
         action={<Button onPress={() => setCreating(true)}>Create a project</Button>}
       />
+      {/* What getting an agent to work takes, or one line offering it. */}
+      <View className="w-full max-w-xl items-center self-center">
+        <AiSetupChecklist />
+      </View>
       <ProjectFormDialog open={creating} onOpenChange={setCreating} />
     </View>
   );
