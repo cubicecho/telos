@@ -1,0 +1,1 @@
+ALTER TABLE "projects" ADD COLUMN "auto_run" boolean DEFAULT false NOT NULL;

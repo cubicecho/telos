@@ -1,5 +1,15 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { type Board, CLAIM, createBoard, FINISH, QUEUE, runnerClient, setLane } from './board.ts';
+import {
+  type Board,
+  CLAIM,
+  createBoard,
+  FINISH,
+  HEARTBEAT,
+  QUEUE,
+  runnerClient,
+  SET_AUTO_RUN,
+  setLane,
+} from './board.ts';
 import { createTestDb, type TestClient, type TestDb } from './helpers.ts';
 
 // The stations as a person reads them, and sending a todo round again.
@@ -91,6 +101,31 @@ describe('aiStatus', () => {
     });
     await board.person.expectOk(`mutation ($id: ID!) { retryTodo(id: $id) }`, { id: todoId });
     expect((await status()).todos[0].state).toBe('queued');
+  });
+
+  it('parks what a station would take while auto-run is off, and lets a running todo finish', async () => {
+    const waiting = await board.addTodo('Waiting');
+    const running = await board.addTodo('Running');
+    await setLane(board.person, board.lanes[0].id, { wipLimit: 2 });
+    const claim = (await runner.expectOk(CLAIM, { todoId: running, laneId: board.lanes[0].id })).claimRun;
+
+    await board.person.expectOk(SET_AUTO_RUN, { id: board.projectId, enabled: false });
+    expect((await runner.expectOk(QUEUE)).runnerQueue).toEqual([]);
+    expect((await runner.expectOk(CLAIM, { todoId: waiting, laneId: board.lanes[0].id })).claimRun).toBeNull();
+    const byId = new Map((await status()).todos.map((todo: { todoId: string }) => [todo.todoId, todo]));
+    expect(byId.get(waiting)).toMatchObject({ state: 'parked', reason: 'Auto-run is off.' });
+    expect(byId.get(running)).toMatchObject({ state: 'running', liveRunId: claim.runId });
+
+    // Switching it off stopped nothing: the run goes on and its work lands.
+    expect((await runner.expectOk(HEARTBEAT, { id: claim.runId })).heartbeatRun).toBe(false);
+    const run = (await runner.expectOk(FINISH, { id: claim.runId, result: { status: 'ok', output: 'Done.' } }))
+      .finishRun;
+    expect(run.status).toBe('ok');
+
+    await board.person.expectOk(SET_AUTO_RUN, { id: board.projectId, enabled: true });
+    expect((await runner.expectOk(QUEUE)).runnerQueue).toEqual([
+      { todoId: waiting, laneId: board.lanes[0].id, projectId: board.projectId },
+    ]);
   });
 
   it('knows when the runner last asked for work', async () => {

@@ -20,6 +20,10 @@ export const projects = pgTable(
     // project somebody deliberately opened to it. Set through
     // setProjectAiEnabled, never a generated write — see write-guards.ts.
     aiEnabled: boolean('ai_enabled').notNull().default(false),
+    // Whether stations start on todos by themselves. Off, an open project's
+    // todos are worked only when a person asks (runTodo). Means nothing while
+    // aiEnabled is off. Set through setProjectAutoRun, as aiEnabled is.
+    autoRun: boolean('auto_run').notNull().default(false),
     archivedAt: timestamp('archived_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

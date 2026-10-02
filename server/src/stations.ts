@@ -12,6 +12,7 @@ import { INSTANCE_AI_ON } from './instance.ts';
 //
 //   - every AI switch over it is on: its user's, its project's, and it is not
 //     ignored — the same three checks a run token makes on every request
+//   - its project runs by itself (auto-run)
 //   - the project is not archived, and the todo is open and not blocked
 //   - nothing is working it now (a running run inside its lease)
 //   - the station has not already finished with it: no `ok` run in this lane
@@ -67,6 +68,7 @@ export async function readyTodos(
       JOIN projects p ON p.id = t.project_id
       JOIN users u ON u.id = t.user_id
       WHERE ${INSTANCE_AI_ON} AND u.ai_enabled AND p.ai_enabled AND NOT t.ai_ignored
+        AND p.auto_run
         AND p.archived_at IS NULL
         AND t.completed_at IS NULL AND t.archived_at IS NULL AND NOT l.is_done
         AND (l.contract <> 'expand' OR l.on_success_lane_id IS NOT NULL)
@@ -187,6 +189,9 @@ export interface LaneTally {
  *   - blocked: it waits on something unfinished
  *   - queued: a station will start on it when there is room
  *
+ * A todo that would be queued is parked instead while its project's auto-run
+ * is off: nothing starts on it until a person asks.
+ *
  * Done todos are only counted, per lane: there can be many, and none of them
  * needs anything.
  *
@@ -209,6 +214,7 @@ export async function stationStates(
     lane_name: string | null;
     has_agent: boolean;
     ai_ignored: boolean;
+    auto_run: boolean;
     barren_expand: boolean;
     max_attempts: number | null;
     failures: number;
@@ -220,7 +226,7 @@ export async function stationStates(
     await db.execute(sql`
       WITH base AS (
         SELECT
-          t.id, t.title, t.project_id, t.lane_id, t.ai_ignored, t.position, t.created_at,
+          t.id, t.title, t.project_id, t.lane_id, t.ai_ignored, t.position, t.created_at, p.auto_run,
           l.name AS lane_name, l.position AS lane_position, l.agent_id IS NOT NULL AS has_agent,
           (l.contract = 'expand' AND l.on_success_lane_id IS NULL) AS barren_expand,
           l.max_attempts,
@@ -238,7 +244,7 @@ export async function stationStates(
       )
       SELECT
         b.id AS todo_id, b.title, b.project_id, b.lane_id, b.lane_name,
-        coalesce(b.has_agent, false) AS has_agent, b.ai_ignored,
+        coalesce(b.has_agent, false) AS has_agent, b.ai_ignored, b.auto_run,
         coalesce(b.barren_expand, false) AS barren_expand, b.max_attempts,
         (
           SELECT count(*)::int FROM runs r
@@ -299,11 +305,15 @@ export async function stationStates(
   return { todos, done };
 }
 
+/** Why a todo a station could take is not queued, in a project that waits to be asked. */
+const AUTO_RUN_OFF = 'Auto-run is off.';
+
 function judge(row: {
   lane_id: string | null;
   lane_name: string | null;
   has_agent: boolean;
   ai_ignored: boolean;
+  auto_run: boolean;
   barren_expand: boolean;
   max_attempts: number | null;
   failures: number;
@@ -322,5 +332,8 @@ function judge(row: {
   }
   if (row.finished_here) return ['attention', `${row.lane_name} finished with it and has nowhere to send it.`];
   if (row.blockers) return ['blocked', `Waiting on ${row.blockers}.`];
+  if (row.auto_run === false) {
+    return ['parked', AUTO_RUN_OFF];
+  }
   return ['queued', null];
 }
