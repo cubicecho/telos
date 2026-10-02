@@ -1,3 +1,11 @@
+# [1.7.0](https://github.com/cubicecho/telos/compare/v1.6.0...v1.7.0) (2026-10-02)
+
+
+### Features
+
+* **app:** board cards show notes and how the last run went ([fee3a5d](https://github.com/cubicecho/telos/commit/fee3a5d665650e6fd5c4cbcd1178a9260b9240e6)), closes [#26](https://github.com/cubicecho/telos/issues/26)
+* **server:** cardMarks says what a board's cards have to show ([6c190c5](https://github.com/cubicecho/telos/commit/6c190c5fb35a45cd196e7830a7f6ed6428b9b2d8)), closes [#26](https://github.com/cubicecho/telos/issues/26)
+
 # [1.6.0](https://github.com/cubicecho/telos/compare/v1.5.0...v1.6.0) (2026-10-02)
 
 
