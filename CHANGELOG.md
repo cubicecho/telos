@@ -1,3 +1,18 @@
+# [1.5.0](https://github.com/cubicecho/telos/compare/v1.4.0...v1.5.0) (2026-10-02)
+
+
+### Bug Fixes
+
+* **app:** the board follows the auto-run switch at once ([a04e09a](https://github.com/cubicecho/telos/commit/a04e09a3d08bf8e445154847c973816253a2c578))
+
+
+### Features
+
+* **app:** an auto-run switch, and Run now on a todo ([7464fec](https://github.com/cubicecho/telos/commit/7464fec40011442502ca98da8d1bad880fc0ec22)), closes [#13](https://github.com/cubicecho/telos/issues/13)
+* **server:** a project's auto-run switch, apart from its AI switch ([be76d8b](https://github.com/cubicecho/telos/commit/be76d8b08a57930aa0a189c8928116dfa17c4440)), closes [#13](https://github.com/cubicecho/telos/issues/13)
+* **server:** aiStatus says which todos wait to be asked for ([3b41a68](https://github.com/cubicecho/telos/commit/3b41a6821738a14369c267d635b4f730d4adbac4)), closes [#13](https://github.com/cubicecho/telos/issues/13)
+* **server:** run one todo now, on a board that does not run by itself ([7cdbfd9](https://github.com/cubicecho/telos/commit/7cdbfd9d2cfe740c7c4cbcdf01b3f30224a8789b)), closes [#13](https://github.com/cubicecho/telos/issues/13)
+
 # [1.4.0](https://github.com/cubicecho/telos/compare/v1.3.0...v1.4.0) (2026-10-02)
 
 
