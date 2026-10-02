@@ -1,4 +1,5 @@
 export * from './agents.ts';
+export * from './api-key-tools.ts';
 export * from './artifacts.ts';
 export * from './auth.ts';
 export * from './board-templates.ts';
