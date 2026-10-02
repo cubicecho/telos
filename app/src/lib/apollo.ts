@@ -110,6 +110,7 @@ const cache = new InMemoryCache({
         runs: replace,
         artifacts: replace,
         agents: replace,
+        mcpServers: replace,
         drafts: replace,
         boardTemplates: replace,
       },

@@ -6,8 +6,8 @@ import {
   AgentModelsDocument,
   AgentsDocument,
   CreateAgentDocument,
-  McpProbeDocument,
-  TestMcpServerDocument,
+  McpServersDocument,
+  UpdateAgentDocument,
 } from '@/lib/graphql';
 import { AgentManager } from '../agent-manager';
 
@@ -31,9 +31,32 @@ const AGENT = {
   toolSelectModel: null,
   requestTimeoutSeconds: null,
   maxRetries: null,
-  mcpServers: [],
+  mcpServerSlugs: null,
   hasApiKey: false,
 };
+
+const SERVER = {
+  __typename: 'McpServer',
+  id: 's1',
+  slug: 'docs',
+  name: 'Docs',
+  url: 'http://localhost:8080/mcp',
+  command: null,
+  args: [],
+  hiddenTools: [],
+  hooks: [],
+  enabled: true,
+  checkedAt: null,
+  checkOk: null,
+  checkError: null,
+  tools: [],
+  headerNames: [],
+  envNames: [],
+};
+
+function servers(rows: unknown[]) {
+  return { request: { query: McpServersDocument }, result: { data: { mcpServers: rows } } };
+}
 
 function agents(rows: unknown[]) {
   return { request: { query: AgentsDocument }, result: { data: { agents: rows } } };
@@ -64,7 +87,7 @@ describe('AgentManager', () => {
     minted = 0;
     const user = userEvent.setup();
     const values = {
-      id: 'id-2',
+      id: 'id-1',
       name: 'Reviewer',
       baseUrl: 'http://localhost:11434/v1',
       model: 'qwen3:14b',
@@ -77,11 +100,13 @@ describe('AgentManager', () => {
       toolSelectModel: null,
       requestTimeoutSeconds: null,
       maxRetries: null,
-      mcpServers: [{ id: 'id-1', name: 'files', url: 'http://localhost:8080/mcp' }],
+      // Every server the account has, which is what a new agent starts with.
+      mcpServerSlugs: null,
     };
     const create = vi.fn(() => ({ data: { createAgent: { ...AGENT, ...values } } }));
     manager([
       agents([]),
+      servers([SERVER]),
       { request: { query: CreateAgentDocument, variables: { values } }, result: create },
       agents([AGENT]),
     ]);
@@ -93,9 +118,7 @@ describe('AgentManager', () => {
     await user.type(screen.getByLabelText('Base URL'), 'http://localhost:11434/v1');
     await user.type(screen.getByLabelText('Model'), 'qwen3:14b');
     await user.type(screen.getByLabelText('Temperature'), '0.2');
-    await user.click(screen.getByRole('button', { name: 'Add MCP server' }));
-    await user.type(screen.getByLabelText('Server 1 name'), 'files');
-    await user.type(screen.getByLabelText('files URL'), 'http://localhost:8080/mcp');
+    expect(screen.getByRole('checkbox', { name: 'Every server' })).toBeChecked();
     await user.click(screen.getByRole('button', { name: 'Create agent' }));
 
     await waitFor(() => expect(create).toHaveBeenCalled());
@@ -140,54 +163,46 @@ describe('AgentManager', () => {
     expect(screen.getByLabelText('Context length')).toHaveValue('8192');
   });
 
-  it('tests a server through the runner and lists its tools, or says why not', async () => {
+  it('narrows an agent to the servers ticked, starting from the ones it reaches now', async () => {
     const user = userEvent.setup();
-    // What the form does not edit rides along, so the test is of the row as saved.
-    const server = { hiddenTools: ['secret'], id: 'docs', name: 'Docs', url: 'http://localhost:8080/mcp' };
-    const probe = (fields: object) => ({
-      __typename: 'McpProbe',
-      id: 'p1',
-      status: 'done',
-      ok: true,
-      tools: [],
-      error: null,
-      ...fields,
-    });
+    const memory = { ...SERVER, id: 's2', slug: 'memory', name: 'Memory' };
+    const update = vi.fn((variables: { set: { mcpServerSlugs: string[] } }) => ({
+      data: { updateAgent: { ...AGENT, mcpServerSlugs: variables.set.mcpServerSlugs } },
+    }));
     manager([
-      agents([{ ...AGENT, mcpServers: [server] }]),
-      {
-        request: { query: TestMcpServerDocument, variables: { server: JSON.stringify(server) } },
-        result: { data: { testMcpServer: { __typename: 'McpProbe', id: 'p1' } } },
-      },
-      {
-        request: { query: McpProbeDocument, variables: { id: 'p1' } },
-        result: {
-          data: {
-            mcpProbe: probe({
-              tools: [
-                { __typename: 'McpProbeTool', name: 'search', description: '' },
-                { __typename: 'McpProbeTool', name: 'fetch', description: '' },
-              ],
-            }),
-          },
-        },
-      },
-      {
-        request: { query: TestMcpServerDocument, variables: { server: JSON.stringify(server) } },
-        result: { data: { testMcpServer: { __typename: 'McpProbe', id: 'p2' } } },
-      },
-      {
-        request: { query: McpProbeDocument, variables: { id: 'p2' } },
-        result: { data: { mcpProbe: probe({ id: 'p2', ok: false, error: 'connect ECONNREFUSED' }) } },
-      },
+      agents([AGENT]),
+      servers([SERVER, memory]),
+      { request: { query: UpdateAgentDocument }, variableMatcher: () => true, result: update },
     ]);
 
     await user.click(await screen.findByRole('button', { name: 'Edit Reviewer' }));
-    await user.click(screen.getByRole('button', { name: 'Test Docs' }));
-    expect(await screen.findByText('Reached. 2 tools: search, fetch')).toBeInTheDocument();
+    await user.click(await screen.findByRole('checkbox', { name: 'Every server' }));
+    expect(await screen.findByRole('checkbox', { name: 'Docs' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Memory' })).toBeChecked();
+    await user.click(screen.getByRole('checkbox', { name: 'Memory' }));
+    await user.click(screen.getByRole('button', { name: 'Save' }));
 
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Test Docs' })).toBeEnabled());
-    await user.click(screen.getByRole('button', { name: 'Test Docs' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('connect ECONNREFUSED');
+    await waitFor(() => expect(update).toHaveBeenCalled());
+    expect(update.mock.calls[0][0]).toMatchObject({ id: 'a1', set: { mcpServerSlugs: ['docs'] } });
+  });
+
+  it('shows a server the agent names that is gone, and lets it be taken off the list', async () => {
+    const user = userEvent.setup();
+    const update = vi.fn((variables: { set: { mcpServerSlugs: string[] } }) => ({
+      data: { updateAgent: { ...AGENT, mcpServerSlugs: variables.set.mcpServerSlugs } },
+    }));
+    manager([
+      agents([{ ...AGENT, mcpServerSlugs: ['docs', 'gone'] }]),
+      servers([SERVER]),
+      { request: { query: UpdateAgentDocument }, variableMatcher: () => true, result: update },
+    ]);
+
+    await user.click(await screen.findByRole('button', { name: 'Edit Reviewer' }));
+    expect(await screen.findByText('“gone” no longer exists, so it is left out.')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Remove gone' }));
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(update).toHaveBeenCalled());
+    expect(update.mock.calls[0][0]).toMatchObject({ set: { mcpServerSlugs: ['docs'] } });
   });
 });

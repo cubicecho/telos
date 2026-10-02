@@ -34,8 +34,14 @@ beforeEach(async () => {
   runner = runnerClient(db);
 });
 
-async function setServers(servers: unknown[]): Promise<void> {
-  await db.update(dbSchema.agents).set({ mcpServers: servers }).where(eq(dbSchema.agents.id, board.agentId));
+/** Makes these the account's servers. The board's agent names none, so it reaches them all. */
+async function setServers(servers: Array<{ id: string; name: string; url: string; hooks?: unknown[] }>): Promise<void> {
+  await db.delete(dbSchema.mcpServers).where(eq(dbSchema.mcpServers.userId, board.userId));
+  await db
+    .insert(dbSchema.mcpServers)
+    .values(
+      servers.map(({ id, name, url, hooks }) => ({ userId: board.userId, slug: id, name, url, hooks: hooks ?? [] })),
+    );
 }
 
 async function claim(todoId: string): Promise<{ runId: string; turn: number; opensSession: boolean }> {

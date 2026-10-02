@@ -6,6 +6,7 @@ import type { Context } from '../context.ts';
 import { DRAFT_LEASE_SECONDS, draftBeingAnswered, expireLapsedDraftRuns, stopDraftReply } from '../draft-runs.ts';
 import { instanceAiOn } from '../instance.ts';
 import { findFirstOpenLaneId } from '../lanes.ts';
+import { runnerAgent } from '../mcp-servers.ts';
 import { stampActor } from '../provenance.ts';
 import { markRunnerSeen } from '../runner-seen.ts';
 import { loadAiProject, nextPosition } from './requests.ts';
@@ -358,7 +359,7 @@ export function applyDraftsExtension(schema: GraphQLSchema): GraphQLSchema {
         return {
           draftId: draft.id,
           runId: run.id,
-          agent: { ...agent, mcpServers: JSON.stringify(agent.mcpServers ?? []) },
+          agent: await runnerAgent(tx, agent),
           projectName: project.name,
           projectDescription: project.description ?? null,
           projectContext: project.context ?? null,

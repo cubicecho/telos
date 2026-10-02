@@ -7,6 +7,7 @@ import type { Actor, Context } from '../context.ts';
 import { stopDraftReply } from '../draft-runs.ts';
 import { instanceAiOn } from '../instance.ts';
 import { findDoneLaneId, findFirstOpenLaneId } from '../lanes.ts';
+import { runnerAgent } from '../mcp-servers.ts';
 import { stampActor } from '../provenance.ts';
 import { mintRunToken } from '../run-tokens.ts';
 import { markRunnerSeen } from '../runner-seen.ts';
@@ -54,8 +55,10 @@ const RUNS_SDL = parse(`
     toolSelectModel: String
     requestTimeoutSeconds: Int
     maxRetries: Int
-    "The agent's MCP servers, as JSON."
+    "The account's MCP servers the agent reaches, in slug order, as JSON, secrets included."
     mcpServers: String!
+    "What to say on the run about its servers: one line for each the agent names that is gone."
+    mcpNotices: [String!]!
   }
 
   "Everything an agent is told about the todo it is working, and where."
@@ -783,7 +786,7 @@ export function applyRunsExtension(schema: GraphQLSchema): GraphQLSchema {
           leaseExpiresAt: run.leaseExpiresAt,
           turn,
           opensSession,
-          agent: { ...agent, mcpServers: JSON.stringify(agent.mcpServers ?? []) },
+          agent: await runnerAgent(tx, agent),
           brief: await briefFor(tx, todo, lane, project),
         };
       });
