@@ -135,7 +135,8 @@ every level:
 
 With AI on there are two doors in. **`/mcp`** is for your own agents (Claude
 Code and the like): with an API key from Settings they can submit requests,
-read the board and add notes, but not move todos. **The runner** is telos's own
+read the board, add notes and correct or take back the notes they signed, but
+not move todos. **The runner** is telos's own
 worker. A lane with an agent is a *station*: the runner claims a todo there,
 has the agent work it, verify it, or split it into child todos, and telos moves
 it along the lane's arrows. A station can archive what passes instead of
@@ -166,6 +167,11 @@ reviewer rejected the work and **Run failed** when the run never finished (the
 reason is one press away on either), and how many attempts the station has
 used of its limit. The marks update as the board does. The note count is there
 with AI off too.
+
+A note you wrote can be edited or deleted from the todo's thread, and an edited
+note says so, with the time. What a run reported, and a verdict it returned,
+stay as written: the next agent may already have been told them. An edit
+reaches the runs that start after it and no run already under way.
 
 ```bash
 export AUTH_SECRET=$(openssl rand -hex 32)
