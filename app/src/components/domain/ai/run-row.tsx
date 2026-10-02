@@ -9,15 +9,20 @@ import { ChevronDown, ChevronRight } from '@/components/ui/icons';
 import { Spinner } from '@/components/ui/spinner';
 import { describeError } from '@/lib/errors';
 import { CancelRunDocument, DeleteRunDocument, RunDocument } from '@/lib/graphql';
-import { describeRun, RunLog, RunStatusBadge } from './run-log';
+import { DRAFT_RUN, describeRun, RunLog, RunStatusBadge, runSubject, runWhere } from './run-log';
 
 /** How often an open, live run is asked about again. */
 export const RUN_POLL_MS = 2000;
 
+/** What deleting a run takes and leaves, by what the run was. */
+const DELETE_TODO_RUN = 'Its log and prompts go. What it did to the todo, its notes and its artifacts stay.';
+const DELETE_DRAFT_RUN = 'Its log and prompts go. The draft, and what was said in it, stay.';
+
 /**
  * One run in a list: a line that says where, who and how it went, and opens
  * onto the whole log. Only an open row loads the log, so a list of a hundred
- * runs polls a hundred summaries rather than a hundred logs.
+ * runs polls a hundred summaries rather than a hundred logs. A reply in a
+ * draft is a run too, and is marked as one where runs of both kinds are listed.
  */
 export function RunRow({
   run,
@@ -25,7 +30,7 @@ export function RunRow({
   pollMs = RUN_POLL_MS,
 }: {
   run: RunSummaryFieldsFragment;
-  /** Name the todo too, for a list that is not already one todo's. */
+  /** Name the todo or draft too, for a list that is not already one todo's or one draft's. */
   showTodo?: boolean;
   pollMs?: number;
 }) {
@@ -35,8 +40,9 @@ export function RunRow({
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const running = run.status === 'running';
-  const where = `${run.lane?.name ?? 'A deleted lane'} · ${run.agent?.name ?? 'a deleted agent'}`;
-  const title = showTodo ? `${run.todo?.title ?? 'A deleted todo'} — ${where}` : where;
+  const ofDraft = run.kind === DRAFT_RUN;
+  const where = runWhere(run);
+  const title = showTodo ? `${runSubject(run)} — ${where}` : where;
 
   async function attempt(action: () => Promise<unknown>) {
     setError(null);
@@ -81,6 +87,7 @@ export function RunRow({
             <Text className="text-muted-foreground text-xs">{describeRun(run)}</Text>
           </View>
         </Pressable>
+        {ofDraft && showTodo ? <Badge variant="outline">Draft</Badge> : null}
         {run.verdict === 'none' ? null : (
           <Badge variant={run.verdict === 'pass' ? 'success' : 'destructive'}>
             {run.verdict === 'pass' ? 'Pass' : 'Fail'}
@@ -88,7 +95,8 @@ export function RunRow({
         )}
         <RunStatusBadge status={run.status} />
         {/* Cancelling asks; the runner stops at its next heartbeat and the run
-            is marked stopped then. Until it does, the request is what shows. */}
+            is marked stopped then. Until it does, the request is what shows.
+            A draft's reply stops at once: the turn goes back to the person. */}
         {running && !run.cancelRequestedAt ? (
           <Button variant="outline" size="sm" disabled={cancelling} onPress={cancel}>
             Cancel
@@ -120,7 +128,7 @@ export function RunRow({
         open={confirmingDelete}
         onOpenChange={setConfirmingDelete}
         title="Delete this run?"
-        description="Its log and prompts go. What it did to the todo, its notes and its artifacts stay."
+        description={ofDraft ? DELETE_DRAFT_RUN : DELETE_TODO_RUN}
         confirmLabel="Delete"
         onConfirm={remove}
       />

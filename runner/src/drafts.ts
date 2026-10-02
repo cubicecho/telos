@@ -1,10 +1,15 @@
-import { askJson, errorMessage } from '@cubicecho/agent-core';
-import type { ClaimedAgent, DraftAnswer, DraftClaim, Telos } from './telos.ts';
+import { askJson, errorMessage, estimateTokens } from '@cubicecho/agent-core';
+import type { ClaimedAgent, DraftAnswer, DraftClaim, RunEvent, Telos } from './telos.ts';
 
 // A draft's turn: the agent reads the conversation so far and answers it,
 // rewriting the draft's title and brief as it goes. Ported from kanban_server's
 // refine chat. It is one model call with no tools: the agent is helping a
 // person say what they want, not doing it.
+//
+// Each answer is recorded as a run, so it reports what a run does: what the
+// agent was told, what happened, and what it spent. `askJson` returns the
+// parsed answer and nothing about the request, so the token counts here are
+// estimated from the text, and the run says so.
 
 export const REFINE_SYSTEM = `You help someone turn a rough request into a todo worth working on.
 
@@ -35,6 +40,11 @@ const ANSWER_SCHEMA = {
 };
 
 const DEFAULTS = { maxTokens: 4096, temperature: 0.3, requestTimeoutSeconds: 300 };
+
+/** Said on every draft run, so nobody reads its token counts as the endpoint's. */
+export const ESTIMATED_NOTICE =
+  'Token counts for a draft reply are estimated from the text; the endpoint’s own counts are not reported.';
+const MALFORMED = 'The agent did not answer in the shape asked for. Try saying it again.';
 
 /**
  * The system prompt for a draft: the job, then where, then who the agent is.
@@ -77,6 +87,18 @@ export async function answerDraft(
   options: { signal?: AbortSignal; ask?: typeof askJson } = {},
 ): Promise<DraftAnswer> {
   const agent: ClaimedAgent = claim.agent;
+  const prompt = { system: refineSystem(claim), user: refinePrompt(claim) };
+  const asked = estimateTokens(prompt.system) + estimateTokens(prompt.user);
+  const events: RunEvent[] = [{ kind: 'notice', text: ESTIMATED_NOTICE }];
+  /** What the turn is recorded with, given what the model sent back. */
+  const spend = (said: string) => {
+    const completionTokens = said ? estimateTokens(said) : 0;
+    return {
+      prompt,
+      usage: { toolCalls: 0, promptTokens: asked, completionTokens, totalTokens: asked + completionTokens },
+      events,
+    };
+  };
   try {
     const answer = await (options.ask ?? askJson)<{ reply?: unknown; title?: unknown; brief?: unknown }>(
       {
@@ -85,22 +107,28 @@ export async function answerDraft(
         requestTimeoutSeconds: agent.requestTimeoutSeconds ?? DEFAULTS.requestTimeoutSeconds,
       },
       agent.model,
-      refineSystem(claim),
-      refinePrompt(claim),
+      prompt.system,
+      prompt.user,
       ANSWER_SCHEMA,
       {
         name: 'draft_turn',
         maxTokens: agent.maxTokens ?? DEFAULTS.maxTokens,
         temperature: agent.temperature ?? DEFAULTS.temperature,
+        onNotice: (text) => events.push({ kind: 'notice', text }),
         ...(options.signal ? { signal: options.signal } : {}),
       },
     );
     const text = (value: unknown) => (typeof value === 'string' ? value.trim() : '');
     const reply = text(answer?.reply);
-    if (!reply) return { error: 'The agent did not answer in the shape asked for. Try saying it again.' };
-    return { reply, title: text(answer?.title), brief: text(answer?.brief) };
+    // What it sent back, as near as the parsed answer tells: the counts are estimates.
+    const said = answer === undefined ? '' : JSON.stringify(answer);
+    if (!reply) {
+      return { error: MALFORMED, ...spend(said) };
+    }
+    events.push({ kind: 'output', text: reply });
+    return { reply, title: text(answer?.title), brief: text(answer?.brief), ...spend(said) };
   } catch (error) {
-    return { error: errorMessage(error) || 'The agent could not be reached.' };
+    return { error: errorMessage(error) || 'The agent could not be reached.', ...spend('') };
   }
 }
 
@@ -130,7 +158,7 @@ export async function takeDrafts(
     if (!claim) continue;
     taken++;
     const turn = answerDraft(claim, options)
-      .then((answer) => telos.finishDraft(id, answer))
+      .then((answer) => telos.finishDraft(id, claim.runId, answer))
       .catch((error) =>
         options.log(
           `[runner] reporting a draft's answer failed: ${error instanceof Error ? error.message : String(error)}`,

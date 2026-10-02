@@ -398,9 +398,12 @@ export const UpdateStationDocument = graphql(`
 
 // A run's summary is what a list polls: no log, no prompts, no output, which
 // are the heavy parts. RunFields adds them, for a run someone has opened.
+// A run is a station's work on a todo or an agent's reply in a draft (`kind`),
+// and has the todo and lane, or the draft, to match.
 export const RunSummaryFieldsFragment = graphql(`
   fragment RunSummaryFields on Run {
     id
+    kind
     status
     verdict
     contract
@@ -422,6 +425,10 @@ export const RunSummaryFieldsFragment = graphql(`
       name
     }
     todo {
+      id
+      title
+    }
+    draft {
       id
       title
     }
@@ -514,6 +521,7 @@ export const ProjectRunsDocument = graphql(`
 /**
  * What a project's agents are doing now, and have spent since `since`: the
  * board's live marks and the project header's figures, polled together.
+ * `spent` is every run; `draftSpent` is how much of it was replies in drafts.
  */
 export const ProjectActivityDocument = graphql(`
   query ProjectActivity($projectId: UUID!, $project: ID!, $since: DateTime!) {
@@ -529,6 +537,7 @@ export const ProjectActivityDocument = graphql(`
     }
     live: runs(where: { projectId: { eq: $projectId }, status: { eq: "running" } }) {
       id
+      kind
       todoId
       laneId
       cancelRequestedAt
@@ -542,6 +551,14 @@ export const ProjectActivityDocument = graphql(`
       sum {
         promptTokens
         completionTokens
+        totalTokens
+      }
+    }
+    draftSpent: runsAggregate(
+      where: { projectId: { eq: $projectId }, kind: { eq: "draft" }, startedAt: { gte: $since } }
+    ) {
+      count
+      sum {
         totalTokens
       }
     }
@@ -600,6 +617,12 @@ export const TodoRecordDocument = graphql(`
         runId
         reason
         at
+      }
+      draft {
+        id
+        runs(orderBy: { startedAt: { direction: asc, priority: 1 } }) {
+          ...RunSummaryFields
+        }
       }
       project {
         id
@@ -1106,6 +1129,9 @@ export const DraftDocument = graphql(`
         id
         role
         content
+      }
+      runs(orderBy: { startedAt: { direction: desc, priority: 1 } }) {
+        ...RunSummaryFields
       }
     }
   }

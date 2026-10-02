@@ -136,6 +136,8 @@ export interface ProbeResult {
 /** A draft the runner has taken to answer. */
 export interface DraftClaim {
   draftId: string;
+  /** The run this answer is recorded as. */
+  runId: string;
   agent: ClaimedAgent;
   projectName: string;
   projectDescription: string | null;
@@ -146,7 +148,14 @@ export interface DraftClaim {
 }
 
 /** What the agent made of a draft: its reply and the title and brief now, or why it could not. */
-export type DraftAnswer = { reply: string; title: string; brief: string } | { error: string };
+export type DraftAnswer = ({ reply: string; title: string; brief: string } | { error: string }) & DraftSpend;
+
+/** What a draft's answer is recorded with, on its run: said or failed alike. */
+export interface DraftSpend {
+  prompt: RunPrompt;
+  usage: RunUsage;
+  events: RunEvent[];
+}
 
 /** The runner's calls into telos. An interface so a test can stand in for it. */
 export interface Telos {
@@ -161,7 +170,8 @@ export interface Telos {
   /** Drafts waiting on an answer. */
   drafts(limit?: number): Promise<string[]>;
   claimDraft(id: string): Promise<DraftClaim | null>;
-  finishDraft(id: string, answer: DraftAnswer): Promise<void>;
+  /** Reports a draft's answer against the run `claimDraft` started. */
+  finishDraft(id: string, runId: string, answer: DraftAnswer): Promise<void>;
 }
 
 const QUEUE = `query ($limit: Int) { runnerQueue(limit: $limit) { todoId laneId projectId } }`;
@@ -188,13 +198,19 @@ const FINISH_PROBE = `mutation ($id: ID!, $result: ProbeResultInput!) { finishPr
 const DRAFTS = `query ($limit: Int) { runnerDrafts(limit: $limit) }`;
 const CLAIM_DRAFT = `mutation ($id: ID!) {
   claimDraft(id: $id) {
-    draftId projectName projectDescription projectContext title brief
+    draftId runId projectName projectDescription projectContext title brief
     agent { ${AGENT_FIELDS} }
     messages { role content }
   }
 }`;
-const FINISH_DRAFT = `mutation ($id: ID!, $reply: String, $title: String, $brief: String, $error: String) {
-  finishDraft(id: $id, reply: $reply, title: $title, brief: $brief, error: $error)
+const FINISH_DRAFT = `mutation (
+  $id: ID!, $runId: ID, $reply: String, $title: String, $brief: String, $error: String,
+  $prompt: RunPromptInput, $usage: RunUsageInput, $events: [RunEventInput!]
+) {
+  finishDraft(
+    id: $id, runId: $runId, reply: $reply, title: $title, brief: $brief, error: $error,
+    prompt: $prompt, usage: $usage, events: $events
+  )
 }`;
 const FINISH = `mutation ($id: ID!, $result: RunResultInput!) { finishRun(id: $id, result: $result) { id } }`;
 
@@ -267,8 +283,8 @@ export function createTelos(options: { telosUrl: string; runnerKey: string; fetc
     },
     drafts: async (limit = 20) => (await request<{ runnerDrafts: string[] }>(DRAFTS, { limit })).runnerDrafts,
     claimDraft: async (id) => (await request<{ claimDraft: DraftClaim | null }>(CLAIM_DRAFT, { id })).claimDraft,
-    finishDraft: async (id, answer) => {
-      await request(FINISH_DRAFT, { id, ...answer });
+    finishDraft: async (id, runId, answer) => {
+      await request(FINISH_DRAFT, { id, runId, ...answer });
     },
   };
 }

@@ -4,6 +4,7 @@ import { extendSchema, GraphQLError, type GraphQLObjectType, type GraphQLSchema,
 import { requireSystem } from '../ai-gate.ts';
 import { assertNoCycle, findBlocked } from '../blocking.ts';
 import type { Actor, Context } from '../context.ts';
+import { stopDraftReply } from '../draft-runs.ts';
 import { instanceAiOn } from '../instance.ts';
 import { findDoneLaneId, findFirstOpenLaneId } from '../lanes.ts';
 import { stampActor } from '../provenance.ts';
@@ -169,7 +170,7 @@ const RUNS_SDL = parse(`
     heartbeatRun(id: ID!, events: [RunEventInput!], prompt: RunPromptInput, usage: RunUsageInput): Boolean!
     "Records what a run came to and moves its todo on. The runner's only."
     finishRun(id: ID!, result: RunResultInput!): Run!
-    "Asks a running run to stop, and tells AI to ignore its todo so no run starts on it again until that is switched off. The agent hears it on its next heartbeat."
+    "Asks a running run to stop, and tells AI to ignore its todo so no run starts on it again until that is switched off. The agent hears it on its next heartbeat. A draft's run stops at once, as stopDraft does."
     cancelRun(id: ID!): Run!
     "Deletes a finished run and its log. What it did to the todo, its notes and history, stays."
     deleteRun(id: ID!): Boolean!
@@ -224,6 +225,11 @@ function leaseFromNow(): Date {
 async function loadRunForUpdate(tx: AnyRow, runId: string) {
   const [run] = await tx.select().from(dbSchema.runs).where(eq(dbSchema.runs.id, runId)).for('update');
   if (!run) throw notFound('Run');
+  if (run.kind !== 'todo') {
+    throw new GraphQLError("That run is a draft's reply, which has no station. Report it with finishDraft.", {
+      extensions: { code: 'BAD_USER_INPUT' },
+    });
+  }
   const [todo] = await tx.select().from(dbSchema.todos).where(eq(dbSchema.todos.id, run.todoId));
   const [project] = await tx.select().from(dbSchema.projects).where(eq(dbSchema.projects.id, run.projectId));
   const [user] = await tx
@@ -357,7 +363,7 @@ interface ProposedTodo {
   dependsOn?: string[] | null;
 }
 
-interface RunEventInput {
+export interface RunEventInput {
   kind: string;
   name?: string | null;
   ok?: boolean | null;
@@ -383,7 +389,7 @@ interface ArtifactInput {
  * @param incoming What the runner just reported.
  * @returns The events to store.
  */
-function withEvents(existing: dbSchema.RunEvent[] | null, incoming: RunEventInput[] | null | undefined) {
+export function withEvents(existing: dbSchema.RunEvent[] | null, incoming: RunEventInput[] | null | undefined) {
   const at = new Date().toISOString();
   const events = [...(existing ?? [])];
   for (const event of incoming ?? []) {
@@ -431,7 +437,7 @@ function keepEnd(text: string, limit: number): string {
  * @param usage What the runner says the run has spent.
  * @returns Columns to set.
  */
-function reported(run: AnyRow, prompt: RunPrompt | null | undefined, usage: RunUsage | null | undefined) {
+export function reported(run: AnyRow, prompt: RunPrompt | null | undefined, usage: RunUsage | null | undefined) {
   return {
     ...(prompt && run.systemPrompt == null && run.userPrompt == null
       ? { systemPrompt: prompt.system.slice(0, PROMPT_CHARS), userPrompt: prompt.user.slice(0, PROMPT_CHARS) }
@@ -447,12 +453,12 @@ function reported(run: AnyRow, prompt: RunPrompt | null | undefined, usage: RunU
   };
 }
 
-interface RunPrompt {
+export interface RunPrompt {
   system: string;
   user: string;
 }
 
-interface RunUsage {
+export interface RunUsage {
   toolCalls?: number | null;
   promptTokens: number;
   completionTokens: number;
@@ -825,6 +831,14 @@ export function applyRunsExtension(schema: GraphQLSchema): GraphQLSchema {
       .where(and(eq(dbSchema.runs.id, args.id), eq(dbSchema.runs.userId, userId)));
     if (!run) throw notFound('Run');
     if (run.status !== 'running' || run.cancelRequestedAt) return run;
+    if (run.kind === 'draft') {
+      // A draft's reply has no todo to set aside: stopping it is stopDraft.
+      return db.transaction(async (tx: AnyRow) => {
+        await stopDraftReply(tx, run.draftId);
+        const [stopped] = await tx.select().from(dbSchema.runs).where(eq(dbSchema.runs.id, run.id));
+        return stopped;
+      });
+    }
     return db.transaction(async (tx: AnyRow) => {
       const [cancelled] = await tx
         .update(dbSchema.runs)
@@ -890,7 +904,7 @@ export function applyRunsExtension(schema: GraphQLSchema): GraphQLSchema {
  * @param error What was thrown.
  * @returns Whether it was SQLSTATE 23505.
  */
-function isUniqueViolation(error: unknown): boolean {
+export function isUniqueViolation(error: unknown): boolean {
   let current: unknown = error;
   for (let depth = 0; current && depth < 4; depth++) {
     if ((current as { code?: unknown }).code === '23505') return true;

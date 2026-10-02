@@ -9,12 +9,14 @@ import { Button } from '@/components/ui/button';
 import { LoadState } from '@/components/ui/load-failure';
 import { SegmentedButton, SegmentedGroup } from '@/components/ui/segmented';
 import { ProjectArtifactsDocument, ProjectRunsDocument } from '@/lib/graphql';
-import { type ProjectActivity, SPEND_DAYS } from './project-activity';
+import { draftReplies, type ProjectActivity, SPEND_DAYS } from './project-activity';
 import { RunRow } from './run-row';
 import { ArtifactRow } from './todo-runs';
 
 // A project's runs, every station and todo together, newest first: the place
-// to see what its agents have been doing, and what it cost.
+// to see what its agents have been doing, and what it cost. An agent's replies
+// in the project's drafts are runs too: listed with the rest, marked as drafts,
+// and counted in the figures, which say how much of each was theirs.
 
 /** How many runs a page adds. */
 export const RUNS_PAGE = 50;
@@ -54,6 +56,9 @@ export function ProjectRuns({
   const runs = query.data?.runs ?? [];
   const spent = activity.spent;
   const sum = spent?.sum;
+  const drafting = activity.drafting.length;
+  const drafts = activity.draftSpent?.count ?? 0;
+  const draftTokens = activity.draftSpent?.sum?.totalTokens ?? 0;
 
   return (
     <View className="gap-6">
@@ -61,7 +66,8 @@ export function ProjectRuns({
         <StatTile
           className="min-w-40 flex-1"
           label="Running now"
-          value={activity.live.size}
+          value={activity.live.size + drafting}
+          hint={drafting > 0 ? draftReplies(drafting) : undefined}
           loading={!spent}
           onPress={() => setFilter(filter === 'running' ? 'all' : 'running')}
           selected={filter === 'running'}
@@ -70,14 +76,19 @@ export function ProjectRuns({
           className="min-w-40 flex-1"
           label="Runs"
           value={(spent?.count ?? 0).toLocaleString()}
-          hint={`in ${SPEND_DAYS} days`}
+          hint={drafts > 0 ? `in ${SPEND_DAYS} days, ${draftReplies(drafts)}` : `in ${SPEND_DAYS} days`}
           loading={!spent}
         />
         <StatTile
           className="min-w-40 flex-1"
           label="Tokens"
           value={(sum?.totalTokens ?? 0).toLocaleString()}
-          hint={`${(sum?.promptTokens ?? 0).toLocaleString()} in, ${(sum?.completionTokens ?? 0).toLocaleString()} out, ${SPEND_DAYS} days`}
+          hint={[
+            `${(sum?.promptTokens ?? 0).toLocaleString()} in`,
+            `${(sum?.completionTokens ?? 0).toLocaleString()} out`,
+            ...(draftTokens > 0 ? [`${draftTokens.toLocaleString()} on drafts`] : []),
+            `${SPEND_DAYS} days`,
+          ].join(', ')}
           loading={!spent}
         />
       </View>

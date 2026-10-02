@@ -243,6 +243,26 @@ many runs came before (`turn`), so a todo's first run fires `sessionStart`
 ahead of `beforeTurn`, and every run fires `afterTurn` and `sessionEnd`.
 `beforeCompact` and `sessionDelete` are never fired.
 
+**A draft's reply is a run, and no todo's.** `runs.kind` is `todo` or `draft`,
+and `ck_runs_owner` holds each to its shape: a todo's run has `todo_id` and a
+`contract`, a draft's has `draft_id` and neither. `claimDraft` starts the run
+and `finishDraft` closes it with the prompt, usage and events `finishRun`
+takes; `finishRun` and `heartbeatRun` refuse a draft's run. The lease and the
+stop are the run's (`server/src/draft-runs.ts`): a draft is being answered
+while it has a running run whose lease has not lapsed, `stopDraft` and
+`cancelRun` both stop that run at once, and a reply that lands on a run no
+longer running records its spend and nothing else. The runner cannot read the
+endpoint's token counts through `askJson`, so it estimates them and says so in
+a notice on the run. Whatever reads runs to decide something about a todo must
+leave these out, by `kind = 'todo'` or because it joins through `todo_id` or
+`lane_id`, which they lack: `readyTodos`, `failuresSinceTouched`,
+`stationStates`, `cardMarks`, `aiStatus`, `claimRun`'s `turn` and `aiSetup`'s
+`has_run`. Where runs are listed or added up (a project's runs, its spend,
+retention) they count, and the app marks them as drafts. The runs stay with
+the draft: a todo made from one reaches them through `todo.draft`, and
+discarding the draft deletes them. An API key or an agent sees none of them,
+as it sees no draft.
+
 **`scope` cannot reach a plain insert.** Any foreign key a caller can state gets
 checked in an `onWrite` hook in `server/src/resolvers/write-guards.ts`. A new
 table with a user-facing FK needs an entry in `FOREIGN_KEYS`.

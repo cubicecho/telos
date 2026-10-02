@@ -2,6 +2,7 @@ import { useMutation, useQuery } from '@apollo/client';
 import { useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
 import { DialogLayout } from '@/components/dialog-layout';
+import { RunRow } from '@/components/domain/ai/run-row';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -31,6 +32,9 @@ export const DRAFT_POLL_MS = 1500;
  *
  * Turns alternate: while the agent is thinking there is nothing to send, only
  * Stop, which gives the turn back and drops whatever answer comes late.
+ *
+ * Each reply is a run, listed under the brief and opened as a todo's runs are:
+ * what the agent was told, what it said and spent, and why a reply failed.
  */
 export function DraftDialog({
   open,
@@ -304,6 +308,17 @@ function DraftTalk({
           placeholder="The agent writes this as you talk."
         />
       </View>
+
+      {draft.runs.length > 0 ? (
+        <View className="gap-2 border-border border-t pt-4">
+          <Text className="font-medium text-foreground text-sm">Replies</Text>
+          <View role="list" aria-label="Replies" className="gap-2">
+            {draft.runs.map((run) => (
+              <RunRow key={run.id} run={run} pollMs={pollMs} />
+            ))}
+          </View>
+        </View>
+      ) : null}
 
       {actionError ? (
         <Text className="text-destructive text-sm" aria-live="polite">

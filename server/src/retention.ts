@@ -14,6 +14,9 @@ import { resultRows } from './blocking.ts';
 //
 // What a run did stays: its notes and history keep their `runId`, pointing at
 // a run that is gone, and its artifacts keep their files.
+//
+// A draft's replies are runs too, and no station counts them, so every finished
+// one past its keep goes. What the agent said stays in the draft's conversation.
 
 // biome-ignore lint/suspicious/noExplicitAny: db type varies by driver (postgres-js, PGlite)
 type AnyDb = any;
@@ -32,13 +35,21 @@ export const MAX_RETENTION_DAYS = 3650;
  * @returns How many runs went.
  */
 export async function pruneRuns(db: AnyDb, now: Date = new Date()): Promise<number> {
+  const stale = sql`u.run_retention_days IS NOT NULL
+      AND r.status <> 'running'
+      AND coalesce(r.finished_at, r.started_at) < ${now.toISOString()}::timestamptz - make_interval(days => u.run_retention_days)`;
+  const drafts = await db.execute(sql`
+    DELETE FROM runs r
+    USING users u
+    WHERE u.id = r.user_id AND r.kind = 'draft'
+      AND ${stale}
+    RETURNING r.id
+  `);
   const result = await db.execute(sql`
     DELETE FROM runs r
     USING users u, todos t
-    WHERE u.id = r.user_id AND t.id = r.todo_id
-      AND u.run_retention_days IS NOT NULL
-      AND r.status <> 'running'
-      AND coalesce(r.finished_at, r.started_at) < ${now.toISOString()}::timestamptz - make_interval(days => u.run_retention_days)
+    WHERE u.id = r.user_id AND t.id = r.todo_id AND r.kind = 'todo'
+      AND ${stale}
       AND (
         t.completed_at IS NOT NULL
         OR NOT (
@@ -56,7 +67,7 @@ export async function pruneRuns(db: AnyDb, now: Date = new Date()): Promise<numb
       )
     RETURNING r.id
   `);
-  return resultRows(result).length;
+  return resultRows(result).length + resultRows(drafts).length;
 }
 
 /**

@@ -64,7 +64,7 @@ async function readSetup(db: AnyDb, userId: string): Promise<SetupRow> {
         AND EXISTS (SELECT 1 FROM lanes l WHERE l.project_id = p.id AND l.agent_id IS NOT NULL)
     ),
     has_run AS (
-      SELECT EXISTS (SELECT 1 FROM runs r WHERE r.user_id = ${userId}) AS yes
+      SELECT EXISTS (SELECT 1 FROM runs r WHERE r.user_id = ${userId} AND r.kind = 'todo') AS yes
     )
     SELECT
       EXISTS (SELECT 1 FROM agents a WHERE a.user_id = ${userId}) AS agent,

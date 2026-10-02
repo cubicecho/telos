@@ -28,11 +28,9 @@ export const drafts = pgTable(
     title: text('title').notNull().default(''),
     brief: text('brief').notNull().default(''),
     // Set when the person has said something the agent has not answered yet;
-    // cleared by the answer. This is what the runner looks for.
+    // cleared by the answer. This is what the runner looks for. The answering
+    // itself is a run (models/runs.ts, kind `draft`), which holds the lease.
     waitingSince: timestamp('waiting_since', { withTimezone: true }),
-    // Held while the runner has the agent answering. One that passes is a
-    // runner that died, and the draft is taken again.
-    leaseExpiresAt: timestamp('lease_expires_at', { withTimezone: true }),
     // Why the last answer did not come, when it did not.
     error: text('error'),
     // The todo it became.
