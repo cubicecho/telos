@@ -3,7 +3,13 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { format } from 'date-fns';
 import { describe, expect, it, vi } from 'vitest';
-import { AiStateDocument, TodoRecordDocument, TodoRunsDocument, UpdateTodoDocument } from '@/lib/graphql';
+import {
+  AiStateDocument,
+  RunTodoDocument,
+  TodoRecordDocument,
+  TodoRunsDocument,
+  UpdateTodoDocument,
+} from '@/lib/graphql';
 import { TodoFormDialog } from '../todo-form-dialog';
 import type { TodoSummary } from '../types';
 
@@ -244,6 +250,46 @@ describe('TodoFormDialog', () => {
       </MockedProvider>,
     );
     expect(await screen.findByRole('tab', { name: 'Runs' })).toBeInTheDocument();
+  });
+
+  it('asks for the todo to be run now from the Runs tab, when it stands in a lane', async () => {
+    const user = userEvent.setup();
+    const todoRuns = {
+      request: { query: TodoRunsDocument, variables: { id: TODO.id } },
+      result: {
+        data: {
+          todo: {
+            __typename: 'Todo',
+            id: TODO.id,
+            project: { __typename: 'Project', id: 'p1', aiEnabled: true },
+            runs: [],
+            artifacts: [],
+          },
+        },
+      },
+    };
+    const asked = vi.fn(() => ({ data: { runTodo: { __typename: 'Todo', id: TODO.id } } }));
+    const runTodo = { request: { query: RunTodoDocument, variables: { id: TODO.id } }, result: asked };
+    const standing = { ...TODO, lane: { id: 'l1', name: 'To do', position: 0, isDone: false } };
+
+    const first = render(
+      <MockedProvider mocks={[aiState(true, true), todoRuns, todoRuns]}>
+        <TodoFormDialog open onOpenChange={vi.fn()} todo={TODO} initialTab="runs" />
+      </MockedProvider>,
+    );
+    // In no lane, no station could take it, so there is nothing to ask.
+    expect(await screen.findByText('No agent has worked this todo yet.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Run “Replace the tap” now' })).not.toBeInTheDocument();
+    first.unmount();
+
+    render(
+      <MockedProvider mocks={[aiState(true, true), todoRuns, todoRuns, todoRuns, runTodo]}>
+        <TodoFormDialog open onOpenChange={vi.fn()} todo={standing} initialTab="runs" />
+      </MockedProvider>,
+    );
+    await user.click(await screen.findByRole('button', { name: 'Run “Replace the tap” now' }));
+    await waitFor(() => expect(asked).toHaveBeenCalled());
+    expect(await screen.findByText('Asked. An agent takes it when its station has room.')).toBeInTheDocument();
   });
 
   it('opens the thread at a note an agent left, from its artifact', async () => {

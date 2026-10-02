@@ -1,6 +1,6 @@
 import { Pressable, Text, View } from 'react-native';
 import { AiIgnoredBadge } from '@/components/domain/ai/ai-ignored-badge';
-import type { LiveRun, StuckTodo } from '@/components/domain/ai/project-activity';
+import type { LiveRun, StuckTodo, WaitingTodo } from '@/components/domain/ai/project-activity';
 import { LiveDot } from '@/components/domain/ai/run-log';
 import { LabelBadge } from '@/components/domain/label/label-badge';
 import { DueBadge } from '@/components/domain/todo/due-badge';
@@ -18,8 +18,11 @@ export interface BoardAi {
   live: ReadonlyMap<string, LiveRun>;
   /** The todos a station gave up on or finished with, by todo id. */
   stuck: ReadonlyMap<string, StuckTodo>;
+  /** The todos a station would work if asked, or has been asked to, by todo id. */
+  waiting: ReadonlyMap<string, WaitingTodo>;
   onWatch: (todo: TodoSummary) => void;
   onRetry: (todo: TodoSummary) => void;
+  onRun: (todo: TodoSummary) => void;
 }
 
 /**
@@ -34,8 +37,10 @@ export function BoardCardBody({
   onEdit,
   live,
   stuck,
+  waiting,
   onWatch,
   onRetry,
+  onRun,
   className,
 }: {
   todo: TodoSummary;
@@ -46,8 +51,11 @@ export function BoardCardBody({
   live?: LiveRun | undefined;
   /** Why a station stopped on it, when one did and it waits on a person. */
   stuck?: StuckTodo | undefined;
+  /** Set when its project does not run by itself and a station would work it if asked, or has been. */
+  waiting?: WaitingTodo | undefined;
   onWatch?: (() => void) | undefined;
   onRetry?: (() => void) | undefined;
+  onRun?: (() => void) | undefined;
   className?: string;
 }) {
   const done = todo.completedAt != null;
@@ -160,6 +168,23 @@ export function BoardCardBody({
             </Button>
           ) : null}
         </View>
+      ) : waiting ? (
+        <View className="mt-2 flex-row items-center gap-2">
+          <Text numberOfLines={1} className="min-w-0 flex-1 text-muted-foreground text-xs">
+            {waiting.runRequested ? 'Waiting for an agent' : 'Waiting to be run'}
+          </Text>
+          {onRun && waiting.runRequested === false ? (
+            <Button
+              variant="ghost"
+              size="xs"
+              className="-my-1 -mr-2"
+              aria-label={`Run “${todo.title}” now`}
+              onPress={onRun}
+            >
+              Run now
+            </Button>
+          ) : null}
+        </View>
       ) : null}
     </View>
   );
@@ -173,8 +198,10 @@ export function BoardCard({
   onEdit,
   live,
   stuck,
+  waiting,
   onWatch,
   onRetry,
+  onRun,
 }: {
   todo: TodoSummary;
   lanes: readonly LaneSummary[];
@@ -182,8 +209,10 @@ export function BoardCard({
   onEdit: () => void;
   live?: LiveRun | undefined;
   stuck?: StuckTodo | undefined;
+  waiting?: WaitingTodo | undefined;
   onWatch?: (() => void) | undefined;
   onRetry?: (() => void) | undefined;
+  onRun?: (() => void) | undefined;
 }) {
   // A blocked card is not draggable — the same choice the row's checkbox makes,
   // disabling the affordance rather than letting it fail — but it stays a drop
@@ -197,8 +226,10 @@ export function BoardCard({
         onEdit={onEdit}
         live={live}
         stuck={stuck}
+        waiting={waiting}
         onWatch={onWatch}
         onRetry={onRetry}
+        onRun={onRun}
       />
     </DraggableCard>
   );

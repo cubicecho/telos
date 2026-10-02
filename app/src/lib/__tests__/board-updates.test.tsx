@@ -18,6 +18,7 @@ const project = (name: string) => ({
         todoCount: 0,
         openTodoCount: 0,
         aiEnabled: false,
+        autoRun: false,
         labels: [],
       },
     },

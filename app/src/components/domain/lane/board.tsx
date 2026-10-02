@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from '@apollo/client';
 import { useMemo, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
-import type { LiveRun, StuckTodo } from '@/components/domain/ai/project-activity';
+import type { LiveRun, StuckTodo, WaitingTodo } from '@/components/domain/ai/project-activity';
 import { StationDialog } from '@/components/domain/ai/station-dialog';
 import { WatchRunDialog } from '@/components/domain/ai/watch-run-dialog';
 import { TodoFormDialog } from '@/components/domain/todo/todo-form-dialog';
@@ -9,7 +9,7 @@ import type { TodoSummary } from '@/components/domain/todo/types';
 import { useAi } from '@/lib/ai';
 import type { CachedLane } from '@/lib/cache';
 import { describeError } from '@/lib/errors';
-import { ProjectActivityDocument, ProjectStationsDocument, RetryTodoDocument } from '@/lib/graphql';
+import { ProjectActivityDocument, ProjectStationsDocument, RetryTodoDocument, RunTodoDocument } from '@/lib/graphql';
 import { todosInLane } from '@/lib/lanes';
 import { type BoardAi, BoardCardBody } from './board-card';
 import { DragBoard } from './drag-surfaces';
@@ -42,6 +42,7 @@ export function Board({
   todos,
   live,
   stuck,
+  waiting,
 }: {
   projectId: string;
   /** The project's own AI switch. */
@@ -52,6 +53,8 @@ export function Board({
   live?: ReadonlyMap<string, LiveRun> | undefined;
   /** The todos a station stopped on, by todo id, from the same poll. */
   stuck?: ReadonlyMap<string, StuckTodo> | undefined;
+  /** The todos waiting to be asked for, or asked for and not yet started, from the same poll. */
+  waiting?: ReadonlyMap<string, WaitingTodo> | undefined;
 }) {
   const [dragging, setDragging] = useState<TodoSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -72,12 +75,15 @@ export function Board({
   const [watching, setWatching] = useState<TodoSummary | null>(null);
   const shownLive = stationsOn ? live : undefined;
   const [retryTodo] = useMutation(RetryTodoDocument, { refetchQueries: [ProjectActivityDocument] });
+  const [runTodo] = useMutation(RunTodoDocument, { refetchQueries: [ProjectActivityDocument] });
   const boardAi: BoardAi | undefined = shownLive
     ? {
         live: shownLive,
         stuck: stuck ?? new Map(),
+        waiting: waiting ?? new Map(),
         onWatch: setWatching,
         onRetry: (todo) => run(() => retryTodo({ variables: { id: todo.id } })),
+        onRun: (todo) => run(() => runTodo({ variables: { id: todo.id } })),
       }
     : undefined;
 

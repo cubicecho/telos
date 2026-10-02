@@ -187,8 +187,10 @@ export function LaneColumn({
             onEdit={() => onEdit(todo)}
             live={ai?.live.get(todo.id)}
             stuck={ai?.stuck.get(todo.id)}
+            waiting={ai?.waiting.get(todo.id)}
             onWatch={ai ? () => ai.onWatch(todo) : undefined}
             onRetry={ai ? () => ai.onRetry(todo) : undefined}
+            onRun={ai ? () => ai.onRun(todo) : undefined}
           />
         ))}
         {todos.length === 0 ? <Text className="px-1 py-2 text-muted-foreground text-xs">Drop a todo here.</Text> : null}

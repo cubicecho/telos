@@ -1,9 +1,16 @@
 import { MockedProvider } from '@apollo/client/testing';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { GraphQLError } from 'graphql';
 import { describe, expect, it, vi } from 'vitest';
 import type { TodoSummary } from '@/components/domain/todo/types';
-import { AiStateDocument, CancelRunDocument, ProjectStationsDocument, RetryTodoDocument } from '@/lib/graphql';
+import {
+  AiStateDocument,
+  CancelRunDocument,
+  ProjectStationsDocument,
+  RetryTodoDocument,
+  RunTodoDocument,
+} from '@/lib/graphql';
 import { fullRun, run, runMock } from '../../ai/__tests__/run-fixtures';
 import { Board } from '../board';
 
@@ -69,9 +76,15 @@ const LIVE = new Map([
   ],
 ]);
 
-const STUCK = new Map([
-  ['t1', { __typename: 'StationTodo' as const, todoId: 't1', state: 'attention', reason: 'It broke.', failures: 4 }],
-]);
+function stationTodo(state: string, reason: string | null, { awaitsRun = false, runRequested = false } = {}) {
+  return new Map([
+    ['t1', { __typename: 'StationTodo' as const, todoId: 't1', state, reason, failures: 0, awaitsRun, runRequested }],
+  ]);
+}
+
+const STUCK = stationTodo('attention', 'It broke.');
+const AWAITS_RUN = stationTodo('parked', 'Auto-run is off.', { awaitsRun: true });
+const RUN_REQUESTED = stationTodo('queued', null, { runRequested: true });
 
 const STATIONS = {
   request: { query: ProjectStationsDocument, variables: { projectId: 'p1' } },
@@ -87,11 +100,24 @@ function board(
   // biome-ignore lint/suspicious/noExplicitAny: MockedProvider's mock array type
   mocks: any[],
   aiEnabled: boolean,
-  { todos = [], live, stuck }: { todos?: TodoSummary[]; live?: typeof LIVE; stuck?: typeof STUCK } = {},
+  {
+    todos = [],
+    live,
+    stuck,
+    waiting,
+  }: { todos?: TodoSummary[]; live?: typeof LIVE; stuck?: typeof STUCK; waiting?: typeof STUCK } = {},
 ) {
   render(
     <MockedProvider mocks={mocks}>
-      <Board projectId="p1" aiEnabled={aiEnabled} lanes={LANES} todos={todos} live={live} stuck={stuck} />
+      <Board
+        projectId="p1"
+        aiEnabled={aiEnabled}
+        lanes={LANES}
+        todos={todos}
+        live={live}
+        stuck={stuck}
+        waiting={waiting}
+      />
     </MockedProvider>,
   );
 }
@@ -192,6 +218,50 @@ describe('Board stations', () => {
     expect(await screen.findByText('It broke.')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Send “Write it” round again' }));
     await vi.waitFor(() => expect(retried).toHaveBeenCalled());
+  });
+
+  it('offers to run a card that waits to be asked, and asks', async () => {
+    const user = userEvent.setup();
+    const asked = vi.fn(() => ({ data: { runTodo: { __typename: 'Todo', id: 't1' } } }));
+    board(
+      [aiState(true, true), STATIONS, { request: { query: RunTodoDocument, variables: { id: 't1' } }, result: asked }],
+      true,
+      { todos: [CARD], live: new Map(), waiting: AWAITS_RUN },
+    );
+    expect(await screen.findByText('Waiting to be run')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Run “Write it” now' }));
+    await vi.waitFor(() => expect(asked).toHaveBeenCalled());
+  });
+
+  it('says a card that was asked for waits on an agent, and does not offer to ask twice', async () => {
+    board([aiState(true, true), STATIONS], true, { todos: [CARD], live: new Map(), waiting: RUN_REQUESTED });
+    expect(await screen.findByText('Waiting for an agent')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Run “Write it” now' })).not.toBeInTheDocument();
+  });
+
+  it('says why a card could not be run', async () => {
+    const user = userEvent.setup();
+    board(
+      [
+        aiState(true, true),
+        STATIONS,
+        {
+          request: { query: RunTodoDocument, variables: { id: 't1' } },
+          result: { errors: [new GraphQLError('An agent is working it now.')] },
+        },
+      ],
+      true,
+      { todos: [CARD], live: new Map(), waiting: AWAITS_RUN },
+    );
+    await user.click(await screen.findByRole('button', { name: 'Run “Write it” now' }));
+    expect(await screen.findByText('An agent is working it now.')).toBeInTheDocument();
+  });
+
+  it('offers no run while the project has AI off', async () => {
+    board([aiState(true, true)], false, { todos: [CARD], live: new Map(), waiting: AWAITS_RUN });
+    expect(await screen.findByText('Write it')).toBeInTheDocument();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(screen.queryByRole('button', { name: 'Run “Write it” now' })).not.toBeInTheDocument();
   });
 
   it('stops the agent from the watch dialog', async () => {

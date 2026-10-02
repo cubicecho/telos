@@ -13,14 +13,22 @@ export const SPEND_DAYS = 30;
 
 export type LiveRun = ProjectActivityQuery['live'][number];
 
+/** Where a todo stands with the stations. */
+export type StationTodo = ProjectActivityQuery['stations']['todos'][number];
+
 /** A todo a station gave up on or finished with, and why. */
-export type StuckTodo = ProjectActivityQuery['stations']['todos'][number];
+export type StuckTodo = StationTodo;
+
+/** A todo a station would work if asked, or has been asked to and has not started. */
+export type WaitingTodo = StationTodo;
 
 export interface ProjectActivity {
   /** The run working each todo now, by todo id. */
   live: ReadonlyMap<string, LiveRun>;
   /** The todos waiting on a person, by todo id. */
   stuck: ReadonlyMap<string, StuckTodo>;
+  /** The todos waiting to be asked for, or asked for and not yet started, by todo id. */
+  waiting: ReadonlyMap<string, WaitingTodo>;
   spent: ProjectActivityQuery['spent'] | undefined;
   loading: boolean;
 }
@@ -36,7 +44,7 @@ function spendSince(): string {
 
 /**
  * What a project's agents are doing now and have spent lately, and which todos
- * wait on a person, polled while the project is on screen. One query serves
+ * wait on a person or on being asked for, polled while the project is on screen. One query serves
  * the header's line and the board's marks, so the page polls once.
  */
 export function useProjectActivity(projectId: string, { skip = false }: { skip?: boolean } = {}): ProjectActivity {
@@ -54,7 +62,16 @@ export function useProjectActivity(projectId: string, { skip = false }: { skip?:
     () => new Map((stations ?? []).filter((todo) => todo.state === 'attention').map((todo) => [todo.todoId, todo])),
     [stations],
   );
-  return { live, stuck, spent: query.data?.spent, loading: query.loading };
+  const waiting = useMemo(
+    () =>
+      new Map(
+        (stations ?? [])
+          .filter((todo) => todo.awaitsRun || (todo.runRequested && todo.state === 'queued'))
+          .map((todo) => [todo.todoId, todo]),
+      ),
+    [stations],
+  );
+  return { live, stuck, waiting, spent: query.data?.spent, loading: query.loading };
 }
 
 /** "3 running · 41,200 tokens in 30 days", or nothing before the answer lands. */
