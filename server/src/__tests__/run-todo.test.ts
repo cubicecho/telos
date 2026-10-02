@@ -24,7 +24,7 @@ const MOVE = `mutation ($id: ID!, $laneId: ID!) { moveTodo(id: $id, laneId: $lan
 const UPDATE = `mutation ($id: UUID!, $set: UpdateTodoInput!) {
   updateTodo(set: $set, where: { id: { eq: $id } }) { id }
 }`;
-const STATUS = `query ($projectId: ID) { aiStatus(projectId: $projectId) { todos { todoId state reason failures } } }`;
+const STATUS = `query ($projectId: ID) { aiStatus(projectId: $projectId) { todos { todoId state reason failures awaitsRun runRequested } } }`;
 const SET_PROJECT_AI = `mutation ($id: ID!, $enabled: Boolean!) {
   setProjectAiEnabled(projectId: $id, enabled: $enabled) { id }
 }`;
@@ -57,12 +57,17 @@ describe('runTodo', () => {
     const asked = await board.addTodo('Asked');
     const other = await board.addTodo('Other');
     expect(await queued()).toEqual([]);
-    expect(await stateOf(asked)).toMatchObject({ state: 'parked', reason: 'Auto-run is off.' });
+    expect(await stateOf(asked)).toMatchObject({
+      state: 'parked',
+      reason: 'Auto-run is off.',
+      awaitsRun: true,
+      runRequested: false,
+    });
 
     const todo = (await board.person.expectOk(RUN, { id: asked })).runTodo;
     expect(todo).toMatchObject({ id: asked });
     expect(todo.runRequestedAt).not.toBeNull();
-    expect(await stateOf(asked)).toMatchObject({ state: 'queued', reason: null });
+    expect(await stateOf(asked)).toMatchObject({ state: 'queued', reason: null, awaitsRun: false, runRequested: true });
     expect(await stateOf(other)).toMatchObject({ state: 'parked', reason: 'Auto-run is off.' });
     expect(await queued()).toEqual([asked]);
     expect(await claim(other)).toBeNull();
@@ -228,6 +233,7 @@ describe('runTodo refuses', () => {
   it('a todo in a lane with no agent', async () => {
     const todoId = await board.addTodo('Nobody home');
     await board.person.expectOk(MOVE, { id: todoId, laneId: board.lanes[1].id });
+    expect(await stateOf(todoId)).toMatchObject({ state: 'parked', awaitsRun: false });
     expect(await refusal(todoId)).toEqual({ message: 'In progress has no agent.', code: 'BAD_USER_INPUT' });
   });
 

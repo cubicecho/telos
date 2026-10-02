@@ -33,6 +33,10 @@ const AI_STATUS_SDL = parse(`
     failures: Int!
     "The run working it now."
     liveRunId: ID
+    "A station would take it, were it asked to (runTodo): its project does not run by itself."
+    awaitsRun: Boolean!
+    "A person asked for it to be run, and no run has taken it yet."
+    runRequested: Boolean!
   }
 
   "How many of a lane's todos are in each state."

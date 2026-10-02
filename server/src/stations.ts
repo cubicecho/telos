@@ -183,6 +183,10 @@ export interface StationTodo {
   failures: number;
   /** The run working it now, if one is. */
   liveRunId: string | null;
+  /** A station would take it, were it asked to: its project does not run by itself. */
+  awaitsRun: boolean;
+  /** A person asked for it to be run, and no run has taken it yet. */
+  runRequested: boolean;
 }
 
 export interface LaneTally {
@@ -302,6 +306,8 @@ export async function stationStates(
       reason,
       failures: Number(row.failures),
       liveRunId: row.live_run_id,
+      awaitsRun: state === 'parked' && reason === AUTO_RUN_OFF,
+      runRequested: row.run_requested,
     };
   });
 
