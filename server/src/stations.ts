@@ -12,7 +12,8 @@ import { INSTANCE_AI_ON } from './instance.ts';
 //
 //   - every AI switch over it is on: its user's, its project's, and it is not
 //     ignored — the same three checks a run token makes on every request
-//   - its project runs by itself (auto-run)
+//   - its project runs by itself (auto-run), or a person asked for this todo
+//     to be run (runTodo), which holds until a run claims it
 //   - the project is not archived, and the todo is open and not blocked
 //   - nothing is working it now (a running run inside its lease)
 //   - the station has not already finished with it: no `ok` run in this lane
@@ -68,7 +69,7 @@ export async function readyTodos(
       JOIN projects p ON p.id = t.project_id
       JOIN users u ON u.id = t.user_id
       WHERE ${INSTANCE_AI_ON} AND u.ai_enabled AND p.ai_enabled AND NOT t.ai_ignored
-        AND p.auto_run
+        AND (p.auto_run OR t.run_requested_at IS NOT NULL)
         AND p.archived_at IS NULL
         AND t.completed_at IS NULL AND t.archived_at IS NULL AND NOT l.is_done
         AND (l.contract <> 'expand' OR l.on_success_lane_id IS NOT NULL)
@@ -154,6 +155,19 @@ export async function cancelRunsUnder(
   `);
 }
 
+/**
+ * Forgets the run a person asked for: a run has taken the todo, or AI can no
+ * longer work it.
+ *
+ * @param db - The database or transaction.
+ * @param where - Which requests: one todo's, or every one in a project.
+ * @returns Nothing.
+ */
+export async function dropRunRequests(db: AnyDb, where: { todoId: string } | { projectId: string }): Promise<void> {
+  const narrow = 'todoId' in where ? sql`id = ${where.todoId}` : sql`project_id = ${where.projectId}`;
+  await db.execute(sql`UPDATE todos SET run_requested_at = NULL WHERE run_requested_at IS NOT NULL AND ${narrow}`);
+}
+
 /** Where a todo stands with the stations, for a person reading the board. */
 export type StationState = 'attention' | 'running' | 'blocked' | 'queued' | 'parked' | 'done';
 
@@ -190,7 +204,7 @@ export interface LaneTally {
  *   - queued: a station will start on it when there is room
  *
  * A todo that would be queued is parked instead while its project's auto-run
- * is off: nothing starts on it until a person asks.
+ * is off, until a person asks for it to be run.
  *
  * Done todos are only counted, per lane: there can be many, and none of them
  * needs anything.
@@ -215,6 +229,7 @@ export async function stationStates(
     has_agent: boolean;
     ai_ignored: boolean;
     auto_run: boolean;
+    run_requested: boolean;
     barren_expand: boolean;
     max_attempts: number | null;
     failures: number;
@@ -227,6 +242,7 @@ export async function stationStates(
       WITH base AS (
         SELECT
           t.id, t.title, t.project_id, t.lane_id, t.ai_ignored, t.position, t.created_at, p.auto_run,
+          t.run_requested_at IS NOT NULL AS run_requested,
           l.name AS lane_name, l.position AS lane_position, l.agent_id IS NOT NULL AS has_agent,
           (l.contract = 'expand' AND l.on_success_lane_id IS NULL) AS barren_expand,
           l.max_attempts,
@@ -244,7 +260,7 @@ export async function stationStates(
       )
       SELECT
         b.id AS todo_id, b.title, b.project_id, b.lane_id, b.lane_name,
-        coalesce(b.has_agent, false) AS has_agent, b.ai_ignored, b.auto_run,
+        coalesce(b.has_agent, false) AS has_agent, b.ai_ignored, b.auto_run, b.run_requested,
         coalesce(b.barren_expand, false) AS barren_expand, b.max_attempts,
         (
           SELECT count(*)::int FROM runs r
@@ -314,6 +330,7 @@ function judge(row: {
   has_agent: boolean;
   ai_ignored: boolean;
   auto_run: boolean;
+  run_requested: boolean;
   barren_expand: boolean;
   max_attempts: number | null;
   failures: number;
@@ -332,7 +349,7 @@ function judge(row: {
   }
   if (row.finished_here) return ['attention', `${row.lane_name} finished with it and has nowhere to send it.`];
   if (row.blockers) return ['blocked', `Waiting on ${row.blockers}.`];
-  if (row.auto_run === false) {
+  if (row.auto_run === false && row.run_requested === false) {
     return ['parked', AUTO_RUN_OFF];
   }
   return ['queued', null];

@@ -140,6 +140,16 @@ function assertIgnoreFlagFromPerson(args: Parameters<typeof writtenRows>[0], con
 }
 
 /**
+ * Asking for a run is `runTodo`'s: it checks a station would take the todo, and
+ * it is a person's to ask.
+ */
+function assertRunRequestUntouched(args: Parameters<typeof writtenRows>[0]): void {
+  if (states(args, 'runRequestedAt')) {
+    throw new GraphQLError('Use runTodo to ask for a todo to be run.', { extensions: { code: 'BAD_USER_INPUT' } });
+  }
+}
+
+/**
  * People write plain notes. Reports and verdicts are what a run leaves behind,
  * and the server writes those itself, so a generated insert cannot pass one off.
  */
@@ -257,6 +267,7 @@ export const onWrite: NonNullable<BuildSchemaConfig['onWrite']> = {
   todos: {
     before: async ({ args, context, tx }: WriteHookPayload) => {
       assertIgnoreFlagFromPerson(args, context as Context);
+      assertRunRequestUntouched(args);
       await assertForeignKeysOwned(tx, requireAuth(context as Context), writtenRows(args), FOREIGN_KEYS.todos);
       await stampActor(tx, (context as Context).actor);
     },

@@ -8,7 +8,7 @@ import { eq } from 'drizzle-orm';
 import express from 'express';
 import { graphql } from 'graphql';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { type Board, createBoard, setLane } from '../../../server/src/__tests__/board.ts';
+import { type Board, createBoard, SET_AUTO_RUN, setLane } from '../../../server/src/__tests__/board.ts';
 import { authFor, createTestDb, type TestDb } from '../../../server/src/__tests__/helpers.ts';
 // The runner never imports the server or the database; its test does, to stand
 // a real telos up for it to talk to.
@@ -515,6 +515,24 @@ describe('the runner', () => {
     for (const title of ['One', 'Two', 'Three']) await board.addTodo(title);
     expect(await cycle(loopOptions({ concurrency: 2 }))).toBe(2);
     expect(await cycle(loopOptions({ concurrency: 2 }))).toBe(1);
+  });
+
+  it('leaves a board that does not run by itself alone, but for the todo a person asks for', async () => {
+    await board.person.expectOk(SET_AUTO_RUN, { id: board.projectId, enabled: false });
+    await setLane(board.person, board.lanes[0].id, { wipLimit: 5 });
+    const asked = await board.addTodo('Asked');
+    const other = await board.addTodo('Other');
+    expect(await cycle()).toBe(0);
+
+    await board.person.expectOk(`mutation ($id: ID!) { runTodo(id: $id) { id } }`, { id: asked });
+    expect(await cycle()).toBe(1);
+    expect(await cycle()).toBe(0);
+
+    const [run] = await runsOf(asked);
+    expect(run).toMatchObject({ status: 'ok', output: 'Done.' });
+    expect((await todoRow(asked)).completedAt).not.toBeNull();
+    expect(await runsOf(other)).toEqual([]);
+    expect((await todoRow(other)).laneId).toBe(board.lanes[0].id);
   });
 
   it('is refused by telos without the right key', async () => {
