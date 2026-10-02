@@ -8,6 +8,7 @@ import type { TodoSummary } from '@/components/domain/todo/types';
 import { Button } from '@/components/ui/button';
 import { laneLock } from '@/lib/lanes';
 import { cn, HOVER_REVEAL } from '@/lib/utils';
+import { type CardMark, CardMarks } from './card-marks';
 import { DraggableCard } from './drag-surfaces';
 import type { LaneSummary } from './lane-badge';
 import { LanePicker } from './lane-picker';
@@ -35,6 +36,7 @@ export function BoardCardBody({
   lanes,
   onMove,
   onEdit,
+  mark,
   live,
   stuck,
   waiting,
@@ -47,6 +49,8 @@ export function BoardCardBody({
   lanes: readonly LaneSummary[];
   onMove?: (lane: LaneSummary) => void;
   onEdit?: () => void;
+  /** Its notes and how its last run went, when there is something to say. */
+  mark?: CardMark | undefined;
   /** The run working this todo now, when one is. */
   live?: LiveRun | undefined;
   /** Why a station stopped on it, when one did and it waits on a person. */
@@ -132,6 +136,8 @@ export function BoardCardBody({
 
       <AiIgnoredBadge ignored={todo.aiIgnored} className="mt-2" />
 
+      {mark ? <CardMarks mark={mark} todoTitle={todo.title} /> : null}
+
       {live ? (
         <View className="mt-2 flex-row items-center gap-2">
           <LiveDot />
@@ -196,6 +202,7 @@ export function BoardCard({
   lanes,
   onMove,
   onEdit,
+  mark,
   live,
   stuck,
   waiting,
@@ -207,6 +214,7 @@ export function BoardCard({
   lanes: readonly LaneSummary[];
   onMove: (lane: LaneSummary) => void;
   onEdit: () => void;
+  mark?: CardMark | undefined;
   live?: LiveRun | undefined;
   stuck?: StuckTodo | undefined;
   waiting?: WaitingTodo | undefined;
@@ -224,6 +232,7 @@ export function BoardCard({
         lanes={lanes}
         onMove={onMove}
         onEdit={onEdit}
+        mark={mark}
         live={live}
         stuck={stuck}
         waiting={waiting}
