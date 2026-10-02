@@ -277,14 +277,80 @@ export const AgentFieldsFragment = graphql(`
     toolSelectModel
     requestTimeoutSeconds
     maxRetries
-    mcpServers
+    mcpServerSlugs
     hasApiKey
   }
 `);
 
+// The account's MCP servers, which its agents name by slug. `headers` and `env`
+// are not in the schema: they are written one at a time with
+// `setMcpServerSecret`, and all that comes back is their names.
+
+export const McpServerFieldsFragment = graphql(`
+  fragment McpServerFields on McpServer {
+    id
+    slug
+    name
+    url
+    command
+    args
+    hiddenTools
+    hooks
+    enabled
+    checkedAt
+    checkOk
+    checkError
+    tools
+    headerNames
+    envNames
+  }
+`);
+
+export const McpServersDocument = graphql(`
+  query McpServers {
+    mcpServers(orderBy: { slug: { direction: asc, priority: 1 } }) {
+      ...McpServerFields
+    }
+  }
+`);
+
+export const CreateMcpServerDocument = graphql(`
+  mutation CreateMcpServer($values: CreateMcpServerInput!) {
+    createMcpServer(values: $values) {
+      ...McpServerFields
+    }
+  }
+`);
+
+export const UpdateMcpServerDocument = graphql(`
+  mutation UpdateMcpServer($id: UUID!, $set: UpdateMcpServerInput!) {
+    updateMcpServer(set: $set, where: { id: { eq: $id } }) {
+      ...McpServerFields
+    }
+  }
+`);
+
+export const DeleteMcpServerDocument = graphql(`
+  mutation DeleteMcpServer($id: UUID!) {
+    deleteMcpServer(where: { id: { eq: $id } }) {
+      id
+    }
+  }
+`);
+
+export const SetMcpServerSecretDocument = graphql(`
+  mutation SetMcpServerSecret($id: ID!, $kind: McpSecretKind!, $name: String!, $value: String) {
+    setMcpServerSecret(id: $id, kind: $kind, name: $name, value: $value) {
+      id
+      headerNames
+      envNames
+    }
+  }
+`);
+
 export const TestMcpServerDocument = graphql(`
-  mutation TestMcpServer($server: String!) {
-    testMcpServer(server: $server) {
+  mutation TestMcpServer($id: ID!) {
+    testMcpServer(id: $id) {
       id
     }
   }

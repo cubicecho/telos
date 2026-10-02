@@ -9,32 +9,21 @@ import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Form } from '@/components/ui/form';
 import { FormDialog, FormDialogFooter } from '@/components/ui/form-dialog';
-import { ChevronDown, Pencil, Plus, Trash2, X } from '@/components/ui/icons';
-import { Input } from '@/components/ui/input';
+import { ChevronDown, Pencil, Plus, Trash2 } from '@/components/ui/icons';
 import { LoadState } from '@/components/ui/load-failure';
 import { Menu, MenuContent, MenuItem, MenuTrigger } from '@/components/ui/menu';
-import { Textarea } from '@/components/ui/textarea';
-import {
-  type AgentDraft,
-  emptyMcpServer,
-  fromAgentDraft,
-  type McpServerDraft,
-  numberRule,
-  toAgentDraft,
-  toStoredServer,
-} from '@/lib/agents';
+import { type AgentDraft, fromAgentDraft, numberRule, toAgentDraft } from '@/lib/agents';
 import { describeError } from '@/lib/errors';
 import {
   AgentModelsDocument,
   AgentsDocument,
   CreateAgentDocument,
   DeleteAgentDocument,
-  McpProbeDocument,
   SetAgentApiKeyDocument,
-  TestMcpServerDocument,
   UpdateAgentDocument,
 } from '@/lib/graphql';
 import { newId } from '@/lib/ids';
+import { McpServerPicker } from './mcp-server-picker';
 
 type AgentRow = AgentFieldsFragment;
 
@@ -280,8 +269,8 @@ export function AgentFormDialog({
             <form.AppField name="toolSelectModel">
               {(field) => <field.InputField label="Tool selection model" placeholder="The agent's own model" />}
             </form.AppField>
-            <form.AppField name="mcpServers">
-              {(field) => <McpServerList servers={field.state.value} onChange={(next) => field.handleChange(next)} />}
+            <form.AppField name="mcpServerSlugs">
+              {(field) => <McpServerPicker slugs={field.state.value} onChange={(next) => field.handleChange(next)} />}
             </form.AppField>
           </ScrollView>
           <FormDialogFooter onCancel={() => onOpenChange(false)} error={error ? describeError(error) : null}>
@@ -341,163 +330,6 @@ function ModelMenu({
         ))}
       </MenuContent>
     </Menu>
-  );
-}
-
-/**
- * The agent's MCP servers, a row each. A URL is an HTTP server; a command is a
- * process the runner spawns, which it refuses unless its host has set
- * RUNNER_ALLOW_STDIO — the command would run there, with the runner's rights.
- */
-function McpServerList({
-  servers,
-  onChange,
-}: {
-  servers: McpServerDraft[];
-  onChange: (servers: McpServerDraft[]) => void;
-}) {
-  function patch(id: string, change: Partial<McpServerDraft>) {
-    onChange(servers.map((server) => (server.id === id ? { ...server, ...change } : server)));
-  }
-
-  return (
-    <View className="gap-2">
-      <Text className="font-medium text-foreground text-sm">MCP servers</Text>
-      <Text className="text-muted-foreground text-xs">
-        Telos's own tools are always there. A command is refused by the runner unless its host sets RUNNER_ALLOW_STDIO,
-        because it would run on that machine.
-      </Text>
-      {servers.map((server, index) => {
-        const label = server.name.trim() || `Server ${index + 1}`;
-        return (
-          <View key={server.id} className="gap-2 rounded-lg border border-border px-3 py-2">
-            <View className="flex-row items-center gap-2">
-              <Input
-                className="flex-1"
-                value={server.name}
-                aria-label={`${label} name`}
-                placeholder="Name"
-                onChangeText={(name) => patch(server.id, { name })}
-              />
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                aria-label={`Remove ${label}`}
-                onPress={() => onChange(servers.filter((row) => row.id !== server.id))}
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </View>
-            <Input
-              value={server.url}
-              type="url"
-              aria-label={`${label} URL`}
-              placeholder="URL, e.g. http://localhost:8080/mcp"
-              onChangeText={(url) => patch(server.id, { url })}
-            />
-            <Input
-              value={server.command}
-              aria-label={`${label} command`}
-              placeholder="Or a command (stdio)"
-              onChangeText={(command) => patch(server.id, { command })}
-            />
-            {server.command.trim() ? (
-              <Textarea
-                value={server.args}
-                aria-label={`${label} arguments`}
-                placeholder="Arguments, one per line"
-                rows={2}
-                onChangeText={(args) => patch(server.id, { args })}
-              />
-            ) : null}
-            <McpServerTest server={server} label={label} />
-          </View>
-        );
-      })}
-      <Button
-        variant="outline"
-        size="sm"
-        className="self-start"
-        onPress={() => onChange([...servers, emptyMcpServer()])}
-      >
-        <Plus className="h-4 w-4" />
-        Add MCP server
-      </Button>
-    </View>
-  );
-}
-
-/** How often a test's answer is asked for while the runner makes it. */
-const PROBE_POLL_MS = 1000;
-
-/**
- * Tests a server row as it stands, saved or not: the runner connects to it and
- * lists its tools, so what is found is what a run would find.
- */
-function McpServerTest({ server, label }: { server: McpServerDraft; label: string }) {
-  const [probeId, setProbeId] = useState<string | null>(null);
-  const [ask, asking] = useMutation(TestMcpServerDocument);
-  const query = useQuery(McpProbeDocument, {
-    variables: { id: probeId ?? '' },
-    skip: !probeId,
-    fetchPolicy: 'network-only',
-  });
-  const probe = query.data?.mcpProbe;
-  const done = !probeId || probe?.status === 'done' || (query.data && !probe);
-  const { startPolling, stopPolling } = query;
-  useEffect(() => {
-    if (done) stopPolling();
-    else startPolling(PROBE_POLL_MS);
-  }, [done, startPolling, stopPolling]);
-
-  async function test() {
-    setProbeId(null);
-    try {
-      const { data } = await ask({ variables: { server: JSON.stringify(toStoredServer(server)) } });
-      setProbeId(data?.testMcpServer.id ?? null);
-    } catch {
-      // Shown from the mutation's error.
-    }
-  }
-
-  const empty = !server.url.trim() && !server.command.trim();
-  let result: { text: string; failed: boolean } | null = null;
-  if (asking.error) result = { text: describeError(asking.error), failed: true };
-  else if (query.error) result = { text: describeError(query.error), failed: true };
-  else if (probeId && query.data && !probe) result = { text: 'The test was forgotten; try again.', failed: true };
-  else if (probe?.status === 'done' && !probe.ok)
-    result = { text: probe.error ?? 'It could not be reached.', failed: true };
-  else if (probe?.status === 'done') {
-    const names = probe.tools.map((tool) => tool.name);
-    result = {
-      text: names.length
-        ? `Reached. ${names.length} tool${names.length === 1 ? '' : 's'}: ${names.join(', ')}`
-        : 'Reached, but it offers no tools.',
-      failed: false,
-    };
-  } else if (probeId) result = { text: 'The runner is testing it…', failed: false };
-
-  return (
-    <View className="gap-1">
-      <Button
-        variant="outline"
-        size="sm"
-        className="self-start"
-        disabled={empty || asking.loading || !done}
-        aria-label={`Test ${label}`}
-        onPress={() => void test()}
-      >
-        Test
-      </Button>
-      {result ? (
-        <Text
-          role={result.failed ? 'alert' : 'status'}
-          className={result.failed ? 'text-destructive text-xs' : 'text-muted-foreground text-xs'}
-        >
-          {result.text}
-        </Text>
-      ) : null}
-    </View>
   );
 }
 

@@ -27,7 +27,7 @@ const AGENT = {
   toolSelectModel: null,
   requestTimeoutSeconds: null,
   maxRetries: null,
-  mcpServers: [],
+  mcpServerSlugs: null,
   hasApiKey: false,
 };
 
