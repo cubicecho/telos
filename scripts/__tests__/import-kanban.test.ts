@@ -246,4 +246,24 @@ describe('importKanban', () => {
     expect(projects.map((project: { name: string }) => project.name).sort()).toEqual(['Research', 'Research (kanban)']);
     expect((await db.select().from(dbSchema.agents).where(eq(dbSchema.agents.userId, userId))).length).toBe(1);
   });
+
+  it('carries archive-on-success across, except where the lane breaks todos into pieces', async () => {
+    await client.exec(`
+      INSERT INTO roles VALUES ('r-split', 'Split', 'expand', 'Split the card.');
+      UPDATE lanes SET "archiveOnSuccess" = true, "onSuccessLaneId" = null WHERE "id" = 'l-review';
+      UPDATE lanes SET "archiveOnSuccess" = true, "onSuccessLaneId" = null, "roleId" = 'r-split' WHERE "id" = 'l-doing';
+    `);
+    const otherId = await createUser(db, 'other@example.com');
+    const carried = await importKanban({ source, target: db, email: 'other@example.com' });
+    const lanes = await db
+      .select()
+      .from(dbSchema.lanes)
+      .where(eq(dbSchema.lanes.userId, otherId))
+      .orderBy(asc(dbSchema.lanes.position));
+    const [, doing, review, done] = lanes;
+    expect(review).toMatchObject({ archiveOnSuccess: true, onSuccessLaneId: null, onFailureLaneId: doing.id });
+    expect(doing).toMatchObject({ contract: 'expand', archiveOnSuccess: false, onSuccessLaneId: done.id });
+    expect(carried.notes.join('\n')).toContain('Lane "Doing" in "Research" archived on success');
+    expect(carried.notes.join('\n')).not.toContain('Lane "Review"');
+  });
 });
