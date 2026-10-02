@@ -1,3 +1,12 @@
+# [1.12.0](https://github.com/cubicecho/telos/compare/v1.11.0...v1.12.0) (2026-10-02)
+
+
+### Features
+
+* **app:** mark a client's artifacts unverified and keep a deleted todo's ([68cb9c9](https://github.com/cubicecho/telos/commit/68cb9c9ff5d468522e171e7d9a17c9ee6aba7d5b))
+* **db:** let an artifact outlive its todo and come from a client ([0699fac](https://github.com/cubicecho/telos/commit/0699fac603bc04d94512ac7b6dab366b9eed0955))
+* **server:** record_artifact for MCP clients, kept as the client's word ([4807554](https://github.com/cubicecho/telos/commit/4807554212f41f44cb82fd14c48a734cf34a6e04))
+
 # [1.11.0](https://github.com/cubicecho/telos/compare/v1.10.0...v1.11.0) (2026-10-02)
 
 
