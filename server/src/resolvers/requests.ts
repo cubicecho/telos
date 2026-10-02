@@ -108,7 +108,14 @@ async function insertNote(tx: AnyRow, context: Context, userId: string, todoId: 
   return note;
 }
 
-function requireText(value: string, field: string): string {
+/**
+ * `value` without its surrounding space, or BAD_USER_INPUT when nothing is left.
+ *
+ * @param value - What the caller sent.
+ * @param field - The argument's name, for the message.
+ * @returns The trimmed text.
+ */
+export function requireText(value: string, field: string): string {
   const trimmed = value.trim();
   if (!trimmed) {
     throw new GraphQLError(`${field} cannot be empty`, { extensions: { code: 'BAD_USER_INPUT' } });

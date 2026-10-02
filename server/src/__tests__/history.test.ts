@@ -200,16 +200,15 @@ describe('todo notes', () => {
     expect(error.code).toBe('BAD_USER_INPUT');
   });
 
-  it('can be deleted but not rewritten', async () => {
+  it('can be deleted, and rewritten only through editTodoNote', async () => {
     const note = (await client.expectOk(ADD, { todoId, body: 'Typo' })).createTodoNote;
+    // Generated CRUD would let a `where` rewrite a report along with the note.
     const rewrite = await client.expectError(
       `mutation ($id: UUID!) { updateTodoNote(set: { body: "Fixed" }, where: { id: { eq: $id } }) { id } }`,
       { id: note.id },
     );
     expect(rewrite.message).toMatch(/updateTodoNote/);
-    await client.expectOk(`mutation ($id: UUID!) { deleteTodoNote(where: { id: { eq: $id } }) { id } }`, {
-      id: note.id,
-    });
+    await client.expectOk(`mutation ($id: ID!) { deleteTodoNote(id: $id) { id } }`, { id: note.id });
     const read = await client.expectOk(`query ($id: UUID!) { todo(where: { id: { eq: $id } }) { thread { id } } }`, {
       id: todoId,
     });

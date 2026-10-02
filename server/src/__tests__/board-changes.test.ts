@@ -77,6 +77,25 @@ describe('boardChanged', () => {
     await changes.return?.();
   });
 
+  it('tells the owner when a note is edited or deleted, so a card’s count follows', async () => {
+    const todoId = await board.addTodo('Watch me');
+    const note = (
+      await board.person.expectOk(
+        `mutation ($todoId: UUID!) { createTodoNote(values: { todoId: $todoId, body: "Typo" }) { id } }`,
+        { todoId },
+      )
+    ).createTodoNote.id;
+    const changes = await watchAsOwner();
+
+    await board.person.expectOk(`mutation ($id: ID!) { editTodoNote(id: $id, body: "Fixed") { id } }`, { id: note });
+    expect(await next(changes)).toMatchObject({ projectId: board.projectId });
+    while (await next(changes, 100));
+
+    await board.person.expectOk(`mutation ($id: ID!) { deleteTodoNote(id: $id) { id } }`, { id: note });
+    expect(await next(changes)).toMatchObject({ projectId: board.projectId });
+    await changes.return?.();
+  });
+
   it('hears nothing from another project', async () => {
     const changes = await watchAsOwner();
     const other = (await board.person.expectOk(`mutation { createProject(values: { name: "Other" }) { id } }`))

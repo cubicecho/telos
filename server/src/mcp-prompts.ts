@@ -52,10 +52,11 @@ then. That is queued, not stuck.
 ## What you can do, and what you cannot
 
 You can read (\`projects\`, \`todos\`, \`request\`), hand work over (\`submit_request\`),
-say more about it (\`add_todo_note\`), and withdraw it (\`cancel_request\`). You cannot
-move, edit, complete, retry or delete a todo, create a project, or change a lane: the
-board belongs to a person, and its stations do the work. When something needs one of
-those, say what and why, and leave it to the person.
+say more about it (\`add_todo_note\`), correct or take back a note you signed
+(\`edit_todo_note\`, \`delete_todo_note\`), and withdraw it (\`cancel_request\`). You
+cannot move, edit, complete, retry or delete a todo, create a project, or change a
+lane: the board belongs to a person, and its stations do the work. When something
+needs one of those, say what and why, and leave it to the person.
 
 ## Start here
 

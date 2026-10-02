@@ -15,8 +15,9 @@ export type ActorKindValue = (typeof ACTOR_KINDS)[number];
 export const NOTE_KINDS = ['note', 'report', 'verdict'] as const;
 export type NoteKind = (typeof NOTE_KINDS)[number];
 
-// A todo's running commentary. Append-only: a note can be deleted but not
-// rewritten, so what an agent was told is what it was told.
+// A todo's running commentary. What a run wrote stays as written, so what an
+// agent said is what it said. A plain note can be rewritten or taken away by
+// whoever wrote it (server resolvers/notes.ts), and says when it was.
 export const todoNotes = pgTable(
   'todo_notes',
   {
@@ -36,6 +37,8 @@ export const todoNotes = pgTable(
     // outlives the run's own row.
     runId: uuid('run_id'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    // When its author last rewrote it. Null for a note that reads as written.
+    editedAt: timestamp('edited_at', { withTimezone: true }),
   },
   (t) => [index('idx_todo_notes_user_id').on(t.userId), index('idx_todo_notes_todo_id').on(t.todoId)],
 );

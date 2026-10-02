@@ -4,7 +4,9 @@
 #
 # The surface is for handing work to the board and following it, not for
 # working the board: nothing here moves, completes or edits a todo. The
-# board's own agents do the work; a person owns the board.
+# board's own agents do the work; a person owns the board. What a caller
+# said about a todo is its own to correct: it can rewrite or take back a note
+# it signed.
 
 # The projects open to AI, each with its lanes in board order. Start here: a
 # request needs a project id, and a lane id means nothing without its name.
@@ -89,6 +91,7 @@ query request(
       body
       actorKind
       createdAt
+      editedAt
     }
     history(orderBy: { at: { direction: asc, priority: 1 } }) {
       kind
@@ -150,5 +153,32 @@ mutation addTodoNote(
   addTodoNote(todoId: $todoId, body: $body) {
     id
     createdAt
+  }
+}
+
+# Rewrites a note you added with `add_todo_note`. Only a note this key signed:
+# a person's notes, and the reports and verdicts of the board's agents, stay
+# as written. The note says it was edited. A run already under way keeps the
+# wording it read; runs that start afterwards read the new one.
+mutation editTodoNote(
+  # The note, as `add_todo_note` or `request` returned it.
+  $id: ID!
+  # The note's new text, in markdown. It replaces the old text whole.
+  $body: String!
+) {
+  editTodoNote(id: $id, body: $body) {
+    id
+    editedAt
+  }
+}
+
+# Takes back a note you added with `add_todo_note`. Only a note this key
+# signed. Nothing else on the todo changes.
+mutation deleteTodoNote(
+  # The note, as `add_todo_note` or `request` returned it.
+  $id: ID!
+) {
+  deleteTodoNote(id: $id) {
+    id
   }
 }
