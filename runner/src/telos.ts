@@ -46,8 +46,10 @@ export interface ClaimedAgent {
   toolSelectModel: string | null;
   requestTimeoutSeconds: number | null;
   maxRetries: number | null;
-  /** JSON, as telos sends it. */
+  /** The account's servers it reaches, as JSON, as telos sends it. */
   mcpServers: string;
+  /** What telos has to say about them: a server the agent names that is gone. */
+  mcpNotices: string[];
 }
 
 export interface Brief {
@@ -141,7 +143,7 @@ export interface SessionDelete {
   /** The todo that was deleted: the session's id. */
   todoId: string;
   agentName: string;
-  /** The agent's servers that have a `sessionDelete` hook, as JSON. */
+  /** The servers the agent reaches that have a `sessionDelete` hook, as JSON. */
   mcpServers: string;
 }
 
@@ -194,7 +196,7 @@ const QUEUE = `query ($limit: Int) { runnerQueue(limit: $limit) { todoId laneId 
 /** What the runner reads of an agent, for a run or a draft. */
 const AGENT_FIELDS = `
   id name baseUrl model apiKey systemPrompt temperature maxTokens contextLength
-  maxToolIterations toolDiscovery toolSelectModel requestTimeoutSeconds maxRetries mcpServers
+  maxToolIterations toolDiscovery toolSelectModel requestTimeoutSeconds maxRetries mcpServers mcpNotices
 `;
 const CLAIM = `mutation ($todoId: ID!, $laneId: ID!) {
   claimRun(todoId: $todoId, laneId: $laneId) {

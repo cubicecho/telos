@@ -2,7 +2,7 @@ import { probe } from '@cubicecho/agent-mcp-pool';
 import type { ProbeResult, RunnerProbe, Telos } from './telos.ts';
 import { readServers, serverConfig } from './tools.ts';
 
-// "Test this MCP server" from the agent form, made here: the runner is where
+// "Test this MCP server" from the account's list of them, made here: the runner is where
 // an agent's tools are reached from, so a server that answers the runner is
 // one a run can use, whatever the person's own machine can see.
 
