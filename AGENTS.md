@@ -179,7 +179,11 @@ a 404 unless the instance's switch is on.
 **Agents work the board only at stations, and only through the runner.** A
 lane with an `agentId` is a station: its `contract` (work, verdict, expand),
 `prompt`, `onSuccessLaneId`/`onFailureLaneId` arrows, `wipLimit` and
-`maxAttempts` say what happens there. The runner (`@telos/runner`, which never
+`maxAttempts` say what happens there. `archiveOnSuccess` is the other answer to
+a pass: `finishRun` completes the todo, puts it in the done lane and archives
+it in one write, as the run. It is that or a success arrow, never both, and not
+for an `expand` station; the lane write guard (`assertArchiveOnSuccessFits`)
+holds both and says what to change. The runner (`@telos/runner`, which never
 imports `@telos/db`) runs inside the server's process: `index.ts` starts it
 with `startRunner` whenever AI is included, handing it a key made up at boot
 (`config.ts` `runnerKey`; `RUNNER_KEY` fixes it, for a second runner elsewhere).

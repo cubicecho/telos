@@ -138,7 +138,9 @@ Code and the like): with an API key from Settings they can submit requests,
 read the board and add notes, but not move todos. **The runner** is telos's own
 worker. A lane with an agent is a *station*: the runner claims a todo there,
 has the agent work it, verify it, or split it into child todos, and telos moves
-it along the lane's arrows. It claims by itself in a project with auto-run on,
+it along the lane's arrows. A station can archive what passes instead of
+moving it: the todo is completed and leaves the board, for a pipeline whose
+finished work nobody needs to see in a column. It claims by itself in a project with auto-run on,
 and only the todos you asked for in one with it off. Each run keeps a log of its tool calls, which the
 todo shows as it goes, and a list of what it made: files it wrote, and anything
 the agent chose to record. An agent's MCP servers can carry hooks, for example
@@ -204,8 +206,9 @@ What comes across:
   Done (or Complete, Finished, Shipped, Closed) becomes the done lane; a board
   without one gets none, and you can mark one in telos. A lane's role becomes
   its contract, the role's prompt and the lane's own are joined, and the
-  success and failure arrows, WIP limit and attempts carry over. A lane that
-  archived on success now sends to the done lane.
+  success and failure arrows, WIP limit and attempts carry over, and so does
+  archiving on success. A lane that broke cards into pieces and archived on
+  success sends to the done lane instead, as telos has no such station.
 - **Agents**, with settings they inherited from kanban_server's Settings
   written onto them, and their MCP servers. An agent with the same name
   already in telos is used as is rather than copied again.
