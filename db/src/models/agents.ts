@@ -14,20 +14,6 @@ import {
 
 import { users } from './users.ts';
 
-/**
- * An MCP server an agent may use: an HTTP endpoint, or a command to spawn.
- * The shape `@cubicecho/agent-mcp-pool` reads.
- */
-export interface AgentMcpServer {
-  id: string;
-  name?: string | undefined;
-  url?: string | undefined;
-  command?: string | undefined;
-  args?: string[] | undefined;
-  headers?: Record<string, string> | undefined;
-  env?: Record<string, string> | undefined;
-}
-
 // Somebody the board can hand work to: a model behind an OpenAI-compatible
 // endpoint, with whatever tools it is given. An agent is nothing until a lane
 // names it (lanes.agentId); what it is asked to do is the lane's business.
@@ -59,7 +45,10 @@ export const agents = pgTable(
     toolSelectModel: text('tool_select_model'),
     requestTimeoutSeconds: integer('request_timeout_seconds'),
     maxRetries: integer('max_retries'),
-    mcpServers: jsonb('mcp_servers').$type<AgentMcpServer[]>().notNull().default([]),
+    // The account's MCP servers it may reach, by slug (mcp-servers.ts). Null is
+    // every server, an empty list is none, a list is exactly those: the three
+    // states of the agent spec's `tools.servers`.
+    mcpServerSlugs: jsonb('mcp_server_slugs').$type<string[]>(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true })
       .notNull()
