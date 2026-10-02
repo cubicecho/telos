@@ -125,6 +125,12 @@ every level:
    nothing the runner does touches its rows.
 3. **The project**: its AI switch. Off, the project takes no requests and its
    stations sit idle.
+   Under it is a second switch, **auto-run**: whether the project's stations
+   start on todos by themselves. It is off on a new project, so switching AI on
+   starts nothing. Off, a station works a todo only when you ask: **Run now**,
+   on its card or in its Runs tab, has the station it stands in work it once.
+   It then follows the lane's arrow and waits again. Switching auto-run off
+   lets what is running finish.
 4. **The todo**: "AI ignores this". The runner leaves it alone.
 
 With AI on there are two doors in. **`/mcp`** is for your own agents (Claude
@@ -132,7 +138,8 @@ Code and the like): with an API key from Settings they can submit requests,
 read the board and add notes, but not move todos. **The runner** is telos's own
 worker. A lane with an agent is a *station*: the runner claims a todo there,
 has the agent work it, verify it, or split it into child todos, and telos moves
-it along the lane's arrows. Each run keeps a log of its tool calls, which the
+it along the lane's arrows. It claims by itself in a project with auto-run on,
+and only the todos you asked for in one with it off. Each run keeps a log of its tool calls, which the
 todo shows as it goes, and a list of what it made: files it wrote, and anything
 the agent chose to record. An agent's MCP servers can carry hooks, for example
 a memory lookup injected before each turn.
@@ -174,7 +181,8 @@ What comes across:
 
 - **Projects**, with their description and context. AI is **off** on every
   imported project, whatever `autoRun` said, so importing never starts an
-  agent. Switch it on per project when you are ready.
+  agent. Switch it on per project when you are ready, and auto-run after it
+  if the board should run by itself.
 - **Lanes**, in order. kanban_server has no done flag, so the lane named
   Done (or Complete, Finished, Shipped, Closed) becomes the done lane; a board
   without one gets none, and you can mark one in telos. A lane's role becomes

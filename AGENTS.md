@@ -188,6 +188,17 @@ as the `system` actor, which may call only
 `RUNNER_MUTATIONS` (`claimRun`, `heartbeatRun`, `finishRun`) and
 `runnerQueue`. What is ready is one SQL query, `readyTodos` in `stations.ts`,
 used by both the queue and the claim, and it checks every AI switch itself.
+A project's AI switch and its auto-run switch are two things. `projects.autoRun`
+(`setProjectAutoRun`, a person's only, off by default) says whether stations
+start by themselves; with it off `readyTodos` takes only a todo a person asked
+for with `runTodo`, which sets `todos.runRequestedAt`. A request is for one run
+where the todo stands: the claim clears it, the `todos_run_request` trigger
+clears it when the todo moves, is done, archived or ignored, and
+`setProjectAiEnabled(false)` clears the project's. `runTodo` never gets round
+the AI switches, a lane without an agent, a blocker or the WIP limit, and it is
+also a retry: its `run` event is a person's arrival in the lane, as
+`retryTodo`'s is. Switching auto-run off cancels nothing. `aiStatus` reads the
+same rules back: such a todo is `parked` with `awaitsRun` until asked for.
 `claimRun` returns a run token (`x-run-token`) the agent uses to reach `/mcp`
 as the `agent` actor, scoped to the run's owner, and only while the run is
 live. `finishRun` decides the verdict and the move on the server; the runner
