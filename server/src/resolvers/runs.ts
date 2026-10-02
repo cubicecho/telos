@@ -5,7 +5,7 @@ import { requireSystem } from '../ai-gate.ts';
 import { assertNoCycle, findBlocked } from '../blocking.ts';
 import type { Actor, Context } from '../context.ts';
 import { instanceAiOn } from '../instance.ts';
-import { findFirstOpenLaneId } from '../lanes.ts';
+import { findDoneLaneId, findFirstOpenLaneId } from '../lanes.ts';
 import { stampActor } from '../provenance.ts';
 import { mintRunToken } from '../run-tokens.ts';
 import { markRunnerSeen } from '../runner-seen.ts';
@@ -534,8 +534,9 @@ function spend(run: AnyRow, result: RunResult) {
  * Otherwise the outcome is read against the lane's contract. A `verdict`
  * station ruled FAIL, a failed run, or an expansion that proposed nothing
  * sends the todo down the failure arm; anything else passes, down the success
- * arm. A todo a person moved while the agent worked stays where the person
- * put it: the run's opinion is recorded, but the person's move wins.
+ * arm, or into the archive when that is what the lane does with a pass. A todo
+ * a person moved while the agent worked stays where the person put it: the
+ * run's opinion is recorded, but the person's move wins.
  *
  * @param context The runner's context.
  * @param runId The run.
@@ -617,6 +618,8 @@ async function finish(context: Context, runId: string, result: RunResult): Promi
         actorKind: 'agent',
         runId: run.id,
       });
+    } else if (passed && stillHere && lane.archiveOnSuccess && run.contract !== 'expand') {
+      await archiveOn(tx, actor, todo, { noteId: note?.id ?? null, reason: null });
     } else if (targetId && targetId !== todo.laneId) {
       await moveOn(tx, actor, todo, targetId, {
         noteId: note?.id ?? null,
@@ -678,6 +681,39 @@ async function moveOn(
   await tx
     .update(dbSchema.todos)
     .set({ laneId: target.id, completedAt, position: await nextPosition(tx, todo.projectId) })
+    .where(eq(dbSchema.todos.id, todo.id));
+}
+
+/**
+ * Completes a todo and archives it, which is what a pass does at a lane set to
+ * archive. It lands in the done lane when the board has one, so lane and
+ * completion agree and a restore puts it back among the finished. Like a move
+ * into the done lane, a todo that became blocked while it was worked is left
+ * where it is: finished work waiting on something unfinished is not finished.
+ *
+ * @param tx The transaction.
+ * @param actor The run's agent.
+ * @param todo The todo.
+ * @param provenance The note and reason for its history.
+ * @returns Nothing.
+ */
+async function archiveOn(
+  tx: AnyRow,
+  actor: Actor,
+  todo: AnyRow,
+  provenance: { noteId: string | null; reason: string | null },
+): Promise<void> {
+  if ((await findBlocked(tx, [todo.id])).size > 0) return;
+  const doneLaneId = await findDoneLaneId(tx, todo.projectId);
+  const now = new Date();
+  await stampActor(tx, actor, provenance);
+  await tx
+    .update(dbSchema.todos)
+    .set({
+      ...(doneLaneId ? { laneId: doneLaneId, position: await nextPosition(tx, todo.projectId) } : {}),
+      completedAt: todo.completedAt ?? now,
+      archivedAt: now,
+    })
     .where(eq(dbSchema.todos.id, todo.id));
 }
 

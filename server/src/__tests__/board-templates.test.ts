@@ -14,7 +14,7 @@ const SAVE = `mutation ($projectId: ID!, $name: String!) { saveBoardTemplate(pro
 const APPLY = `mutation ($projectId: ID!, $templateId: ID!) { applyBoardTemplate(projectId: $projectId, templateId: $templateId) { id } }`;
 const LANES = `query ($projectId: UUID!) {
   lanes(where: { projectId: { eq: $projectId } }, orderBy: { position: { direction: asc, priority: 1 } }) {
-    id name isDone agentId contract prompt onSuccessLaneId onFailureLaneId wipLimit maxAttempts
+    id name isDone agentId contract prompt onSuccessLaneId onFailureLaneId archiveOnSuccess wipLimit maxAttempts
   }
 }`;
 
@@ -43,6 +43,20 @@ describe('board templates', () => {
     expect(lanes[0]).toMatchObject({ agentId: board.agentId, onSuccessLaneId: lanes[2].id, prompt: 'Do the work.' });
     expect(lanes[1]).toMatchObject({ onFailureLaneId: lanes[0].id, wipLimit: 2, maxAttempts: 5 });
     expect(lanes[2].isDone).toBe(true);
+  });
+
+  it('carries a station that archives on success', async () => {
+    await setLane(board.person, board.lanes[0].id, { onSuccessLaneId: null, archiveOnSuccess: true });
+    const saved = (await board.person.expectOk(SAVE, { projectId: board.projectId, name: 'Archiving' }))
+      .saveBoardTemplate;
+    expect(saved.lanes[0]).toMatchObject({ archiveOnSuccess: true, onSuccess: null });
+    expect(saved.lanes[1].archiveOnSuccess).toBe(false);
+
+    const projectId = await newProject();
+    await board.person.expectOk(APPLY, { projectId, templateId: saved.id });
+    const lanes = (await board.person.expectOk(LANES, { projectId })).lanes;
+    expect(lanes[0]).toMatchObject({ archiveOnSuccess: true, onSuccessLaneId: null });
+    expect(lanes[1].archiveOnSuccess).toBe(false);
   });
 
   it('replaces a template of the same name', async () => {
@@ -84,6 +98,8 @@ describe('board templates', () => {
     expect(await bad([{ name: 'A', onSuccess: 3 }])).toBe('BAD_USER_INPUT');
     expect(await bad([{ name: 'A', contract: 'magic' }])).toBe('BAD_USER_INPUT');
     expect(await bad([{ name: 'A', wipLimit: 0 }])).toBe('BAD_USER_INPUT');
+    expect(await bad([{ name: 'A', archiveOnSuccess: true, onSuccess: 0 }])).toBe('BAD_USER_INPUT');
+    expect(await bad([{ name: 'A', archiveOnSuccess: true, contract: 'expand' }])).toBe('BAD_USER_INPUT');
     // The board is as it was.
     expect((await board.person.expectOk(LANES, { projectId })).lanes).toHaveLength(3);
   });

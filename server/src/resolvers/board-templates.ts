@@ -79,6 +79,13 @@ export function checkTemplateLanes(value: unknown): TemplateLane[] {
     if (!Number.isInteger(maxAttempts) || (maxAttempts as number) < 0) {
       throw badInput(`"${name}" needs 0 or more attempts.`);
     }
+    const archiveOnSuccess = lane.archiveOnSuccess === true;
+    if (archiveOnSuccess && index(lane.onSuccess) != null) {
+      throw badInput(`"${name}" can archive on success or send todos to a success lane, not both.`);
+    }
+    if (archiveOnSuccess && contract === 'expand') {
+      throw badInput(`"${name}" breaks todos into pieces, so it cannot archive on success.`);
+    }
     return {
       name,
       isDone: lane.isDone === true,
@@ -87,6 +94,7 @@ export function checkTemplateLanes(value: unknown): TemplateLane[] {
       prompt: typeof lane.prompt === 'string' ? lane.prompt : null,
       onSuccess: index(lane.onSuccess),
       onFailure: index(lane.onFailure),
+      archiveOnSuccess,
       wipLimit: wipLimit as number,
       maxAttempts: maxAttempts as number,
     };
@@ -123,6 +131,7 @@ export function applyBoardTemplatesExtension(schema: GraphQLSchema): GraphQLSche
       prompt: lane.prompt,
       onSuccess: lane.onSuccessLaneId ? (at.get(lane.onSuccessLaneId) ?? null) : null,
       onFailure: lane.onFailureLaneId ? (at.get(lane.onFailureLaneId) ?? null) : null,
+      archiveOnSuccess: lane.archiveOnSuccess,
       wipLimit: lane.wipLimit,
       maxAttempts: lane.maxAttempts,
     }));
@@ -190,6 +199,7 @@ export function applyBoardTemplatesExtension(schema: GraphQLSchema): GraphQLSche
             agentId: lane.agentId && agents.has(lane.agentId) ? lane.agentId : null,
             contract: lane.contract ?? 'work',
             prompt: lane.prompt ?? null,
+            archiveOnSuccess: lane.archiveOnSuccess ?? false,
             wipLimit: lane.wipLimit ?? 1,
             maxAttempts: lane.maxAttempts ?? 3,
           })),

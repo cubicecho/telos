@@ -135,6 +135,7 @@ describe('an instance with AI off', () => {
     expect(schema.artifact).toBeNull();
     expect(names(schema.lane)).not.toContain('agentId');
     expect(names(schema.lane)).not.toContain('onSuccessLaneId');
+    expect(names(schema.lane)).not.toContain('archiveOnSuccess');
   });
 
   it('has no system principal, whatever key is sent', async () => {
