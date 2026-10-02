@@ -366,7 +366,7 @@ async function work(claim: Claim, pool: McpPool, options: WorkOptions): Promise<
     hooks: {
       run: hooksOf(pool, log),
       // A todo's first run opens its session; every run after is another turn of it.
-      events: claim.turn === 0 ? ['sessionStart', 'beforeTurn'] : ['beforeTurn'],
+      events: claim.opensSession ? ['sessionStart', 'beforeTurn'] : ['beforeTurn'],
       context: { ...options.hookContext, prompt },
       onNote: (note) => feed.fromHook(note),
     },

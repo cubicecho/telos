@@ -1,6 +1,7 @@
 import { takeDrafts } from './drafts.ts';
 import { type ExecuteOptions, execute } from './execute.ts';
 import { takeTests } from './probes.ts';
+import { takeSessionDeletes } from './session-deletes.ts';
 import type { Telos } from './telos.ts';
 
 // The runner's heartbeat as a process: ask telos what is ready, claim what it
@@ -59,6 +60,13 @@ export async function runLoop(options: LoopOptions, signal: AbortSignal): Promis
       await takeTests(options.telos, options.allowStdio, log);
     } catch (error) {
       log(`[runner] asking telos for MCP tests failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    try {
+      await takeSessionDeletes(options.telos, options.allowStdio, log);
+    } catch (error) {
+      log(
+        `[runner] asking telos for deleted sessions failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
     let started = 0;
     // Drafts first: somebody is sitting there waiting for the answer. They
