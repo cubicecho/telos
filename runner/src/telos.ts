@@ -70,6 +70,8 @@ export interface Claim {
   todoId: string;
   token: string;
   leaseExpiresAt: string;
+  /** How many runs the todo had before this one: zero for its first. */
+  turn: number;
   agent: ClaimedAgent;
   brief: Brief;
 }
@@ -170,7 +172,7 @@ const AGENT_FIELDS = `
 `;
 const CLAIM = `mutation ($todoId: ID!, $laneId: ID!) {
   claimRun(todoId: $todoId, laneId: $laneId) {
-    runId todoId token leaseExpiresAt
+    runId todoId token leaseExpiresAt turn
     agent { ${AGENT_FIELDS} }
     brief {
       projectName projectDescription projectContext laneName contract lanePrompt

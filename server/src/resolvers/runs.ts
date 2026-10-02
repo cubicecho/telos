@@ -83,6 +83,8 @@ const RUNS_SDL = parse(`
     token: String!
     "Heartbeat before this passes, or the run counts as abandoned."
     leaseExpiresAt: DateTime!
+    "How many runs the todo had before this one: zero for its first."
+    turn: Int!
     agent: RunnerAgent!
     brief: RunBrief!
   }
@@ -706,6 +708,9 @@ export function applyRunsExtension(schema: GraphQLSchema): GraphQLSchema {
         const [todo] = await tx.select().from(dbSchema.todos).where(eq(dbSchema.todos.id, args.todoId));
         const [project] = await tx.select().from(dbSchema.projects).where(eq(dbSchema.projects.id, todo.projectId));
         const [agent] = await tx.select().from(dbSchema.agents).where(eq(dbSchema.agents.id, lane.agentId));
+        // Counted before this run is written. The todo is the session its
+        // agents' hooks file things under, and its first run opens it.
+        const turn = await tx.$count(dbSchema.runs, eq(dbSchema.runs.todoId, todo.id));
         const [run] = await tx
           .insert(dbSchema.runs)
           .values({
@@ -725,6 +730,7 @@ export function applyRunsExtension(schema: GraphQLSchema): GraphQLSchema {
           todoId: todo.id,
           token: mintRunToken(run.id),
           leaseExpiresAt: run.leaseExpiresAt,
+          turn,
           agent: { ...agent, mcpServers: JSON.stringify(agent.mcpServers ?? []) },
           brief: await briefFor(tx, todo, lane, project),
         };

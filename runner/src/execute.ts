@@ -229,6 +229,7 @@ export async function execute(claim: Claim, options: ExecuteOptions): Promise<Ru
   const hookContext: HookContext = {
     session: { id: claim.todoId },
     host: HOST,
+    turn: { index: claim.turn },
     vars: { todoId: claim.todoId, runId: claim.runId, lane: claim.brief.laneName, contract: claim.brief.contract },
   };
   try {
@@ -364,6 +365,8 @@ async function work(claim: Claim, pool: McpPool, options: WorkOptions): Promise<
     signal,
     hooks: {
       run: hooksOf(pool, log),
+      // A todo's first run opens its session; every run after is another turn of it.
+      events: claim.turn === 0 ? ['sessionStart', 'beforeTurn'] : ['beforeTurn'],
       context: { ...options.hookContext, prompt },
       onNote: (note) => feed.fromHook(note),
     },

@@ -413,6 +413,46 @@ describe('the runner', () => {
     ]);
   });
 
+  it('opens the session on a todo’s first run, and not on the ones after', async () => {
+    const desk = await serveTools('What is known so far.');
+    await db
+      .update(dbSchema.agents)
+      .set({
+        mcpServers: [
+          {
+            id: 'desk',
+            name: 'Desk',
+            url: desk.url,
+            hiddenTools: ['recall'],
+            hooks: [
+              { id: 'opening', on: 'sessionStart', tool: 'recall', inject: true },
+              { id: 'memory', on: 'beforeTurn', tool: 'recall', inject: true },
+            ],
+          },
+        ],
+      })
+      .where(eq(dbSchema.agents.id, board.agentId));
+    const todoId = await board.addTodo('Plan it');
+    const hooksOf = (run: typeof dbSchema.runs.$inferSelect) =>
+      run.events
+        .filter((event: dbSchema.RunEvent) => event.kind === 'hook')
+        .map((event: dbSchema.RunEvent) => event.text?.split(' · ')[0]);
+
+    llm.script = () => ({ fail: 400 });
+    await cycle();
+    llm.script = () => ({ content: 'Planned.' });
+    await cycle();
+
+    const [first, second] = (await runsOf(todoId)).sort(
+      (a: typeof dbSchema.runs.$inferSelect, b: typeof dbSchema.runs.$inferSelect) =>
+        a.startedAt.getTime() - b.startedAt.getTime(),
+    );
+    expect(hooksOf(first)).toEqual(expect.arrayContaining(['sessionStart', 'beforeTurn']));
+    expect(second.status).toBe('ok');
+    expect(hooksOf(second)).toContain('beforeTurn');
+    expect(hooksOf(second)).not.toContain('sessionStart');
+  });
+
   it('turns an expansion’s JSON into child todos', async () => {
     await setLane(board.person, board.lanes[0].id, { contract: 'expand', onSuccessLaneId: board.lanes[1].id });
     const parentId = await board.addTodo('Build the thing');

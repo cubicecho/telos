@@ -214,6 +214,10 @@ location; `finishRun` stores them in `artifacts`, a reserved table no client
 can write. A stopped run keeps its events but no artifacts. An agent's MCP
 servers may carry `hooks` (agent-mcp-pool's `ToolHook`) and `hiddenTools`;
 invalid hooks are dropped with a notice, and a failing hook never fails a run.
+The todo is the hooks' session and each run a turn of it: `claimRun` says how
+many runs came before (`turn`), so a todo's first run fires `sessionStart`
+ahead of `beforeTurn`, and every run fires `afterTurn` and `sessionEnd`.
+`beforeCompact` and `sessionDelete` are never fired.
 
 **`scope` cannot reach a plain insert.** Any foreign key a caller can state gets
 checked in an `onWrite` hook in `server/src/resolvers/write-guards.ts`. A new
