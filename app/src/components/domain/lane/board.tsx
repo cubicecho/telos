@@ -9,9 +9,16 @@ import type { TodoSummary } from '@/components/domain/todo/types';
 import { useAi } from '@/lib/ai';
 import type { CachedLane } from '@/lib/cache';
 import { describeError } from '@/lib/errors';
-import { ProjectActivityDocument, ProjectStationsDocument, RetryTodoDocument, RunTodoDocument } from '@/lib/graphql';
+import {
+  CardMarksDocument,
+  ProjectActivityDocument,
+  ProjectStationsDocument,
+  RetryTodoDocument,
+  RunTodoDocument,
+} from '@/lib/graphql';
 import { todosInLane } from '@/lib/lanes';
 import { type BoardAi, BoardCardBody } from './board-card';
+import { marksByTodo } from './card-marks';
 import { DragBoard } from './drag-surfaces';
 import type { Drop } from './drag-surfaces-base';
 import type { LaneSummary } from './lane-badge';
@@ -34,6 +41,9 @@ import { useMoveTodo } from './use-move-todo';
  * With AI on for the account and the project, a column can also be a station,
  * and its settings are read here in a query of their own: the columns do not
  * exist in the schema otherwise, so `LaneFields` cannot carry them.
+ *
+ * What each card says about its notes and its last run comes in one query for
+ * the board, which follows `boardChanged` like every other active query.
  */
 export function Board({
   projectId,
@@ -86,6 +96,11 @@ export function Board({
         onRun: (todo) => run(() => runTodo({ variables: { id: todo.id } })),
       }
     : undefined;
+
+  // A board that cannot read its marks is still a board, so a failure here is
+  // left unsaid: the cards draw without them.
+  const marksQuery = useQuery(CardMarksDocument, { variables: { projectId }, fetchPolicy: 'cache-and-network' });
+  const marks = useMemo(() => marksByTodo(marksQuery.data?.cardMarks), [marksQuery.data]);
 
   const actions = useLaneActions(projectId);
   const moveTodo = useMoveTodo(projectId);
@@ -140,7 +155,16 @@ export function Board({
         onDragStart={onDragStart}
         onDrop={onDrop}
         onDragCancel={() => setDragging(null)}
-        overlay={dragging ? <BoardCardBody todo={dragging} lanes={lanes} live={shownLive?.get(dragging.id)} /> : null}
+        overlay={
+          dragging ? (
+            <BoardCardBody
+              todo={dragging}
+              lanes={lanes}
+              mark={marks.get(dragging.id)}
+              live={shownLive?.get(dragging.id)}
+            />
+          ) : null
+        }
       >
         <ScrollView horizontal contentContainerClassName="flex-row items-start gap-3 pb-2">
           {lanes.map((lane) => (
@@ -160,6 +184,7 @@ export function Board({
               // Offered once the settings are in, so a save cannot overwrite them with defaults.
               onEditStation={stationsOn && stationsQuery.data ? () => setStationLane(lane) : undefined}
               ai={boardAi}
+              marks={marks}
             />
           ))}
           <LaneComposer onCreate={(name) => run(() => actions.createLane(name, lanes.length))} />

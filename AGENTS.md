@@ -203,6 +203,12 @@ same rules back: such a todo is `parked` with `awaitsRun` until asked for.
 first run, in one statement and with nothing remembered; the app's setup
 checklist (`ai-setup-checklist.tsx`) adds the two switches from `useAi()` and
 disappears when every step is taken. A new step goes in both.
+`cardMarks` (`resolvers/card-marks.ts`) is what a board's cards show about
+their threads and last runs, one query for the board and only the todos with
+something to mark. It is applied with AI off too, because notes are not an AI
+feature; the run half needs AI on for the instance, the account and the
+project. "Failed" is `RUN_FAILED` and `failuresSinceTouched` in `stations.ts`,
+the same the queue and `aiStatus` use: do not write a second definition.
 `claimRun` returns a run token (`x-run-token`) the agent uses to reach `/mcp`
 as the `agent` actor, scoped to the run's owner, and only while the run is
 live. `finishRun` decides the verdict and the move on the server; the runner

@@ -7,6 +7,7 @@ import type { TodoSummary } from '@/components/domain/todo/types';
 import {
   AiStateDocument,
   CancelRunDocument,
+  CardMarksDocument,
   ProjectStationsDocument,
   RetryTodoDocument,
   RunTodoDocument,
@@ -86,6 +87,13 @@ const STUCK = stationTodo('attention', 'It broke.');
 const AWAITS_RUN = stationTodo('parked', 'Auto-run is off.', { awaitsRun: true });
 const RUN_REQUESTED = stationTodo('queued', null, { runRequested: true });
 
+/** The board asks for its cards' marks whatever AI is set to; these tests have none to show. */
+const NO_MARKS = {
+  request: { query: CardMarksDocument, variables: { projectId: 'p1' } },
+  result: { data: { cardMarks: [] } },
+  maxUsageCount: Number.POSITIVE_INFINITY,
+};
+
 const STATIONS = {
   request: { query: ProjectStationsDocument, variables: { projectId: 'p1' } },
   result: {
@@ -108,7 +116,7 @@ function board(
   }: { todos?: TodoSummary[]; live?: typeof LIVE; stuck?: typeof STUCK; waiting?: typeof STUCK } = {},
 ) {
   render(
-    <MockedProvider mocks={mocks}>
+    <MockedProvider mocks={[...mocks, NO_MARKS]}>
       <Board
         projectId="p1"
         aiEnabled={aiEnabled}

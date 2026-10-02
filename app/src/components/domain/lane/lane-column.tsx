@@ -12,6 +12,7 @@ import { Menu, MenuContent, MenuItem, MenuTrigger } from '@/components/ui/menu';
 import type { CachedLane } from '@/lib/cache';
 import { cn } from '@/lib/utils';
 import { type BoardAi, BoardCard } from './board-card';
+import type { CardMark } from './card-marks';
 import { DropLane } from './drag-surfaces';
 import type { LaneSummary } from './lane-badge';
 
@@ -37,6 +38,7 @@ export function LaneColumn({
   agentName,
   onEditStation,
   ai,
+  marks,
 }: {
   lane: CachedLane;
   lanes: readonly CachedLane[];
@@ -56,6 +58,8 @@ export function LaneColumn({
   onEditStation?: (() => void) | undefined;
   /** What the project's agents are doing to its cards, while AI is on for it. */
   ai?: BoardAi | undefined;
+  /** What the board's cards have to show, by todo id. */
+  marks?: ReadonlyMap<string, CardMark> | undefined;
 }) {
   const [renaming, setRenaming] = useState(false);
   const renameInput = useRef<TextInput>(null);
@@ -185,6 +189,7 @@ export function LaneColumn({
             lanes={lanes}
             onMove={(target) => onMove(todo, target)}
             onEdit={() => onEdit(todo)}
+            mark={marks?.get(todo.id)}
             live={ai?.live.get(todo.id)}
             stuck={ai?.stuck.get(todo.id)}
             waiting={ai?.waiting.get(todo.id)}

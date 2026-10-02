@@ -953,6 +953,25 @@ export const AiSetupDocument = graphql(`
   }
 `);
 
+/**
+ * What a board's cards have to show: notes, and how each todo's last run went.
+ * Only todos with something to mark come back. An active query, so it follows
+ * `boardChanged` with the rest of the board.
+ */
+export const CardMarksDocument = graphql(`
+  query CardMarks($projectId: ID!) {
+    cardMarks(projectId: $projectId) {
+      todoId
+      notes
+      lastRun
+      reason
+      runId
+      attempts
+      maxAttempts
+    }
+  }
+`);
+
 /** Just how many todos need a person, for the sidebar. */
 export const AiAttentionDocument = graphql(`
   query AiAttention {
