@@ -11,6 +11,7 @@ import { stampActor } from '../provenance.ts';
 import { mintRunToken } from '../run-tokens.ts';
 import { markRunnerSeen } from '../runner-seen.ts';
 import { dropRunRequests, expireLapsedRuns, LEASE_SECONDS, readyTodos } from '../stations.ts';
+import { openSession } from '../todo-sessions.ts';
 import { requireAuth } from './auth.ts';
 
 // The runner's side of the board. The runner is a separate process that talks
@@ -86,6 +87,8 @@ const RUNS_SDL = parse(`
     leaseExpiresAt: DateTime!
     "How many runs the todo had before this one: zero for its first."
     turn: Int!
+    "Whether no agent has worked the todo before: its hooks' session opens with this run."
+    opensSession: Boolean!
     agent: RunnerAgent!
     brief: RunBrief!
   }
@@ -752,8 +755,11 @@ export function applyRunsExtension(schema: GraphQLSchema): GraphQLSchema {
         const [project] = await tx.select().from(dbSchema.projects).where(eq(dbSchema.projects.id, todo.projectId));
         const [agent] = await tx.select().from(dbSchema.agents).where(eq(dbSchema.agents.id, lane.agentId));
         // Counted before this run is written. The todo is the session its
-        // agents' hooks file things under, and its first run opens it.
+        // agents' hooks file things under.
         const turn = await tx.$count(dbSchema.runs, eq(dbSchema.runs.todoId, todo.id));
+        // Asked of the sessions and not of `turn`: retention prunes runs, and a
+        // todo whose runs are gone has still had its session opened.
+        const opensSession = await openSession(tx, todo, agent.id);
         const [run] = await tx
           .insert(dbSchema.runs)
           .values({
@@ -776,6 +782,7 @@ export function applyRunsExtension(schema: GraphQLSchema): GraphQLSchema {
           token: mintRunToken(run.id),
           leaseExpiresAt: run.leaseExpiresAt,
           turn,
+          opensSession,
           agent: { ...agent, mcpServers: JSON.stringify(agent.mcpServers ?? []) },
           brief: await briefFor(tx, todo, lane, project),
         };

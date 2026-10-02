@@ -20,6 +20,7 @@ import { answerDraft, ESTIMATED_NOTICE, takeDrafts } from '../drafts.ts';
 import { startRunner } from '../embed.ts';
 import { type LoopOptions, tick } from '../loop.ts';
 import { takeTests } from '../probes.ts';
+import { takeSessionDeletes } from '../session-deletes.ts';
 import { createTelos, type DraftClaim } from '../telos.ts';
 
 // The runner end to end: a real telos over HTTP (GraphQL for the runner, /mcp
@@ -188,10 +189,13 @@ async function serveLlm(): Promise<string> {
  * hook calls before every turn. Stateless, a server per request.
  *
  * @param recalled What the memory tool answers.
- * @returns Its URL, and the files written through it.
+ * @returns Its URL, the files written through it, and what the memory tool was called with.
  */
-async function serveTools(recalled: string): Promise<{ url: string; written: Map<string, string> }> {
+async function serveTools(
+  recalled: string,
+): Promise<{ url: string; written: Map<string, string>; recalls: Array<Record<string, unknown>> }> {
   const written = new Map<string, string>();
+  const recalls: Array<Record<string, unknown>> = [];
   const app = express();
   app.post('/mcp', express.json(), async (req, res) => {
     const server = new McpServer({ name: 'desk', version: '0' }, { capabilities: { tools: {} } });
@@ -215,6 +219,7 @@ async function serveTools(recalled: string): Promise<{ url: string; written: Map
         written.set(args.path, args.content);
         return { content: [{ type: 'text', text: 'Written.' }] };
       }
+      recalls.push(request.params.arguments ?? {});
       return { content: [{ type: 'text', text: recalled }] };
     });
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
@@ -225,7 +230,7 @@ async function serveTools(recalled: string): Promise<{ url: string; written: Map
     await server.connect(transport);
     await transport.handleRequest(req, res, req.body);
   });
-  return { url: `${await listen(app)}/mcp`, written };
+  return { url: `${await listen(app)}/mcp`, written, recalls };
 }
 
 /**
@@ -572,6 +577,83 @@ describe('testing an MCP server', () => {
   it('will not run a command without RUNNER_ALLOW_STDIO', async () => {
     const probe = await testOf({ id: 'local', command: 'echo' });
     expect(probe).toMatchObject({ ok: false, error: expect.stringMatching(/RUNNER_ALLOW_STDIO/) });
+  });
+});
+
+describe('a deleted todo’s session', () => {
+  const PURGE = `mutation ($id: UUID!) { deleteTodo(where: { id: { eq: $id } }, hard: true) { id } }`;
+
+  /** A todo the agent has worked, then deleted for good, its agent's server hooked to hear of it. */
+  async function deletedTodo(url: string): Promise<string> {
+    await db
+      .update(dbSchema.agents)
+      .set({
+        mcpServers: [
+          {
+            id: 'desk',
+            name: 'Desk',
+            url,
+            hooks: [{ id: 'forget', on: 'sessionDelete', tool: 'recall', args: { session: '{{session.id}}' } }],
+          },
+        ],
+      })
+      .where(eq(dbSchema.agents.id, board.agentId));
+    const todoId = await board.addTodo('Write it');
+    await cycle();
+    await board.person.expectOk(PURGE, { id: todoId });
+    return todoId;
+  }
+
+  async function tell(log: (text: string) => void = () => {}): Promise<void> {
+    await Promise.all(await takeSessionDeletes(createTelos({ telosUrl, runnerKey: RUNNER_KEY }), false, log));
+  }
+
+  it('is told to the servers that asked, as sessionDelete with the todo’s id', async () => {
+    const desk = await serveTools('');
+    const todoId = await deletedTodo(desk.url);
+    expect(desk.recalls).toEqual([]);
+
+    await tell();
+
+    expect(desk.recalls).toEqual([{ session: todoId }]);
+    expect(await db.select().from(dbSchema.todoSessions)).toEqual([]);
+  });
+
+  it('is kept to try again when the server cannot be reached', async () => {
+    const todoId = await deletedTodo('http://127.0.0.1:9/mcp');
+    const said: string[] = [];
+
+    await tell((text) => said.push(text));
+
+    const [session] = await db.select().from(dbSchema.todoSessions);
+    expect(session).toMatchObject({ todoId, attempts: 1 });
+    expect(session.error).toBeTruthy();
+    expect(session.retryAt.getTime()).toBeGreaterThan(Date.now());
+    expect(said.join('\n')).toContain(todoId);
+  });
+});
+
+describe('a hook bound to beforeCompact', () => {
+  it('is said never to fire, and is kept', async () => {
+    const desk = await serveTools('');
+    const server = {
+      id: 'desk',
+      name: 'Desk',
+      url: desk.url,
+      hooks: [{ id: 'keep', on: 'beforeCompact', tool: 'recall' }],
+    };
+    await db
+      .update(dbSchema.agents)
+      .set({ mcpServers: [server] })
+      .where(eq(dbSchema.agents.id, board.agentId));
+    const todoId = await board.addTodo('Write it');
+    await cycle();
+
+    const [run] = await runsOf(todoId);
+    expect(run.status).toBe('ok');
+    const notices = run.events.filter((event: dbSchema.RunEvent) => event.kind === 'notice');
+    expect(notices).toEqual([expect.objectContaining({ text: expect.stringMatching(/beforeCompact.*never fires/) })]);
+    expect(desk.recalls).toEqual([]);
   });
 });
 

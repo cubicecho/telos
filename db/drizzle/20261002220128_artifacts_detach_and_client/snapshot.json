@@ -1,10 +1,10 @@
 {
-  "id": "ca1156ff-5a2b-4186-88cb-cb3713edfbb6",
-  "prevIds": [
-    "8c519b25-093a-491b-8d33-b399c2cf2483"
-  ],
   "version": "8",
   "dialect": "postgres",
+  "id": "0d598168-485e-4133-b604-11840d128bf2",
+  "prevIds": [
+    "4b3f8a04-9923-4502-b9aa-08fa2f220d35"
+  ],
   "ddl": [
     {
       "isRlsEnabled": false,
@@ -117,6 +117,12 @@
     {
       "isRlsEnabled": false,
       "name": "todo_notes",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "todo_sessions",
       "entityType": "tables",
       "schema": "public"
     },
@@ -2782,6 +2788,123 @@
       "name": "id",
       "entityType": "columns",
       "schema": "public",
+      "table": "todo_sessions"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "user_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "todo_sessions"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "todo_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "todo_sessions"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "agent_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "todo_sessions"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "opened_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "todo_sessions"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "deleted_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "todo_sessions"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "0",
+      "generated": null,
+      "identity": null,
+      "name": "attempts",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "todo_sessions"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "retry_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "todo_sessions"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "error",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "todo_sessions"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "gen_random_uuid()",
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "public",
       "table": "todos"
     },
     {
@@ -4161,6 +4284,97 @@
       "with": "",
       "method": "btree",
       "concurrently": false,
+      "name": "idx_todo_sessions_user_id",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "todo_sessions"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "agent_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "idx_todo_sessions_agent_id",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "todo_sessions"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "todo_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "agent_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "uq_todo_sessions_todo_agent",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "todo_sessions"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "deleted_at",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": "deleted_at IS NOT NULL",
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "idx_todo_sessions_deleted_at",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "todo_sessions"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "user_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
       "name": "idx_todos_user_id",
       "entityType": "indexes",
       "schema": "public",
@@ -5018,6 +5232,40 @@
       ],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
+      "name": "todo_sessions_user_id_users_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "todo_sessions"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "agent_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "agents",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "name": "todo_sessions_agent_id_agents_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "todo_sessions"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "user_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "users",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
       "name": "todos_user_id_users_id_fkey",
       "entityType": "fks",
       "schema": "public",
@@ -5269,6 +5517,16 @@
         "id"
       ],
       "nameExplicit": false,
+      "name": "todo_sessions_pkey",
+      "schema": "public",
+      "table": "todo_sessions",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
       "name": "todos_pkey",
       "schema": "public",
       "table": "todos",
@@ -5456,6 +5714,13 @@
       "entityType": "checks",
       "schema": "public",
       "table": "runs"
+    },
+    {
+      "value": "\"attempts\" >= 0",
+      "name": "ck_todo_sessions_attempts",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "todo_sessions"
     }
   ],
   "renames": []

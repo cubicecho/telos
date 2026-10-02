@@ -148,8 +148,16 @@ and only the todos you asked for in one with it off. Each run keeps a log of its
 todo shows as it goes, and a list of what it made: files it wrote, and anything
 the agent chose to record. What was made for a todo outlives it: delete the
 todo for good and its artifacts stay on the project's Artifacts list, under the
-title the todo had, until you remove them or delete the project. An agent's MCP servers can carry hooks, for example
-a memory lookup injected before each turn.
+title the todo had, until you remove them or delete the project. An agent's MCP
+servers can carry hooks, for example
+a memory lookup injected before each turn. The todo is the hooks' session:
+`sessionStart` fires on its first run, `beforeTurn`, `afterTurn` and
+`sessionEnd` on every run, and `sessionDelete` after the todo is deleted for
+good, so a memory server can forget what it filed. The delete does not wait
+for that: the runner tells the servers afterwards, tries a few times, and
+gives up with a line in the server's log. `beforeCompact` never fires, since a
+run does not compact its transcript, and a run says so when a hook is bound to
+it.
 
 Before a request is a todo you can **talk it over** with an agent: it asks what
 it needs to and writes the title and brief as you go. Each of its replies is a

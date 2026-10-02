@@ -37,6 +37,8 @@ export const RUNNER_MUTATIONS = new Set([
   'finishProbe',
   'claimDraft',
   'finishDraft',
+  'takeSessionDeletes',
+  'finishSessionDelete',
 ]);
 
 /**
