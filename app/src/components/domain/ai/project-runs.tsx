@@ -24,7 +24,8 @@ export const RUNS_PAGE = 50;
 /** How often the list is asked about again while it is on screen. */
 export const RUNS_POLL_MS = 5000;
 
-const FILTERS = [
+/** The statuses a list of runs can be narrowed to. */
+export const RUN_FILTERS = [
   { value: 'all', label: 'All' },
   { value: 'running', label: 'Running' },
   { value: 'error', label: 'Failed' },
@@ -32,7 +33,7 @@ const FILTERS = [
   { value: 'ok', label: 'Finished' },
 ] as const;
 
-type Filter = (typeof FILTERS)[number]['value'];
+export type RunFilter = (typeof RUN_FILTERS)[number]['value'];
 
 export function ProjectRuns({
   projectId,
@@ -43,7 +44,7 @@ export function ProjectRuns({
   activity: ProjectActivity;
   pollMs?: number;
 }) {
-  const [filter, setFilter] = useState<Filter>('all');
+  const [filter, setFilter] = useState<RunFilter>('all');
   const [limit, setLimit] = useState(RUNS_PAGE);
   const where: RunFilters = { projectId: { eq: projectId } };
   if (filter !== 'all') where.status = { eq: filter };
@@ -97,12 +98,12 @@ export function ProjectRuns({
         aria-label="Show runs"
         value={filter}
         onValueChange={(next) => {
-          setFilter(next as Filter);
+          setFilter(next as RunFilter);
           setLimit(RUNS_PAGE);
         }}
         className="self-start"
       >
-        {FILTERS.map((option) => (
+        {RUN_FILTERS.map((option) => (
           <SegmentedButton key={option.value} value={option.value}>
             {option.label}
           </SegmentedButton>

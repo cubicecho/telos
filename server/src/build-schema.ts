@@ -1,5 +1,6 @@
 import { AUTH_TABLES, SERVER_TABLES } from '@telos/db/schema';
 import { buildSchema, GraphQLDateTime } from '@vantreeseba/drizzle-graphql';
+import { applyAccountActivityExtension } from './resolvers/account-activity.ts';
 import { applyActorLock } from './resolvers/actor-lock.ts';
 import { applyAgentsExtension } from './resolvers/agents.ts';
 import { applyAiSetupExtension } from './resolvers/ai-setup.ts';
@@ -127,6 +128,7 @@ export function createSchema(db: AnyDb, options: SchemaOptions) {
     schema = applySessionDeletesExtension(schema);
     schema = applyAiStatusExtension(schema);
     schema = applyAiSetupExtension(schema);
+    schema = applyAccountActivityExtension(schema);
   }
   // Last, so it sees every mutation the extensions above added.
   schema = applyActorLock(schema);

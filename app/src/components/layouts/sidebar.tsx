@@ -2,7 +2,7 @@ import { useQuery } from '@apollo/client';
 import { Link, usePathname } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Platform, Pressable, Text, View } from 'react-native';
-import { Activity, LogOut } from '@/components/app-icons';
+import { Activity, History, LogOut } from '@/components/app-icons';
 import { useAttentionCount } from '@/components/domain/ai/ai-status';
 import { ProjectFormDialog } from '@/components/domain/project/project-form-dialog';
 import { TodoSearch, useSearchShortcut } from '@/components/domain/todo/todo-search';
@@ -99,6 +99,16 @@ export function Sidebar() {
                   icon={<Activity />}
                   count={attention > 0 ? attention : undefined}
                   active={pathname === '/stations'}
+                />
+              </Link>
+            ) : null}
+            {ai.on ? (
+              <Link href="/activity" asChild>
+                <SidebarNavItem
+                  href="/activity"
+                  label="Activity"
+                  icon={<History />}
+                  active={pathname === '/activity'}
                 />
               </Link>
             ) : null}

@@ -27,11 +27,14 @@ const DELETE_DRAFT_RUN = 'Its log and prompts go. The draft, and what was said i
 export function RunRow({
   run,
   showTodo = false,
+  project,
   pollMs = RUN_POLL_MS,
 }: {
   run: RunSummaryFieldsFragment;
   /** Name the todo or draft too, for a list that is not already one todo's or one draft's. */
   showTodo?: boolean;
+  /** Its project's name, for a list across projects. */
+  project?: string | undefined;
   pollMs?: number;
 }) {
   const [open, setOpen] = useState(false);
@@ -84,7 +87,9 @@ export function RunRow({
             <Text numberOfLines={1} className="text-foreground text-sm">
               {title}
             </Text>
-            <Text className="text-muted-foreground text-xs">{describeRun(run)}</Text>
+            <Text className="text-muted-foreground text-xs">
+              {project ? `${project} · ${describeRun(run)}` : describeRun(run)}
+            </Text>
           </View>
         </Pressable>
         {ofDraft && showTodo ? <Badge variant="outline">Draft</Badge> : null}

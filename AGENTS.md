@@ -302,6 +302,21 @@ the draft: a todo made from one reaches them through `todo.draft`, and
 discarding the draft deletes them. An API key or an agent sees none of them,
 as it sees no draft.
 
+**The account's activity page adds two queries and no table.** `/activity`
+(`account-activity.tsx`) lists runs, artifacts and archived todos with the
+generated queries and no project filter, which are already the account's own,
+and reuses the project's rows (`RunRow`, `ArtifactRow`, `ArchivedTodoList`,
+`RunDialog`). What those cannot say is in `resolvers/account-activity.ts`,
+both a person's (`requireSession`) and behind `requireAi`: `accountSpend` adds
+up a window's runs by project and by agent, drafts' replies included, over
+every project the account owns, and returns `keptSince` when run retention is
+shorter than the window; `accountAttention` is the open todos that are out of
+attempts or whose last run errored, found by `todo_id` so no draft is among
+them, with `failuresSinceTouched` as the count. An error stops counting when a
+person touches the todo, as an attempt does. An artifact's row must draw
+without its todo. The sidebar link and the route both go when `useAi().on` is
+false.
+
 **`scope` cannot reach a plain insert.** Any foreign key a caller can state gets
 checked in an `onWrite` hook in `server/src/resolvers/write-guards.ts`. A new
 table with a user-facing FK needs an entry in `FOREIGN_KEYS`.

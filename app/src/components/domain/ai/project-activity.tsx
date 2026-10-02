@@ -52,7 +52,7 @@ export function draftReplies(count: number): string {
  * The start of the spend window. Rounded to the hour so the variables, and so
  * the cached answer, hold still between renders and polls.
  */
-function spendSince(): string {
+export function spendSince(): string {
   const hour = 60 * 60 * 1000;
   return new Date(Math.floor((Date.now() - SPEND_DAYS * 24 * hour) / hour) * hour).toISOString();
 }

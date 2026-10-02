@@ -189,6 +189,16 @@ reason is one press away on either), and how many attempts the station has
 used of its limit. The marks update as the board does. The note count is there
 with AI off too.
 
+**Activity**, beside Stations in the sidebar, is the same thing across every
+project you own. At the top is what needs you: each todo that is out of
+attempts or whose last run errored, with its project, the reason, and a way to
+send it round again. Under it is what the last 30 days cost in tokens, by
+project and by agent; when your run retention is shorter than that, it says
+which day the figures start on. Then three lists, newest first: runs (a
+draft's replies among them, marked), artifacts with the todo and project each
+came from, and archived todos with restore. A run opens as it does in its
+project. The page is not there while AI is off.
+
 A note you wrote can be edited or deleted from the todo's thread, and an edited
 note says so, with the time. What a run reported, and a verdict it returned,
 stay as written: the next agent may already have been told them. An edit
