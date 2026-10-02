@@ -12,8 +12,9 @@ import { DeleteArtifactDocument, TodoRunsDocument } from '@/lib/graphql';
 import { RUN_POLL_MS, RunRow } from './run-row';
 
 // A todo's runs — each time a station's agent worked it — and the artifacts
-// they left. Drawn only while AI is on for the account and the project; the
-// todo dialog decides that, from the same query this reads.
+// made for it, by those runs or by a client outside one. Drawn only while AI is
+// on for the account and the project; the todo dialog decides that, from the
+// same query this reads.
 
 export function useTodoRuns(todoId: string, { skip = false }: { skip?: boolean } = {}) {
   return useQuery(TodoRunsDocument, { variables: { id: todoId }, skip, fetchPolicy: 'cache-and-network' });
@@ -90,10 +91,32 @@ export function noteIdOf(artifact: Pick<ArtifactFieldsFragment, 'location'>): st
   return artifact.location.startsWith(NOTE_LOCATION) ? artifact.location.slice(NOTE_LOCATION.length) || null : null;
 }
 
+/** The source of an artifact an MCP client recorded outside any run. */
+const CLIENT_SOURCE = 'client';
+
+/** Said beside a client's artifact: nothing held it against what was done. */
+export const UNCHECKED = 'Recorded by a client, not checked by a run';
+
+/**
+ * What an artifact's todo is called, for a list that spans todos.
+ *
+ * @param artifact The artifact, with its todo when it still has one.
+ * @returns The todo's title, marked when the todo has been deleted.
+ */
+export function todoLabelOf(
+  artifact: Pick<ArtifactFieldsFragment, 'todoId' | 'todoTitle'> & { todo?: { title: string } | null },
+): string {
+  if (artifact.todo) {
+    return artifact.todo.title;
+  }
+  return artifact.todoTitle ? `${artifact.todoTitle} (todo deleted)` : 'Todo deleted';
+}
+
 /**
  * One artifact: a note on the card as a way into the thread, anything else as
  * where it lives. Either can be taken off the board, which removes the link and
- * leaves what it points at wherever it was stored.
+ * leaves what it points at wherever it was stored. One a client recorded is
+ * marked as its word, not as something a run was seen to make.
  */
 export function ArtifactRow({
   artifact,
@@ -149,6 +172,7 @@ export function ArtifactRow({
       </Pressable>
     );
   } else {
+    const unchecked = artifact.source === CLIENT_SOURCE;
     body = (
       <>
         <View className="min-w-0 flex-1 gap-0.5">
@@ -158,9 +182,10 @@ export function ArtifactRow({
           <Text numberOfLines={1} className="text-muted-foreground text-xs">
             {[todoTitle, artifact.title ? artifact.location : null, artifact.mediaType].filter(Boolean).join(' · ')}
           </Text>
+          {unchecked ? <Text className="text-muted-foreground text-xs italic">{UNCHECKED}</Text> : null}
         </View>
         <Badge variant="outline">{artifact.action}</Badge>
-        <Badge variant="secondary">{artifact.source}</Badge>
+        {unchecked ? <Badge variant="outline">unverified</Badge> : <Badge variant="secondary">{artifact.source}</Badge>}
       </>
     );
   }

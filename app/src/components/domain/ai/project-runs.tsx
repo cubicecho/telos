@@ -11,7 +11,7 @@ import { SegmentedButton, SegmentedGroup } from '@/components/ui/segmented';
 import { ProjectArtifactsDocument, ProjectRunsDocument } from '@/lib/graphql';
 import { draftReplies, type ProjectActivity, SPEND_DAYS } from './project-activity';
 import { RunRow } from './run-row';
-import { ArtifactRow } from './todo-runs';
+import { ArtifactRow, todoLabelOf } from './todo-runs';
 
 // A project's runs, every station and todo together, newest first: the place
 // to see what its agents have been doing, and what it cost. An agent's replies
@@ -138,7 +138,10 @@ export function ProjectRuns({
   );
 }
 
-/** What a project's runs left behind, with the todo each is on. */
+/**
+ * What was made for a project's todos, with the todo each is on. One whose todo
+ * has been deleted stays, under the title the todo had.
+ */
 export function ProjectArtifacts({ projectId }: { projectId: string }) {
   const [limit, setLimit] = useState(RUNS_PAGE);
   const query = useQuery(ProjectArtifactsDocument, {
@@ -156,7 +159,9 @@ export function ProjectArtifacts({ projectId }: { projectId: string }) {
         query={query}
         what="the artifacts"
         count={artifacts.length}
-        empty={<Text className="text-muted-foreground text-sm">No run has left anything behind yet.</Text>}
+        empty={
+          <Text className="text-muted-foreground text-sm">Nothing has been made for this project’s todos yet.</Text>
+        }
       />
       {artifacts.length === 0 ? null : (
         <View role="list" aria-label="Artifacts" className="gap-1">
@@ -164,7 +169,7 @@ export function ProjectArtifacts({ projectId }: { projectId: string }) {
             <ArtifactRow
               key={artifact.id}
               artifact={artifact}
-              todoTitle={artifact.todo?.title}
+              todoTitle={todoLabelOf(artifact)}
               onOpenNote={(noteId) => {
                 if (artifact.todo) setOpened({ todo: artifact.todo, noteId });
               }}
