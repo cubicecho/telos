@@ -15,6 +15,7 @@ import { applyLanesExtension } from './resolvers/lanes.ts';
 import { applyNotesExtension } from './resolvers/notes.ts';
 import { applyRequestsExtension } from './resolvers/requests.ts';
 import { applyRunsExtension } from './resolvers/runs.ts';
+import { applySessionDeletesExtension } from './resolvers/session-deletes.ts';
 import { applyTodosExtension } from './resolvers/todos.ts';
 import { onWrite } from './resolvers/write-guards.ts';
 import { contextValues, features, scope } from './tenancy.ts';
@@ -121,6 +122,7 @@ export function createSchema(db: AnyDb, options: SchemaOptions) {
     schema = applyAgentsExtension(schema);
     schema = applyRunsExtension(schema);
     schema = applyDraftsExtension(schema);
+    schema = applySessionDeletesExtension(schema);
     schema = applyAiStatusExtension(schema);
     schema = applyAiSetupExtension(schema);
   }
