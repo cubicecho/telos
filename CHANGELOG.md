@@ -1,3 +1,13 @@
+# [1.14.0](https://github.com/cubicecho/telos/compare/v1.13.0...v1.14.0) (2026-10-02)
+
+
+### Features
+
+* **app:** MCP servers in Settings, and the ones each agent reaches ([1bea965](https://github.com/cubicecho/telos/commit/1bea9650b2e62b42fb2135c1ae263542c6176e7b))
+* **db:** MCP servers kept once per account, and named by agents by slug ([0ff993a](https://github.com/cubicecho/telos/commit/0ff993a23e3a80de6f1a1e097c3a783d1bafc7cb))
+* **runner:** say on the run when an agent names an MCP server that is gone ([3c5a802](https://github.com/cubicecho/telos/commit/3c5a80227aed8cf4480efc52c337ca106da5d7bd))
+* **server:** the account's MCP servers, their secrets, and the ones an agent reaches ([9835b2a](https://github.com/cubicecho/telos/commit/9835b2a9ad5e8ceda5699bff106ff308dd777b48))
+
 # [1.13.0](https://github.com/cubicecho/telos/compare/v1.12.0...v1.13.0) (2026-10-02)
 
 
