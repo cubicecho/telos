@@ -162,17 +162,19 @@ const WRITES_RESERVED = new Set<string>([
 ]);
 
 /**
- * Tables that can be added to and deleted from, but not rewritten. A note an
- * agent was given, or a verdict it returned, should read later as it read then.
+ * Tables generated CRUD may add to and nothing more. Rewriting a note or taking
+ * one away depends on who wrote it and what kind it is, which a `where` cannot
+ * say: `editTodoNote` and `deleteTodoNote` (resolvers/notes.ts) decide. A report
+ * an agent wrote, or a verdict it returned, should read later as it read then.
  */
-const APPEND_ONLY = new Set<string>(['todoNotes']);
+const INSERT_ONLY = new Set<string>(['todoNotes']);
 
 const generatedWritesAllowed = (table: string) => !WRITES_RESERVED.has(table);
-const generatedUpdatesAllowed = (table: string) => generatedWritesAllowed(table) && !APPEND_ONLY.has(table);
+const generatedChangesAllowed = (table: string) => generatedWritesAllowed(table) && !INSERT_ONLY.has(table);
 
 export const features: NonNullable<BuildSchemaConfig['features']> = {
   insert: generatedWritesAllowed,
-  update: generatedUpdatesAllowed,
-  updateMany: generatedUpdatesAllowed,
-  delete: generatedWritesAllowed,
+  update: generatedChangesAllowed,
+  updateMany: generatedChangesAllowed,
+  delete: generatedChangesAllowed,
 };

@@ -12,6 +12,7 @@ import { applyBoardTemplatesExtension } from './resolvers/board-templates.ts';
 import { applyCardMarksExtension } from './resolvers/card-marks.ts';
 import { applyDraftsExtension } from './resolvers/drafts.ts';
 import { applyLanesExtension } from './resolvers/lanes.ts';
+import { applyNotesExtension } from './resolvers/notes.ts';
 import { applyRequestsExtension } from './resolvers/requests.ts';
 import { applyRunsExtension } from './resolvers/runs.ts';
 import { applyTodosExtension } from './resolvers/todos.ts';
@@ -109,6 +110,7 @@ export function createSchema(db: AnyDb, options: SchemaOptions) {
   let schema = applyAuthExtension(drizzleSchema, options);
   schema = applyTodosExtension(schema);
   schema = applyLanesExtension(schema);
+  schema = applyNotesExtension(schema);
   schema = applyBoardTemplatesExtension(schema);
   schema = applyBoardChangesExtension(schema);
   schema = applyCardMarksExtension(schema, { ai: options.ai });

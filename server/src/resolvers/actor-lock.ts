@@ -6,12 +6,21 @@ import { type Context, isAiActor } from '../context.ts';
 // That is the separation: the board is the person's, and policy (where a todo
 // goes when a run ends) is the server's, not the caller's.
 //
+// A note is the one thing it may take back: `editTodoNote` and `deleteTodoNote`
+// are open to it, and resolvers/notes.ts holds it to the notes it signed.
+//
 // An allowlist over the whole Mutation type rather than a check per resolver,
 // so a mutation added later is closed to AI until someone opens it here.
 // Applied last in createSchema, after every extension has added its fields.
 
 /** The only mutations an AI caller may make. */
-export const AI_MUTATIONS = new Set(['submitRequest', 'cancelRequest', 'addTodoNote']);
+export const AI_MUTATIONS = new Set([
+  'submitRequest',
+  'cancelRequest',
+  'addTodoNote',
+  'editTodoNote',
+  'deleteTodoNote',
+]);
 
 /**
  * The only mutations the runner may make. It owns no rows, so generated CRUD

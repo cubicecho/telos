@@ -579,6 +579,7 @@ export const TodoNoteFieldsFragment = graphql(`
     actorKind
     runId
     createdAt
+    editedAt
   }
 `);
 
@@ -620,9 +621,17 @@ export const CreateTodoNoteDocument = graphql(`
   }
 `);
 
+export const EditTodoNoteDocument = graphql(`
+  mutation EditTodoNote($id: ID!, $body: String!) {
+    editTodoNote(id: $id, body: $body) {
+      ...TodoNoteFields
+    }
+  }
+`);
+
 export const DeleteTodoNoteDocument = graphql(`
-  mutation DeleteTodoNote($id: UUID!) {
-    deleteTodoNote(where: { id: { eq: $id } }) {
+  mutation DeleteTodoNote($id: ID!) {
+    deleteTodoNote(id: $id) {
       id
     }
   }

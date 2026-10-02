@@ -17,7 +17,16 @@ import { authFor, createClient, createTestDb, createUser, type TestDb } from './
 // API key in the header — the path Claude Code takes. What a key may see and
 // write is pinned here too, through the same schema the door serves.
 
-const TOOLS = ['projects', 'todos', 'request', 'submit_request', 'cancel_request', 'add_todo_note'];
+const TOOLS = [
+  'projects',
+  'todos',
+  'request',
+  'submit_request',
+  'cancel_request',
+  'add_todo_note',
+  'edit_todo_note',
+  'delete_todo_note',
+];
 
 let db: TestDb;
 let server: Server | null = null;

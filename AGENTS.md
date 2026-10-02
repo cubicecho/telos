@@ -170,8 +170,8 @@ directly (a loader, a hand-written mutation) has to apply the same narrowing
 itself — see `visibleToAi` in `resolvers/todos.ts` and `loadAiTodo` in
 `resolvers/requests.ts`. What it writes: `resolvers/actor-lock.ts` wraps every
 mutation and refuses AI all but `AI_MUTATIONS` (`submitRequest`,
-`cancelRequest`, `addTodoNote`). A new mutation is closed to AI until it is
-added there. The MCP door (`mcp.ts`) serves only the operations written in
+`cancelRequest`, `addTodoNote`, and `editTodoNote` and `deleteTodoNote` for
+the notes it signed). A new mutation is closed to AI until it is added there. The MCP door (`mcp.ts`) serves only the operations written in
 `mcp.graphql` — the tool list is the menu, the lock is the lock. `/mcp` is
 a 404 unless the instance's switch is on.
 
@@ -305,7 +305,20 @@ using it cannot reach.
 
 **Dependency edges have no generated mutations.** `features` in `tenancy.ts`
 turns off insert/update/delete for `todoDependencies` so every edge goes through
-`addTodoDependency`, which is where `assertNoCycle` lives.
+`addTodoDependency` or `setTodoDependencies`, which is where `assertNoCycle`
+lives. `setTodoDependencies` replaces a todo's whole list in one transaction,
+for a caller that would otherwise leave it half-written; the one-edge mutations
+are what the app uses. A refused edge names the todos in the loop.
+
+**Notes are added by generated CRUD and changed only by `resolvers/notes.ts`.**
+`features` turns off generated update and delete for `todoNotes`, because who
+may change a note is not something a `where` can say. `editTodoNote` and
+`deleteTodoNote` hold the rule: a report or a verdict is what a run said and
+nobody changes it; a plain note is rewritten only by whoever signed it (a
+person, an API key by `actorKeyId`, a run by `runId`); a person may delete any
+plain note on their own board. An edit stamps `editedAt`. `briefFor` reads the
+thread when a run is claimed, so an edit reaches later runs only, and the app
+says so beside the editor.
 
 **Report `NOT_FOUND`, never `FORBIDDEN`.** "You may not touch this" confirms the
 row exists, which is itself something the caller is not entitled to know.

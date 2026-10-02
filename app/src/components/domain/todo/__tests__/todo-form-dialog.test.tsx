@@ -331,6 +331,7 @@ describe('TodoFormDialog', () => {
       actorKind: 'agent',
       runId: null,
       createdAt: '2026-09-24T10:00:00.000Z',
+      editedAt: null,
     });
     const record = {
       request: { query: TodoRecordDocument, variables: { id: TODO.id } },
