@@ -199,6 +199,10 @@ the AI switches, a lane without an agent, a blocker or the WIP limit, and it is
 also a retry: its `run` event is a person's arrival in the lane, as
 `retryTodo`'s is. Switching auto-run off cancels nothing. `aiStatus` reads the
 same rules back: such a todo is `parked` with `awaitsRun` until asked for.
+`aiSetup` (`resolvers/ai-setup.ts`) answers what an account has in place for a
+first run, in one statement and with nothing remembered; the app's setup
+checklist (`ai-setup-checklist.tsx`) adds the two switches from `useAi()` and
+disappears when every step is taken. A new step goes in both.
 `claimRun` returns a run token (`x-run-token`) the agent uses to reach `/mcp`
 as the `agent` actor, scoped to the run's owner, and only while the run is
 live. `finishRun` decides the verdict and the move on the server; the runner

@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import { type ReactNode, useState } from 'react';
 import { Text, View } from 'react-native';
 import { MessageSquare } from '@/components/app-icons';
+import { AiSetupChecklist } from '@/components/domain/ai/ai-setup-checklist';
 import { type ProjectActivity, ProjectActivityLine } from '@/components/domain/ai/project-activity';
 import { ProjectAiSwitch, ProjectAutoRunSwitch } from '@/components/domain/ai/project-ai-switch';
 import { DraftDialog } from '@/components/domain/draft/draft-dialog';
@@ -167,6 +168,7 @@ export function ProjectPage({
           <ProjectAiSwitch projectId={project.id} enabled={project.aiEnabled} />
           {project.aiEnabled ? <ProjectAutoRunSwitch projectId={project.id} enabled={project.autoRun} /> : null}
           {activity ? <ProjectActivityLine activity={activity} /> : null}
+          <AiSetupChecklist projectId={project.id} />
 
           {actionError ? (
             <Text className="text-destructive text-sm" aria-live="polite">
