@@ -366,6 +366,7 @@ export const StationFieldsFragment = graphql(`
     prompt
     onSuccessLaneId
     onFailureLaneId
+    archiveOnSuccess
     wipLimit
     maxAttempts
   }

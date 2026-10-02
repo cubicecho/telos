@@ -13,6 +13,9 @@ import { UpdateStationDocument } from '@/lib/graphql';
 /** "No agent" and "stay here", as a select can hold them: radix refuses an empty value. */
 const NONE = 'none';
 
+/** "Archive it" among the lanes a pass can send a todo to: one answer, never both. */
+const ARCHIVE = 'archive';
+
 const CONTRACTS = [
   { value: 'work', label: 'Work — do the job, then move it on' },
   { value: 'verdict', label: 'Verdict — judge it: pass or fail' },
@@ -24,22 +27,29 @@ export interface StationAgent {
   name: string;
 }
 
-interface StationDraft {
+export interface StationDraft {
   agentId: string;
   contract: string;
   prompt: string;
-  onSuccessLaneId: string;
+  /** A lane's id, `ARCHIVE` or `NONE`. */
+  onSuccess: string;
   onFailureLaneId: string;
   wipLimit: string;
   maxAttempts: string;
 }
 
-function toDraft(station: StationFieldsFragment | null): StationDraft {
+/**
+ * Reads a station into what the form holds.
+ *
+ * @param station - The lane's station settings, or null before they load.
+ * @returns The form's values.
+ */
+export function toDraft(station: StationFieldsFragment | null): StationDraft {
   return {
     agentId: station?.agentId ?? NONE,
     contract: station?.contract ?? 'work',
     prompt: station?.prompt ?? '',
-    onSuccessLaneId: station?.onSuccessLaneId ?? NONE,
+    onSuccess: station?.archiveOnSuccess ? ARCHIVE : (station?.onSuccessLaneId ?? NONE),
     onFailureLaneId: station?.onFailureLaneId ?? NONE,
     wipLimit: String(station?.wipLimit ?? 1),
     maxAttempts: String(station?.maxAttempts ?? 3),
@@ -47,6 +57,47 @@ function toDraft(station: StationFieldsFragment | null): StationDraft {
 }
 
 const orNone = (value: string) => (value === NONE ? null : value);
+
+/**
+ * Turns the form's values into the lane columns to write. Archiving and the
+ * success arrow are written together, so choosing one always clears the other.
+ *
+ * @param value - The form's values.
+ * @returns The columns for `updateLane`.
+ */
+export function toStationSet(value: StationDraft) {
+  const archives = value.onSuccess === ARCHIVE;
+  return {
+    agentId: orNone(value.agentId),
+    contract: value.contract,
+    prompt: value.prompt.trim() === '' ? null : value.prompt.trim(),
+    onSuccessLaneId: archives ? null : orNone(value.onSuccess),
+    archiveOnSuccess: archives,
+    onFailureLaneId: orNone(value.onFailureLaneId),
+    wipLimit: Number(value.wipLimit),
+    maxAttempts: Number(value.maxAttempts),
+  };
+}
+
+/**
+ * Says what is wrong with a station's answer to success, if anything.
+ *
+ * @param contract - The station's contract.
+ * @param onSuccess - A lane's id, `ARCHIVE` or `NONE`.
+ * @returns The message to show, or undefined when the answer stands.
+ */
+export function successRule(contract: string, onSuccess: string): string | undefined {
+  if (contract !== 'expand') {
+    return undefined;
+  }
+  if (onSuccess === ARCHIVE) {
+    return 'An expand station cannot archive: the todo waits on what it adds. Pick a lane for them.';
+  }
+  if (onSuccess === NONE) {
+    return 'An expand station needs somewhere to send what it adds.';
+  }
+  return undefined;
+}
 
 /**
  * What a lane does as a station: which agent works the todos that arrive in
@@ -86,15 +137,7 @@ export function StationDialog({
       await updateStation({
         variables: {
           id: lane.id,
-          set: {
-            agentId: orNone(value.agentId),
-            contract: value.contract,
-            prompt: value.prompt.trim() === '' ? null : value.prompt.trim(),
-            onSuccessLaneId: orNone(value.onSuccessLaneId),
-            onFailureLaneId: orNone(value.onFailureLaneId),
-            wipLimit: Number(value.wipLimit),
-            maxAttempts: Number(value.maxAttempts),
-          },
+          set: toStationSet(value),
         },
       });
     } catch {
@@ -107,9 +150,12 @@ export function StationDialog({
     { value: NONE, label: 'None — an ordinary lane' },
     ...agents.map((a) => ({ value: a.id, label: a.name })),
   ];
-  const laneOptions = [
+  const otherLanes = lanes.filter((row) => row.id !== lane.id).map((row) => ({ value: row.id, label: row.name }));
+  const failureOptions = [{ value: NONE, label: 'Stay here' }, ...otherLanes];
+  const successOptions = [
     { value: NONE, label: 'Stay here' },
-    ...lanes.filter((row) => row.id !== lane.id).map((row) => ({ value: row.id, label: row.name })),
+    { value: ARCHIVE, label: 'Archive it — done, and off the board' },
+    ...otherLanes.map((row) => ({ ...row, label: `Move to ${row.label}` })),
   ];
 
   return (
@@ -144,19 +190,16 @@ export function StationDialog({
                     )}
                   </form.AppField>
                   <form.AppField
-                    name="onSuccessLaneId"
+                    name="onSuccess"
                     validators={{
                       onChangeListenTo: ['contract'],
-                      onChange: ({ value, fieldApi }) =>
-                        fieldApi.form.getFieldValue('contract') === 'expand' && value === NONE
-                          ? 'An expand station needs somewhere to send what it adds.'
-                          : undefined,
+                      onChange: ({ value, fieldApi }) => successRule(fieldApi.form.getFieldValue('contract'), value),
                     }}
                   >
-                    {(field) => <field.SelectField label="On success, move to" options={laneOptions} />}
+                    {(field) => <field.SelectField label="On success" options={successOptions} />}
                   </form.AppField>
                   <form.AppField name="onFailureLaneId">
-                    {(field) => <field.SelectField label="On failure, move to" options={laneOptions} />}
+                    {(field) => <field.SelectField label="On failure, move to" options={failureOptions} />}
                   </form.AppField>
                   <form.AppField name="wipLimit" validators={{ onChange: numberRule({ min: 1, required: true }) }}>
                     {(field) => <field.InputField label="Work at once (WIP limit)" inputMode="numeric" />}
