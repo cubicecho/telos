@@ -1,3 +1,12 @@
+# [1.15.0](https://github.com/cubicecho/telos/compare/v1.14.0...v1.15.0) (2026-10-02)
+
+
+### Features
+
+* **app:** lane presets in Settings, and a station that follows one ([c4c97b9](https://github.com/cubicecho/telos/commit/c4c97b9e817b41c9a827593e8c3a7632c0a0a07a))
+* **db:** add lane presets a lane follows, with its own overrides ([de303ef](https://github.com/cubicecho/telos/commit/de303ef40da30e44589e86a049ded84db6f8619e))
+* **server:** lane presets, followed by lanes and named by board templates ([7adfefc](https://github.com/cubicecho/telos/commit/7adfefcc6202a8e1f75e2fa143925f46d3f1b525))
+
 # [1.14.0](https://github.com/cubicecho/telos/compare/v1.13.0...v1.14.0) (2026-10-02)
 
 
