@@ -41,6 +41,7 @@ function station(id: string, agentId: string | null) {
     prompt: null,
     onSuccessLaneId: null,
     onFailureLaneId: null,
+    archiveOnSuccess: false,
     wipLimit: 1,
     maxAttempts: 3,
   };

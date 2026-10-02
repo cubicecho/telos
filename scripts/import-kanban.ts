@@ -375,18 +375,20 @@ export async function importKanban(options: ImportOptions): Promise<ImportReport
             };
             let onSuccessLaneId = arrow('onSuccessLaneId');
             const onFailureLaneId = arrow('onFailureLaneId');
-            if (row.source.archiveOnSuccess === true && !onSuccessLaneId) {
-              // Archiving is how a kanban pipeline ended, and archived cards
-              // arrive completed, so the nearest thing is the done lane.
+            // A station that broke cards into pieces cannot archive in telos:
+            // the todo waits on its pieces. The done lane is the nearest thing.
+            const archives = row.source.archiveOnSuccess === true && !onSuccessLaneId;
+            const archiveOnSuccess = archives && row.contract !== 'expand';
+            if (archives && archiveOnSuccess === false) {
               onSuccessLaneId = doneLane ? laneMap.get(str(doneLane.id))! : null;
               notes.push(
-                `Lane "${row.name}" in "${name}" archived on success; ${doneLane ? `it now sends to "${str(doneLane.name)}"` : 'telos has no archive, so it has no success arrow'}.`,
+                `Lane "${row.name}" in "${name}" archived on success, which a lane that breaks todos into pieces cannot do in telos; ${doneLane ? `it now sends to "${str(doneLane.name)}"` : 'it has no success arrow'}.`,
               );
             }
-            if (onSuccessLaneId || onFailureLaneId) {
+            if (onSuccessLaneId || onFailureLaneId || archiveOnSuccess) {
               await tx
                 .update(dbSchema.lanes)
-                .set({ onSuccessLaneId, onFailureLaneId })
+                .set({ onSuccessLaneId, onFailureLaneId, archiveOnSuccess })
                 .where(eq(dbSchema.lanes.id, row.id));
             }
           }

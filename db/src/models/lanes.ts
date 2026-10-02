@@ -56,6 +56,12 @@ export const lanes = pgTable(
     // the todo stays where it is.
     onSuccessLaneId: uuid('on_success_lane_id').references((): AnyPgColumn => lanes.id, { onDelete: 'set null' }),
     onFailureLaneId: uuid('on_failure_lane_id').references((): AnyPgColumn => lanes.id, { onDelete: 'set null' }),
+    // What a pass does instead of following the success arrow: completes the
+    // todo and archives it, for a pipeline whose finished work nobody needs to
+    // see in a column. One or the other, so it excludes a success arrow; and
+    // not for `expand`, whose todo waits on the pieces it became. Both are
+    // held by the lane write guard, which can say what to change.
+    archiveOnSuccess: boolean('archive_on_success').notNull().default(false),
     // How many of this lane's todos may be worked at once.
     wipLimit: integer('wip_limit').notNull().default(1),
     // How many failures a todo may have here before the station stops picking

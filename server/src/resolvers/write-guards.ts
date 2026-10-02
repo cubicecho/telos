@@ -214,6 +214,31 @@ async function assertArrowsInProject(tx: AnyTable, userId: string): Promise<void
 }
 
 /**
+ * A lane that archives on a pass has no success arrow, and is not an `expand`
+ * station: its todo waits on the pieces it became, so there is nothing to put
+ * away yet. Checked after the write, over the caller's lanes, so the message
+ * says what to change rather than which constraint fired.
+ */
+async function assertArchiveOnSuccessFits(tx: AnyTable, userId: string): Promise<void> {
+  const rows = resultRows<{ name: string; expand: boolean }>(
+    await tx.execute(sql`
+      SELECT l.name, l.contract = 'expand' AS expand FROM lanes l
+      WHERE l.user_id = ${userId} AND l.archive_on_success
+        AND (l.on_success_lane_id IS NOT NULL OR l.contract = 'expand')
+      LIMIT 1
+    `),
+  );
+  if (rows.length === 0) return;
+  const [lane] = rows;
+  throw new GraphQLError(
+    lane.expand
+      ? `"${lane.name}" breaks todos into pieces, so it cannot archive on success: the todo waits on its pieces. Give it a success lane for the pieces instead.`
+      : `"${lane.name}" can archive on success or send todos to a success lane, not both. Clear one of them.`,
+    { extensions: { code: 'BAD_USER_INPUT' } },
+  );
+}
+
+/**
  * Which lane means done is `setDoneLane`'s to decide: moving the flag has to
  * move the todos with it, and a generated write would leave the board saying one
  * thing and the list another.
@@ -249,6 +274,7 @@ export const onWrite: NonNullable<BuildSchemaConfig['onWrite']> = {
     after: async ({ args, context, tx }: WriteHookPayload) => {
       const userId = requireAuth(context as Context);
       if (states(args, 'onSuccessLaneId', 'onFailureLaneId')) await assertArrowsInProject(tx, userId);
+      if (states(args, 'archiveOnSuccess', 'onSuccessLaneId', 'contract')) await assertArchiveOnSuccessFits(tx, userId);
       await assertEveryProjectHasLanes(tx, userId);
       await realignLanes(tx, userId);
       await assertCompletionMatchesLane(tx, userId);

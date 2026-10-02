@@ -51,6 +51,7 @@ const AI_LANE_COLUMNS = [
   'prompt',
   'onSuccessLaneId',
   'onFailureLaneId',
+  'archiveOnSuccess',
   'wipLimit',
   'maxAttempts',
 ];

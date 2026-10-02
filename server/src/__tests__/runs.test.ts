@@ -302,6 +302,127 @@ describe('finishRun', () => {
   });
 });
 
+describe('a station that archives on success', () => {
+  const ARCHIVES = { onSuccessLaneId: null, archiveOnSuccess: true };
+  const UPDATE_LANE = `mutation ($id: UUID!, $set: UpdateLaneInput!) { updateLane(set: $set, where: { id: { eq: $id } }) { id } }`;
+  const DEPEND = `mutation ($a: ID!, $b: ID!) { addTodoDependency(todoId: $a, dependsOnTodoId: $b) { id } }`;
+
+  it('completes a passing todo and archives it, as the run', async () => {
+    await setLane(board.person, board.lanes[0].id, ARCHIVES);
+    const todoId = await board.addTodo('Write it');
+    const { runId } = await claim(todoId);
+    await finish(runId, { status: 'ok', output: 'Wrote it.' });
+
+    const todo = await todoRow(todoId);
+    expect(todo.archivedAt).not.toBeNull();
+    expect(todo.completedAt).not.toBeNull();
+    expect(todo.laneId).toBe(board.lanes[2].id);
+    const [note] = await thread(todoId);
+    expect(note).toMatchObject({ kind: 'report', body: 'Wrote it.' });
+    const events = await db.select().from(dbSchema.todoEvents).where(eq(dbSchema.todoEvents.todoId, todoId));
+    expect(events.at(-1)).toMatchObject({ kind: 'archive', actorKind: 'agent', runId, noteId: note.id });
+    expect(events.filter((event: { kind: string }) => event.kind === 'archive')).toHaveLength(1);
+    expect(await queue()).toEqual([]);
+  });
+
+  it('frees what was waiting on the todo', async () => {
+    await setLane(board.person, board.lanes[0].id, ARCHIVES);
+    const first = await board.addTodo('First');
+    const second = await board.addTodo('Second');
+    await board.person.expectOk(DEPEND, { a: second, b: first });
+    const { runId } = await claim(first);
+    await finish(runId, { status: 'ok', output: 'Done.' });
+    expect((await queue()).map((row) => row.todoId)).toEqual([second]);
+  });
+
+  it('archives a verdict station’s PASS, and still sends a FAIL down the failure arm', async () => {
+    await setLane(board.person, board.lanes[0].id, {
+      ...ARCHIVES,
+      contract: 'verdict',
+      onFailureLaneId: board.lanes[1].id,
+    });
+    const passes = await board.addTodo('Good');
+    const fails = await board.addTodo('Bad');
+    await finish((await claim(passes)).runId, { status: 'ok', output: 'PASS: reads well.' });
+    await finish((await claim(fails)).runId, { status: 'ok', output: 'FAIL: the ending is missing.' });
+
+    expect((await todoRow(passes)).archivedAt).not.toBeNull();
+    const failed = await todoRow(fails);
+    expect(failed).toMatchObject({ laneId: board.lanes[1].id, archivedAt: null, completedAt: null });
+  });
+
+  it('leaves a run that errored where it is', async () => {
+    await setLane(board.person, board.lanes[0].id, ARCHIVES);
+    const todoId = await board.addTodo('Write it');
+    await finish((await claim(todoId)).runId, { status: 'error', error: 'The model did not answer.' });
+    expect(await todoRow(todoId)).toMatchObject({ laneId: board.lanes[0].id, archivedAt: null, completedAt: null });
+  });
+
+  it('leaves a todo a person moved mid-run where the person put it', async () => {
+    await setLane(board.person, board.lanes[0].id, ARCHIVES);
+    const todoId = await board.addTodo('Write it');
+    const { runId } = await claim(todoId);
+    await board.person.expectOk(`mutation ($id: ID!, $laneId: ID!) { moveTodo(id: $id, laneId: $laneId) { id } }`, {
+      id: todoId,
+      laneId: board.lanes[1].id,
+    });
+    await finish(runId, { status: 'ok', output: 'Wrote it.' });
+    expect(await todoRow(todoId)).toMatchObject({ laneId: board.lanes[1].id, archivedAt: null, completedAt: null });
+  });
+
+  it('leaves a todo that came to wait on another mid-run', async () => {
+    await setLane(board.person, board.lanes[0].id, ARCHIVES);
+    const todoId = await board.addTodo('Write it');
+    const blocker = await board.addTodo('First this');
+    const { runId } = await claim(todoId);
+    await board.person.expectOk(DEPEND, { a: todoId, b: blocker });
+    await finish(runId, { status: 'ok', output: 'Wrote it.' });
+    expect(await todoRow(todoId)).toMatchObject({ laneId: board.lanes[0].id, archivedAt: null, completedAt: null });
+  });
+
+  it('archives in place on a board with no done lane', async () => {
+    await db.update(dbSchema.lanes).set({ isDone: false }).where(eq(dbSchema.lanes.id, board.lanes[2].id));
+    await setLane(board.person, board.lanes[0].id, ARCHIVES);
+    const todoId = await board.addTodo('Write it');
+    await finish((await claim(todoId)).runId, { status: 'ok', output: 'Wrote it.' });
+    const todo = await todoRow(todoId);
+    expect(todo.laneId).toBe(board.lanes[0].id);
+    expect(todo.archivedAt).not.toBeNull();
+    expect(todo.completedAt).not.toBeNull();
+  });
+
+  it('is one or the other: archive, or a success lane', async () => {
+    const both = await board.person.expectError(UPDATE_LANE, {
+      id: board.lanes[0].id,
+      set: { archiveOnSuccess: true },
+    });
+    expect(both.code).toBe('BAD_USER_INPUT');
+    expect(both.message).toContain('not both');
+
+    await setLane(board.person, board.lanes[0].id, ARCHIVES);
+    const arrow = await board.person.expectError(UPDATE_LANE, {
+      id: board.lanes[0].id,
+      set: { onSuccessLaneId: board.lanes[2].id },
+    });
+    expect(arrow.code).toBe('BAD_USER_INPUT');
+    // Swapping them in one write is fine.
+    await setLane(board.person, board.lanes[0].id, { onSuccessLaneId: board.lanes[2].id, archiveOnSuccess: false });
+  });
+
+  it('is not for a station that breaks todos into pieces', async () => {
+    const error = await board.person.expectError(UPDATE_LANE, {
+      id: board.lanes[0].id,
+      set: { ...ARCHIVES, contract: 'expand' },
+    });
+    expect(error.code).toBe('BAD_USER_INPUT');
+    expect(error.message).toContain('pieces');
+
+    await setLane(board.person, board.lanes[0].id, ARCHIVES);
+    const later = await board.person.expectError(UPDATE_LANE, { id: board.lanes[0].id, set: { contract: 'expand' } });
+    expect(later.code).toBe('BAD_USER_INPUT');
+  });
+});
+
 describe('stopping a run', () => {
   it('is heard on the next heartbeat, and a stopped run changes nothing', async () => {
     const todoId = await board.addTodo('Write it');

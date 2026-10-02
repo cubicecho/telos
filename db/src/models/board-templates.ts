@@ -18,6 +18,8 @@ export interface TemplateLane {
   onSuccess?: number | null;
   /** The index of the lane a failure goes to. */
   onFailure?: number | null;
+  /** A pass archives the todo instead of sending it anywhere. */
+  archiveOnSuccess?: boolean;
   wipLimit?: number;
   maxAttempts?: number;
 }
