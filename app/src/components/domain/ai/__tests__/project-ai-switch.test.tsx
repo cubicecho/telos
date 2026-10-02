@@ -3,7 +3,8 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { GraphQLError } from 'graphql';
 import { describe, expect, it, vi } from 'vitest';
-import { AiStateDocument, SetProjectAutoRunDocument } from '@/lib/graphql';
+import { AiStateDocument, ProjectActivityDocument, SetProjectAutoRunDocument } from '@/lib/graphql';
+import { useProjectActivity } from '../project-activity';
 import { ProjectAutoRunSwitch } from '../project-ai-switch';
 
 function aiState(on: boolean) {
@@ -49,6 +50,44 @@ describe('ProjectAutoRunSwitch', () => {
     expect(toggle).not.toBeChecked();
     await user.click(toggle);
     await vi.waitFor(() => expect(set).toHaveBeenCalled());
+  });
+
+  it('has the board ask again where its todos stand, without waiting for the poll', async () => {
+    const user = userEvent.setup();
+    const activity = vi.fn(() => ({
+      data: {
+        stations: { __typename: 'AiStatus', todos: [] },
+        live: [],
+        spent: { __typename: 'RunAggregate', count: 0, sum: null },
+      },
+    }));
+    /** Holds the project's activity the way the project page does. */
+    function Page() {
+      useProjectActivity('p1');
+      return <ProjectAutoRunSwitch projectId="p1" enabled={false} />;
+    }
+    render(
+      <MockedProvider
+        mocks={[
+          aiState(true),
+          {
+            request: { query: ProjectActivityDocument },
+            variableMatcher: () => true,
+            result: activity,
+            maxUsageCount: 5,
+          },
+          {
+            request: { query: SetProjectAutoRunDocument, variables: { projectId: 'p1', enabled: true } },
+            result: { data: { setProjectAutoRun: { __typename: 'Project', id: 'p1', autoRun: true } } },
+          },
+        ]}
+      >
+        <Page />
+      </MockedProvider>,
+    );
+    await vi.waitFor(() => expect(activity).toHaveBeenCalledTimes(1));
+    await user.click(await screen.findByRole('switch'));
+    await vi.waitFor(() => expect(activity).toHaveBeenCalledTimes(2));
   });
 
   it('says why auto-run could not be switched', async () => {

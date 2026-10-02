@@ -61,7 +61,13 @@ export function ProjectAiSwitch({ projectId, enabled }: { projectId: string; ena
  */
 export function ProjectAutoRunSwitch({ projectId, enabled }: { projectId: string; enabled: boolean }) {
   const ai = useAi();
-  const [setEnabled, { loading }] = useMutation(SetProjectAutoRunDocument);
+  // The board's cards say which todos wait to be run, so they follow the switch
+  // now rather than at the next poll. By name among the active ones: the switch
+  // is also drawn where nothing holds the project's activity.
+  const [setEnabled, { loading }] = useMutation(SetProjectAutoRunDocument, {
+    refetchQueries: 'active',
+    onQueryUpdated: (query) => query.queryName === 'ProjectActivity',
+  });
   const [error, setError] = useState<string | null>(null);
 
   if (!ai.on) return null;
