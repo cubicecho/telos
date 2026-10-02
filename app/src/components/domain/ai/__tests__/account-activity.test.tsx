@@ -218,6 +218,8 @@ describe('AccountActivity', () => {
     const artifact = {
       __typename: 'Artifact',
       id: 'x1',
+      todoId: null,
+      todoTitle: 'Plan the site',
       location: 'docs/plan.md',
       source: 'declared',
       action: 'created',
@@ -245,7 +247,9 @@ describe('AccountActivity', () => {
 
     const list = await screen.findByRole('list', { name: 'Artifacts' });
     expect(within(list).getByText('The plan')).toBeInTheDocument();
-    expect(within(list).getByText('Site · docs/plan.md · text/markdown')).toBeInTheDocument();
+    expect(
+      within(list).getByText('Site · Plan the site (todo deleted) · docs/plan.md · text/markdown'),
+    ).toBeInTheDocument();
     // Only the view that is showing asks for its rows.
     expect(screen.queryByRole('list', { name: 'Runs' })).not.toBeInTheDocument();
   });

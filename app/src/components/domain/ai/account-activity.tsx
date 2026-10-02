@@ -29,7 +29,7 @@ import { draftReplies, SPEND_DAYS, spendSince } from './project-activity';
 import { RUN_FILTERS, RUNS_PAGE, RUNS_POLL_MS, type RunFilter } from './project-runs';
 import { RunDialog } from './run-dialog';
 import { RunRow } from './run-row';
-import { ArtifactRow } from './todo-runs';
+import { ArtifactRow, todoLabelOf } from './todo-runs';
 
 // What the account's agents did, across every project it owns: which todos
 // wait on a person because of how a run went, what the runs spent, and then the
@@ -395,7 +395,7 @@ function AccountArtifacts() {
               <ArtifactRow
                 key={artifact.id}
                 artifact={artifact}
-                todoTitle={[artifact.project?.name, todo?.title].filter(Boolean).join(' · ') || undefined}
+                todoTitle={[artifact.project?.name, todoLabelOf(artifact)].filter(Boolean).join(' · ')}
                 onOpenNote={todo ? (noteId) => setOpened({ todo, noteId }) : undefined}
               />
             );
