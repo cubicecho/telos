@@ -95,6 +95,7 @@ const AI_SCOPES: Partial<Record<(typeof USER_OWNED_TABLES)[number], RowScope<Con
   // Drafts are a person's conversation with their own agent, not work yet.
   drafts: aiNarrowed(() => sql`false`),
   draftMessages: aiNarrowed(() => sql`false`),
+  // By todo, so a draft's runs, which have none, are hidden as drafts are.
   runs: aiNarrowed((context, table, userId) => inArray(table.todoId, aiTodoIds(context, userId))),
   artifacts: aiNarrowed((context, table, userId) => inArray(table.todoId, aiTodoIds(context, userId))),
   projects: aiNarrowed((_context, table) => eq(table.aiEnabled, true)),

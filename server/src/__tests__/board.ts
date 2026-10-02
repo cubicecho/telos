@@ -106,3 +106,60 @@ export const HEARTBEAT = `mutation ($id: ID!, $events: [RunEventInput!], $prompt
 export const FINISH = `mutation ($id: ID!, $result: RunResultInput!) {
   finishRun(id: $id, result: $result) { id status verdict output error totalTokens }
 }`;
+
+export const START_DRAFT = `mutation ($projectId: ID!, $agentId: ID!, $message: String!) {
+  startDraft(projectId: $projectId, agentId: $agentId, message: $message) { id waitingSince }
+}`;
+export const CLAIM_DRAFT = `mutation ($id: ID!) {
+  claimDraft(id: $id) { draftId runId projectName projectContext title brief agent { id apiKey model } messages { role content } }
+}`;
+export const FINISH_DRAFT = `mutation (
+  $id: ID!, $runId: ID, $reply: String, $title: String, $brief: String, $error: String,
+  $prompt: RunPromptInput, $usage: RunUsageInput, $events: [RunEventInput!]
+) {
+  finishDraft(
+    id: $id, runId: $runId, reply: $reply, title: $title, brief: $brief, error: $error,
+    prompt: $prompt, usage: $usage, events: $events
+  )
+}`;
+
+/** What a draft's agent spent on one reply, in the tests that count it. */
+export const DRAFT_USAGE = { promptTokens: 40, completionTokens: 10, totalTokens: 50 };
+
+/**
+ * Starts a draft on a board and has the runner take it, leaving its reply
+ * running.
+ *
+ * @param board - The board.
+ * @param runner - The runner.
+ * @returns The draft and the run answering it.
+ */
+export async function claimedDraft(board: Board, runner: TestClient): Promise<{ draftId: string; runId: string }> {
+  const draftId = (
+    await board.person.expectOk(START_DRAFT, {
+      projectId: board.projectId,
+      agentId: board.agentId,
+      message: 'Make the export faster',
+    })
+  ).startDraft.id;
+  const { runId } = (await runner.expectOk(CLAIM_DRAFT, { id: draftId })).claimDraft;
+  return { draftId, runId };
+}
+
+/**
+ * A draft on a board whose agent has answered once, or failed to.
+ *
+ * @param board - The board.
+ * @param runner - The runner.
+ * @param answer - What the runner reports: a reply, or an error.
+ * @returns The draft and the finished run.
+ */
+export async function answeredDraft(
+  board: Board,
+  runner: TestClient,
+  answer: Record<string, unknown> = { reply: 'Which export?', brief: 'Speed up the export.' },
+): Promise<{ draftId: string; runId: string }> {
+  const claimed = await claimedDraft(board, runner);
+  await runner.expectOk(FINISH_DRAFT, { id: claimed.draftId, runId: claimed.runId, usage: DRAFT_USAGE, ...answer });
+  return claimed;
+}

@@ -1,7 +1,7 @@
 import * as dbSchema from '@telos/db/schema';
 import { eq } from 'drizzle-orm';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { CLAIM, QUEUE, runnerClient, SET_AUTO_RUN, setLane } from './board.ts';
+import { CLAIM, CLAIM_DRAFT, FINISH_DRAFT, QUEUE, runnerClient, SET_AUTO_RUN, START_DRAFT, setLane } from './board.ts';
 import { createClient, createTestDb, createUser, type TestClient, type TestDb } from './helpers.ts';
 
 // What is in place for a first run, read back a step at a time.
@@ -135,6 +135,20 @@ describe('aiSetup', () => {
       { projectId: project.id, agentId },
     );
     expect(await setup()).toMatchObject({ station: false, request: true });
+  });
+
+  it('does not count a draft’s reply as a station having started', async () => {
+    const project = await createProject('P');
+    const agentId = await createAgent();
+    await person.expectOk(SET_PROJECT_AI, { id: project.id, enabled: true });
+    const draftId = (await person.expectOk(START_DRAFT, { projectId: project.id, agentId, message: 'Hello' }))
+      .startDraft.id;
+    const runner = runnerClient(db);
+    const { runId } = (await runner.expectOk(CLAIM_DRAFT, { id: draftId })).claimDraft;
+    await runner.expectOk(FINISH_DRAFT, { id: draftId, runId, reply: 'Hi.' });
+    // The reply is a run, but no station made it.
+    expect(await db.$count(dbSchema.runs)).toBe(1);
+    expect(await setup()).toMatchObject({ request: true, started: false });
   });
 
   it('links to the project furthest along, and leaves archived ones out', async () => {
