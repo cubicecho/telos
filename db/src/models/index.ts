@@ -7,6 +7,7 @@ export * from './instance-settings.ts';
 export * from './labels.ts';
 export * from './lane-presets.ts';
 export * from './lanes.ts';
+export * from './mcp-servers.ts';
 export * from './project-labels.ts';
 export * from './projects.ts';
 export * from './runs.ts';

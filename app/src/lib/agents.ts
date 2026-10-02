@@ -1,22 +1,8 @@
 import type { AgentFieldsFragment, CreateAgentInput } from '@/__generated__/graphql';
-import { newId } from '@/lib/ids';
 
 // An agent as its form holds it, and back. Numbers are typed as text and read
 // on the way out, so a cleared box means "use the runner's default" (null)
-// rather than zero; MCP servers are rows of text, with anything the form does
-// not edit (headers, env, hooks) carried through untouched.
-
-/** One MCP server as its row in the form holds it. */
-export interface McpServerDraft {
-  id: string;
-  name: string;
-  url: string;
-  command: string;
-  /** One argument per line, since an argument may itself contain spaces. */
-  args: string;
-  /** What the form does not edit (headers, env, hooks…), kept as it came so a save does not drop it. */
-  kept: unknown;
-}
+// rather than zero.
 
 export interface AgentDraft {
   name: string;
@@ -31,33 +17,26 @@ export interface AgentDraft {
   toolSelectModel: string;
   requestTimeoutSeconds: string;
   maxRetries: string;
-  mcpServers: McpServerDraft[];
+  /**
+   * The slugs of the account's MCP servers it may reach: null is every one,
+   * whatever is added later; a list is exactly those, and an empty one is none.
+   */
+  mcpServerSlugs: string[] | null;
 }
 
-type StoredServer = {
-  id?: unknown;
-  name?: unknown;
-  url?: unknown;
-  command?: unknown;
-  args?: unknown;
-  [field: string]: unknown;
-};
-
-/** A stored row's fields the form does not edit. */
-function kept(server: StoredServer): Record<string, unknown> {
-  const { id: _id, name: _name, url: _url, command: _command, args: _args, ...rest } = server;
-  return rest;
-}
-
-const text = (value: unknown) => (typeof value === 'string' ? value : '');
 const numberText = (value: number | null | undefined) => (value == null ? '' : String(value));
 
-export function emptyMcpServer(): McpServerDraft {
-  return { id: newId(), name: '', url: '', command: '', args: '', kept: {} };
+/**
+ * An agent's list of servers as it was stored.
+ *
+ * @param stored - `mcpServerSlugs`, which the API types as JSON.
+ * @returns The slugs, or null when the agent reaches every server.
+ */
+export function readServerSlugs(stored: unknown): string[] | null {
+  return Array.isArray(stored) ? stored.filter((slug): slug is string => typeof slug === 'string') : null;
 }
 
 export function toAgentDraft(agent: AgentFieldsFragment | null | undefined): AgentDraft {
-  const servers = Array.isArray(agent?.mcpServers) ? (agent.mcpServers as StoredServer[]) : [];
   return {
     name: agent?.name ?? '',
     baseUrl: agent?.baseUrl ?? '',
@@ -71,14 +50,7 @@ export function toAgentDraft(agent: AgentFieldsFragment | null | undefined): Age
     toolSelectModel: agent?.toolSelectModel ?? '',
     requestTimeoutSeconds: numberText(agent?.requestTimeoutSeconds),
     maxRetries: numberText(agent?.maxRetries),
-    mcpServers: servers.map((server) => ({
-      id: text(server.id) || newId(),
-      name: text(server.name),
-      url: text(server.url),
-      command: text(server.command),
-      args: Array.isArray(server.args) ? server.args.filter((arg) => typeof arg === 'string').join('\n') : '',
-      kept: kept(server),
-    })),
+    mcpServerSlugs: readServerSlugs(agent?.mcpServerSlugs),
   };
 }
 
@@ -100,27 +72,7 @@ export function fromAgentDraft(draft: AgentDraft): Omit<CreateAgentInput, 'id'> 
     toolSelectModel: orNull(draft.toolSelectModel),
     requestTimeoutSeconds: numberOrNull(draft.requestTimeoutSeconds),
     maxRetries: numberOrNull(draft.maxRetries),
-    // A row with neither a URL nor a command is one somebody added and left
-    // blank; the runner could do nothing with it.
-    mcpServers: draft.mcpServers
-      .filter((server) => server.url.trim() !== '' || server.command.trim() !== '')
-      .map(toStoredServer),
-  };
-}
-
-/** One server row as the agent stores it, and as the runner reads it. */
-export function toStoredServer(server: McpServerDraft): Record<string, unknown> {
-  const args = server.args
-    .split('\n')
-    .map((arg) => arg.trim())
-    .filter(Boolean);
-  return {
-    ...(server.kept as object),
-    id: server.id,
-    ...(server.name.trim() ? { name: server.name.trim() } : {}),
-    ...(server.url.trim() ? { url: server.url.trim() } : {}),
-    ...(server.command.trim() ? { command: server.command.trim() } : {}),
-    ...(args.length > 0 ? { args } : {}),
+    mcpServerSlugs: draft.mcpServerSlugs,
   };
 }
 

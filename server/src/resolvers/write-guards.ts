@@ -297,6 +297,58 @@ function assertPresetValuesFit(args: Parameters<typeof writtenRows>[0]): void {
   }
 }
 
+/** What a slug is made of: it is the prefix of every tool the server offers. */
+const SERVER_SLUG = /^[A-Za-z0-9_-]+$/;
+/** The slug of the board's own door, which every run has already. */
+const TELOS_SLUG = 'telos';
+const SLUG_CHARS = 60;
+
+const isStrings = (value: unknown) => Array.isArray(value) && value.every((entry) => typeof entry === 'string');
+
+/**
+ * Whether an MCP server as written is one the runner could use. The table's
+ * constraints say the same; this says it in words a form can show.
+ */
+async function assertServersSound(tx: AnyTable, userId: string, rows: Row[], inserting: boolean): Promise<void> {
+  for (const row of rows) {
+    const { slug, url, command } = row;
+    if ('slug' in row) {
+      if (typeof slug !== 'string' || slug.length > SLUG_CHARS || SERVER_SLUG.test(slug) === false) {
+        throw badServer('A slug is letters, digits, dashes and underscores, such as "docs": tools are named under it.');
+      }
+      if (slug === TELOS_SLUG) {
+        throw badServer(`"${TELOS_SLUG}" is the board's own tools, which every agent has. Pick another slug.`);
+      }
+    }
+    if (typeof url === 'string') {
+      const protocol = URL.canParse(url) ? new URL(url).protocol : '';
+      if (protocol !== 'http:' && protocol !== 'https:') {
+        throw badServer('The URL must be http or https.');
+      }
+    }
+    if (inserting && typeof url !== 'string' && (typeof command !== 'string' || command.trim() === '')) {
+      throw badServer('Give the server a URL or a command.');
+    }
+    for (const key of ['args', 'hiddenTools']) {
+      if (key in row && isStrings(row[key]) === false) {
+        throw badServer(`${key} is a list of strings.`);
+      }
+    }
+    if ('hooks' in row && Array.isArray(row.hooks) === false) {
+      throw badServer('hooks is a list.');
+    }
+    if (inserting && typeof slug === 'string') {
+      const taken = await tx.$count(
+        dbSchema.mcpServers,
+        and(eq(dbSchema.mcpServers.userId, userId), eq(dbSchema.mcpServers.slug, slug)),
+      );
+      if (taken > 0) {
+        throw badServer(`You already have an MCP server with the slug "${slug}". Pick another.`);
+      }
+    }
+  }
+}
+
 /**
  * A preset's name is the only thing a person picks it by, so two of the same
  * name are refused in words. The unique constraint is what holds it; this is
@@ -320,6 +372,24 @@ async function assertPresetNamesFree(tx: AnyTable, userId: string, args: WriteHo
   const clash = taken.find((row) => row.id !== renamed);
   if (clash) {
     throw new GraphQLError(`You already have a preset called "${clash.name}".`, { extensions: { code: 'CONFLICT' } });
+  }
+}
+
+function badServer(message: string): GraphQLError {
+  return new GraphQLError(message, { extensions: { code: 'BAD_USER_INPUT' } });
+}
+
+/**
+ * An agent's servers are absent (null: every server), or a list of slugs.
+ * Anything else would be read as no list at all, which is every server.
+ */
+function assertServerListSound(rows: Row[]): void {
+  for (const row of rows) {
+    if ('mcpServerSlugs' in row && row.mcpServerSlugs !== null && isStrings(row.mcpServerSlugs) === false) {
+      throw new GraphQLError('mcpServerSlugs is null for every server, or a list of slugs.', {
+        extensions: { code: 'BAD_USER_INPUT' },
+      });
+    }
   }
 }
 
@@ -357,6 +427,13 @@ export const onWrite: NonNullable<BuildSchemaConfig['onWrite']> = {
       await realignLanes(tx, userId);
       await assertCompletionMatchesLane(tx, userId);
     },
+  },
+  agents: {
+    before: async ({ args }: WriteHookPayload) => assertServerListSound(writtenRows(args)),
+  },
+  mcpServers: {
+    before: async ({ args, context, operation, tx }: WriteHookPayload) =>
+      assertServersSound(tx, requireAuth(context as Context), writtenRows(args), operation === 'insert'),
   },
   lanePresets: {
     before: async ({ args, context, operation, tx }: WriteHookPayload) => {

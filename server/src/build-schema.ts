@@ -47,7 +47,7 @@ export interface SchemaOptions {
 }
 
 /** Tables that exist in the API only while the instance has AI on. */
-const AI_TABLES = ['agents', 'runs', 'artifacts', 'drafts', 'draftMessages', 'lanePresets'];
+const AI_TABLES = ['agents', 'mcpServers', 'runs', 'artifacts', 'drafts', 'draftMessages', 'lanePresets'];
 
 /** A lane's station settings, which mean nothing without agents. */
 const AI_LANE_COLUMNS = [
@@ -106,10 +106,11 @@ export function createSchema(db: AnyDb, options: SchemaOptions) {
     // Nor does the instance's settings row, which belongs to no user.
     //
     // An agent's API key is write-only: `setAgentApiKey` stores it and only
-    // the runner's `claimRun` reads it back. With AI off, the agent machinery
-    // is not in the schema at all.
+    // the runner's `claimRun` reads it back. An MCP server's headers and env
+    // are the same, through `setMcpServerSecret`. With AI off, the agent
+    // machinery is not in the schema at all.
     exclude: options.ai
-      ? { tables: [...AUTH_TABLES, ...SERVER_TABLES], columns: { agents: ['apiKey'] } }
+      ? { tables: [...AUTH_TABLES, ...SERVER_TABLES], columns: { agents: ['apiKey'], mcpServers: ['headers', 'env'] } }
       : { tables: [...AUTH_TABLES, ...SERVER_TABLES, ...AI_TABLES], columns: { lanes: AI_LANE_COLUMNS } },
   });
 

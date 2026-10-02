@@ -36,6 +36,7 @@ describe('tenancy configuration', () => {
       'labels',
       'lanePresets',
       'lanes',
+      'mcpServers',
       'projectLabels',
       'projects',
       'runs',

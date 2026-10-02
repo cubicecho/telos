@@ -4,6 +4,7 @@ import { extendSchema, GraphQLError, type GraphQLObjectType, type GraphQLSchema,
 import { requireAi, requireSystem } from '../ai-gate.ts';
 import type { Context } from '../context.ts';
 import { askProbe, finishProbe, type McpProbe, readProbe, takeProbes } from '../mcp-probes.ts';
+import { runnerServer } from '../mcp-servers.ts';
 import { markRunnerSeen } from '../runner-seen.ts';
 import { requireSession } from './auth.ts';
 
@@ -11,6 +12,10 @@ import { requireSession } from './auth.ts';
 // generated schema (build-schema.ts), so the only way in is this mutation and
 // the only way out is the runner's `claimRun`. A person can see whether one is
 // set, never what it is.
+//
+// An MCP server's headers and env are the same kind of thing, kept the same
+// way: `setMcpServerSecret` writes one, the runner reads them with the run it
+// claims, and a person sees their names.
 //
 // Applied only when the instance has AI on.
 
@@ -21,6 +26,19 @@ const AGENTS_SDL = parse(`
   extend type Agent {
     "Whether an API key is stored for this agent. The key itself is never readable."
     hasApiKey: Boolean!
+  }
+
+  extend type McpServer {
+    "The names of the headers stored for this server. Their values are never readable."
+    headerNames: [String!]!
+    "The names of the environment variables stored for this server. Their values are never readable."
+    envNames: [String!]!
+  }
+
+  "Which of an MCP server's secrets: a header sent to its URL, or a variable in its command's environment."
+  enum McpSecretKind {
+    header
+    env
   }
 
   "A model an endpoint offers, as its \`/models\` lists it."
@@ -81,8 +99,10 @@ const AGENTS_SDL = parse(`
   extend type Mutation {
     "Stores an agent's API key, or clears it with null."
     setAgentApiKey(agentId: ID!, apiKey: String): Agent!
-    "Asks the runner to connect to an MCP server row (JSON, saved or not) and list its tools. Read the answer with mcpProbe."
-    testMcpServer(server: String!): McpProbe!
+    "Stores one header or environment variable of an MCP server, or removes it with a null value."
+    setMcpServerSecret(id: ID!, kind: McpSecretKind!, name: String!, value: String): McpServer!
+    "Asks the runner to connect to one of your MCP servers and list its tools. Read the answer with mcpProbe; the server keeps what was found."
+    testMcpServer(id: ID!): McpProbe!
     "Records what a test found. The runner's only."
     finishProbe(id: ID!, result: ProbeResultInput!): Boolean!
   }
@@ -94,44 +114,15 @@ export const MODELS_TIMEOUT_MS = 5000;
 /** The most models returned: a picker, not an inventory. */
 const MODELS_LIMIT = 500;
 
-/** The longest server row a test takes: a row is a URL and a few headers. */
-const PROBE_SERVER_CHARS = 20_000;
 /** The most of a server's tools, and of each description, a test keeps. */
 const PROBE_TOOLS = 200;
 const PROBE_TEXT_CHARS = 1000;
-
-/**
- * A server row a test can be made of, as JSON, or why not.
- *
- * @param json What was sent.
- * @returns The row, re-serialized.
- */
-function probeServer(json: string): string {
-  if (json.length > PROBE_SERVER_CHARS) throw badInput('That server is too long to test.');
-  let row: unknown;
-  try {
-    row = JSON.parse(json);
-  } catch {
-    throw badInput('The server is not JSON.');
-  }
-  const { id, url, command } = (row ?? {}) as Record<string, unknown>;
-  if (!row || typeof row !== 'object' || Array.isArray(row) || typeof id !== 'string' || !id) {
-    throw badInput('A server needs an id.');
-  }
-  if (typeof url === 'string' && url.trim()) {
-    const protocol = URL.canParse(url) ? new URL(url).protocol : '';
-    if (protocol !== 'http:' && protocol !== 'https:') throw badInput('The URL must be http or https.');
-  } else if (typeof command !== 'string' || !command.trim()) {
-    throw badInput('Give the server a URL or a command first.');
-  }
-  return JSON.stringify(row);
-}
 
 const cut = (text: string, chars: number) => (text.length > chars ? `${text.slice(0, chars - 1)}…` : text);
 
 /** A test as a person reads it: without whose it is or the row it tested. */
 function visibleProbe(probe: McpProbe) {
-  const { userId: _user, server: _server, askedAt: _at, ...visible } = probe;
+  const { userId: _user, serverId: _serverId, server: _server, askedAt: _at, ...visible } = probe;
   return visible;
 }
 
@@ -142,6 +133,41 @@ interface AgentModel {
 
 function badInput(message: string): GraphQLError {
   return new GraphQLError(message, { extensions: { code: 'BAD_USER_INPUT' } });
+}
+
+/** The longest name and value a header or a variable may have. */
+const SECRET_NAME_CHARS = 200;
+const SECRET_VALUE_CHARS = 8000;
+/** The most headers, and the most variables, one server keeps. */
+const SECRET_LIMIT = 50;
+/** A header's name, as HTTP spells a token. */
+const HEADER_NAME = /^[A-Za-z0-9!#$%&'*+.^_`|~-]+$/;
+/** A variable's name, as a shell would take it. */
+const ENV_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+/**
+ * The caller's MCP server, secrets and all, or NOT_FOUND.
+ *
+ * @param db The database or a transaction.
+ * @param userId Whose it must be.
+ * @param id The server.
+ * @param lock Whether to hold the row until the transaction ends.
+ * @returns The row.
+ */
+async function ownedServer(db: AnyRow, userId: string, id: string, lock = false): Promise<dbSchema.McpServer> {
+  const query = db
+    .select()
+    .from(dbSchema.mcpServers)
+    .where(and(eq(dbSchema.mcpServers.id, id), eq(dbSchema.mcpServers.userId, userId)));
+  const [row] = await (lock ? query.for('update') : query);
+  if (!row) throw new GraphQLError('MCP server not found', { extensions: { code: 'NOT_FOUND' } });
+  return row;
+}
+
+/** A server as a person reads it: without what its headers and env hold. */
+function visibleServer(server: dbSchema.McpServer) {
+  const { headers: _headers, env: _env, ...visible } = server;
+  return visible;
 }
 
 /**
@@ -197,6 +223,7 @@ export async function listModels(baseUrl: string, apiKey: string | null): Promis
 export function applyAgentsExtension(schema: GraphQLSchema): GraphQLSchema {
   const extendedSchema = extendSchema(schema, AGENTS_SDL);
   const agent = (extendedSchema.getType('Agent') as GraphQLObjectType).getFields();
+  const mcpServer = (extendedSchema.getType('McpServer') as GraphQLObjectType).getFields();
   const mutations = (extendedSchema.getType('Mutation') as GraphQLObjectType).getFields();
   const queries = (extendedSchema.getType('Query') as GraphQLObjectType).getFields();
 
@@ -234,16 +261,17 @@ export function applyAgentsExtension(schema: GraphQLSchema): GraphQLSchema {
     return takeProbes().map(({ id, server }) => ({ id, server }));
   };
 
-  mutations.testMcpServer.resolve = async (_parent: unknown, args: { server: string }, context: Context) => {
+  mutations.testMcpServer.resolve = async (_parent: unknown, args: { id: string }, context: Context) => {
     // A person only, as with the models: it has a process dial where it is told.
     requireSession(context);
     const userId = await requireAi(context);
-    const probe = askProbe(userId, probeServer(args.server));
+    const server = await ownedServer(context.db, userId, args.id);
+    const probe = askProbe(userId, server.id, JSON.stringify(runnerServer(server)));
     if (!probe) throw badInput('Some tests are still waiting; try again when they are done.');
     return visibleProbe(probe);
   };
 
-  mutations.finishProbe.resolve = (
+  mutations.finishProbe.resolve = async (
     _parent: unknown,
     args: {
       id: string;
@@ -258,7 +286,7 @@ export function applyAgentsExtension(schema: GraphQLSchema): GraphQLSchema {
   ) => {
     requireSystem(context);
     const { ok, tools, instructions, error } = args.result;
-    return finishProbe(args.id, {
+    const probe = finishProbe(args.id, {
       ok,
       tools: tools.slice(0, PROBE_TOOLS).map((tool) => ({
         name: cut(tool.name, 200),
@@ -266,6 +294,67 @@ export function applyAgentsExtension(schema: GraphQLSchema): GraphQLSchema {
       })),
       instructions: cut(instructions ?? '', PROBE_TEXT_CHARS * 4),
       error: ok ? null : cut(error || 'The server could not be reached.', PROBE_TEXT_CHARS),
+    });
+    if (!probe) return false;
+    // Kept on the server's row, so its page can say what it offered after the
+    // test itself is forgotten. A failed test keeps the tools the last good one found.
+    await (context.db as AnyRow)
+      .update(dbSchema.mcpServers)
+      .set({
+        checkedAt: new Date(),
+        checkOk: probe.ok,
+        checkError: probe.error,
+        ...(probe.ok ? { tools: probe.tools } : {}),
+      })
+      .where(and(eq(dbSchema.mcpServers.id, probe.serverId), eq(dbSchema.mcpServers.userId, probe.userId)));
+    return true;
+  };
+
+  // The generated resolvers never select an excluded column, so ask.
+  const secretNames =
+    (column: 'headers' | 'env') => async (parent: { id: string }, _args: unknown, context: Context) => {
+      const [row] = await (context.db as AnyRow)
+        .select({ secrets: dbSchema.mcpServers[column] })
+        .from(dbSchema.mcpServers)
+        .where(eq(dbSchema.mcpServers.id, parent.id));
+      return Object.keys(row?.secrets ?? {}).sort();
+    };
+  mcpServer.headerNames.resolve = secretNames('headers');
+  mcpServer.envNames.resolve = secretNames('env');
+
+  mutations.setMcpServerSecret.resolve = async (
+    _parent: unknown,
+    args: { id: string; kind: 'header' | 'env'; name: string; value?: string | null },
+    context: Context,
+  ) => {
+    const userId = requireSession(context);
+    const name = args.name.trim();
+    const pattern = args.kind === 'header' ? HEADER_NAME : ENV_NAME;
+    if (name.length > SECRET_NAME_CHARS || !pattern.test(name)) {
+      throw badInput(
+        args.kind === 'header'
+          ? 'A header name is letters, digits and dashes, such as Authorization.'
+          : 'A variable name is letters, digits and underscores, and does not start with a digit, such as API_TOKEN.',
+      );
+    }
+    if ((args.value?.length ?? 0) > SECRET_VALUE_CHARS) {
+      throw badInput(`A value can be at most ${SECRET_VALUE_CHARS} characters.`);
+    }
+    const column = args.kind === 'header' ? 'headers' : 'env';
+    return (context.db as AnyRow).transaction(async (tx: AnyRow) => {
+      const server = await ownedServer(tx, userId, args.id, true);
+      const secrets = { ...server[column] };
+      if (args.value == null || args.value === '') delete secrets[name];
+      else secrets[name] = args.value;
+      if (Object.keys(secrets).length > SECRET_LIMIT) {
+        throw badInput(`A server keeps at most ${SECRET_LIMIT} of these. Remove one first.`);
+      }
+      const [row] = await tx
+        .update(dbSchema.mcpServers)
+        .set({ [column]: secrets })
+        .where(eq(dbSchema.mcpServers.id, server.id))
+        .returning();
+      return visibleServer(row);
     });
   };
 

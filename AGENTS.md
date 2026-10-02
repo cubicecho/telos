@@ -239,9 +239,26 @@ it is written with `setAgentApiKey` and read only by the runner, in a claim.
 comes from `runnerQueue` and `claimRun`, and everything it does goes back
 through `finishRun` or, for the agent, through `/mcp` with the run token; its
 tests import server code only to stand a real telos up. Each run gets its own
-MCP pool, because the telos server in it carries that run's token. Agents'
-stdio MCP servers are refused unless `RUNNER_ALLOW_STDIO=true`: an agent
-belongs to a user, and a command runs on the runner's host with its rights.
+MCP pool, because the telos server in it carries that run's token. stdio MCP
+servers are refused unless `RUNNER_ALLOW_STDIO=true`: a server belongs to a
+user, and a command runs on the runner's host with its rights.
+
+**MCP servers are the account's, and an agent names the ones it reaches.**
+`mcp_servers` holds one row per server; `agents.mcp_server_slugs` is null (every
+enabled server, including ones added later), `[]` (none) or a list of slugs
+(exactly those). A list only narrows: a slug that names no server is left out
+and the run says so (`mcpNotices` on the claim, shown as a notice), never read
+as "all"; a server switched off is left out without a word. The server works
+the list out (`serversFor` in `server/src/mcp-servers.ts`) and hands the runner
+the rows in slug order, so a run's tools come in the same order every time.
+The slug is what the tools are named under (`slug__tool`), so renaming one is
+followed into agents' lists by the `mcp_servers_rename` trigger; deleting one
+is not. `headers` and `env` are secrets, as an agent's key is: excluded from
+the schema, written one at a time with `setMcpServerSecret`, readable only as
+names (`headerNames`, `envNames`) and sent only to the runner. `testMcpServer`
+tests a saved server by id, so the test has its secrets, and `finishProbe`
+keeps what it found on the row (`checked_at`, `check_ok`, `check_error`,
+`tools`), which only the server writes.
 
 **A run reports what it did; it never writes it.** The runner sends events
 (tool calls, tool results, hook notes, notices) with each heartbeat and the
@@ -270,8 +287,8 @@ detached artifact stays on the project's list until someone removes it
 (`deleteArtifact`) or the project is deleted, and is hidden from AI callers,
 whose scope is by todo.
 
-An agent's MCP
-servers may carry `hooks` (agent-mcp-pool's `ToolHook`) and `hiddenTools`;
+An MCP
+server may carry `hooks` (agent-mcp-pool's `ToolHook`) and `hiddenTools`;
 invalid hooks are dropped with a notice, and a failing hook never fails a run.
 The todo is the hooks' session and each run a turn of it: `claimRun` records
 the session in `todo_sessions` (one row per todo and agent, a server-only

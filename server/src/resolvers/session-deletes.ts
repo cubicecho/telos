@@ -4,6 +4,7 @@ import { extendSchema, type GraphQLObjectType, type GraphQLSchema, parse } from 
 import { requireSystem } from '../ai-gate.ts';
 import type { Context } from '../context.ts';
 import { instanceAiOn } from '../instance.ts';
+import { serversFor } from '../mcp-servers.ts';
 import { markRunnerSeen } from '../runner-seen.ts';
 
 // Telling an agent's MCP servers that a todo is gone. The todo is the session
@@ -34,7 +35,7 @@ const SESSION_DELETES_SDL = parse(`
     agentName: String!
     "Which try this is, from one."
     attempt: Int!
-    "The agent's servers that have a sessionDelete hook, as JSON, secrets included."
+    "The servers the agent reaches that have a sessionDelete hook, as JSON, secrets included."
     mcpServers: String!
   }
 
@@ -60,17 +61,14 @@ const MAX_ERROR = 2000;
 const MS_PER_SECOND = 1000;
 
 /**
- * An agent's servers that ask to hear of a deleted session.
+ * The servers, of those an agent reaches, that ask to hear of a deleted session.
  *
- * @param servers - `agents.mcp_servers`, which a client wrote and may be anything.
+ * @param servers - The agent's servers, whose hooks a client wrote and may be anything.
  * @returns The servers with an enabled `sessionDelete` hook.
  */
-export function serversToTell(servers: unknown): unknown[] {
-  if (Array.isArray(servers) === false) {
-    return [];
-  }
-  return (servers as unknown[]).filter((server) => {
-    const hooks = (server as { hooks?: unknown } | null)?.hooks;
+export function serversToTell<Server extends { hooks?: unknown }>(servers: Server[]): Server[] {
+  return servers.filter((server) => {
+    const hooks = server.hooks;
     return (
       Array.isArray(hooks) &&
       hooks.some((hook: { on?: unknown; enabled?: unknown } | null) => {
@@ -136,7 +134,7 @@ export function applySessionDeletesExtension(schema: GraphQLSchema): GraphQLSche
 
       const taken = [];
       for (const { session, agent } of owed) {
-        const servers = serversToTell(agent.mcpServers);
+        const servers = serversToTell((await serversFor(tx, agent)).servers);
         const spent = session.attempts >= SESSION_DELETE_ATTEMPTS;
         if (servers.length === 0 || spent) {
           // Nobody asked to hear, or a runner took the last try and never came back.

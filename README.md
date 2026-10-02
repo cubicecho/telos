@@ -103,7 +103,7 @@ domain.
 | `AI_ENABLED` | — | Set to `false` to remove AI entirely: no MCP endpoint, no API keys, no agents, no switch in Settings. Otherwise an admin turns it on in Settings. |
 | `RUNNER_CONCURRENCY` | `2` | The most runs the runner works at once. |
 | `RUNNER_POLL_SECONDS` | `5` | How long the runner waits when nothing is ready. |
-| `RUNNER_ALLOW_STDIO` | `false` | Let agents name MCP servers the runner spawns as commands. |
+| `RUNNER_ALLOW_STDIO` | `false` | Let the runner spawn MCP servers that are commands. |
 | `RUNNER_KEY` | made up at boot | Only for a second runner on another host (`runner/`, with `TELOS_URL`): set the same value on both. |
 
 Telos ships no mail provider. With magic links on, the link is written to the
@@ -153,8 +153,14 @@ and only the todos you asked for in one with it off. Each run keeps a log of its
 todo shows as it goes, and a list of what it made: files it wrote, and anything
 the agent chose to record. What was made for a todo outlives it: delete the
 todo for good and its artifacts stay on the project's Artifacts list, under the
-title the todo had, until you remove them or delete the project. An agent's MCP
-servers can carry hooks, for example
+title the todo had, until you remove them or delete the project. **MCP
+servers** are kept once, under Settings → AI, and each agent reaches every one
+of them or only the ones you tick. A server's headers and environment are
+secrets: you can see which are set, never their values, and only the runner is
+sent them. Test a server there and it keeps what it found, so the list shows
+which servers answer and the tools each offers. An agent that names a server
+you have since deleted carries on without it, and its runs say so. A server
+can carry hooks, for example
 a memory lookup injected before each turn. The todo is the hooks' session:
 `sessionStart` fires on its first run, `beforeTurn`, `afterTurn` and
 `sessionEnd` on every run, and `sessionDelete` after the todo is deleted for
@@ -216,7 +222,7 @@ docker compose up --build
 ```
 
 Agents talk to any OpenAI-compatible endpoint, so a local Ollama works. An
-agent's base URL and its MCP servers are fetched from the server's host, so on
+agent's base URL and the account's MCP servers are fetched from the server's host, so on
 a shared instance keep it where it cannot reach anything private, and leave
 `RUNNER_ALLOW_STDIO` off.
 

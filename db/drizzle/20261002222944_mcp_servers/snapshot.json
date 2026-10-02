@@ -1,7 +1,7 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "3c90f794-a6a2-4f37-9a89-8199d14d2ab6",
+  "id": "ff871428-6260-40eb-87aa-5955eaf0f5e0",
   "prevIds": [
     "0d598168-485e-4133-b604-11840d128bf2"
   ],
@@ -74,13 +74,13 @@
     },
     {
       "isRlsEnabled": false,
-      "name": "lane_presets",
+      "name": "lanes",
       "entityType": "tables",
       "schema": "public"
     },
     {
       "isRlsEnabled": false,
-      "name": "lanes",
+      "name": "mcp_servers",
       "entityType": "tables",
       "schema": "public"
     },
@@ -342,12 +342,12 @@
     {
       "type": "jsonb",
       "typeSchema": null,
-      "notNull": true,
+      "notNull": false,
       "dimensions": 0,
-      "default": "'[]'",
+      "default": null,
       "generated": null,
       "identity": null,
-      "name": "mcp_servers",
+      "name": "mcp_server_slugs",
       "entityType": "columns",
       "schema": "public",
       "table": "agents"
@@ -1663,123 +1663,6 @@
       "name": "id",
       "entityType": "columns",
       "schema": "public",
-      "table": "lane_presets"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "user_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "lane_presets"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "name",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "lane_presets"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "'work'",
-      "generated": null,
-      "identity": null,
-      "name": "contract",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "lane_presets"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "prompt",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "lane_presets"
-    },
-    {
-      "type": "integer",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "1",
-      "generated": null,
-      "identity": null,
-      "name": "wip_limit",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "lane_presets"
-    },
-    {
-      "type": "integer",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "3",
-      "generated": null,
-      "identity": null,
-      "name": "max_attempts",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "lane_presets"
-    },
-    {
-      "type": "timestamp with time zone",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
-      "name": "created_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "lane_presets"
-    },
-    {
-      "type": "timestamp with time zone",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
-      "name": "updated_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "lane_presets"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "gen_random_uuid()",
-      "generated": null,
-      "identity": null,
-      "name": "id",
-      "entityType": "columns",
-      "schema": "public",
       "table": "lanes"
     },
     {
@@ -1952,32 +1835,6 @@
       "table": "lanes"
     },
     {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "preset_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "lanes"
-    },
-    {
-      "type": "jsonb",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "'[]'",
-      "generated": null,
-      "identity": null,
-      "name": "preset_overrides",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "lanes"
-    },
-    {
       "type": "timestamp with time zone",
       "typeSchema": null,
       "notNull": true,
@@ -2002,6 +1859,240 @@
       "entityType": "columns",
       "schema": "public",
       "table": "lanes"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "gen_random_uuid()",
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "mcp_servers"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "user_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "mcp_servers"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "slug",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "mcp_servers"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "name",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "mcp_servers"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "url",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "mcp_servers"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "command",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "mcp_servers"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "'[]'",
+      "generated": null,
+      "identity": null,
+      "name": "args",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "mcp_servers"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "'{}'",
+      "generated": null,
+      "identity": null,
+      "name": "headers",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "mcp_servers"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "'{}'",
+      "generated": null,
+      "identity": null,
+      "name": "env",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "mcp_servers"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "'[]'",
+      "generated": null,
+      "identity": null,
+      "name": "hooks",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "mcp_servers"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "'[]'",
+      "generated": null,
+      "identity": null,
+      "name": "hidden_tools",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "mcp_servers"
+    },
+    {
+      "type": "boolean",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "true",
+      "generated": null,
+      "identity": null,
+      "name": "enabled",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "mcp_servers"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "checked_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "mcp_servers"
+    },
+    {
+      "type": "boolean",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "check_ok",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "mcp_servers"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "check_error",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "mcp_servers"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "'[]'",
+      "generated": null,
+      "identity": null,
+      "name": "tools",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "mcp_servers"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "mcp_servers"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "mcp_servers"
     },
     {
       "type": "uuid",
@@ -3824,27 +3915,6 @@
       "with": "",
       "method": "btree",
       "concurrently": false,
-      "name": "idx_lane_presets_user_id",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "lane_presets"
-    },
-    {
-      "nameExplicit": true,
-      "columns": [
-        {
-          "value": "user_id",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "with": "",
-      "method": "btree",
-      "concurrently": false,
       "name": "idx_lanes_user_id",
       "entityType": "indexes",
       "schema": "public",
@@ -3938,27 +4008,6 @@
       "nameExplicit": true,
       "columns": [
         {
-          "value": "preset_id",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "with": "",
-      "method": "btree",
-      "concurrently": false,
-      "name": "idx_lanes_preset_id",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "lanes"
-    },
-    {
-      "nameExplicit": true,
-      "columns": [
-        {
           "value": "project_id",
           "isExpression": false,
           "asc": true,
@@ -3975,6 +4024,55 @@
       "entityType": "indexes",
       "schema": "public",
       "table": "lanes"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "user_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "idx_mcp_servers_user_id",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "mcp_servers"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "user_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "slug",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "uq_mcp_servers_user_slug",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "mcp_servers"
     },
     {
       "nameExplicit": true,
@@ -4981,23 +5079,6 @@
       ],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
-      "name": "lane_presets_user_id_users_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "lane_presets"
-    },
-    {
-      "nameExplicit": false,
-      "columns": [
-        "user_id"
-      ],
-      "schemaTo": "public",
-      "tableTo": "users",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
       "name": "lanes_user_id_users_id_fkey",
       "entityType": "fks",
       "schema": "public",
@@ -5074,19 +5155,19 @@
     {
       "nameExplicit": false,
       "columns": [
-        "preset_id"
+        "user_id"
       ],
       "schemaTo": "public",
-      "tableTo": "lane_presets",
+      "tableTo": "users",
       "columnsTo": [
         "id"
       ],
       "onUpdate": "NO ACTION",
-      "onDelete": "SET NULL",
-      "name": "lanes_preset_id_lane_presets_id_fkey",
+      "onDelete": "CASCADE",
+      "name": "mcp_servers_user_id_users_id_fkey",
       "entityType": "fks",
       "schema": "public",
-      "table": "lanes"
+      "table": "mcp_servers"
     },
     {
       "nameExplicit": false,
@@ -5662,9 +5743,9 @@
         "id"
       ],
       "nameExplicit": false,
-      "name": "lane_presets_pkey",
+      "name": "lanes_pkey",
       "schema": "public",
-      "table": "lane_presets",
+      "table": "lanes",
       "entityType": "pks"
     },
     {
@@ -5672,9 +5753,9 @@
         "id"
       ],
       "nameExplicit": false,
-      "name": "lanes_pkey",
+      "name": "mcp_servers_pkey",
       "schema": "public",
-      "table": "lanes",
+      "table": "mcp_servers",
       "entityType": "pks"
     },
     {
@@ -5804,18 +5885,6 @@
     {
       "nameExplicit": true,
       "columns": [
-        "user_id",
-        "name"
-      ],
-      "nullsNotDistinct": false,
-      "name": "uq_lane_presets_user_name",
-      "entityType": "uniques",
-      "schema": "public",
-      "table": "lane_presets"
-    },
-    {
-      "nameExplicit": true,
-      "columns": [
         "project_id",
         "label_id"
       ],
@@ -5908,27 +5977,6 @@
     },
     {
       "value": "\"contract\" in ('work', 'verdict', 'expand')",
-      "name": "ck_lane_presets_contract",
-      "entityType": "checks",
-      "schema": "public",
-      "table": "lane_presets"
-    },
-    {
-      "value": "\"wip_limit\" > 0",
-      "name": "ck_lane_presets_wip_limit",
-      "entityType": "checks",
-      "schema": "public",
-      "table": "lane_presets"
-    },
-    {
-      "value": "\"max_attempts\" >= 0",
-      "name": "ck_lane_presets_max_attempts",
-      "entityType": "checks",
-      "schema": "public",
-      "table": "lane_presets"
-    },
-    {
-      "value": "\"contract\" in ('work', 'verdict', 'expand')",
       "name": "ck_lanes_contract",
       "entityType": "checks",
       "schema": "public",
@@ -5947,6 +5995,20 @@
       "entityType": "checks",
       "schema": "public",
       "table": "lanes"
+    },
+    {
+      "value": "\"slug\" ~ '^[A-Za-z0-9_-]+$' AND \"slug\" <> 'telos'",
+      "name": "ck_mcp_servers_slug",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "mcp_servers"
+    },
+    {
+      "value": "\"url\" IS NOT NULL OR \"command\" IS NOT NULL",
+      "name": "ck_mcp_servers_target",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "mcp_servers"
     },
     {
       "value": "\"kind\" in ('todo', 'draft')",

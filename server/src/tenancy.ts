@@ -38,6 +38,7 @@ export const USER_OWNED_TABLES = [
   'todoNotes',
   'todoEvents',
   'agents',
+  'mcpServers',
   'runs',
   'artifacts',
   'boardTemplates',
@@ -93,6 +94,7 @@ const AI_SCOPES: Partial<Record<(typeof USER_OWNED_TABLES)[number], RowScope<Con
   // Agents are the board's own machinery, configured by a person. Nothing
   // on the AI side has a reason to read them.
   agents: aiNarrowed(() => sql`false`),
+  mcpServers: aiNarrowed(() => sql`false`),
   // Drafts are a person's conversation with their own agent, not work yet.
   drafts: aiNarrowed(() => sql`false`),
   draftMessages: aiNarrowed(() => sql`false`),
@@ -139,6 +141,15 @@ export const contextValues: NonNullable<BuildSchemaConfig['contextValues']> = {
     actorKind: (context: Context) => context.actor.kind,
     actorKeyId: (context: Context) => context.actor.keyId ?? null,
     runId: (context: Context) => context.actor.runId ?? null,
+  },
+  // What a test of the server found is the runner's to say (`finishProbe`),
+  // so no client states it: a new server has never been tested.
+  mcpServers: {
+    userId: (context: Context) => requireAuth(context),
+    checkedAt: () => null,
+    checkOk: () => null,
+    checkError: () => null,
+    tools: () => [],
   },
 };
 
