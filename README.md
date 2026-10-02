@@ -147,6 +147,15 @@ todo shows as it goes, and a list of what it made: files it wrote, and anything
 the agent chose to record. An agent's MCP servers can carry hooks, for example
 a memory lookup injected before each turn.
 
+Before a request is a todo you can **talk it over** with an agent: it asks what
+it needs to and writes the title and brief as you go. Each of its replies is a
+run like a station's, with the agent, the model, what it was told, what it said
+and what it spent, so a reply that failed can be opened and read. They are
+listed in the draft and among the project's runs, marked as drafts, and counted
+in its spend; a todo made from a draft shows them at the top of its history. A
+reply's token counts are estimated from the text, and the run says so.
+Discarding a draft deletes its runs with it.
+
 The runner is part of the server: it starts with it and signs itself in, so
 there is nothing to set up. Until AI is on it only checks, every few seconds,
 whether there is anything to do.
