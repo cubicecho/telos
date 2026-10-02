@@ -53,7 +53,7 @@ describe('cardMarks', () => {
     // A work run leaves a report on the thread.
     await runOnce(todoId, { status: 'ok', output: 'Wrote it.' });
     const thread = await db.select().from(dbSchema.todoNotes).where(eq(dbSchema.todoNotes.todoId, todoId));
-    expect(thread.map((note) => note.kind).sort()).toEqual(['note', 'note', 'report']);
+    expect(thread.map((note: { kind: string }) => note.kind).sort()).toEqual(['note', 'note', 'report']);
 
     expect(await marks()).toEqual([
       { todoId, notes: 2, lastRun: null, reason: null, runId: null, attempts: 0, maxAttempts: null },
