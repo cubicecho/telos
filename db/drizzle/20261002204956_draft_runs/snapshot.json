@@ -1,9 +1,9 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "fd6e2cfa-cd92-491b-b98e-6f2a743d40f3",
+  "id": "09cdced7-c1f3-47d4-95dd-b18cccc7ce71",
   "prevIds": [
-    "658fec9a-4e2b-4da4-8bc3-0155a45df207"
+    "e5dc1000-081c-48eb-aa06-7be51e97148f"
   ],
   "ddl": [
     {
@@ -2715,6 +2715,19 @@
       "generated": null,
       "identity": null,
       "name": "created_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "todo_notes"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "edited_at",
       "entityType": "columns",
       "schema": "public",
       "table": "todo_notes"
