@@ -60,7 +60,7 @@ export async function loadAiProject(context: Context, userId: string, projectId:
 }
 
 /** A todo of the caller's that AI may see, or NOT_FOUND. */
-async function loadAiTodo(context: Context, userId: string, todoId: string): Promise<AnyRow> {
+export async function loadAiTodo(context: Context, userId: string, todoId: string): Promise<AnyRow> {
   const [row] = await (context.db as AnyRow)
     .select({ todo: dbSchema.todos })
     .from(dbSchema.todos)

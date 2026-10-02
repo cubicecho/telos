@@ -1,3 +1,12 @@
+# [1.11.0](https://github.com/cubicecho/telos/compare/v1.10.0...v1.11.0) (2026-10-02)
+
+
+### Features
+
+* **db:** record a todo's hook session per agent, and mark it when the todo is deleted ([d6a31ce](https://github.com/cubicecho/telos/commit/d6a31ceae8f4ff1d8c89897ed3cc417118a4f237))
+* **runner:** fire sessionDelete for deleted todos, and say that beforeCompact never fires ([7cbe62a](https://github.com/cubicecho/telos/commit/7cbe62a86c016864ff2f5a731c780afbb5d01c21))
+* **server:** hand the runner the sessionDeletes a deleted todo owes ([564448e](https://github.com/cubicecho/telos/commit/564448ecddc852eeca5437c025f2236224111a20))
+
 # [1.10.0](https://github.com/cubicecho/telos/compare/v1.9.0...v1.10.0) (2026-10-02)
 
 

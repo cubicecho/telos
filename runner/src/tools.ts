@@ -9,6 +9,11 @@ import type { Claim, McpServerRow } from './telos.ts';
 
 /** The slug telos's own tools are named under: `telos__submit_request`, and so on. */
 export const TELOS_SERVER = 'telos';
+/** The door's tool for a client's artifacts, which a run is not offered. */
+const TELOS_RECORD_ARTIFACT = 'record_artifact';
+
+/** The one hook event telos has no moment for: a run's transcript is never compacted. */
+const NEVER_FIRED = 'beforeCompact';
 
 /**
  * An agent's server as the pool reads it, or null when this runner will not
@@ -31,6 +36,14 @@ export function serverConfig(
   if (!slug || slug === TELOS_SERVER) return null;
   const problems = row.hooks?.length ? validateHooks(row.hooks) : [];
   if (problems.length > 0) onNotice?.(`Hooks on "${row.name || row.id}" left out: ${problems.join('; ')}`);
+  else if ((row.hooks as ToolHook[] | undefined)?.some((hook) => hook.on === NEVER_FIRED && hook.enabled !== false)) {
+    // Kept, since the row is the person's and nothing is wrong with it; said, so
+    // a hook that never runs is not mistaken for one that does.
+    onNotice?.(
+      `A hook on "${row.name || row.id}" is bound to ${NEVER_FIRED}, which telos never fires: ` +
+        'a run does not compact its transcript. Bind it to afterTurn or sessionEnd to have it run.',
+    );
+  }
   const base = {
     id: slug,
     slug,
@@ -86,6 +99,9 @@ export async function openTools(
       transport: 'http',
       url: `${options.telosUrl}/mcp`,
       headers: { 'x-run-token': claim.token },
+      // The door's own record_artifact is for work done outside a run. A run
+      // has the runner's, which is checked against what its tools did.
+      hiddenTools: [TELOS_RECORD_ARTIFACT],
     },
   ];
   for (const row of readServers(claim.agent.mcpServers)) {
@@ -93,6 +109,16 @@ export async function openTools(
     if (config) configs.push(config);
     else options.onNotice?.(`MCP server "${row.name || row.id}" left out: this runner does not spawn commands.`);
   }
+  return openPool(configs);
+}
+
+/**
+ * Connects to a set of servers.
+ *
+ * @param configs The servers.
+ * @returns Their pool. Close it with `shutdown()`.
+ */
+export async function openPool(configs: McpServerConfig[]): Promise<McpPool> {
   const pool = new McpPool({
     clientName: 'telos-runner',
     log: { info: () => {}, error: (message) => console.error(`[mcp] ${message}`) },

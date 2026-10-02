@@ -6,7 +6,7 @@
 # working the board: nothing here moves, completes or edits a todo. The
 # board's own agents do the work; a person owns the board. What a caller
 # said about a todo is its own to correct: it can rewrite or take back a note
-# it signed.
+# it signed. What it made for a todo somewhere else it can point the board at.
 
 # The projects open to AI, each with its lanes in board order. Start here: a
 # request needs a project id, and a lane id means nothing without its name.
@@ -180,5 +180,33 @@ mutation deleteTodoNote(
 ) {
   deleteTodoNote(id: $id) {
     id
+  }
+}
+
+# Tells the board about something you made for a todo and stored somewhere
+# else: a file, a page, an uploaded object. The board keeps where it is and
+# what you call it, never a copy, and lists it on the todo as your word for
+# it, signed as this key. Recording the same location on the same todo again
+# updates the label, media type and size. For something to read on the todo
+# itself, use `add_todo_note`.
+mutation recordArtifact(
+  # The todo it was made for.
+  $todoId: ID!
+  # Where it is: a path or a URI someone could open.
+  $location: String!
+  # A short name for it, as a person would list it.
+  $label: String!
+  # e.g. text/markdown. Leave out when not known.
+  $mediaType: String
+  # Its size in bytes. Leave out when not known.
+  $sizeBytes: Int
+) {
+  recordArtifact(todoId: $todoId, location: $location, label: $label, mediaType: $mediaType, sizeBytes: $sizeBytes) {
+    id
+    location
+    title
+    source
+    action
+    createdAt
   }
 }

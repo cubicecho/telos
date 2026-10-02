@@ -3,7 +3,7 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { CancelRunDocument, DeleteArtifactDocument, DeleteRunDocument, TodoRunsDocument } from '@/lib/graphql';
-import { TodoRuns } from '../todo-runs';
+import { TodoRuns, UNCHECKED } from '../todo-runs';
 import { fullRun, run, runMock } from './run-fixtures';
 
 function runs(rows: unknown[], artifacts: unknown[] = []) {
@@ -145,6 +145,8 @@ describe('TodoRuns', () => {
         [
           {
             __typename: 'Artifact',
+            todoId: 't1',
+            todoTitle: null,
             id: 'x1',
             location: 'docs/plan.md',
             source: 'declared',
@@ -165,6 +167,41 @@ describe('TodoRuns', () => {
     expect(screen.getByText('docs/plan.md · text/markdown')).toBeInTheDocument();
     expect(screen.getByText('created')).toBeInTheDocument();
     expect(screen.getByText('declared')).toBeInTheDocument();
+    expect(screen.queryByText('unverified')).not.toBeInTheDocument();
+    expect(screen.queryByText(UNCHECKED)).not.toBeInTheDocument();
+  });
+
+  it('marks what a client recorded as its word, not as something a run made', async () => {
+    show([
+      runs(
+        [],
+        [
+          {
+            __typename: 'Artifact',
+            id: 'x3',
+            todoId: 't1',
+            todoTitle: null,
+            location: 'https://example.com/plan',
+            source: 'client',
+            action: 'created',
+            serverSlug: null,
+            tool: null,
+            title: 'The plan, published',
+            description: null,
+            mediaType: null,
+            sizeBytes: null,
+            createdAt: '2026-09-24T10:00:30.000Z',
+          },
+        ],
+      ),
+    ]);
+
+    expect(await screen.findByText('The plan, published')).toBeInTheDocument();
+    expect(screen.getByText('unverified')).toBeInTheDocument();
+    expect(screen.getByText(UNCHECKED)).toBeInTheDocument();
+    // Not under a run's sources, and not under its own name as if it were one.
+    expect(screen.queryByText('client')).not.toBeInTheDocument();
+    expect(screen.queryByText('declared')).not.toBeInTheDocument();
   });
 
   it('shows a note the agent left as a link into the thread, not a location', async () => {
@@ -177,6 +214,8 @@ describe('TodoRuns', () => {
           [
             {
               __typename: 'Artifact',
+              todoId: 't1',
+              todoTitle: null,
               id: 'x2',
               location: 'telos:note/n1',
               source: 'detected',
@@ -212,6 +251,8 @@ describe('TodoRuns', () => {
         [
           {
             __typename: 'Artifact',
+            todoId: 't1',
+            todoTitle: null,
             id: 'x1',
             location: 'quinton_lucas_bio.txt',
             source: 'declared',

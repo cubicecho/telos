@@ -8,6 +8,8 @@ import { type Context, isAiActor } from '../context.ts';
 //
 // A note is the one thing it may take back: `editTodoNote` and `deleteTodoNote`
 // are open to it, and resolvers/notes.ts holds it to the notes it signed.
+// `recordArtifact` is how a client says what it made for a todo; a run has its
+// own way (resolvers/artifacts.ts).
 //
 // An allowlist over the whole Mutation type rather than a check per resolver,
 // so a mutation added later is closed to AI until someone opens it here.
@@ -20,6 +22,7 @@ export const AI_MUTATIONS = new Set([
   'addTodoNote',
   'editTodoNote',
   'deleteTodoNote',
+  'recordArtifact',
 ]);
 
 /**
@@ -34,6 +37,8 @@ export const RUNNER_MUTATIONS = new Set([
   'finishProbe',
   'claimDraft',
   'finishDraft',
+  'takeSessionDeletes',
+  'finishSessionDelete',
 ]);
 
 /**

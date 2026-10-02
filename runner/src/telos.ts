@@ -72,6 +72,8 @@ export interface Claim {
   leaseExpiresAt: string;
   /** How many runs the todo had before this one: zero for its first. */
   turn: number;
+  /** Whether no agent has worked the todo before: its hooks' session opens with this run. */
+  opensSession: boolean;
   agent: ClaimedAgent;
   brief: Brief;
 }
@@ -133,6 +135,16 @@ export interface ProbeResult {
   error?: string | null;
 }
 
+/** A deleted todo's session, which one agent's servers have yet to be told is gone. */
+export interface SessionDelete {
+  id: string;
+  /** The todo that was deleted: the session's id. */
+  todoId: string;
+  agentName: string;
+  /** The agent's servers that have a `sessionDelete` hook, as JSON. */
+  mcpServers: string;
+}
+
 /** A draft the runner has taken to answer. */
 export interface DraftClaim {
   draftId: string;
@@ -172,6 +184,10 @@ export interface Telos {
   claimDraft(id: string): Promise<DraftClaim | null>;
   /** Reports a draft's answer against the run `claimDraft` started. */
   finishDraft(id: string, runId: string, answer: DraftAnswer): Promise<void>;
+  /** Deleted todos whose sessions' servers are still to be told, now taken. */
+  sessionDeletes(limit?: number): Promise<SessionDelete[]>;
+  /** With `error`, the servers could not be told. */
+  finishSessionDelete(id: string, error?: string | null): Promise<void>;
 }
 
 const QUEUE = `query ($limit: Int) { runnerQueue(limit: $limit) { todoId laneId projectId } }`;
@@ -182,7 +198,7 @@ const AGENT_FIELDS = `
 `;
 const CLAIM = `mutation ($todoId: ID!, $laneId: ID!) {
   claimRun(todoId: $todoId, laneId: $laneId) {
-    runId todoId token leaseExpiresAt turn
+    runId todoId token leaseExpiresAt turn opensSession
     agent { ${AGENT_FIELDS} }
     brief {
       projectName projectDescription projectContext laneName contract lanePrompt
@@ -212,6 +228,8 @@ const FINISH_DRAFT = `mutation (
     prompt: $prompt, usage: $usage, events: $events
   )
 }`;
+const SESSION_DELETES = `mutation ($limit: Int) { takeSessionDeletes(limit: $limit) { id todoId agentName mcpServers } }`;
+const FINISH_SESSION_DELETE = `mutation ($id: ID!, $error: String) { finishSessionDelete(id: $id, error: $error) }`;
 const FINISH = `mutation ($id: ID!, $result: RunResultInput!) { finishRun(id: $id, result: $result) { id } }`;
 
 /** A GraphQL answer carrying errors, as one error. */
@@ -285,6 +303,11 @@ export function createTelos(options: { telosUrl: string; runnerKey: string; fetc
     claimDraft: async (id) => (await request<{ claimDraft: DraftClaim | null }>(CLAIM_DRAFT, { id })).claimDraft,
     finishDraft: async (id, runId, answer) => {
       await request(FINISH_DRAFT, { id, runId, ...answer });
+    },
+    sessionDeletes: async (limit = 5) =>
+      (await request<{ takeSessionDeletes: SessionDelete[] }>(SESSION_DELETES, { limit })).takeSessionDeletes,
+    finishSessionDelete: async (id, error = null) => {
+      await request(FINISH_SESSION_DELETE, { id, error });
     },
   };
 }
