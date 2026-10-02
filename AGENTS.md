@@ -238,10 +238,29 @@ location; `finishRun` stores them in `artifacts`, a reserved table no client
 can write. A stopped run keeps its events but no artifacts. An agent's MCP
 servers may carry `hooks` (agent-mcp-pool's `ToolHook`) and `hiddenTools`;
 invalid hooks are dropped with a notice, and a failing hook never fails a run.
-The todo is the hooks' session and each run a turn of it: `claimRun` says how
-many runs came before (`turn`), so a todo's first run fires `sessionStart`
-ahead of `beforeTurn`, and every run fires `afterTurn` and `sessionEnd`.
-`beforeCompact` and `sessionDelete` are never fired.
+The todo is the hooks' session and each run a turn of it: `claimRun` records
+the session in `todo_sessions` (one row per todo and agent, a server-only
+table) and says whether this run opens it (`opensSession`, true when no agent
+had worked the todo; asked of the sessions and not of `turn`, because
+retention prunes runs). That run fires `sessionStart` ahead of `beforeTurn`,
+and every run fires `afterTurn` and `sessionEnd`. A draft's reply runs no
+hooks.
+
+**A deleted todo owes its agents' servers a `sessionDelete`, and the delete
+never waits for it.** `todo_sessions.todo_id` has no foreign key: the
+`todos_end_sessions` trigger stamps `deleted_at` on a hard delete by any path
+(a project's delete included; archiving is not a delete), and the runner
+comes for what is owed as it comes for MCP tests (`takeSessionDeletes`,
+`finishSessionDelete` in `server/src/resolvers/session-deletes.ts`;
+`runner/src/session-deletes.ts`). Only servers with an enabled `sessionDelete`
+hook are sent, and a session nobody asked to hear the end of is forgotten. A
+failure is retried with a backoff up to `SESSION_DELETE_ATTEMPTS`, then
+dropped with a line on the server's log, since there is no todo left to hang a
+notice on. They wait while AI is off for the instance or the account; the
+project's switch is not asked, as the project may be gone too. `beforeCompact`
+is never fired, because a run does not compact its transcript: a hook bound to
+it is kept and the runner says so in a notice on each run and on a test of the
+server.
 
 **A draft's reply is a run, and no todo's.** `runs.kind` is `todo` or `draft`,
 and `ck_runs_owner` holds each to its shape: a todo's run has `todo_id` and a
