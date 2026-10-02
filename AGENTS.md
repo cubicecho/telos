@@ -170,8 +170,8 @@ directly (a loader, a hand-written mutation) has to apply the same narrowing
 itself — see `visibleToAi` in `resolvers/todos.ts` and `loadAiTodo` in
 `resolvers/requests.ts`. What it writes: `resolvers/actor-lock.ts` wraps every
 mutation and refuses AI all but `AI_MUTATIONS` (`submitRequest`,
-`cancelRequest`, `addTodoNote`, and `editTodoNote` and `deleteTodoNote` for
-the notes it signed). A new mutation is closed to AI until it is added there. The MCP door (`mcp.ts`) serves only the operations written in
+`cancelRequest`, `addTodoNote`, `editTodoNote` and `deleteTodoNote` for
+the notes it signed, and `recordArtifact`). A new mutation is closed to AI until it is added there. The MCP door (`mcp.ts`) serves only the operations written in
 `mcp.graphql` — the tool list is the menu, the lock is the lock. `/mcp` is
 a 404 unless the instance's switch is on.
 
@@ -235,7 +235,27 @@ rest with `finishRun`, where they land in `runs.events`, capped at
 what the run made, declared by the agent through the runner's own
 `record_artifact` tool or read off a write/edit/move/delete tool call, one per
 location; `finishRun` stores them in `artifacts`, a reserved table no client
-can write. A stopped run keeps its events but no artifacts. An agent's MCP
+can write. A stopped run keeps its events but no artifacts.
+
+**An artifact says who vouches for it, and outlives its todo.** `source` is
+`declared` or `detected` for what a run reported (`RUN_ARTIFACT_SOURCES`, the
+only two `finishRun` accepts) and `client` for what an MCP client recorded with
+`recordArtifact` (`resolvers/artifacts.ts`, `record_artifact` on `/mcp`): a
+location and a label on a todo the caller can see, signed like a note
+(`actor_kind`, `actor_key_id`), and checked by nothing. So `client` is its own
+source, the app marks it unverified, and a run cannot use the mutation: it is
+refused for an `agent` actor and the runner hides the door's tool
+(`hiddenTools` in `runner/src/tools.ts`), leaving the run its own checked
+`record_artifact`. Recording the same location on the same todo again updates
+the row. `artifacts.todo_id` is nullable with `ON DELETE SET NULL`: deleting a
+todo for good detaches its artifacts, and the `todos_detach_artifacts` trigger
+writes the todo's title into `todo_title` first, so every delete path keeps it.
+Note artifacts (`telos:note/<id>`) go with the todo, since their notes do. A
+detached artifact stays on the project's list until someone removes it
+(`deleteArtifact`) or the project is deleted, and is hidden from AI callers,
+whose scope is by todo.
+
+An agent's MCP
 servers may carry `hooks` (agent-mcp-pool's `ToolHook`) and `hiddenTools`;
 invalid hooks are dropped with a notice, and a failing hook never fails a run.
 The todo is the hooks' session and each run a turn of it: `claimRun` records

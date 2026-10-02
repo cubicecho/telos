@@ -307,6 +307,8 @@ describe('TodoFormDialog', () => {
               {
                 __typename: 'Artifact',
                 id: 'x1',
+                todoId: 't1',
+                todoTitle: null,
                 location: 'telos:note/n1',
                 source: 'detected',
                 action: 'created',

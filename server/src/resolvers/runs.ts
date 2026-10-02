@@ -470,15 +470,16 @@ export interface RunUsage {
 
 /**
  * The artifacts a result reports, as rows. Anything without a location, or
- * with a source or action the board does not know, is dropped rather than
- * failing the finish: a run's work is not undone by a malformed receipt.
+ * with a source or action a run cannot report, is dropped rather than failing
+ * the finish: a run's work is not undone by a malformed receipt. `client` is
+ * not a run's to claim (resolvers/artifacts.ts).
  *
  * @param run The run.
  * @param reported What the runner reported.
  * @returns Rows to insert.
  */
 function artifactRows(run: AnyRow, reported: ArtifactInput[] | null | undefined) {
-  const sources: readonly string[] = dbSchema.ARTIFACT_SOURCES;
+  const sources: readonly string[] = dbSchema.RUN_ARTIFACT_SOURCES;
   const actions: readonly string[] = dbSchema.ARTIFACT_ACTIONS;
   return (reported ?? [])
     .filter(
@@ -887,8 +888,9 @@ export function applyRunsExtension(schema: GraphQLSchema): GraphQLSchema {
     return true;
   };
 
-  // A person's, like watching a board: what a run made is theirs to tidy, and
-  // an agent that could remove it could hide what it did.
+  // A person's, like watching a board: what was made is theirs to tidy, and
+  // an agent that could remove it could hide what it did. An artifact whose
+  // todo is gone is removed the same way.
   mutations.deleteArtifact.resolve = async (_parent: unknown, args: { id: string }, context: Context) => {
     const userId = requireAuth(context);
     if (context.actor.kind !== 'user') {

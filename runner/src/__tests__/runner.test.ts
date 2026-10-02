@@ -308,6 +308,8 @@ describe('the runner', () => {
     ]);
     // With only the board to reach, there is nothing to record a file with.
     expect(offered).toContain('telos__add_todo_note');
+    // The door's record_artifact is a client's. A run has the runner's own.
+    expect(offered).not.toContain('telos__record_artifact');
     expect(offered).not.toContain('record_artifact');
     // The note it left is kept as a link to it.
     const made = await db.select().from(dbSchema.artifacts).where(eq(dbSchema.artifacts.todoId, todoId));

@@ -135,8 +135,10 @@ every level:
 
 With AI on there are two doors in. **`/mcp`** is for your own agents (Claude
 Code and the like): with an API key from Settings they can submit requests,
-read the board, add notes and correct or take back the notes they signed, but
-not move todos. **The runner** is telos's own
+read the board, add notes and correct or take back the notes they signed, and
+record what they made for a todo (`record_artifact`: where it is and what to
+call it), but not move todos. Nothing checks what a client records, so the
+board lists it as unverified, signed with the key that said it. **The runner** is telos's own
 worker. A lane with an agent is a *station*: the runner claims a todo there,
 has the agent work it, verify it, or split it into child todos, and telos moves
 it along the lane's arrows. A station can archive what passes instead of
@@ -144,7 +146,10 @@ moving it: the todo is completed and leaves the board, for a pipeline whose
 finished work nobody needs to see in a column. It claims by itself in a project with auto-run on,
 and only the todos you asked for in one with it off. Each run keeps a log of its tool calls, which the
 todo shows as it goes, and a list of what it made: files it wrote, and anything
-the agent chose to record. An agent's MCP servers can carry hooks, for example
+the agent chose to record. What was made for a todo outlives it: delete the
+todo for good and its artifacts stay on the project's Artifacts list, under the
+title the todo had, until you remove them or delete the project. An agent's MCP
+servers can carry hooks, for example
 a memory lookup injected before each turn. The todo is the hooks' session:
 `sessionStart` fires on its first run, `beforeTurn`, `afterTurn` and
 `sessionEnd` on every run, and `sessionDelete` after the todo is deleted for

@@ -448,6 +448,8 @@ export const RunFieldsFragment = graphql(`
 export const ArtifactFieldsFragment = graphql(`
   fragment ArtifactFields on Artifact {
     id
+    todoId
+    todoTitle
     location
     source
     action
@@ -566,8 +568,9 @@ export const ProjectActivityDocument = graphql(`
 `);
 
 /**
- * Everything a project's runs left behind, newest first, with the todo each is
- * on: the whole of it, so a note artifact can open that todo's dialog.
+ * Everything made for a project's todos, newest first, with the todo each is
+ * on: the whole of it, so a note artifact can open that todo's dialog. One
+ * whose todo was deleted has no todo, only the title it had (`todoTitle`).
  */
 export const ProjectArtifactsDocument = graphql(`
   query ProjectArtifacts($projectId: UUID!, $limit: Int!, $offset: Int!) {

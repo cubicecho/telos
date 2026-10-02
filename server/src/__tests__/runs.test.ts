@@ -700,7 +700,8 @@ describe('what a run shows as it goes, and leaves behind', () => {
 
     const mutations = await board.person.expectOk(`query { __type(name: "Mutation") { fields { name } } }`);
     const names: string[] = mutations.__type.fields.map((field: { name: string }) => field.name);
-    expect(names.filter((name) => /artifact/i.test(name))).toEqual(['deleteArtifact']);
+    // recordArtifact is a client's word, kept under a source of its own.
+    expect(names.filter((name) => /artifact/i.test(name)).sort()).toEqual(['deleteArtifact', 'recordArtifact']);
   });
 
   it('lets the owner take an artifact off the board, and no one else', async () => {
