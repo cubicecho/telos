@@ -14,6 +14,8 @@ export interface ProbeTool {
 export interface McpProbe {
   id: string;
   userId: string;
+  /** The account's server being tested, which keeps what is found. */
+  serverId: string;
   /** The server row, as JSON, as the runner reads an agent's. */
   server: string;
   status: 'pending' | 'testing' | 'done';
@@ -46,10 +48,11 @@ function sweep(now: number): void {
  * Asks for a server to be tested.
  *
  * @param userId Who asked; only they may read the answer.
+ * @param serverId Which of their servers it is.
  * @param server The server row, as JSON.
  * @returns The test, or null when they already have too many waiting.
  */
-export function askProbe(userId: string, server: string): McpProbe | null {
+export function askProbe(userId: string, serverId: string, server: string): McpProbe | null {
   const now = Date.now();
   sweep(now);
   const waiting = [...probes.values()].filter((probe) => probe.userId === userId && probe.status !== 'done');
@@ -57,6 +60,7 @@ export function askProbe(userId: string, server: string): McpProbe | null {
   const probe: McpProbe = {
     id: randomUUID(),
     userId,
+    serverId,
     server,
     status: 'pending',
     ok: false,
@@ -99,16 +103,16 @@ export function takeProbes(): McpProbe[] {
  *
  * @param id The test.
  * @param result What the server said, or why it could not be reached.
- * @returns Whether the test was still there to finish.
+ * @returns The test as it now stands, or null when it was no longer there to finish.
  */
 export function finishProbe(
   id: string,
   result: { ok: boolean; tools: ProbeTool[]; instructions: string; error: string | null },
-): boolean {
+): McpProbe | null {
   const probe = probes.get(id);
-  if (!probe || probe.status === 'done') return false;
+  if (!probe || probe.status === 'done') return null;
   Object.assign(probe, { ...result, status: 'done' });
-  return true;
+  return probe;
 }
 
 /** Forgets every test. For tests. */
