@@ -1,3 +1,10 @@
+# [1.4.0](https://github.com/cubicecho/telos/compare/v1.3.0...v1.4.0) (2026-10-02)
+
+
+### Features
+
+* **runner:** fire sessionStart on a todo's first run ([81b89bb](https://github.com/cubicecho/telos/commit/81b89bb792fec7d1ca16fee310016ac19d23334c))
+
 # [1.3.0](https://github.com/cubicecho/telos/compare/v1.2.0...v1.3.0) (2026-09-26)
 
 
