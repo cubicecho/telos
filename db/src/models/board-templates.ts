@@ -1,5 +1,6 @@
 import { index, jsonb, pgTable, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core';
 
+import type { PresetField } from './lane-presets.ts';
 import type { LaneContract } from './lanes.ts';
 import { users } from './users.ts';
 
@@ -22,6 +23,13 @@ export interface TemplateLane {
   archiveOnSuccess?: boolean;
   wipLimit?: number;
   maxAttempts?: number;
+  /**
+   * The lane preset the lane follows. With one, `prompt` is only what the lane
+   * adds after the preset's, so the preset's prompt is not copied here.
+   */
+  presetId?: string | null;
+  /** Which of the preset's fields the lane keeps its own value for. */
+  presetOverrides?: PresetField[];
 }
 
 // A board saved to start new projects from: its lanes, in order, and their

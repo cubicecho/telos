@@ -5,6 +5,7 @@ export * from './board-templates.ts';
 export * from './drafts.ts';
 export * from './instance-settings.ts';
 export * from './labels.ts';
+export * from './lane-presets.ts';
 export * from './lanes.ts';
 export * from './project-labels.ts';
 export * from './projects.ts';
