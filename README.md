@@ -148,6 +148,16 @@ The runner is part of the server: it starts with it and signs itself in, so
 there is nothing to set up. Until AI is on it only checks, every few seconds,
 whether there is anything to do.
 
+Getting a first run takes a few steps in a few places, so the app keeps a
+**setup checklist** until they are all taken: the two switches, an agent, a
+station, the project's switch, a first request, something that lets work start
+(auto-run, or Run now), and the runner having asked for work in the last
+minute. It shows on the home page, on a project with no station, and on the
+project it points at. Each row is read from what is there now and links to
+where it is fixed, and the list goes away when every row is ticked. An account
+with AI off gets one line offering it on the home page, and with
+`AI_ENABLED=false` there is nothing.
+
 ```bash
 export AUTH_SECRET=$(openssl rand -hex 32)
 docker compose up --build
