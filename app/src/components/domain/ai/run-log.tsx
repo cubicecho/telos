@@ -47,6 +47,37 @@ export function runEvents(run: Pick<RunFieldsFragment, 'events'>): RunEvent[] {
   return Array.isArray(run.events) ? (run.events as RunEvent[]) : [];
 }
 
+/** A run that is an agent's reply in a draft, rather than a station's work on a todo. */
+export const DRAFT_RUN = 'draft';
+
+/**
+ * Where a run happened and who made it: its lane and agent, or for a reply in a
+ * draft, that and its agent.
+ *
+ * @param run - The run.
+ * @returns "Review · Reviewer", or "Draft reply · Planner".
+ */
+export function runWhere(run: RunSummaryFieldsFragment): string {
+  const agent = run.agent?.name ?? 'a deleted agent';
+  if (run.kind === DRAFT_RUN) {
+    return `Draft reply · ${agent}`;
+  }
+  return `${run.lane?.name ?? 'A deleted lane'} · ${agent}`;
+}
+
+/**
+ * What a run was about, for a list that is not already one todo's or one draft's.
+ *
+ * @param run - The run.
+ * @returns The todo's title, or the draft's.
+ */
+export function runSubject(run: RunSummaryFieldsFragment): string {
+  if (run.kind === DRAFT_RUN) {
+    return run.draft?.title || 'Untitled draft';
+  }
+  return run.todo?.title ?? 'A deleted todo';
+}
+
 /** When it started, how long it took, and what it spent. */
 export function describeRun(run: RunSummaryFieldsFragment): string {
   const parts = [formatTimestamp(run.startedAt)];

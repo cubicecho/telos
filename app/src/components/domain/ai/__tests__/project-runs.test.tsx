@@ -5,12 +5,17 @@ import { describe, expect, it } from 'vitest';
 import { ProjectRunsDocument } from '@/lib/graphql';
 import type { ProjectActivity } from '../project-activity';
 import { ProjectRuns, RUNS_PAGE } from '../project-runs';
-import { run } from './run-fixtures';
+import { draftRun, run } from './run-fixtures';
 
 const ACTIVITY: ProjectActivity = {
   live: new Map([
-    ['t1', { __typename: 'Run', id: 'r2', todoId: 't1', laneId: 'l1', cancelRequestedAt: null, agent: null }],
+    [
+      't1',
+      { __typename: 'Run', id: 'r2', kind: 'todo', todoId: 't1', laneId: 'l1', cancelRequestedAt: null, agent: null },
+    ],
   ]),
+  drafting: [],
+  draftSpent: { __typename: 'RunAggregate', count: 0, sum: null },
   stuck: new Map(),
   waiting: new Map(),
   spent: {
@@ -57,5 +62,38 @@ describe('ProjectRuns', () => {
     await user.click(screen.getByRole('button', { name: 'Failed' }));
     await screen.findByText('Fix it — Review · Reviewer');
     expect(within(screen.getByRole('list', { name: 'Runs' })).getAllByRole('listitem')).toHaveLength(1);
+  });
+
+  it('lists a draft’s replies among the runs, marked as drafts, and says what they cost', async () => {
+    const drafting = {
+      __typename: 'Run',
+      id: 'r3',
+      kind: 'draft',
+      todoId: null,
+      laneId: null,
+      cancelRequestedAt: null,
+      agent: null,
+    };
+    const activity = {
+      ...ACTIVITY,
+      drafting: [drafting],
+      draftSpent: { __typename: 'RunAggregate', count: 4, sum: { __typename: 'RunSumAggregate', totalTokens: 900 } },
+    } as ProjectActivity;
+    render(
+      <MockedProvider mocks={[page(null, [draftRun('r3', 'running'), run('r2', 'running')])]}>
+        <ProjectRuns projectId="p1" activity={activity} pollMs={60_000} />
+      </MockedProvider>,
+    );
+
+    // One station run and one reply are under way.
+    expect(await screen.findByRole('button', { name: /Running now.*2.*1 draft reply/ })).toBeInTheDocument();
+    expect(screen.getByText('in 30 days, 4 draft replies')).toBeInTheDocument();
+    expect(screen.getByText('30,000 in, 1,200 out, 900 on drafts, 30 days')).toBeInTheDocument();
+
+    const [reply, work] = within(await screen.findByRole('list', { name: 'Runs' })).getAllByRole('listitem');
+    expect(within(reply).getByText('Faster export — Draft reply · Planner')).toBeInTheDocument();
+    expect(within(reply).getByText('Draft')).toBeInTheDocument();
+    expect(within(work).getByText('Write it — Review · Reviewer')).toBeInTheDocument();
+    expect(within(work).queryByText('Draft')).not.toBeInTheDocument();
   });
 });

@@ -59,6 +59,7 @@ describe('ProjectAutoRunSwitch', () => {
         stations: { __typename: 'AiStatus', todos: [] },
         live: [],
         spent: { __typename: 'RunAggregate', count: 0, sum: null },
+        draftSpent: { __typename: 'RunAggregate', count: 0, sum: null },
       },
     }));
     /** Holds the project's activity the way the project page does. */

@@ -5,7 +5,7 @@ import { GraphQLError } from 'graphql';
 import { describe, expect, it } from 'vitest';
 import type { RunSummaryFieldsFragment } from '@/__generated__/graphql';
 import { DeleteTodoNoteDocument, EditTodoNoteDocument, TodoRecordDocument } from '@/lib/graphql';
-import { aiStateMock, fullRun, run, runMock } from '../../ai/__tests__/run-fixtures';
+import { aiStateMock, draftRun, fullRun, run, runMock } from '../../ai/__tests__/run-fixtures';
 import { TodoHistory, TodoThread } from '../todo-record';
 
 const REPORT = {
@@ -34,7 +34,11 @@ function plainNote(id: string, body: string, extra: Record<string, unknown> = {}
   };
 }
 
-function record(aiEnabled = true, thread: Array<Record<string, unknown>> = [REPORT]) {
+function record(
+  aiEnabled = true,
+  thread: Array<Record<string, unknown>> = [REPORT],
+  draft: Record<string, unknown> | null = null,
+) {
   return {
     request: { query: TodoRecordDocument, variables: { id: 't1' } },
     result: {
@@ -69,6 +73,7 @@ function record(aiEnabled = true, thread: Array<Record<string, unknown>> = [REPO
               at: '2026-09-24T10:01:00.000Z',
             },
           ],
+          draft,
           project: {
             __typename: 'Project',
             id: 'p1',
@@ -108,6 +113,37 @@ describe('TodoHistory', () => {
 
     await user.click(await within(items[2]).findByRole('button', { name: 'View run' }));
     expect(await screen.findByText('Looks right.')).toBeInTheDocument();
+  });
+
+  it('says a todo came from a draft, and puts the draft’s replies first, each to be opened', async () => {
+    const user = userEvent.setup();
+    const reply = draftRun('r0', 'error', { startedAt: '2026-09-24T08:00:00.000Z', error: 'The model timed out.' });
+    show(<TodoHistory todoId="t1" />, [
+      aiStateMock(true, true),
+      record(true, [REPORT], { __typename: 'Draft', id: 'd1', runs: [reply] }),
+      runMock(fullRun('r0', 'error', { ...reply, userPrompt: 'Them: Export is slow' })),
+    ]);
+
+    await screen.findByText('Created from a draft');
+    const items = screen.getAllByRole('listitem');
+    expect(items.map((item) => item.textContent)).toEqual([
+      expect.stringContaining('Planner replied in the draft it was made from'),
+      expect.stringContaining('Created from a draft'),
+      expect.stringContaining('Moved from Review to Done'),
+    ]);
+    expect(within(items[0]).getByText('The model timed out.')).toBeInTheDocument();
+
+    await user.click(await within(items[0]).findByRole('button', { name: 'View run' }));
+    expect(await screen.findByRole('dialog', { name: 'Draft reply · Planner' })).toBeInTheDocument();
+  });
+
+  it('keeps a draft’s replies out of the history while the project’s AI is off', async () => {
+    show(<TodoHistory todoId="t1" />, [
+      aiStateMock(true, true),
+      record(false, [REPORT], { __typename: 'Draft', id: 'd1', runs: [draftRun('r0', 'ok')] }),
+    ]);
+    expect(await screen.findByText('Created from a draft')).toBeInTheDocument();
+    expect(screen.queryByText(/replied in the draft/)).not.toBeInTheDocument();
   });
 
   it('offers no run links while AI is off', async () => {

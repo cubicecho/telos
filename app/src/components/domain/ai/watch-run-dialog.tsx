@@ -7,7 +7,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { describeError } from '@/lib/errors';
 import { CancelRunDocument, RunDocument } from '@/lib/graphql';
 import type { LiveRun } from './project-activity';
-import { describeRun, RUN_STATUS, RunLog, RunStatusBadge } from './run-log';
+import { describeRun, RUN_STATUS, RunLog, RunStatusBadge, runWhere } from './run-log';
 import { RUN_POLL_MS } from './run-row';
 
 /**
@@ -62,11 +62,7 @@ export function WatchRunDialog({
       onOpenChange={onOpenChange}
       size="lg"
       title={todoTitle}
-      description={
-        run
-          ? `${run.lane?.name ?? 'A deleted lane'} · ${run.agent?.name ?? 'a deleted agent'} · ${describeRun(run)}`
-          : 'Waiting for the run…'
-      }
+      description={run ? `${runWhere(run)} · ${describeRun(run)}` : 'Waiting for the run…'}
       footer={
         run && running ? (
           run.cancelRequestedAt ? (

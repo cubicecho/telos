@@ -127,6 +127,7 @@ const cache = new InMemoryCache({
       },
     },
     Run: { fields: { artifacts: replace } },
+    Draft: { fields: { messages: replace, runs: replace } },
     Project: { fields: { labels: replace, todos: replace, lanes: replace } },
     Lane: { fields: { todos: replace } },
     Label: { fields: { todos: replace, projects: replace } },

@@ -70,6 +70,7 @@ const LIVE = new Map([
     {
       __typename: 'Run' as const,
       id: 'r1',
+      kind: 'todo',
       todoId: 't1',
       laneId: 'l2',
       cancelRequestedAt: null,

@@ -5,7 +5,7 @@ import { DialogLayout } from '@/components/dialog-layout';
 import { Spinner } from '@/components/ui/spinner';
 import { describeError } from '@/lib/errors';
 import { RunDocument } from '@/lib/graphql';
-import { describeRun, RunLog, RunStatusBadge } from './run-log';
+import { describeRun, RunLog, RunStatusBadge, runWhere } from './run-log';
 import { RUN_POLL_MS } from './run-row';
 
 /**
@@ -43,7 +43,7 @@ export function RunDialog({
       open={open}
       onOpenChange={onOpenChange}
       size="lg"
-      title={run ? `${run.lane?.name ?? 'A deleted lane'} · ${run.agent?.name ?? 'a deleted agent'}` : 'Run'}
+      title={run ? runWhere(run) : 'Run'}
       description={run ? describeRun(run) : undefined}
       content={
         run ? (

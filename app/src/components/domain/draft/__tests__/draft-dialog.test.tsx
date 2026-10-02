@@ -1,5 +1,5 @@
 import { MockedProvider } from '@apollo/client/testing';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import {
@@ -9,6 +9,7 @@ import {
   OpenDraftsDocument,
   StartDraftDocument,
 } from '@/lib/graphql';
+import { draftRun, fullRun, runMock } from '../../ai/__tests__/run-fixtures';
 import { DraftDialog } from '../draft-dialog';
 
 const AGENT = {
@@ -51,6 +52,17 @@ const ANSWERED = {
   waitingSince: null,
   agent: { __typename: 'Agent', id: 'a1', name: 'Planner' },
   messages: [ASKED, { __typename: 'DraftMessage', id: 'm2', role: 'assistant', content: 'How big are the files?' }],
+  runs: [draftRun('r1', 'ok')],
+};
+
+const FAILED_REPLY = draftRun('r2', 'error', { error: 'The model timed out.' });
+
+const FAILED = {
+  ...FIELDS,
+  title: '',
+  brief: '',
+  waitingSince: null,
+  error: 'The model timed out.',
 };
 
 const openDrafts = {
@@ -82,7 +94,7 @@ describe('DraftDialog', () => {
             result: { data: { startDraft: WAITING } },
           },
           openDrafts,
-          draft({ ...WAITING, agent: ANSWERED.agent, messages: [ASKED] }),
+          draft({ ...WAITING, agent: ANSWERED.agent, messages: [ASKED], runs: [draftRun('r1', 'running')] }),
           draft(ANSWERED),
           draft(ANSWERED),
           draft(ANSWERED),
@@ -112,6 +124,33 @@ describe('DraftDialog', () => {
     await user.click(screen.getByRole('button', { name: 'Make a todo' }));
     await vi.waitFor(() => expect(onMade).toHaveBeenCalledWith('Faster CSV export'));
     expect(make).toHaveBeenCalled();
+  });
+
+  it('lists a draft’s replies as runs, and opens a failed one onto what the agent was told', async () => {
+    const user = userEvent.setup();
+    render(
+      <MockedProvider
+        mocks={[
+          { request: { query: AgentsDocument }, result: { data: { agents: [AGENT] } } },
+          { ...openDrafts, result: { data: { drafts: [FAILED] } } },
+          draft({ ...FAILED, agent: ANSWERED.agent, messages: [ASKED], runs: [FAILED_REPLY] }),
+          runMock(fullRun('r2', 'error', { ...FAILED_REPLY, userPrompt: 'Them: Export is slow' })),
+        ]}
+      >
+        <DraftDialog open onOpenChange={() => {}} projectId="p1" pollMs={20} />
+      </MockedProvider>,
+    );
+
+    await user.click(await screen.findByRole('button', { name: 'Untitled draft' }));
+    const replies = await screen.findByRole('list', { name: 'Replies' });
+    const [reply] = within(replies).getAllByRole('listitem');
+    // Within a draft the row needs no draft's name and no mark saying it is one.
+    expect(within(reply).getByText('Draft reply · Planner')).toBeInTheDocument();
+    expect(within(reply).getByText('Failed')).toBeInTheDocument();
+    expect(within(reply).queryByText('Draft')).not.toBeInTheDocument();
+
+    await user.click(within(reply).getByRole('button', { name: 'Draft reply · Planner, error' }));
+    expect(await within(reply).findByText('The model timed out.')).toBeInTheDocument();
   });
 
   it('asks for an agent when there is none', async () => {
