@@ -311,13 +311,14 @@ export function applyAgentsExtension(schema: GraphQLSchema): GraphQLSchema {
   };
 
   // The generated resolvers never select an excluded column, so ask.
-  const secretNames = (column: 'headers' | 'env') => async (parent: { id: string }, _args: unknown, context: Context) => {
-    const [row] = await (context.db as AnyRow)
-      .select({ secrets: dbSchema.mcpServers[column] })
-      .from(dbSchema.mcpServers)
-      .where(eq(dbSchema.mcpServers.id, parent.id));
-    return Object.keys(row?.secrets ?? {}).sort();
-  };
+  const secretNames =
+    (column: 'headers' | 'env') => async (parent: { id: string }, _args: unknown, context: Context) => {
+      const [row] = await (context.db as AnyRow)
+        .select({ secrets: dbSchema.mcpServers[column] })
+        .from(dbSchema.mcpServers)
+        .where(eq(dbSchema.mcpServers.id, parent.id));
+      return Object.keys(row?.secrets ?? {}).sort();
+    };
   mcpServer.headerNames.resolve = secretNames('headers');
   mcpServer.envNames.resolve = secretNames('env');
 

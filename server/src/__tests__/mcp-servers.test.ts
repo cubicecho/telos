@@ -116,7 +116,7 @@ describe('the registry', () => {
     expect((await refused({})).message).toMatch(/already have an MCP server with the slug "docs"/);
   });
 
-  it('is the owner\'s alone, and not for AI to read or write', async () => {
+  it("is the owner's alone, and not for AI to read or write", async () => {
     const id = await addServer('docs');
     const other = await createBoard(db, 'other@example.com');
     expect((await other.person.expectOk(LIST)).mcpServers).toEqual([]);
@@ -252,7 +252,14 @@ describe('the migration', () => {
         // Another account's server of the same definition is its own row.
         ['b@example.com', 'Theirs', [{ id: 'f0e1d2c3-0000-4000-8000-000000000004', name: 'Team Memory', ...memory }]],
         // An unnamed uuid row, and a hand-written id the board's own door has.
-        ['b@example.com', 'Odd', [{ id: 'f0e1d2c3-0000-4000-8000-000000000005', url: 'http://x.test' }, { id: 'telos', url: 'http://y.test' }]],
+        [
+          'b@example.com',
+          'Odd',
+          [
+            { id: 'f0e1d2c3-0000-4000-8000-000000000005', url: 'http://x.test' },
+            { id: 'telos', url: 'http://y.test' },
+          ],
+        ],
       ];
       for (const [email, name, servers] of agents) {
         await old.execute(sql`INSERT INTO users (email) VALUES (${email}) ON CONFLICT DO NOTHING`);
