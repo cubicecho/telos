@@ -1,3 +1,12 @@
+# [1.9.0](https://github.com/cubicecho/telos/compare/v1.8.0...v1.9.0) (2026-10-02)
+
+
+### Features
+
+* **app:** the thread edits and deletes a person's own notes ([9fbcfd0](https://github.com/cubicecho/telos/commit/9fbcfd0179a84d55a4e7b6d8999f5a0ba20bb81a))
+* **server:** a note can be edited or deleted by whoever signed it ([0345397](https://github.com/cubicecho/telos/commit/03453973b92ede8b289e9281155588fa440d72f0))
+* **server:** set a todo's dependencies in one call ([15a115d](https://github.com/cubicecho/telos/commit/15a115dbb1c751968b5bc68fe8dfd878c42ca154))
+
 # [1.8.0](https://github.com/cubicecho/telos/compare/v1.7.0...v1.8.0) (2026-10-02)
 
 
