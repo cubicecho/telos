@@ -37,6 +37,31 @@ export interface ReadyTodo {
 }
 
 /**
+ * What a failed run is, in a query that names the run `r`: it errored, or a
+ * reviewer ruled against it. One definition, for the queue, the status panel
+ * and the board's cards.
+ */
+export const RUN_FAILED = sql`(r.status = 'error' OR r.verdict = 'fail')`;
+
+/**
+ * How many of a todo's runs failed since a person last touched it: the count a
+ * lane's `maxAttempts` is held against.
+ *
+ * @param todoId - The todo's id column, as the surrounding query names it.
+ * @returns A scalar subquery.
+ */
+export function failuresSinceTouched(todoId: SQL): SQL {
+  return sql`(
+    SELECT count(*)::int FROM runs r
+    WHERE r.todo_id = ${todoId} AND ${RUN_FAILED}
+      AND r.started_at > coalesce(
+        (SELECT max(e.at) FROM todo_events e WHERE e.todo_id = ${todoId} AND e.actor_kind = 'user'),
+        '-infinity'::timestamptz
+      )
+  )`;
+}
+
+/**
  * The todos stations could start on now, first station and first todo first.
  *
  * @param db The database or transaction.
@@ -90,14 +115,7 @@ export async function readyTodos(
               t.created_at
             )
         )
-        AND (
-          SELECT count(*) FROM runs r
-          WHERE r.todo_id = t.id AND (r.status = 'error' OR r.verdict = 'fail')
-            AND r.started_at > coalesce(
-              (SELECT max(e.at) FROM todo_events e WHERE e.todo_id = t.id AND e.actor_kind = 'user'),
-              '-infinity'::timestamptz
-            )
-        ) <= l.max_attempts
+        AND ${failuresSinceTouched(sql`t.id`)} <= l.max_attempts
     )
     SELECT c.todo_id, c.lane_id, c.project_id, c.user_id
     FROM candidates c LEFT JOIN live ON live.lane_id = c.lane_id
@@ -250,7 +268,6 @@ export async function stationStates(
           l.name AS lane_name, l.position AS lane_position, l.agent_id IS NOT NULL AS has_agent,
           (l.contract = 'expand' AND l.on_success_lane_id IS NULL) AS barren_expand,
           l.max_attempts,
-          (SELECT max(e.at) FROM todo_events e WHERE e.todo_id = t.id AND e.actor_kind = 'user') AS touched,
           coalesce(
             (SELECT max(e.at) FROM todo_events e WHERE e.todo_id = t.id AND e.to_lane_id = l.id),
             t.created_at
@@ -266,18 +283,14 @@ export async function stationStates(
         b.id AS todo_id, b.title, b.project_id, b.lane_id, b.lane_name,
         coalesce(b.has_agent, false) AS has_agent, b.ai_ignored, b.auto_run, b.run_requested,
         coalesce(b.barren_expand, false) AS barren_expand, b.max_attempts,
-        (
-          SELECT count(*)::int FROM runs r
-          WHERE r.todo_id = b.id AND (r.status = 'error' OR r.verdict = 'fail')
-            AND r.started_at > coalesce(b.touched, '-infinity'::timestamptz)
-        ) AS failures,
+        ${failuresSinceTouched(sql`b.id`)} AS failures,
         EXISTS (
           SELECT 1 FROM runs r
           WHERE r.todo_id = b.id AND r.lane_id = b.lane_id AND r.status = 'ok' AND r.started_at >= b.arrived
         ) AS finished_here,
         (
           SELECT coalesce(r.error, r.output) FROM runs r
-          WHERE r.todo_id = b.id AND (r.status = 'error' OR r.verdict = 'fail')
+          WHERE r.todo_id = b.id AND ${RUN_FAILED}
           ORDER BY r.started_at DESC LIMIT 1
         ) AS last_failure,
         (
