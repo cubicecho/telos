@@ -10,7 +10,7 @@ import { requireAuth } from './auth.ts';
 // What generated CRUD cannot express: the derived fields the project screen
 // reads, and the two state transitions that carry rules — completing a todo
 // (which the dependency graph can forbid) and adding a dependency edge (which
-// must not close a cycle).
+// must not close a cycle, one at a time or as a whole list).
 
 // biome-ignore lint/suspicious/noExplicitAny: drizzle-orm 1.0 table/column type compat
 type AnyRow = any;
@@ -35,6 +35,12 @@ const TODOS_SDL = parse(`
     "Makes \`todoId\` wait on \`dependsOnTodoId\`. Rejects cycles."
     addTodoDependency(todoId: ID!, dependsOnTodoId: ID!): Todo!
     removeTodoDependency(todoId: ID!, dependsOnTodoId: ID!): Todo!
+    """
+    Replaces everything a todo waits on with \`dependsOn\`, in one transaction:
+    all of it lands or none does. Rejects a list that would close a cycle,
+    naming the todos in it. An empty list clears them.
+    """
+    setTodoDependencies(id: ID!, dependsOn: [ID!]!): Todo!
   }
 `);
 
@@ -54,6 +60,17 @@ async function loadOwnedTodo(context: Context, id: string): Promise<AnyRow> {
     throw new GraphQLError('Todo not found', { extensions: { code: 'NOT_FOUND' } });
   }
   return rows[0];
+}
+
+/** Refuses an edge that would leave `todo` completed and waiting at once. */
+function assertNotCompletedBehind(todo: AnyRow, blocker: AnyRow): void {
+  if (todo.completedAt != null && blocker.completedAt == null) {
+    // Otherwise the todo would sit completed and blocked at once, and
+    // `isBlocked` would stop meaning "cannot be completed".
+    throw new GraphQLError('Reopen this todo before making it depend on an open one.', {
+      extensions: { code: 'BAD_USER_INPUT' },
+    });
+  }
 }
 
 /**
@@ -152,13 +169,7 @@ export function applyTodosExtension(schema: GraphQLSchema): GraphQLSchema {
       loadOwnedTodo(context, args.todoId),
       loadOwnedTodo(context, args.dependsOnTodoId),
     ]);
-    if (todo.completedAt != null && blocker.completedAt == null) {
-      // Otherwise the todo would sit completed and blocked at once, and
-      // `isBlocked` would stop meaning "cannot be completed".
-      throw new GraphQLError('Reopen this todo before making it depend on an open one.', {
-        extensions: { code: 'BAD_USER_INPUT' },
-      });
-    }
+    assertNotCompletedBehind(todo, blocker);
     await assertNoCycle(context.db, args.todoId, args.dependsOnTodoId);
     await (context.db as AnyRow)
       .insert(dbSchema.todoDependencies)
@@ -183,6 +194,54 @@ export function applyTodosExtension(schema: GraphQLSchema): GraphQLSchema {
         ),
       );
     return loadOwnedTodo(context, args.todoId);
+  };
+
+  mutations.setTodoDependencies.resolve = async (
+    _parent: unknown,
+    args: { id: string; dependsOn: string[] },
+    context: Context,
+  ) => {
+    const userId = requireAuth(context);
+    const todo = await loadOwnedTodo(context, args.id);
+    const wanted = new Set(args.dependsOn);
+    const existing: Array<{ dependsOnTodoId: string }> = await (context.db as AnyRow)
+      .select({ dependsOnTodoId: dbSchema.todoDependencies.dependsOnTodoId })
+      .from(dbSchema.todoDependencies)
+      .where(and(eq(dbSchema.todoDependencies.userId, userId), eq(dbSchema.todoDependencies.todoId, todo.id)));
+    const kept = new Set(existing.map((row) => String(row.dependsOnTodoId)));
+    const dropped = [...kept].filter((id) => wanted.has(id) === false);
+    // An edge already there is kept as it stands, so a caller can send back the
+    // list it read. Only the new ones are held to what `addTodoDependency` asks.
+    const added = [...wanted].filter((id) => kept.has(id) === false);
+    for (const id of added) {
+      if (id === todo.id) {
+        throw new GraphQLError('A todo cannot depend on itself.', { extensions: { code: 'BAD_USER_INPUT' } });
+      }
+      assertNotCompletedBehind(todo, await loadOwnedTodo(context, id));
+    }
+    await (context.db as AnyRow).transaction(async (tx: AnyRow) => {
+      if (dropped.length > 0) {
+        await tx
+          .delete(dbSchema.todoDependencies)
+          .where(
+            and(
+              eq(dbSchema.todoDependencies.userId, userId),
+              eq(dbSchema.todoDependencies.todoId, todo.id),
+              inArray(dbSchema.todoDependencies.dependsOnTodoId, dropped),
+            ),
+          );
+      }
+      // Checked against the graph as it will be: the dropped edges are gone, and
+      // each new one is in place before the next is tried.
+      for (const dependsOnTodoId of added) {
+        await assertNoCycle(tx, todo.id, dependsOnTodoId);
+        await tx
+          .insert(dbSchema.todoDependencies)
+          .values({ userId, todoId: todo.id, dependsOnTodoId })
+          .onConflictDoNothing();
+      }
+    });
+    return loadOwnedTodo(context, todo.id);
   };
 
   return extendedSchema;

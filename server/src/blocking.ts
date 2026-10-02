@@ -111,11 +111,68 @@ export async function assertNoBlockedCompletions(db: AnyDb, userId: string): Pro
 }
 
 /**
- * Rejects a `todoId → dependsOnTodoId` edge that would close a cycle.
+ * The todos a refused edge would tie into a loop, in the order they wait on
+ * each other: `todoId`, then `dependsOnTodoId`, and on round to `todoId` again.
+ *
+ * Walked a level at a time rather than in SQL, so each todo is visited once
+ * however many ways the graph reaches it.
+ *
+ * @param db - The database, or the transaction the edge is being written in.
+ * @param todoId - The todo that would wait.
+ * @param dependsOnTodoId - The todo it would wait on, which already leads back to it.
+ * @returns The ids around the loop, first and last the same.
+ */
+async function findLoop(db: AnyDb, todoId: string, dependsOnTodoId: string): Promise<string[]> {
+  const cameFrom = new Map<string, string | null>([[dependsOnTodoId, null]]);
+  let frontier = [dependsOnTodoId];
+  while (frontier.length > 0 && cameFrom.has(todoId) === false) {
+    const edges: Array<{ todoId: string; dependsOnTodoId: string }> = await db
+      .select({ todoId: dbSchema.todoDependencies.todoId, dependsOnTodoId: dbSchema.todoDependencies.dependsOnTodoId })
+      .from(dbSchema.todoDependencies)
+      .where(inArray(dbSchema.todoDependencies.todoId, frontier));
+    frontier = [];
+    for (const edge of edges) {
+      if (cameFrom.has(edge.dependsOnTodoId) === false) {
+        cameFrom.set(edge.dependsOnTodoId, edge.todoId);
+        frontier.push(edge.dependsOnTodoId);
+      }
+    }
+  }
+  const back: string[] = [];
+  for (let id = cameFrom.get(todoId) ?? null; id !== null; id = cameFrom.get(id) ?? null) {
+    back.push(id);
+  }
+  return [todoId, ...back.reverse(), todoId];
+}
+
+/**
+ * A loop as a sentence: `"A" waits on "B", which waits on "A"`.
+ *
+ * @param db - The database, or the transaction the edge is being written in.
+ * @param loop - The ids around the loop, first and last the same.
+ * @returns The todos by title, in the order they wait on each other.
+ */
+async function describeLoop(db: AnyDb, loop: readonly string[]): Promise<string> {
+  const rows: Array<{ id: string; title: string }> = await db
+    .select({ id: dbSchema.todos.id, title: dbSchema.todos.title })
+    .from(dbSchema.todos)
+    .where(inArray(dbSchema.todos.id, [...new Set(loop)]));
+  const titles = new Map(rows.map((row) => [String(row.id), row.title]));
+  const [first, ...rest] = loop.map((id) => `"${titles.get(id) ?? id}"`);
+  return `${first} waits on ${rest.join(', which waits on ')}`;
+}
+
+/**
+ * Rejects a `todoId → dependsOnTodoId` edge that would close a cycle, naming
+ * the todos in it.
  *
  * A cycle is a deadlock: every todo in it waits on another, and none can ever be
  * completed. The recursive CTE walks the dependencies of the proposed blocker; if
  * the todo being blocked is reachable from it, the new edge closes a loop.
+ *
+ * @param db - The database, or the transaction the edge is being written in.
+ * @param todoId - The todo that would wait.
+ * @param dependsOnTodoId - The todo it would wait on.
  */
 export async function assertNoCycle(db: AnyDb, todoId: string, dependsOnTodoId: string): Promise<void> {
   if (todoId === dependsOnTodoId) {
@@ -133,6 +190,9 @@ export async function assertNoCycle(db: AnyDb, todoId: string, dependsOnTodoId: 
     SELECT 1 AS hit FROM reachable WHERE id = ${todoId} LIMIT 1
   `);
   if (resultRows(result).length > 0) {
-    throw new GraphQLError('That dependency would create a cycle.', { extensions: { code: 'BAD_USER_INPUT' } });
+    const loop = await describeLoop(db, await findLoop(db, todoId, dependsOnTodoId));
+    throw new GraphQLError(`That dependency would create a cycle: ${loop}. Remove one of those first.`, {
+      extensions: { code: 'BAD_USER_INPUT' },
+    });
   }
 }
