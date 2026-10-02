@@ -33,6 +33,9 @@ export const relations = defineRelations(schema, (r) => ({
     // Named `history` rather than `events`: it reads as what it is on a card.
     history: r.many.todoEvents({ from: r.todos.id, to: r.todoEvents.todoId }),
     runs: r.many.runs({ from: r.todos.id, to: r.runs.todoId }),
+    // The draft it was made from, when it was talked over first. The draft's
+    // runs stay with the draft, so this is the way back to them.
+    draft: r.one.drafts({ from: r.todos.id, to: r.drafts.todoId }),
     artifacts: r.many.artifacts({ from: r.todos.id, to: r.artifacts.todoId }),
     labels: r.many.labels({
       from: r.todos.id.through(r.todoLabels.todoId),
@@ -69,6 +72,7 @@ export const relations = defineRelations(schema, (r) => ({
 
   runs: {
     todo: r.one.todos({ from: r.runs.todoId, to: r.todos.id }),
+    draft: r.one.drafts({ from: r.runs.draftId, to: r.drafts.id }),
     lane: r.one.lanes({ from: r.runs.laneId, to: r.lanes.id }),
     agent: r.one.agents({ from: r.runs.agentId, to: r.agents.id }),
     project: r.one.projects({ from: r.runs.projectId, to: r.projects.id }),
@@ -80,6 +84,8 @@ export const relations = defineRelations(schema, (r) => ({
     agent: r.one.agents({ from: r.drafts.agentId, to: r.agents.id }),
     todo: r.one.todos({ from: r.drafts.todoId, to: r.todos.id }),
     messages: r.many.draftMessages({ from: r.drafts.id, to: r.draftMessages.draftId }),
+    // Each reply the agent made, or failed to: one run a turn.
+    runs: r.many.runs({ from: r.drafts.id, to: r.runs.draftId }),
   },
 
   draftMessages: {

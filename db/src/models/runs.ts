@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm';
 import { check, index, integer, jsonb, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 
 import { agents } from './agents.ts';
+import { drafts } from './drafts.ts';
 import { type LaneContract, lanes } from './lanes.ts';
 import { projects } from './projects.ts';
 import { todos } from './todos.ts';
@@ -14,6 +15,13 @@ import { users } from './users.ts';
  */
 export const RUN_STATUSES = ['running', 'ok', 'error', 'stopped'] as const;
 export type RunStatus = (typeof RUN_STATUSES)[number];
+
+/**
+ * What a run was for. `todo` is an agent working a todo at a station. `draft`
+ * is an agent answering one turn of a draft, which no station counts.
+ */
+export const RUN_KINDS = ['todo', 'draft'] as const;
+export type RunKind = (typeof RUN_KINDS)[number];
 
 /** A verdict lane's ruling. `none` for every other kind of run. */
 export const RUN_VERDICTS = ['none', 'pass', 'fail'] as const;
@@ -35,9 +43,14 @@ export interface RunEvent {
   text?: string | null;
 }
 
-// One agent working one todo in one lane. Written only by the server — the
-// runner claims, renews and finishes a run through resolvers/runs.ts, and a
-// person can only ask for one to stop — so it is read-only through the API.
+// One agent working one todo in one lane, or answering one turn of a draft.
+// Written only by the server — the runner claims, renews and finishes a run
+// through resolvers/runs.ts and resolvers/drafts.ts, and a person can only ask
+// for one to stop — so it is read-only through the API.
+//
+// A run belongs to a todo or to a draft, never both (`ck_runs_owner`). What the
+// stations read is a todo's runs, so anything that asks about runs without
+// naming a todo has to say `kind = 'todo'`.
 export const runs = pgTable(
   'runs',
   {
@@ -48,14 +61,18 @@ export const runs = pgTable(
     projectId: uuid('project_id')
       .notNull()
       .references(() => projects.id, { onDelete: 'cascade' }),
-    todoId: uuid('todo_id')
-      .notNull()
-      .references(() => todos.id, { onDelete: 'cascade' }),
+    kind: text('kind').$type<RunKind>().notNull().default('todo'),
+    // The todo a station's run worked. Null for a draft's run.
+    todoId: uuid('todo_id').references(() => todos.id, { onDelete: 'cascade' }),
+    // The draft a reply was for. Its runs go with it when it is discarded, and
+    // stay with it when it becomes a todo.
+    draftId: uuid('draft_id').references(() => drafts.id, { onDelete: 'cascade' }),
     // `set null` for both: a run is history, and outlives the station it ran at.
     laneId: uuid('lane_id').references(() => lanes.id, { onDelete: 'set null' }),
     agentId: uuid('agent_id').references(() => agents.id, { onDelete: 'set null' }),
-    // The lane's contract when the run was claimed, which is what its output is read against.
-    contract: text('contract').$type<LaneContract>().notNull(),
+    // The lane's contract when the run was claimed, which is what its output is
+    // read against. Null for a draft's run, which has no lane.
+    contract: text('contract').$type<LaneContract>(),
     // The agent's model when the run was claimed: the agent can change after.
     model: text('model'),
     // What the agent was told, exactly, as the runner built it. Reported once,
@@ -74,7 +91,7 @@ export const runs = pgTable(
     // Capped (resolvers/runs.ts), so a chatty agent cannot grow a row forever.
     events: jsonb('events').$type<RunEvent[]>().notNull().default([]),
     // A running run whose lease has passed is abandoned: its runner died.
-    // The next claim of its todo marks it `error` and starts again.
+    // The next claim of its todo, or its draft, marks it `error` and starts again.
     leaseExpiresAt: timestamp('lease_expires_at', { withTimezone: true }).notNull(),
     cancelRequestedAt: timestamp('cancel_requested_at', { withTimezone: true }),
     startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
@@ -84,11 +101,20 @@ export const runs = pgTable(
     index('idx_runs_user_id').on(t.userId),
     index('idx_runs_project_id').on(t.projectId),
     index('idx_runs_todo_id').on(t.todoId, t.startedAt),
+    index('idx_runs_draft_id').on(t.draftId, t.startedAt),
     index('idx_runs_lane_id').on(t.laneId),
     index('idx_runs_agent_id').on(t.agentId),
     // One live run per todo. This is what makes two concurrent claims of the
     // same todo produce one winner rather than two agents doing the same work.
     uniqueIndex('uq_runs_todo_running').on(t.todoId).where(sql`status = 'running'`),
+    // And one live reply per draft, for the same reason.
+    uniqueIndex('uq_runs_draft_running').on(t.draftId).where(sql`status = 'running'`),
+    check('ck_runs_kind', sql`${t.kind} in ('todo', 'draft')`),
+    check(
+      'ck_runs_owner',
+      sql`(${t.kind} = 'todo' and ${t.todoId} is not null and ${t.draftId} is null and ${t.contract} is not null)
+        or (${t.kind} = 'draft' and ${t.draftId} is not null and ${t.todoId} is null and ${t.contract} is null)`,
+    ),
     check('ck_runs_status', sql`${t.status} in ('running', 'ok', 'error', 'stopped')`),
     check('ck_runs_verdict', sql`${t.verdict} in ('none', 'pass', 'fail')`),
     check('ck_runs_contract', sql`${t.contract} in ('work', 'verdict', 'expand')`),
