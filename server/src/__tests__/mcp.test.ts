@@ -9,25 +9,66 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mintApiKey } from '../auth.ts';
 import { createSchema } from '../build-schema.ts';
 import type { Actor } from '../context.ts';
+import { DOOR_TOOLS } from '../door.ts';
 import { mountMcp } from '../mcp.ts';
 import { createContextFactory } from '../request-context.ts';
+import { AI_MUTATIONS } from '../resolvers/actor-lock.ts';
+import { CLAIM, createBoard, FINISH, runnerClient, SET_AUTO_RUN } from './board.ts';
 import { authFor, createClient, createTestDb, createUser, type TestDb } from './helpers.ts';
 
 // The AI door end to end: a real HTTP server, the MCP SDK's own client, and an
 // API key in the header — the path Claude Code takes. What a key may see and
 // write is pinned here too, through the same schema the door serves.
 
-const TOOLS = [
+const READS = [
   'projects',
+  'lanes',
   'todos',
   'request',
+  'todo_notes',
+  'todo_history',
+  'blockers',
+  'runs',
+  'run_events',
+  'artifacts',
+  'agents',
+  'spend',
+  'board_templates',
+  'drafts',
+  'draft',
+];
+
+const WRITES = [
+  'create_project',
+  'update_project',
   'submit_request',
   'cancel_request',
+  'create_todo',
+  'update_todo',
+  'move_todo',
+  'retry_todo',
+  'run_todo',
+  'stop_run',
+  'set_todo_dependencies',
+  'archive_todo',
+  'restore_todo',
+  'delete_todo',
   'add_todo_note',
   'edit_todo_note',
   'delete_todo_note',
   'record_artifact',
+  'start_draft',
+  'say_to_draft',
+  'stop_draft',
+  'make_todo_from_draft',
+  'discard_draft',
+  'save_board_template',
+  'apply_board_template',
 ];
+
+const TOOLS = [...READS, ...WRITES];
+
+const SET_TOOLS = `mutation ($id: ID!, $off: [String!]!) { setApiKeyTools(id: $id, off: $off) { id toolsOff } }`;
 
 let db: TestDb;
 let server: Server | null = null;
@@ -130,8 +171,20 @@ async function addTodo(b: Board, values: Record<string, unknown> = {}): Promise<
   return todo.id;
 }
 
-function keyActor(b: Board): Actor {
-  return { kind: 'apiKey', userId: b.userId, keyId: b.keyId };
+function keyActor(b: Board, off: string[] = []): Actor {
+  return { kind: 'apiKey', userId: b.userId, keyId: b.keyId, toolsOff: new Set(off) };
+}
+
+/** Switches tools off for a key, as its owner does in Settings. */
+async function switchOff(b: Board, off: string[]): Promise<void> {
+  await createClient(db, b.userId, { ai: true }).expectOk(SET_TOOLS, { id: b.keyId, off });
+}
+
+/** The todo's row. */
+// biome-ignore lint/suspicious/noExplicitAny: a row
+async function rowOf(id: string): Promise<any> {
+  const [row] = await db.select().from(dbSchema.todos).where(eq(dbSchema.todos.id, id));
+  return row;
 }
 
 describe('the tool surface', () => {
@@ -140,6 +193,16 @@ describe('the tool surface', () => {
     const client = await connect(await serve(), b.key);
     const { tools } = await client.listTools();
     expect(tools.map((tool) => tool.name).sort()).toEqual([...TOOLS].sort());
+    expect(DOOR_TOOLS.map((tool) => tool.name)).toEqual(TOOLS);
+  });
+
+  it('writes with exactly the mutations the lock opens to AI', () => {
+    const fields = new Set(DOOR_TOOLS.filter((tool) => tool.writes).flatMap((tool) => tool.fields));
+    expect([...fields].sort()).toEqual([...AI_MUTATIONS].sort());
+  });
+
+  it('describes every tool', () => {
+    for (const tool of DOOR_TOOLS) expect(tool.description, tool.name).not.toBe('');
   });
 
   it('stays inside its size budgets', async () => {
@@ -154,8 +217,8 @@ describe('the tool surface', () => {
     const b = await board();
     const client = await connect(await serve(), b.key);
     const byName = new Map((await client.listTools()).tools.map((tool) => [tool.name, tool]));
-    for (const read of ['projects', 'todos', 'request']) expect(byName.get(read)?.annotations?.readOnlyHint).toBe(true);
-    expect(byName.get('submit_request')?.annotations?.readOnlyHint).toBe(false);
+    for (const read of READS) expect(byName.get(read)?.annotations?.readOnlyHint, read).toBe(true);
+    for (const write of WRITES) expect(byName.get(write)?.annotations?.readOnlyHint, write).toBe(false);
   });
 });
 
@@ -312,36 +375,357 @@ describe('submitting a request', () => {
   });
 });
 
+describe('working the board', () => {
+  it('makes a project open to AI, and renames it, and nothing more', async () => {
+    const b = await board();
+    const client = await connect(await serve(), b.key);
+    const { createProject } = await call(client, 'create_project', {
+      name: 'Garden',
+      description: 'Beds and paths.',
+      context: 'The back garden.',
+    });
+    expect(createProject.lanes.length).toBeGreaterThan(0);
+    const [made] = await db.select().from(dbSchema.projects).where(eq(dbSchema.projects.id, createProject.id));
+    expect(made).toMatchObject({ userId: b.userId, aiEnabled: true, autoRun: false });
+
+    const { updateProject } = await call(client, 'update_project', { id: createProject.id, name: 'Yard' });
+    expect(updateProject).toMatchObject({ name: 'Yard', description: 'Beds and paths.' });
+
+    const key = createClient(db, b.userId, { ai: true, actor: keyActor(b) });
+    for (const set of [{ aiEnabled: false }, { autoRun: true }, { archivedAt: new Date().toISOString() }]) {
+      await key.expectError(
+        'mutation ($id: UUID!, $set: UpdateProjectInput!) { updateProject(set: $set, where: { id: { eq: $id } }) { id } }',
+        { id: createProject.id, set },
+      );
+    }
+    const [after] = await db.select().from(dbSchema.projects).where(eq(dbSchema.projects.id, createProject.id));
+    expect(after).toMatchObject({ aiEnabled: true, autoRun: false, archivedAt: null });
+  });
+
+  it('adds a todo to a lane, edits, moves, completes, archives, restores and deletes it', async () => {
+    const b = await board();
+    const client = await connect(await serve(), b.key);
+    const { lanes } = await call(client, 'lanes', { projectId: b.projectId });
+    expect(lanes.map((lane: { name: string }) => lane.name)).toEqual(['To do', 'Doing', 'Done']);
+
+    const { createTodo } = await call(client, 'create_todo', {
+      projectId: b.projectId,
+      laneId: b.lanes.doing,
+      title: 'Paint the fence',
+    });
+    expect(createTodo.laneId).toBe(b.lanes.doing);
+    const id = createTodo.id;
+
+    const { updateTodo } = await call(client, 'update_todo', { id, brief: 'Green.', acceptance: 'No bare wood.' });
+    expect(updateTodo).toMatchObject({ title: 'Paint the fence', brief: 'Green.', acceptance: 'No bare wood.' });
+
+    const { moveTodo } = await call(client, 'move_todo', { id, laneId: b.lanes.done, reason: 'Painted.' });
+    expect(moveTodo.completedAt).not.toBeNull();
+
+    const { todoEvents } = await call(client, 'todo_history', { todoId: id });
+    expect(todoEvents.map((event: { kind: string }) => event.kind)).toEqual(['create', 'edit', 'complete']);
+    expect(new Set(todoEvents.map((event: { actorKind: string }) => event.actorKind))).toEqual(new Set(['apiKey']));
+
+    await call(client, 'archive_todo', { id });
+    expect((await rowOf(id)).archivedAt).not.toBeNull();
+    await call(client, 'restore_todo', { id });
+    expect((await rowOf(id)).archivedAt).toBeNull();
+    await call(client, 'delete_todo', { id });
+    expect(await rowOf(id)).toBeUndefined();
+  });
+
+  it('sets what a todo waits on, and reads it back as blockers', async () => {
+    const b = await board();
+    const first = await addTodo(b, { title: 'First' });
+    const second = await addTodo(b, { title: 'Second' });
+    const client = await connect(await serve(), b.key);
+    const { setTodoDependencies } = await call(client, 'set_todo_dependencies', { id: second, dependsOn: [first] });
+    expect(setTodoDependencies).toMatchObject({ id: second, isBlocked: true, blockedBy: [{ id: first }] });
+    const { todo } = await call(client, 'blockers', { id: first });
+    expect(todo.dependents.map((dependent: { id: string }) => dependent.id)).toEqual([second]);
+    const waiting = await call(client, 'blockers', { id: second });
+    expect(waiting.todo.dependencies.map((dependency: { id: string }) => dependency.id)).toEqual([first]);
+    expect(await callError(client, 'move_todo', { id: second, laneId: b.lanes.done })).toBeTruthy();
+    expect((await rowOf(second)).completedAt).toBeNull();
+  });
+
+  it('keeps an edge to a todo it cannot see when it sets the list', async () => {
+    const b = await board();
+    const secret = await addTodo(b, { title: 'Secret', aiIgnored: true });
+    const shown = await addTodo(b, { title: 'Shown' });
+    const todo = await addTodo(b, { title: 'Waiting' });
+    await db.insert(dbSchema.todoDependencies).values({ userId: b.userId, todoId: todo, dependsOnTodoId: secret });
+    const client = await connect(await serve(), b.key);
+    await call(client, 'set_todo_dependencies', { id: todo, dependsOn: [shown] });
+    const edges = await db.select().from(dbSchema.todoDependencies).where(eq(dbSchema.todoDependencies.todoId, todo));
+    expect(edges.map((edge: { dependsOnTodoId: string }) => edge.dependsOnTodoId).sort()).toEqual(
+      [secret, shown].sort(),
+    );
+    expect(await callError(client, 'set_todo_dependencies', { id: todo, dependsOn: [secret] })).toMatch(/not found/i);
+  });
+
+  it('reads and writes the thread', async () => {
+    const b = await board();
+    const todo = await addTodo(b);
+    const client = await connect(await serve(), b.key);
+    const { addTodoNote } = await call(client, 'add_todo_note', { todoId: todo, body: 'First.' });
+    await call(client, 'edit_todo_note', { id: addTodoNote.id, body: 'First, edited.' });
+    expect((await call(client, 'todo_notes', { todoId: todo })).todoNotes).toEqual([
+      expect.objectContaining({ body: 'First, edited.', actorKind: 'apiKey' }),
+    ]);
+    await call(client, 'delete_todo_note', { id: addTodoNote.id });
+    expect((await call(client, 'todo_notes', { todoId: todo })).todoNotes).toEqual([]);
+  });
+});
+
+describe('the board’s agents and runs', () => {
+  /** A board with a station, an agent and a key, which runs only what it is asked to. */
+  async function station() {
+    const b = await createBoard(db, 'a@example.com');
+    const { id: keyId, key } = await mintApiKey(authFor(db), { userId: b.userId, name: 'claude' });
+    await b.person.expectOk(SET_AUTO_RUN, { id: b.projectId, enabled: false });
+    return { ...b, keyId, key };
+  }
+
+  it('lists the agents and their stations, and nothing secret about them', async () => {
+    const b = await station();
+    const client = await connect(await serve(), b.key);
+    const result = await call(client, 'agents');
+    expect(result.agentRoster).toEqual([
+      expect.objectContaining({
+        id: b.agentId,
+        name: 'Worker',
+        model: 'tiny',
+        hasApiKey: true,
+        stations: [expect.objectContaining({ laneId: b.lanes[0].id })],
+      }),
+    ]);
+    const text = JSON.stringify(result);
+    expect(text).not.toContain('sk-secret');
+    expect(text).not.toContain('llm.test');
+    expect(text).not.toContain('Do the work.');
+  });
+
+  it('asks for a run, reads it and its log, stops it, and sends the todo round again', async () => {
+    const b = await station();
+    const todo = await b.addTodo('Work me');
+    const client = await connect(await serve(), b.key);
+    expect((await call(client, 'run_todo', { id: todo })).runTodo.runRequestedAt).not.toBeNull();
+
+    const { runId } = (await runnerClient(db).expectOk(CLAIM, { todoId: todo, laneId: b.lanes[0].id })).claimRun;
+    const { runs } = await call(client, 'runs', { todoId: todo });
+    expect(runs).toEqual([expect.objectContaining({ id: runId, status: 'running' })]);
+    expect((await call(client, 'run_events', { id: runId })).run).toMatchObject({ id: runId });
+
+    const { cancelRun } = await call(client, 'stop_run', { id: runId });
+    expect(cancelRun.cancelRequestedAt).not.toBeNull();
+    await runnerClient(db).expectOk(FINISH, { id: runId, result: { status: 'error', error: 'Stopped.' } });
+
+    // Stopping it set the todo aside from AI; its owner lets AI back at it.
+    await db.update(dbSchema.todos).set({ aiIgnored: false }).where(eq(dbSchema.todos.id, todo));
+    await call(client, 'retry_todo', { id: todo, reason: 'Try again.' });
+    const events = await db.select().from(dbSchema.todoEvents).where(eq(dbSchema.todoEvents.todoId, todo));
+    expect(events.at(-1)).toMatchObject({ kind: 'retry', actorKind: 'apiKey', actorKeyId: b.keyId });
+  });
+
+  it('says what the account has spent', async () => {
+    const b = await station();
+    const client = await connect(await serve(), b.key);
+    const { aiSpend } = await call(client, 'spend', { since: new Date(0).toISOString() });
+    expect(aiSpend.total).toMatchObject({ runs: 0, totalTokens: 0 });
+  });
+
+  it('talks a draft over and makes a todo of it, or discards it', async () => {
+    const b = await station();
+    const client = await connect(await serve(), b.key);
+    const { startDraft } = await call(client, 'start_draft', {
+      projectId: b.projectId,
+      agentId: b.agentId,
+      message: 'Faster export?',
+    });
+    expect(startDraft.waitingSince).not.toBeNull();
+    expect((await call(client, 'drafts', { projectId: b.projectId })).drafts).toEqual([
+      expect.objectContaining({ id: startDraft.id }),
+    ]);
+    expect((await call(client, 'stop_draft', { id: startDraft.id })).stopDraft.waitingSince).toBeNull();
+    await call(client, 'say_to_draft', { id: startDraft.id, message: 'The CSV one.' });
+    await call(client, 'stop_draft', { id: startDraft.id });
+    const { draft } = await call(client, 'draft', { id: startDraft.id });
+    expect(draft.messages.length).toBeGreaterThan(1);
+
+    const { makeTodoFromDraft } = await call(client, 'make_todo_from_draft', {
+      id: startDraft.id,
+      title: 'Faster CSV export',
+      brief: 'Stream it.',
+    });
+    expect((await rowOf(makeTodoFromDraft.id)).title).toBe('Faster CSV export');
+
+    const { startDraft: second } = await call(client, 'start_draft', {
+      projectId: b.projectId,
+      agentId: b.agentId,
+      message: 'Never mind',
+    });
+    await call(client, 'stop_draft', { id: second.id });
+    expect(await call(client, 'discard_draft', { id: second.id })).toEqual({ discardDraft: true });
+  });
+
+  it('saves a board as a template and gives a new board one', async () => {
+    const b = await station();
+    const client = await connect(await serve(), b.key);
+    const { saveBoardTemplate } = await call(client, 'save_board_template', {
+      projectId: b.projectId,
+      name: 'Pipeline',
+    });
+    expect((await call(client, 'board_templates')).boardTemplates).toEqual([
+      expect.objectContaining({ id: saveBoardTemplate.id, name: 'Pipeline' }),
+    ]);
+    const { createProject } = await call(client, 'create_project', { name: 'Fresh' });
+    const { applyBoardTemplate } = await call(client, 'apply_board_template', {
+      projectId: createProject.id,
+      templateId: saveBoardTemplate.id,
+    });
+    expect(applyBoardTemplate.lanes.map((lane: { name: string }) => lane.name)).toEqual(
+      b.lanes.map((lane) => lane.name),
+    );
+  });
+
+  it('lets a run do what a key does, without switches', async () => {
+    const b = await station();
+    const todo = await b.addTodo('Worked');
+    await b.person.expectOk('mutation ($id: ID!) { runTodo(id: $id) { id } }', { id: todo });
+    const { runId } = (await runnerClient(db).expectOk(CLAIM, { todoId: todo, laneId: b.lanes[0].id })).claimRun;
+    const agent = createClient(db, b.userId, { ai: true, actor: { kind: 'agent', userId: b.userId, runId } });
+    await agent.expectOk('mutation ($id: ID!, $lane: ID!) { moveTodo(id: $id, laneId: $lane) { id } }', {
+      id: await b.addTodo('Moved by a run'),
+      lane: b.lanes[1].id,
+    });
+    await agent.expectOk('mutation ($p: UUID!) { createTodo(values: { projectId: $p, title: "Follow-up" }) { id } }', {
+      p: b.projectId,
+    });
+  });
+});
+
+describe('a key’s switches', () => {
+  it('start all on, and are set by the key’s owner', async () => {
+    const b = await board();
+    const person = createClient(db, b.userId, { ai: true });
+    const { mcpTools } = await person.expectOk('{ mcpTools { name writes description } }');
+    expect(mcpTools.map((tool: { name: string }) => tool.name)).toEqual(TOOLS);
+    expect((await person.expectOk('{ apiKeys { id toolsOff } }')).apiKeys).toEqual([{ id: b.keyId, toolsOff: [] }]);
+
+    const set = await person.expectOk(SET_TOOLS, { id: b.keyId, off: ['delete_todo', 'projects', 'delete_todo'] });
+    expect(set.setApiKeyTools.toolsOff).toEqual(['projects', 'delete_todo']);
+    expect((await person.expectOk('{ apiKeys { toolsOff } }')).apiKeys).toEqual([
+      { toolsOff: ['projects', 'delete_todo'] },
+    ]);
+    await person.expectOk(SET_TOOLS, { id: b.keyId, off: [] });
+    expect((await person.expectOk('{ apiKeys { toolsOff } }')).apiKeys).toEqual([{ toolsOff: [] }]);
+  });
+
+  it('refuse a tool the door does not have, and a key that is not yours', async () => {
+    const b = await board();
+    const other = await board('b@example.com');
+    const person = createClient(db, b.userId, { ai: true });
+    const unknown = await person.expectError(SET_TOOLS, { id: b.keyId, off: ['launch_rockets'] });
+    expect(unknown.code).toBe('BAD_USER_INPUT');
+    expect((await person.expectError(SET_TOOLS, { id: other.keyId, off: [] })).code).toBe('NOT_FOUND');
+    expect((await person.expectError(SET_TOOLS, { id: 'nope', off: [] })).code).toBe('NOT_FOUND');
+  });
+
+  it('cannot be changed by a key', async () => {
+    const b = await board();
+    const key = createClient(db, b.userId, { ai: true, actor: keyActor(b) });
+    await key.expectError(SET_TOOLS, { id: b.keyId, off: [] });
+    expect(await db.select().from(dbSchema.apiKeyTools)).toEqual([]);
+  });
+
+  it.each(TOOLS)('take %s out of the listing, and refuse it, when it is off', async (tool) => {
+    const b = await board();
+    await switchOff(b, [tool]);
+    const client = await connect(await serve(), b.key);
+    const names = (await client.listTools()).tools.map((listed) => listed.name);
+    expect(names).not.toContain(tool);
+    expect(names).toHaveLength(TOOLS.length - 1);
+    expect(await callError(client, tool, {})).toBe(`MCP error -32602: Tool ${tool} not found`);
+  });
+
+  it('are held by the lock too, whichever door a key comes in by', async () => {
+    const b = await board();
+    const todo = await addTodo(b);
+    const key = createClient(db, b.userId, { ai: true, actor: keyActor(b, ['create_todo', 'projects']) });
+    const create = await key.expectError(
+      'mutation ($p: UUID!) { createTodo(values: { projectId: $p, title: "x" }) { id } }',
+      { p: b.projectId },
+    );
+    expect(create).toEqual({ message: 'createTodo is switched off for this key.', code: 'FORBIDDEN' });
+    expect((await key.expectError('{ projects { id } }')).code).toBe('FORBIDDEN');
+    // Other tools still read a todo, so that field stays open.
+    await key.expectOk('query ($id: UUID!) { todo(where: { id: { eq: $id } }) { id } }', { id: todo });
+  });
+
+  it('tell archiving and deleting for good apart', async () => {
+    const b = await board();
+    const kept = await addTodo(b);
+    const gone = await addTodo(b);
+    const key = createClient(db, b.userId, { ai: true, actor: keyActor(b, ['archive_todo']) });
+    const archive = 'mutation ($id: UUID!) { deleteTodo(where: { id: { eq: $id } }) { id } }';
+    expect((await key.expectError(archive, { id: kept })).code).toBe('FORBIDDEN');
+    await key.expectOk('mutation ($id: UUID!) { deleteTodo(where: { id: { eq: $id } }, hard: true) { id } }', {
+      id: gone,
+    });
+    expect((await rowOf(kept)).archivedAt).toBeNull();
+    expect(await rowOf(gone)).toBeUndefined();
+  });
+
+  it('make a key read-only by turning its writing tools off', async () => {
+    const b = await board();
+    await switchOff(b, WRITES);
+    const client = await connect(await serve(), b.key);
+    expect((await client.listTools()).tools.map((tool) => tool.name).sort()).toEqual([...READS].sort());
+    expect((await call(client, 'projects')).projects).toHaveLength(1);
+  });
+
+  it('sit under the AI switches', async () => {
+    const b = await board();
+    const client = await connect(await serve(), b.key);
+    await db.update(dbSchema.projects).set({ aiEnabled: false }).where(eq(dbSchema.projects.id, b.projectId));
+    expect(await callError(client, 'create_todo', { projectId: b.projectId, title: 'x' })).toMatch(/not found/i);
+  });
+});
+
 describe('what a key may not do', () => {
-  it('moves, completes or edits nothing', async () => {
+  it('reaches nothing that decides how far AI goes', async () => {
     const b = await board();
     const todo = await addTodo(b);
     const client = createClient(db, b.userId, { ai: true, actor: keyActor(b) });
     const attempts: Array<[string, Record<string, unknown>]> = [
-      ['mutation($id: ID!, $lane: ID!) { moveTodo(id: $id, laneId: $lane) { id } }', { id: todo, lane: b.lanes.doing }],
       ['mutation($id: ID!) { completeTodo(id: $id) { id } }', { id: todo }],
-      [
-        'mutation($id: UUID!, $lane: UUID!) { updateTodo(set: { laneId: $lane }, where: { id: { eq: $id } }) { id } }',
-        { id: todo, lane: b.lanes.done },
-      ],
-      ['mutation($id: UUID!) { deleteTodo(where: { id: { eq: $id } }) { id } }', { id: todo }],
       ['mutation($p: ID!) { setProjectAiEnabled(projectId: $p, enabled: false) { id } }', { p: b.projectId }],
+      ['mutation($p: ID!) { setProjectAutoRun(projectId: $p, enabled: true) { id } }', { p: b.projectId }],
+      ['mutation($p: UUID!) { deleteProject(where: { id: { eq: $p } }) { id } }', { p: b.projectId }],
+      ['mutation($p: UUID!) { deleteTodos(where: { projectId: { eq: $p } }) { id } }', { p: b.projectId }],
+      [
+        'mutation($p: UUID!) { updateTodos(set: { title: "x" }, where: { projectId: { eq: $p } }) { id } }',
+        { p: b.projectId },
+      ],
+      [
+        'mutation($id: UUID!) { updateLane(set: { name: "x" }, where: { id: { eq: $id } }) { id } }',
+        { id: b.lanes.todo },
+      ],
+      ['mutation { createAgent(values: { name: "x", baseUrl: "http://x.test", model: "m" }) { id } }', {}],
+      ['mutation { createApiKey(name: "x") { key } }', {}],
     ];
     for (const [query, variables] of attempts) {
       expect((await client.expectError(query, variables)).code, query).toBe('FORBIDDEN');
     }
-    const [row] = await db.select().from(dbSchema.todos).where(eq(dbSchema.todos.id, todo));
-    expect(row.laneId).toBe(b.lanes.todo);
+    expect(await rowOf(todo)).toMatchObject({ laneId: b.lanes.todo, completedAt: null, archivedAt: null });
   });
 
-  it('leaves a person free to do all of it', async () => {
+  it('cannot read the agents table itself', async () => {
     const b = await board();
-    const todo = await addTodo(b);
-    const client = createClient(db, b.userId, { ai: true });
-    await client.expectOk('mutation($id: ID!, $lane: ID!) { moveTodo(id: $id, laneId: $lane) { id } }', {
-      id: todo,
-      lane: b.lanes.doing,
-    });
+    await db.insert(dbSchema.agents).values({ userId: b.userId, name: 'Secret', baseUrl: 'http://x.test', model: 'm' });
+    const key = createClient(db, b.userId, { ai: true, actor: keyActor(b) });
+    expect((await key.expectOk('{ agents { id } }')).agents).toEqual([]);
   });
 });
 
@@ -355,6 +739,14 @@ describe('what a key may not see', () => {
     expect((await call(client, 'request', { id: todo })).todo).toBeNull();
     expect(await callError(client, 'submit_request', { projectId: b.projectId, title: 'x' })).toMatch(/not found/i);
     expect(await callError(client, 'add_todo_note', { todoId: todo, body: 'x' })).toMatch(/not found/i);
+    expect(await callError(client, 'create_todo', { projectId: b.projectId, title: 'x' })).toMatch(/not found/i);
+    expect(await callError(client, 'move_todo', { id: todo, laneId: b.lanes.done })).toMatch(/not found/i);
+    expect(await callError(client, 'run_todo', { id: todo })).toMatch(/not found/i);
+    expect((await call(client, 'lanes', { projectId: b.projectId })).lanes).toEqual([]);
+    await call(client, 'update_project', { id: b.projectId, name: 'Renamed' });
+    const [project] = await db.select().from(dbSchema.projects).where(eq(dbSchema.projects.id, b.projectId));
+    expect(project.name).toBe('Board');
+    expect((await rowOf(todo)).laneId).toBe(b.lanes.todo);
   });
 
   it('never sees an ignored todo, even as a blocker', async () => {
@@ -372,6 +764,11 @@ describe('what a key may not see', () => {
     expect((await call(client, 'request', { id: visible })).todo.blockedBy).toEqual([]);
     expect(await callError(client, 'add_todo_note', { todoId: secret, body: 'x' })).toMatch(/not found/i);
     expect(await callError(client, 'cancel_request', { id: secret })).toMatch(/not found/i);
+    expect(await callError(client, 'move_todo', { id: secret, laneId: b.lanes.done })).toMatch(/not found/i);
+    expect(await callError(client, 'retry_todo', { id: secret })).toMatch(/not found/i);
+    expect((await call(client, 'todo_notes', { todoId: secret })).todoNotes).toEqual([]);
+    expect((await call(client, 'update_todo', { id: secret, title: 'x' })).updateTodo).toBeNull();
+    expect((await rowOf(secret)).title).toBe('Secret');
 
     const notes = await createClient(db, b.userId, { ai: true, actor: keyActor(b) }).expectOk(
       '{ todoNotes { id } todoDependencies { id } }',

@@ -237,10 +237,10 @@ describe('setting the whole list', () => {
     expect(await waitsOn(a)).toEqual([b]);
   });
 
-  it('is closed to an API key', async () => {
+  it('is not there for an API key on a project closed to AI', async () => {
     const a = await newTodo('A');
     const key = createClient(db, userId, { ai: true, actor: { kind: 'apiKey', userId, keyId: randomUUID() } });
     const error = await key.expectError(SET, { id: a, d: [] });
-    expect(error.code).toBe('FORBIDDEN');
+    expect(error.code).toBe('NOT_FOUND');
   });
 });

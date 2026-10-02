@@ -157,7 +157,7 @@ describe('drafts', () => {
     expect((await board.person.expectError(STOP, { id })).code).toBe('NOT_FOUND');
   });
 
-  it('keeps to the caller’s own projects, agents and drafts, and away from AI callers', async () => {
+  it('keeps to the caller’s own projects, agents and drafts, and from AI callers once the project is closed to AI', async () => {
     const id = await start();
     const otherId = await createUser(db, 'other@example.com');
     await db.update(dbSchema.users).set({ aiEnabled: true }).where(eq(dbSchema.users.id, otherId));
@@ -168,13 +168,15 @@ describe('drafts', () => {
       (await other.expectError(START, { projectId: board.projectId, agentId: board.agentId, message: 'Hi' })).code,
     ).toBe('NOT_FOUND');
 
-    // A person's drafts are nothing an MCP client or agent may read or write.
+    // An MCP client sees a draft only while its project is open to AI.
     const key = createClient(db, board.userId, {
       ai: true,
       actor: { kind: 'apiKey', userId: board.userId, keyId: 'k' },
     });
+    expect((await key.expectOk(READ, { id })).draft).not.toBeNull();
+    await db.update(dbSchema.projects).set({ aiEnabled: false }).where(eq(dbSchema.projects.id, board.projectId));
     expect((await key.expectOk(READ, { id })).draft).toBeNull();
-    expect((await key.expectError(SAY, { id, message: 'Hi' })).code).toBe('FORBIDDEN');
+    expect((await key.expectError(SAY, { id, message: 'Hi' })).code).toBe('NOT_FOUND');
     // And the runner only answers; it cannot talk as the person.
     expect((await runner.expectError(SAY, { id, message: 'Hi' })).code).toBe('FORBIDDEN');
     expect((await board.person.expectError(FINISH, { id, reply: 'Me' })).code).toBe('FORBIDDEN');

@@ -2,11 +2,17 @@
 # is the tool's name, the comment above it is the tool's description, and the
 # comment above a variable describes that argument.
 #
-# The surface is for handing work to the board and following it, not for
-# working the board: nothing here moves, completes or edits a todo. The
-# board's own agents do the work; a person owns the board. What a caller
-# said about a todo is its own to correct: it can rewrite or take back a note
-# it signed. What it made for a todo somewhere else it can point the board at.
+# The surface is for working a board as well as handing work to it: reading
+# what is on it and what its agents did, making projects and todos, talking a
+# draft over, moving a todo, sending it round again, stopping a run. What it
+# leaves out is what decides how far AI reaches, which stays a person's: keys
+# and secrets, agents and their MCP servers, the AI switches, deleting a
+# project, and changing many rows at once.
+#
+# Every tool here has a switch per API key (Settings), on unless turned off. A
+# tool that is off is not listed to that key and cannot be called by it
+# (door.ts, resolvers/actor-lock.ts). A mutation's root field must also be in
+# `AI_MUTATIONS` (resolvers/actor-lock.ts), which a test holds this file to.
 
 # The projects open to AI, each with its lanes in board order. Start here: a
 # request needs a project id, and a lane id means nothing without its name.
@@ -23,6 +29,30 @@ query projects {
       name
       isDone
     }
+  }
+}
+
+# One project's lanes in board order, with what makes a lane a station: its
+# agent, what the agent is asked to do there (`contract`, `prompt`), where a
+# todo goes after a run (`onSuccessLaneId`, `onFailureLaneId`), how many it
+# works at once and how often it tries.
+query lanes(
+  # From `projects`.
+  $projectId: UUID!
+) {
+  lanes(where: { projectId: { eq: $projectId } }, orderBy: { position: { direction: asc, priority: 1 } }) {
+    id
+    name
+    position
+    isDone
+    agentId
+    contract
+    prompt
+    onSuccessLaneId
+    onFailureLaneId
+    archiveOnSuccess
+    wipLimit
+    maxAttempts
   }
 }
 
@@ -105,6 +135,303 @@ query request(
   }
 }
 
+# A todo's notes alone, oldest first: reports and verdicts from the board's
+# agents, and whatever a person or a key added.
+query todoNotes(
+  # The todo.
+  $todoId: UUID!
+) {
+  todoNotes(where: { todoId: { eq: $todoId } }, orderBy: { createdAt: { direction: asc, priority: 1 } }) {
+    id
+    kind
+    body
+    actorKind
+    runId
+    createdAt
+    editedAt
+  }
+}
+
+# A todo's history alone, oldest first: each move, edit, completion, retry and
+# request to run, with who did it and why.
+query todoHistory(
+  # The todo.
+  $todoId: UUID!
+) {
+  todoEvents(where: { todoId: { eq: $todoId } }, orderBy: { at: { direction: asc, priority: 1 } }) {
+    id
+    kind
+    fromLaneId
+    toLaneId
+    fields
+    actorKind
+    runId
+    reason
+    at
+  }
+}
+
+# What a todo waits on and what waits on it: every todo it depends on
+# (`dependencies`), the ones of those still unfinished (`blockedBy`), and the
+# todos that depend on it (`dependents`).
+query blockers(
+  # The todo.
+  $id: UUID!
+) {
+  todo(where: { id: { eq: $id } }) {
+    id
+    title
+    isBlocked
+    blockedBy {
+      id
+      title
+      laneId
+    }
+    dependencies {
+      id
+      title
+      laneId
+      completedAt
+    }
+    dependents {
+      id
+      title
+      laneId
+      completedAt
+    }
+  }
+}
+
+# The runs agents made of one todo, newest first: which lane and agent, how it
+# ended (`status`, `verdict`, `error`), what it said and what it spent. Use
+# `run_events` for what one of them did step by step.
+query runs(
+  # The todo.
+  $todoId: UUID!
+  # How many to return.
+  $limit: Int! = 20
+) {
+  runs(
+    where: { todoId: { eq: $todoId } }
+    orderBy: { startedAt: { direction: desc, priority: 1 } }
+    limit: $limit
+  ) {
+    id
+    laneId
+    agentId
+    contract
+    model
+    status
+    verdict
+    output
+    error
+    toolCalls
+    promptTokens
+    completionTokens
+    totalTokens
+    cancelRequestedAt
+    startedAt
+    finishedAt
+  }
+}
+
+# One run's log: each step the agent took, the tools it called and what came
+# back, in order.
+query runEvents(
+  # A run id, from `runs`.
+  $id: UUID!
+) {
+  run(where: { id: { eq: $id } }) {
+    id
+    todoId
+    status
+    verdict
+    error
+    startedAt
+    finishedAt
+    events
+  }
+}
+
+# What was made for a todo: the files, pages and objects its runs reported
+# and the ones a client recorded, newest first. Each is a location and a
+# name, never the thing itself.
+query artifacts(
+  # The todo.
+  $todoId: UUID!
+) {
+  artifacts(where: { todoId: { eq: $todoId } }, orderBy: { createdAt: { direction: desc, priority: 1 } }) {
+    id
+    runId
+    location
+    title
+    description
+    source
+    action
+    mediaType
+    sizeBytes
+    actorKind
+    createdAt
+  }
+}
+
+# The agents this account has and the lanes each works, in the projects open
+# to AI. An agent id is what `start_draft` needs. Nothing secret about an
+# agent is here: not its key, its endpoint, its prompt or its MCP servers.
+query agents {
+  agentRoster {
+    id
+    name
+    model
+    hasApiKey
+    stations {
+      laneId
+      laneName
+      projectId
+      projectName
+      contract
+    }
+  }
+}
+
+# What runs have spent since a moment, in the projects open to AI: runs,
+# draft replies and tokens, in total, by project and by agent.
+query spend(
+  # Count runs that started at or after this, e.g. 2026-01-01T00:00:00Z.
+  $since: DateTime!
+) {
+  aiSpend(since: $since) {
+    since
+    total {
+      runs
+      draftReplies
+      promptTokens
+      completionTokens
+      totalTokens
+    }
+    byProject {
+      id
+      name
+      runs
+      draftReplies
+      promptTokens
+      completionTokens
+      totalTokens
+    }
+    byAgent {
+      id
+      name
+      runs
+      draftReplies
+      promptTokens
+      completionTokens
+      totalTokens
+    }
+  }
+}
+
+# The saved board templates: a name and the lanes, with their station
+# settings, that `apply_board_template` would give a board.
+query boardTemplates {
+  boardTemplates(orderBy: { name: { direction: asc, priority: 1 } }) {
+    id
+    name
+    lanes
+    updatedAt
+  }
+}
+
+# The drafts in one project, newest first. A draft is a request being talked
+# over with an agent before it becomes a todo.
+query drafts(
+  # From `projects`.
+  $projectId: UUID!
+) {
+  drafts(where: { projectId: { eq: $projectId } }, orderBy: { updatedAt: { direction: desc, priority: 1 } }) {
+    id
+    agentId
+    title
+    waitingSince
+    error
+    todoId
+    createdAt
+    updatedAt
+  }
+}
+
+# One draft in full: the title and brief as the agent last left them, the
+# conversation so far, and whether an answer is still awaited
+# (`waitingSince`) or failed (`error`). Read this after `start_draft` or
+# `say_to_draft` until `waitingSince` is null.
+query draft(
+  # A draft id, from `drafts` or `start_draft`.
+  $id: UUID!
+) {
+  draft(where: { id: { eq: $id } }) {
+    id
+    projectId
+    agentId
+    title
+    brief
+    waitingSince
+    error
+    todoId
+    createdAt
+    updatedAt
+    messages(orderBy: { createdAt: { direction: asc, priority: 1 } }) {
+      id
+      role
+      content
+      createdAt
+    }
+  }
+}
+
+# Makes a project, with a board of the default lanes. It is open to AI from
+# the start. Whether its stations run by themselves, and archiving it, stay
+# its owner's to decide.
+mutation createProject(
+  # What the board is called.
+  $name: String!
+  # A line about what it is for.
+  $description: String
+  # The standing description every agent working on it is shown.
+  $context: String
+) {
+  createProject(values: { name: $name, description: $description, context: $context }) {
+    id
+    name
+    description
+    context
+    lanes(orderBy: { position: { direction: asc, priority: 1 } }) {
+      id
+      name
+      isDone
+    }
+  }
+}
+
+# Changes a project's name, description or context. Whatever is left out
+# stays as it is.
+mutation updateProject(
+  # From `projects`.
+  $id: UUID!
+  # Its new name.
+  $name: String
+  # Its new description.
+  $description: String
+  # Its new context, which replaces the old whole.
+  $context: String
+) {
+  updateProject(set: { name: $name, description: $description, context: $context }, where: { id: { eq: $id } }) {
+    id
+    name
+    description
+    context
+    updatedAt
+  }
+}
+
 # Hands a piece of work to a project. It lands as a new todo at the back of
 # the project's first open lane, and the board takes it from there: check on
 # it with `request`. Write the brief for someone with no other context.
@@ -140,6 +467,192 @@ mutation cancelRequest(
   $reason: String
 ) {
   cancelRequest(id: $id, reason: $reason)
+}
+
+# Makes a todo in a lane you name, where `submit_request` always uses the
+# first open one. To finish a todo, `move_todo` it to the done lane.
+mutation createTodo(
+  # From `projects`.
+  $projectId: UUID!
+  # One line: what is wanted.
+  $title: String!
+  # A lane of that project, from `projects`. Left out, the first open lane.
+  $laneId: UUID
+  # What to do and why, with whatever context the work needs.
+  $brief: String
+  # How to tell it is done: the checks a reviewer should make.
+  $acceptance: String
+  # A todo in the same project this is part of, if any.
+  $parentId: UUID
+  # When it is due.
+  $dueAt: DateTime
+) {
+  createTodo(
+    values: {
+      projectId: $projectId
+      title: $title
+      laneId: $laneId
+      notes: $brief
+      acceptance: $acceptance
+      parentId: $parentId
+      dueAt: $dueAt
+    }
+  ) {
+    id
+    title
+    laneId
+    position
+    createdAt
+  }
+}
+
+# Changes what a todo says: its title, brief, acceptance, due date or what it
+# is part of. Whatever is left out stays as it is; null clears a brief, an
+# acceptance, a due date or a parent. Moving it is `move_todo`.
+mutation updateTodo(
+  # The todo.
+  $id: UUID!
+  # Its new title.
+  $title: String
+  # Its new brief, which replaces the old whole.
+  $brief: String
+  # Its new acceptance, which replaces the old whole.
+  $acceptance: String
+  # A todo in the same project it is part of.
+  $parentId: UUID
+  # When it is due.
+  $dueAt: DateTime
+) {
+  updateTodo(
+    set: { title: $title, notes: $brief, acceptance: $acceptance, parentId: $parentId, dueAt: $dueAt }
+    where: { id: { eq: $id } }
+  ) {
+    id
+    title
+    brief: notes
+    acceptance
+    parentId
+    dueAt
+    updatedAt
+  }
+}
+
+# Moves a todo to a lane, or within its lane. Moving it into the done lane
+# completes it, which is refused while something it depends on is
+# unfinished; moving it out reopens it. An agent working it is not stopped:
+# use `stop_run` for that.
+mutation moveTodo(
+  # The todo.
+  $id: ID!
+  # The lane to put it in, from `projects` or `lanes`.
+  $laneId: ID!
+  # Where in the lane, from 0 at the top. Left out, the back.
+  $position: Int
+  # Why, for its history.
+  $reason: String
+) {
+  moveTodo(id: $id, laneId: $laneId, position: $position, reason: $reason) {
+    id
+    laneId
+    position
+    completedAt
+  }
+}
+
+# Sends a todo round its station again: the failures a station gave up on
+# are forgotten, and a station that finished with it starts over. Refused
+# while an agent is working it.
+mutation retryTodo(
+  # The todo.
+  $id: ID!
+  # Why, for its history.
+  $reason: String
+) {
+  retryTodo(id: $id, reason: $reason)
+}
+
+# Asks for a todo to be worked once where it stands, whether or not its
+# project's stations run by themselves. Refused, with the reason, when no
+# station would take it: its lane has no agent, it is blocked, it is done.
+mutation runTodo(
+  # The todo.
+  $id: ID!
+) {
+  runTodo(id: $id) {
+    id
+    laneId
+    runRequestedAt
+  }
+}
+
+# Stops a run that is working a todo. The agent is told to stop at its next
+# step, and the todo is set aside from AI so no station picks it straight
+# back up: it leaves your view too, until its owner lets AI at it again. A
+# draft's reply is stopped with `stop_draft`.
+mutation stopRun(
+  # A run id, from `runs`.
+  $id: ID!
+) {
+  cancelRun(id: $id) {
+    id
+    status
+    cancelRequestedAt
+  }
+}
+
+# Sets everything a todo depends on, replacing the list it had: it waits
+# until each of them is done. An empty list clears it. Refused when it would
+# make a circle.
+mutation setTodoDependencies(
+  # The todo that waits.
+  $id: ID!
+  # The todos it waits on, all of them.
+  $dependsOn: [ID!]!
+) {
+  setTodoDependencies(id: $id, dependsOn: $dependsOn) {
+    id
+    isBlocked
+    blockedBy {
+      id
+      title
+    }
+  }
+}
+
+# Archives a todo: it leaves the board, an agent working it is stopped, and
+# `restore_todo` brings it back.
+mutation archiveTodo(
+  # The todo.
+  $id: UUID!
+) {
+  deleteTodo(where: { id: { eq: $id } }) {
+    id
+    title
+  }
+}
+
+# Brings an archived todo back to its lane.
+mutation restoreTodo(
+  # The todo, as `archive_todo` returned it.
+  $id: UUID!
+) {
+  restoreTodo(where: { id: { eq: $id } }) {
+    id
+    title
+    laneId
+  }
+}
+
+# Deletes a todo for good, with its notes, history and runs. There is no
+# bringing it back: use `archive_todo` unless that is meant.
+mutation deleteTodo(
+  # The todo.
+  $id: UUID!
+) {
+  deleteTodo(where: { id: { eq: $id } }, hard: true) {
+    id
+    title
+  }
 }
 
 # Adds a note to a todo's thread: a clarification, an answer to a question on
@@ -208,5 +721,108 @@ mutation recordArtifact(
     source
     action
     createdAt
+  }
+}
+
+# Starts talking a request over with one of the account's agents, before it
+# is a todo. The agent answers in its own time: read the answer with `draft`.
+mutation startDraft(
+  # From `projects`.
+  $projectId: ID!
+  # The agent to talk it over with, from `agents`.
+  $agentId: ID!
+  # What is wanted, as roughly as you have it.
+  $message: String!
+) {
+  startDraft(projectId: $projectId, agentId: $agentId, message: $message) {
+    id
+    waitingSince
+    createdAt
+  }
+}
+
+# Says something more in a draft. Refused while the agent is still
+# answering: wait, or `stop_draft`.
+mutation sayToDraft(
+  # The draft.
+  $id: ID!
+  # What to say.
+  $message: String!
+) {
+  sayToDraft(id: $id, message: $message) {
+    id
+    waitingSince
+  }
+}
+
+# Stops waiting for the agent's answer in a draft, so more can be said. An
+# answer that arrives later is dropped.
+mutation stopDraft(
+  # The draft.
+  $id: ID!
+) {
+  stopDraft(id: $id) {
+    id
+    waitingSince
+  }
+}
+
+# Makes a todo of a draft, in its project's first open lane, with the title
+# and brief the agent arrived at unless you give others.
+mutation makeTodoFromDraft(
+  # The draft.
+  $id: ID!
+  # A title to use in place of the draft's.
+  $title: String
+  # A brief to use in place of the draft's.
+  $brief: String
+) {
+  makeTodoFromDraft(id: $id, title: $title, brief: $brief) {
+    id
+    title
+    laneId
+    createdAt
+  }
+}
+
+# Deletes a draft and its conversation. A todo it became stays.
+mutation discardDraft(
+  # The draft.
+  $id: ID!
+) {
+  discardDraft(id: $id)
+}
+
+# Saves a project's lanes and their station settings as a template,
+# replacing a template of the same name.
+mutation saveBoardTemplate(
+  # The project whose board to save, from `projects`.
+  $projectId: ID!
+  # What to call the template.
+  $name: String!
+) {
+  saveBoardTemplate(projectId: $projectId, name: $name) {
+    id
+    name
+    lanes
+  }
+}
+
+# Gives a project a template's lanes in place of the ones it has. Only a
+# project with no todos on it: a board in use is not rearranged under them.
+mutation applyBoardTemplate(
+  # The project, from `projects`.
+  $projectId: ID!
+  # The template, from `board_templates`.
+  $templateId: ID!
+) {
+  applyBoardTemplate(projectId: $projectId, templateId: $templateId) {
+    id
+    name
+    lanes(orderBy: { position: { direction: asc, priority: 1 } }) {
+      id
+      name
+      isDone
+    }
   }
 }

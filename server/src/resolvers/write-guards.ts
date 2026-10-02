@@ -1,19 +1,21 @@
 import * as dbSchema from '@telos/db/schema';
 import type { BuildSchemaConfig, WriteHookPayload } from '@vantreeseba/drizzle-graphql';
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, inArray, sql } from 'drizzle-orm';
 import { GraphQLError } from 'graphql';
 import { assertNoBlockedCompletions, resultRows } from '../blocking.ts';
-import type { Context } from '../context.ts';
+import { type Context, isAiActor } from '../context.ts';
 import { assertCompletionMatchesLane, assertEveryProjectHasLanes, realignLanes, seedMissingLanes } from '../lanes.ts';
 import { stampActor } from '../provenance.ts';
 import { cancelRunsUnder } from '../stations.ts';
+import { reachable } from '../tenancy.ts';
 import { requireAuth } from './auth.ts';
 
 // A row scope confines reads, updates and deletes, but it cannot reach a plain
 // insert, and it says nothing about the rows a foreign key *points at*. These
 // hooks close the two holes that leaves:
 //
-//   1. Ownership on insert — every id a caller can state must be theirs.
+//   1. Ownership on insert — every id a caller can state must be theirs, and
+//      for an AI caller one AI may see.
 //   2. Blocking on completion — a write that marks a todo done goes through the
 //      same check `completeTodo` does, so the generated `updateTodo` cannot
 //      route around the dependency rule.
@@ -35,16 +37,18 @@ interface ForeignKey {
   /** Name used in the "not found" a caller sees — never leak another user's row. */
   entity: string;
   parent: AnyTable;
+  /** The parent table's key, which names what of it the caller may reach (tenancy.ts). */
+  name: 'projects' | 'todos' | 'labels' | 'lanes' | 'agents';
 }
 
-const project: ForeignKey = { key: 'projectId', entity: 'Project', parent: dbSchema.projects };
-const todo: ForeignKey = { key: 'todoId', entity: 'Todo', parent: dbSchema.todos };
-const label: ForeignKey = { key: 'labelId', entity: 'Label', parent: dbSchema.labels };
-const lane: ForeignKey = { key: 'laneId', entity: 'Lane', parent: dbSchema.lanes };
-const parentTodo: ForeignKey = { key: 'parentId', entity: 'Todo', parent: dbSchema.todos };
-const agent: ForeignKey = { key: 'agentId', entity: 'Agent', parent: dbSchema.agents };
-const onSuccessLane: ForeignKey = { key: 'onSuccessLaneId', entity: 'Lane', parent: dbSchema.lanes };
-const onFailureLane: ForeignKey = { key: 'onFailureLaneId', entity: 'Lane', parent: dbSchema.lanes };
+const project: ForeignKey = { key: 'projectId', entity: 'Project', parent: dbSchema.projects, name: 'projects' };
+const todo: ForeignKey = { key: 'todoId', entity: 'Todo', parent: dbSchema.todos, name: 'todos' };
+const label: ForeignKey = { key: 'labelId', entity: 'Label', parent: dbSchema.labels, name: 'labels' };
+const lane: ForeignKey = { key: 'laneId', entity: 'Lane', parent: dbSchema.lanes, name: 'lanes' };
+const parentTodo: ForeignKey = { key: 'parentId', entity: 'Todo', parent: dbSchema.todos, name: 'todos' };
+const agent: ForeignKey = { key: 'agentId', entity: 'Agent', parent: dbSchema.agents, name: 'agents' };
+const onSuccessLane: ForeignKey = { key: 'onSuccessLaneId', entity: 'Lane', parent: dbSchema.lanes, name: 'lanes' };
+const onFailureLane: ForeignKey = { key: 'onFailureLaneId', entity: 'Lane', parent: dbSchema.lanes, name: 'lanes' };
 
 const FOREIGN_KEYS: Record<string, ForeignKey[]> = {
   lanes: [project, agent, onSuccessLane, onFailureLane],
@@ -65,9 +69,19 @@ export function writtenRows(args: { values?: Row | Row[]; set?: Row; updates?: A
   return args.set ? [args.set] : [];
 }
 
+/**
+ * Refuses a write that points at a row the caller may not reach: someone
+ * else's, or for an AI caller one AI may not see, which is the same answer.
+ *
+ * @param tx The mutation's transaction.
+ * @param context The request.
+ * @param rows The rows being written.
+ * @param foreignKeys The foreign keys to check on them.
+ * @returns Nothing.
+ */
 async function assertForeignKeysOwned(
   tx: AnyTable,
-  userId: string,
+  context: Context,
   rows: Row[],
   foreignKeys: ForeignKey[],
 ): Promise<void> {
@@ -79,7 +93,7 @@ async function assertForeignKeysOwned(
     const owned: Array<{ id: string }> = await tx
       .select({ id: fk.parent.id })
       .from(fk.parent)
-      .where(and(inArray(fk.parent.id, referenced), eq(fk.parent.userId, userId)));
+      .where(and(inArray(fk.parent.id, referenced), reachable(context, fk.name, fk.parent)));
     const ownedIds = new Set(owned.map((row) => row.id));
     if (referenced.some((id) => !ownedIds.has(id))) {
       // NOT_FOUND, not FORBIDDEN: "you may not touch this" would confirm the row
@@ -128,6 +142,37 @@ function assertAiSwitchUntouched(args: Parameters<typeof writtenRows>[0]): void 
   }
 }
 
+/** What of a project an AI caller may state. The rest is a person's: its switches, and archiving it. */
+const AI_PROJECT_COLUMNS = new Set(['id', 'name', 'description', 'context']);
+
+/**
+ * Holds an AI caller's project write to the columns it may state. A project it
+ * makes is open to AI from the start: it could not otherwise see what it made,
+ * and its account's and the instance's switches are already on or it would not
+ * be here.
+ *
+ * @param args The mutation's arguments, whose rows are marked in place.
+ * @param context The request.
+ * @param operation Which write it is.
+ * @returns Nothing.
+ */
+function holdAiProjectWrite(
+  args: Parameters<typeof writtenRows>[0],
+  context: Context,
+  operation: WriteHookPayload['operation'],
+): void {
+  if (!isAiActor(context)) return;
+  for (const row of writtenRows(args)) {
+    const closed = Object.keys(row).find((key) => !AI_PROJECT_COLUMNS.has(key));
+    if (closed !== undefined) {
+      throw new GraphQLError(`Only a person can set a project's ${closed}.`, { extensions: { code: 'FORBIDDEN' } });
+    }
+    if (operation === 'insert') {
+      row.aiEnabled = true;
+    }
+  }
+}
+
 /**
  * "AI ignores this" is a person's instruction to agents, so no agent or key may
  * set it or, more to the point, clear it.
@@ -140,8 +185,8 @@ function assertIgnoreFlagFromPerson(args: Parameters<typeof writtenRows>[0], con
 }
 
 /**
- * Asking for a run is `runTodo`'s: it checks a station would take the todo, and
- * it is a person's to ask.
+ * Asking for a run is `runTodo`'s: it checks a station would take the todo,
+ * and records who asked.
  */
 function assertRunRequestUntouched(args: Parameters<typeof writtenRows>[0]): void {
   if (states(args, 'runRequestedAt')) {
@@ -256,7 +301,7 @@ export const onWrite: NonNullable<BuildSchemaConfig['onWrite']> = {
       table,
       {
         before: async ({ args, context, tx }: WriteHookPayload) =>
-          assertForeignKeysOwned(tx, requireAuth(context as Context), writtenRows(args), foreignKeys),
+          assertForeignKeysOwned(tx, context as Context, writtenRows(args), foreignKeys),
       },
     ]),
   ),
@@ -265,7 +310,7 @@ export const onWrite: NonNullable<BuildSchemaConfig['onWrite']> = {
       assertDoneFlagUntouched(args);
       // Deleting a lane moves its todos (see `after`), which is history.
       await stampActor(tx, (context as Context).actor);
-      await assertForeignKeysOwned(tx, requireAuth(context as Context), writtenRows(args), FOREIGN_KEYS.lanes);
+      await assertForeignKeysOwned(tx, context as Context, writtenRows(args), FOREIGN_KEYS.lanes);
     },
     // Deleting a lane sets its todos' `lane_id` to null, which can strand a
     // completed todo outside the done lane, and can empty a project's board
@@ -281,7 +326,10 @@ export const onWrite: NonNullable<BuildSchemaConfig['onWrite']> = {
     },
   },
   projects: {
-    before: async ({ args }: WriteHookPayload) => assertAiSwitchUntouched(args),
+    before: async ({ args, context, operation }: WriteHookPayload) => {
+      assertAiSwitchUntouched(args);
+      holdAiProjectWrite(args, context as Context, operation);
+    },
     // A project without lanes has an empty board, so every project gets one at
     // the moment it is created — inside the creating transaction, so a project
     // never exists without it.
@@ -294,7 +342,7 @@ export const onWrite: NonNullable<BuildSchemaConfig['onWrite']> = {
     before: async ({ args, context, tx }: WriteHookPayload) => {
       assertIgnoreFlagFromPerson(args, context as Context);
       assertRunRequestUntouched(args);
-      await assertForeignKeysOwned(tx, requireAuth(context as Context), writtenRows(args), FOREIGN_KEYS.todos);
+      await assertForeignKeysOwned(tx, context as Context, writtenRows(args), FOREIGN_KEYS.todos);
       await stampActor(tx, (context as Context).actor);
     },
     // Checked after the statement rather than before it: a `where` may name the
@@ -328,7 +376,7 @@ export const onWrite: NonNullable<BuildSchemaConfig['onWrite']> = {
   todoNotes: {
     before: async ({ args, context, tx }: WriteHookPayload) => {
       assertPlainNotes(args);
-      await assertForeignKeysOwned(tx, requireAuth(context as Context), writtenRows(args), FOREIGN_KEYS.todoNotes);
+      await assertForeignKeysOwned(tx, context as Context, writtenRows(args), FOREIGN_KEYS.todoNotes);
     },
   },
 };

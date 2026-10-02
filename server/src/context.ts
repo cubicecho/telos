@@ -7,7 +7,8 @@ import type { Loaders } from './loaders.ts';
  *
  * - `user`: a person, signed in with a session.
  * - `apiKey`: an external client (an MCP host) holding one of a user's keys.
- *   It acts for that user, but only through the AI door.
+ *   It acts for that user, but only through the AI door, and only with the
+ *   tools its owner left switched on for it.
  * - `agent`: an agent working a run, on the run's token. Acts for the run's
  *   user, through the AI door, for as long as the run is live.
  * - `system`: the runner itself. Owns nothing (`userId` is null) and may call
@@ -22,6 +23,8 @@ export interface Actor {
   userId: string | null;
   /** The `apikeys` row, for an `apiKey` actor. */
   keyId?: string | undefined;
+  /** The door's tools this key has switched off (door.ts), for an `apiKey` actor. */
+  toolsOff?: ReadonlySet<string> | undefined;
   /** The run, for an `agent` actor. */
   runId?: string | undefined;
 }
@@ -43,7 +46,8 @@ export interface Context {
 /**
  * Whether the caller is AI: an MCP client on a key, or an agent on a run token.
  * What such a caller may see is narrower than what its user may (tenancy.ts),
- * and what it may write is a short list (resolvers/actor-lock.ts).
+ * and what it may write is a stated list (resolvers/actor-lock.ts), less
+ * whatever its key has switched off.
  */
 export function isAiActor(ctx: Pick<Context, 'actor'>): boolean {
   return ctx.actor.kind === 'apiKey' || ctx.actor.kind === 'agent';

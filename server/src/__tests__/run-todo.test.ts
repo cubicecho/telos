@@ -152,6 +152,18 @@ describe('runTodo', () => {
     expect(runs[0]).toMatchObject({ actorKind: 'user', fromLaneId: board.lanes[0].id, toLaneId: board.lanes[0].id });
     expect(events).toHaveLength(2);
   });
+
+  it('may be asked by a key, and is signed with it', async () => {
+    const todoId = await board.addTodo('Asked by a client');
+    const keyId = randomUUID();
+    const key = createClient(db, board.userId, {
+      ai: true,
+      actor: { kind: 'apiKey', userId: board.userId, keyId },
+    });
+    expect((await key.expectOk(RUN, { id: todoId })).runTodo.runRequestedAt).not.toBeNull();
+    const events = await db.select().from(dbSchema.todoEvents).where(eq(dbSchema.todoEvents.todoId, todoId));
+    expect(events.at(-1)).toMatchObject({ kind: 'run', actorKind: 'apiKey', actorKeyId: keyId });
+  });
 });
 
 describe('a run request that no longer stands', () => {
@@ -269,11 +281,11 @@ describe('runTodo refuses', () => {
     expect((await rowOf(todoId)).runRequestedAt).toBeNull();
   });
 
-  it('a key, and someone signed out', async () => {
+  it('a key with run_todo switched off, and someone signed out', async () => {
     const todoId = await board.addTodo('Mine');
     const key = createClient(db, board.userId, {
       ai: true,
-      actor: { kind: 'apiKey', userId: board.userId, keyId: randomUUID() },
+      actor: { kind: 'apiKey', userId: board.userId, keyId: randomUUID(), toolsOff: new Set(['run_todo']) },
     });
     expect((await key.expectError(RUN, { id: todoId })).code).toBe('FORBIDDEN');
     const nobody = createClient(db, null, { ai: true });

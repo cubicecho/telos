@@ -4,7 +4,7 @@ import { extendSchema, type GraphQLObjectType, type GraphQLSchema, parse } from 
 import { requireAi } from '../ai-gate.ts';
 import { resultRows } from '../blocking.ts';
 import type { Context } from '../context.ts';
-import { failuresSinceTouched } from '../stations.ts';
+import { failuresSinceTouched, TOUCHED } from '../stations.ts';
 import { requireSession } from './auth.ts';
 
 // What an account's agents did and spent, across every project it owns: the
@@ -85,7 +85,7 @@ const ACCOUNT_ACTIVITY_SDL = parse(`
   }
 `);
 
-interface SpendRow {
+export interface SpendRow {
   id: string | null;
   name: string | null;
   runs: number;
@@ -110,7 +110,7 @@ interface AttentionRow {
 }
 
 /** The columns every spend row has, over runs named `r`. */
-const SPEND_SUMS = sql`
+export const SPEND_SUMS = sql`
   count(*)::int AS runs,
   count(*) FILTER (WHERE r.kind = 'draft')::int AS draft_replies,
   coalesce(sum(r.prompt_tokens), 0) AS prompt_tokens,
@@ -125,7 +125,7 @@ const SPEND_SUMS = sql`
  * @param name - What to call it when it has no name of its own.
  * @returns The line.
  */
-function spendLine(row: SpendRow | undefined, name: string) {
+export function spendLine(row: SpendRow | undefined, name: string) {
   return {
     id: row?.id ?? null,
     name: row?.name ?? name,
@@ -214,7 +214,7 @@ export function applyAccountActivityExtension(schema: GraphQLSchema): GraphQLSch
             l.id AS lane_id, l.name AS lane_name,
             last.id AS run_id, last.started_at AS last_started_at,
             coalesce(last.status = 'error' AND last.started_at > coalesce(
-              (SELECT max(e.at) FROM todo_events e WHERE e.todo_id = t.id AND e.actor_kind = 'user'),
+              (SELECT max(e.at) FROM todo_events e WHERE e.todo_id = t.id AND ${TOUCHED}),
               '-infinity'::timestamptz
             ), false) AS errored,
             CASE WHEN last.status = 'error' OR last.verdict = 'fail' THEN coalesce(last.error, last.output) END AS reason,

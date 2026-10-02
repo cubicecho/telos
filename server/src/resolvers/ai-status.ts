@@ -3,15 +3,15 @@ import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { extendSchema, GraphQLError, type GraphQLObjectType, type GraphQLSchema, parse } from 'graphql';
 import { requireAi } from '../ai-gate.ts';
 import { resultRows } from '../blocking.ts';
-import type { Context } from '../context.ts';
+import type { Actor, Context } from '../context.ts';
 import { runnerSeenAt } from '../runner-seen.ts';
 import { type StationState, stationStates } from '../stations.ts';
-import { requireSession } from './auth.ts';
 
 // The stations, as a person reads them: what needs them, what is running,
 // what waits, per lane; and whether the runner is there at all. Plus the two
-// things a person can do about a todo at a station: send one it gave up on
-// round again, and ask for one to be worked now.
+// things anyone can do about a todo at a station, a key or an agent at the MCP
+// door included: send one it gave up on round again, and ask for one to be
+// worked now.
 //
 // Applied only when the instance has AI on.
 
@@ -29,13 +29,13 @@ const AI_STATUS_SDL = parse(`
     state: String!
     "Why it is where it is, when that needs saying."
     reason: String
-    "Failed runs since a person last touched it."
+    "Failed runs since a person last touched it, or anyone sent it round again."
     failures: Int!
     "The run working it now."
     liveRunId: ID
     "A station would take it, were it asked to (runTodo): its project does not run by itself."
     awaitsRun: Boolean!
-    "A person asked for it to be run, and no run has taken it yet."
+    "It was asked to be run, and no run has taken it yet."
     runRequested: Boolean!
   }
 
@@ -77,12 +77,12 @@ const AI_STATUS_SDL = parse(`
   extend type Mutation {
     "Sends a todo round its station again: its failures are forgotten, and a station that finished with it starts over."
     retryTodo(id: ID!, reason: String): Boolean!
-    "Asks for a todo to be worked once where it stands, whether or not its project runs by itself. Also a retry."
+    "Asks for a todo to be worked once where it stands, whether or not its project runs by itself. Also a retry. Who asked is on its history."
     runTodo(id: ID!): Todo!
   }
 `);
 
-/** The history kinds a person's nudge to a station is recorded as. */
+/** The history kinds a nudge to a station is recorded as. */
 const RETRY_EVENT = 'retry' as const;
 const RUN_EVENT = 'run' as const;
 
@@ -125,17 +125,20 @@ async function restingTodo(db: AnyRow, userId: string, id: string): Promise<AnyR
 }
 
 /**
- * Records a person's nudge in the todo's lane. Their event arriving there is
- * what forgets its failures and restarts a station that finished with it.
+ * Records a nudge in the todo's lane, signed as whoever gave it. The event
+ * arriving there is what forgets its failures (stations.ts `TOUCHED`) and
+ * restarts a station that finished with it.
  *
  * @param db - The database or transaction.
+ * @param actor - Who nudged it.
  * @param todo - The todo's row.
  * @param kind - Which nudge it was.
- * @param [reason] - Why, in the person's words.
+ * @param [reason] - Why, in the caller's words.
  * @returns Nothing.
  */
 async function recordNudge(
   db: AnyRow,
+  actor: Actor,
   todo: AnyRow,
   kind: typeof RETRY_EVENT | typeof RUN_EVENT,
   reason?: string | null,
@@ -146,7 +149,9 @@ async function recordNudge(
     kind,
     fromLaneId: todo.laneId,
     toLaneId: todo.laneId,
-    actorKind: 'user',
+    actorKind: actor.kind === 'anonymous' ? 'system' : actor.kind,
+    actorKeyId: actor.keyId ?? null,
+    runId: actor.runId ?? null,
     reason: reason?.trim() || null,
   });
 }
@@ -288,14 +293,11 @@ export function applyAiStatusExtension(schema: GraphQLSchema): GraphQLSchema {
     const userId = await requireAi(context);
     const db = context.db as AnyRow;
     const todo = await restingTodo(db, userId, args.id);
-    await recordNudge(db, todo, RETRY_EVENT, args.reason);
+    await recordNudge(db, context.actor, todo, RETRY_EVENT, args.reason);
     return true;
   };
 
   mutations.runTodo.resolve = async (_parent: unknown, args: { id: string }, context: Context) => {
-    // A person's, never a key's or an agent's: working the board from the MCP
-    // door is its own decision.
-    requireSession(context);
     const userId = await requireAi(context);
     return (context.db as AnyRow).transaction(async (tx: AnyRow) => {
       const todo = await restingTodo(tx, userId, args.id);
@@ -303,7 +305,7 @@ export function applyAiStatusExtension(schema: GraphQLSchema): GraphQLSchema {
       if (refusal !== null) {
         throw new GraphQLError(refusal, { extensions: { code: 'BAD_USER_INPUT' } });
       }
-      await recordNudge(tx, todo, RUN_EVENT);
+      await recordNudge(tx, context.actor, todo, RUN_EVENT);
       // The history trigger reads none of this column, so asking writes the
       // one event above and no second one.
       const [requested] = await tx
