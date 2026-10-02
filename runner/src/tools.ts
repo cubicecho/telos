@@ -9,6 +9,8 @@ import type { Claim, McpServerRow } from './telos.ts';
 
 /** The slug telos's own tools are named under: `telos__submit_request`, and so on. */
 export const TELOS_SERVER = 'telos';
+/** The door's tool for a client's artifacts, which a run is not offered. */
+const TELOS_RECORD_ARTIFACT = 'record_artifact';
 
 /**
  * An agent's server as the pool reads it, or null when this runner will not
@@ -86,6 +88,9 @@ export async function openTools(
       transport: 'http',
       url: `${options.telosUrl}/mcp`,
       headers: { 'x-run-token': claim.token },
+      // The door's own record_artifact is for work done outside a run. A run
+      // has the runner's, which is checked against what its tools did.
+      hiddenTools: [TELOS_RECORD_ARTIFACT],
     },
   ];
   for (const row of readServers(claim.agent.mcpServers)) {

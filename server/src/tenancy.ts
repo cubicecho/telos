@@ -97,6 +97,7 @@ const AI_SCOPES: Partial<Record<(typeof USER_OWNED_TABLES)[number], RowScope<Con
   draftMessages: aiNarrowed(() => sql`false`),
   // By todo, so a draft's runs, which have none, are hidden as drafts are.
   runs: aiNarrowed((context, table, userId) => inArray(table.todoId, aiTodoIds(context, userId))),
+  // By todo as well, so one whose todo was deleted is a person's to see.
   artifacts: aiNarrowed((context, table, userId) => inArray(table.todoId, aiTodoIds(context, userId))),
   projects: aiNarrowed((_context, table) => eq(table.aiEnabled, true)),
   lanes: aiNarrowed((context, table, userId) => inArray(table.projectId, aiProjectIds(context, userId))),
@@ -147,8 +148,9 @@ export const contextValues: NonNullable<BuildSchemaConfig['contextValues']> = {
  * `todos_history` trigger's, and history nobody can edit is the point of it.
  * `runs` belong to the runner's mutations (resolvers/runs.ts): a run is
  * claimed, renewed and finished, and a person may only ask one to stop.
- * `artifacts` are what a finished run reports, and only `finishRun` writes them;
- * a person may take one off the board (`deleteArtifact`), and nothing else.
+ * `artifacts` are what a finished run reports (`finishRun`) or a client says it
+ * made (`recordArtifact`), each stamped with where it came from; a person may
+ * take one off the board (`deleteArtifact`), and nothing else.
  * `drafts` and their messages are a conversation (resolvers/drafts.ts): the
  * person says something and the runner answers, and neither is edited after.
  */

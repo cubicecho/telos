@@ -6,6 +6,7 @@ import { applyAiSetupExtension } from './resolvers/ai-setup.ts';
 import { applyAiStatusExtension } from './resolvers/ai-status.ts';
 import { applyAiSwitchesExtension } from './resolvers/ai-switches.ts';
 import { applyApiKeysExtension } from './resolvers/api-keys.ts';
+import { applyArtifactsExtension } from './resolvers/artifacts.ts';
 import { applyAuthExtension } from './resolvers/auth.ts';
 import { applyBoardChangesExtension } from './resolvers/board-changes.ts';
 import { applyBoardTemplatesExtension } from './resolvers/board-templates.ts';
@@ -120,6 +121,7 @@ export function createSchema(db: AnyDb, options: SchemaOptions) {
     schema = applyRequestsExtension(schema);
     schema = applyAgentsExtension(schema);
     schema = applyRunsExtension(schema);
+    schema = applyArtifactsExtension(schema);
     schema = applyDraftsExtension(schema);
     schema = applyAiStatusExtension(schema);
     schema = applyAiSetupExtension(schema);

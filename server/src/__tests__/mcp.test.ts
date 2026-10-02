@@ -26,6 +26,7 @@ const TOOLS = [
   'add_todo_note',
   'edit_todo_note',
   'delete_todo_note',
+  'record_artifact',
 ];
 
 let db: TestDb;
@@ -282,6 +283,32 @@ describe('submitting a request', () => {
     const events = await db.select().from(dbSchema.todoEvents).where(eq(dbSchema.todoEvents.todoId, row.id));
     expect(events.at(-1)).toMatchObject({ actorKind: 'apiKey', reason: 'Filed twice.' });
     expect(events.at(-1).noteId).not.toBeNull();
+  });
+
+  it('records what the client made for it, as the client’s word, signed with the key', async () => {
+    const b = await board();
+    const todo = await addTodo(b);
+    const client = await connect(await serve(), b.key);
+    const { recordArtifact } = await call(client, 'record_artifact', {
+      todoId: todo,
+      location: 'https://example.com/changelog',
+      label: 'The changelog',
+      mediaType: 'text/html',
+    });
+    expect(recordArtifact).toMatchObject({
+      location: 'https://example.com/changelog',
+      title: 'The changelog',
+      source: 'client',
+      action: 'created',
+    });
+    const [row] = await db.select().from(dbSchema.artifacts);
+    expect(row).toMatchObject({ todoId: todo, runId: null, actorKind: 'apiKey', actorKeyId: b.keyId });
+
+    const other = await board('b@example.com');
+    const stranger = await addTodo(other);
+    expect(await callError(client, 'record_artifact', { todoId: stranger, location: '/tmp/x', label: 'x' })).toMatch(
+      /not found/i,
+    );
   });
 });
 
