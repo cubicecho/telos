@@ -109,16 +109,23 @@ function states(args: Parameters<typeof writtenRows>[0], ...keys: string[]): boo
   return writtenRows(args).some((row) => keys.some((key) => key in row));
 }
 
+/** The project columns only a switch mutation writes, and the mutation to name for each. */
+const PROJECT_SWITCHES = [
+  { key: 'aiEnabled', message: 'Use setProjectAiEnabled to switch AI on or off for a project.' },
+  { key: 'autoRun', message: 'Use setProjectAutoRun to switch auto-run on or off for a project.' },
+];
+
 /**
  * The AI switches are only ever flipped by a person, through the mutations in
  * ai-switches.ts, which also stop whatever the switch was letting run. A
  * generated write would flip the flag and leave the rest running.
  */
 function assertAiSwitchUntouched(args: Parameters<typeof writtenRows>[0]): void {
-  if (!states(args, 'aiEnabled')) return;
-  throw new GraphQLError('Use setProjectAiEnabled to switch AI on or off for a project.', {
-    extensions: { code: 'BAD_USER_INPUT' },
-  });
+  for (const { key, message } of PROJECT_SWITCHES) {
+    if (states(args, key)) {
+      throw new GraphQLError(message, { extensions: { code: 'BAD_USER_INPUT' } });
+    }
+  }
 }
 
 /**
@@ -130,6 +137,16 @@ function assertIgnoreFlagFromPerson(args: Parameters<typeof writtenRows>[0], con
   throw new GraphQLError('Only a person can change whether AI ignores a todo.', {
     extensions: { code: 'FORBIDDEN' },
   });
+}
+
+/**
+ * Asking for a run is `runTodo`'s: it checks a station would take the todo, and
+ * it is a person's to ask.
+ */
+function assertRunRequestUntouched(args: Parameters<typeof writtenRows>[0]): void {
+  if (states(args, 'runRequestedAt')) {
+    throw new GraphQLError('Use runTodo to ask for a todo to be run.', { extensions: { code: 'BAD_USER_INPUT' } });
+  }
 }
 
 /**
@@ -250,6 +267,7 @@ export const onWrite: NonNullable<BuildSchemaConfig['onWrite']> = {
   todos: {
     before: async ({ args, context, tx }: WriteHookPayload) => {
       assertIgnoreFlagFromPerson(args, context as Context);
+      assertRunRequestUntouched(args);
       await assertForeignKeysOwned(tx, requireAuth(context as Context), writtenRows(args), FOREIGN_KEYS.todos);
       await stampActor(tx, (context as Context).actor);
     },

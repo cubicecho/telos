@@ -29,6 +29,10 @@ export const todos = pgTable(
     // "Hands off": no agent picks this todo up or reads it, whatever its
     // project's AI switch says. Only a person may set or clear it.
     aiIgnored: boolean('ai_ignored').notNull().default(false),
+    // A person asked for this todo to be worked once where it stands
+    // (runTodo). Cleared when a run claims it, and by the `todos_run_request`
+    // trigger when the todo moves, is done, archived or ignored.
+    runRequestedAt: timestamp('run_requested_at', { withTimezone: true }),
     // Which board column the todo sits in. Nullable because a project may have
     // no lanes yet, and `set null` because deleting a lane must not delete work.
     laneId: uuid('lane_id').references(() => lanes.id, { onDelete: 'set null' }),

@@ -100,6 +100,7 @@ export const ProjectDocument = graphql(`
       todoCount
       openTodoCount
       aiEnabled
+      autoRun
       ...ProjectLabelFields
     }
   }
@@ -209,6 +210,15 @@ export const SetProjectAiEnabledDocument = graphql(`
     setProjectAiEnabled(projectId: $projectId, enabled: $enabled) {
       id
       aiEnabled
+    }
+  }
+`);
+
+export const SetProjectAutoRunDocument = graphql(`
+  mutation SetProjectAutoRun($projectId: ID!, $enabled: Boolean!) {
+    setProjectAutoRun(projectId: $projectId, enabled: $enabled) {
+      id
+      autoRun
     }
   }
 `);
@@ -512,6 +522,8 @@ export const ProjectActivityDocument = graphql(`
         state
         reason
         failures
+        awaitsRun
+        runRequested
       }
     }
     live: runs(where: { projectId: { eq: $projectId }, status: { eq: "running" } }) {
@@ -958,6 +970,14 @@ export const RecentFailuresDocument = graphql(`
 export const RetryTodoDocument = graphql(`
   mutation RetryTodo($id: ID!, $reason: String) {
     retryTodo(id: $id, reason: $reason)
+  }
+`);
+
+export const RunTodoDocument = graphql(`
+  mutation RunTodo($id: ID!) {
+    runTodo(id: $id) {
+      id
+    }
   }
 `);
 

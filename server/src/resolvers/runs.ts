@@ -9,7 +9,7 @@ import { findFirstOpenLaneId } from '../lanes.ts';
 import { stampActor } from '../provenance.ts';
 import { mintRunToken } from '../run-tokens.ts';
 import { markRunnerSeen } from '../runner-seen.ts';
-import { expireLapsedRuns, LEASE_SECONDS, readyTodos } from '../stations.ts';
+import { dropRunRequests, expireLapsedRuns, LEASE_SECONDS, readyTodos } from '../stations.ts';
 import { requireAuth } from './auth.ts';
 
 // The runner's side of the board. The runner is a separate process that talks
@@ -724,6 +724,8 @@ export function applyRunsExtension(schema: GraphQLSchema): GraphQLSchema {
             leaseExpiresAt: leaseFromNow(),
           })
           .returning();
+        // A person's request is for one run, and this is it.
+        await dropRunRequests(tx, { todoId: todo.id });
 
         return {
           runId: run.id,

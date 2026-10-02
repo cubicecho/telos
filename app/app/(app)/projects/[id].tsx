@@ -270,6 +270,7 @@ export default function ProjectScreen() {
                         todos={todos}
                         live={activity.live}
                         stuck={activity.stuck}
+                        waiting={activity.waiting}
                       />
                     )}
                   </View>

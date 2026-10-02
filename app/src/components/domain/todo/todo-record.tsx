@@ -208,6 +208,8 @@ export function TodoHistory({ todoId, runs = [] }: { todoId: string; runs?: read
         return `Moved from ${laneName(event.fromLaneId)} to ${laneName(event.toLaneId)}`;
       case 'retry':
         return `Sent round ${laneName(event.toLaneId)} again`;
+      case 'run':
+        return `Asked ${laneName(event.toLaneId)} to run it`;
       case 'archive':
         return 'Archived';
       case 'restore':

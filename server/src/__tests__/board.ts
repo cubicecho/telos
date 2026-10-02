@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm';
 import { createClient, createUser, type TestClient, type TestDb } from './helpers.ts';
 
 // A board wired for agents, for the runner's tests: a user with AI on, a
-// project with AI on, and its first lane made a station whose agent sends
+// project with AI and auto-run on, and its first lane made a station whose agent sends
 // finished work to Done. Everything goes through the API a person would use,
 // so the setup itself exercises the generated agent and lane writes.
 
@@ -41,6 +41,7 @@ export async function createBoard(db: TestDb, email: string): Promise<Board> {
   await person.expectOk(`mutation ($id: ID!) { setProjectAiEnabled(projectId: $id, enabled: true) { id } }`, {
     id: projectId,
   });
+  await person.expectOk(SET_AUTO_RUN, { id: projectId, enabled: true });
   const lanes = (
     await person.expectOk(
       `query ($projectId: UUID!) {
@@ -88,6 +89,9 @@ export async function setLane(person: TestClient, id: string, set: Record<string
   );
 }
 
+export const SET_AUTO_RUN = `mutation ($id: ID!, $enabled: Boolean!) {
+  setProjectAutoRun(projectId: $id, enabled: $enabled) { id autoRun }
+}`;
 export const QUEUE = `query { runnerQueue { todoId laneId projectId } }`;
 export const CLAIM = `mutation ($todoId: ID!, $laneId: ID!) {
   claimRun(todoId: $todoId, laneId: $laneId) {

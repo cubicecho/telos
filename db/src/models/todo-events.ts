@@ -12,6 +12,7 @@ export const TODO_EVENT_KINDS = [
   'reopen',
   'edit',
   'retry',
+  'run',
   'archive',
   'restore',
 ] as const;

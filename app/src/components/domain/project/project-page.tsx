@@ -4,7 +4,7 @@ import { type ReactNode, useState } from 'react';
 import { Text, View } from 'react-native';
 import { MessageSquare } from '@/components/app-icons';
 import { type ProjectActivity, ProjectActivityLine } from '@/components/domain/ai/project-activity';
-import { ProjectAiSwitch } from '@/components/domain/ai/project-ai-switch';
+import { ProjectAiSwitch, ProjectAutoRunSwitch } from '@/components/domain/ai/project-ai-switch';
 import { DraftDialog } from '@/components/domain/draft/draft-dialog';
 import { LabelBadge, type LabelSummary } from '@/components/domain/label/label-badge';
 import { LabelPicker } from '@/components/domain/label/label-picker';
@@ -32,6 +32,8 @@ export interface ProjectOverviewData {
   openTodoCount: number;
   /** The project's AI switch. Meaningless, and not shown, unless AI is on for the account. */
   aiEnabled: boolean;
+  /** Whether its stations start on todos by themselves. Means nothing, and is not shown, while its AI is off. */
+  autoRun: boolean;
   labels: readonly LabelSummary[];
 }
 
@@ -163,6 +165,7 @@ export function ProjectPage({
           </View>
 
           <ProjectAiSwitch projectId={project.id} enabled={project.aiEnabled} />
+          {project.aiEnabled ? <ProjectAutoRunSwitch projectId={project.id} enabled={project.autoRun} /> : null}
           {activity ? <ProjectActivityLine activity={activity} /> : null}
 
           {actionError ? (

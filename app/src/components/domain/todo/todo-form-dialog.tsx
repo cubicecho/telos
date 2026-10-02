@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Text } from 'react-native';
 import { useAppForm } from '@/components/app-form';
 import { DialogLayout } from '@/components/dialog-layout';
+import { RunTodoButton } from '@/components/domain/ai/run-todo-button';
 import { TodoRuns, useTodoRuns } from '@/components/domain/ai/todo-runs';
 import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
@@ -65,6 +66,9 @@ export function TodoFormDialog({
   // answer carries the project's switch, which is what decides the tab.
   const runsQuery = useTodoRuns(todo.id, { skip: !ai.on });
   const showRuns = ai.on && runsQuery.data?.todo?.project?.aiEnabled === true;
+  // Only what the todo itself rules out; the rest (no agent, blocked, being
+  // worked) the server answers with a reason when asked.
+  const canRun = todo.completedAt == null && todo.aiIgnored === false && todo.lane != null && !todo.lane.isDone;
   const [updateTodo, { error }] = useMutation(UpdateTodoDocument);
   // The todo as the form holds it, and so the form's defaults as well as what
   // it resets to. Both matter: TanStack re-applies `defaultValues` whenever they
@@ -218,7 +222,8 @@ export function TodoFormDialog({
               <TodoHistory todoId={todo.id} runs={showRuns ? runsQuery.data?.todo?.runs : undefined} />
             </TabsContent>
             {showRuns ? (
-              <TabsContent value="runs">
+              <TabsContent value="runs" className="gap-4">
+                {canRun ? <RunTodoButton todoId={todo.id} title={todo.title} /> : null}
                 <TodoRuns
                   todoId={todo.id}
                   onOpenNote={(noteId) => {

@@ -5,7 +5,7 @@ import { requireAi } from '../ai-gate.ts';
 import type { Context } from '../context.ts';
 import { isAdmin, setInstanceAi } from '../instance.ts';
 import { MAX_RETENTION_DAYS } from '../retention.ts';
-import { cancelRunsUnder } from '../stations.ts';
+import { cancelRunsUnder, dropRunRequests } from '../stations.ts';
 import { requireSession } from './auth.ts';
 
 // The instance's, the account's and a project's AI switches. Only a person with a session
@@ -17,6 +17,9 @@ import { requireSession } from './auth.ts';
 // The switches nest: a project's only means anything while its owner's is on,
 // and switching the account off leaves each project's setting where it was, so
 // switching it back on restores the board the user had.
+//
+// A project has a second switch under its first: auto-run, whether its stations
+// start on todos by themselves. It stops nothing when it goes off.
 //
 // The instance's switch is an admin's: it decides for every account at once.
 //
@@ -34,6 +37,8 @@ const AI_SWITCHES_SDL = parse(`
     setAiEnabled(enabled: Boolean!): User!
     "Opens a project to agents, or closes it. Opening one needs the account's AI on."
     setProjectAiEnabled(projectId: ID!, enabled: Boolean!): Project!
+    "Lets a project's stations start on todos by themselves, or only when asked (runTodo). Off, running work finishes."
+    setProjectAutoRun(projectId: ID!, enabled: Boolean!): Project!
     "How many days finished runs are kept before they are pruned. Null keeps them for good."
     setRunRetention(days: Int): User!
   }
@@ -79,7 +84,32 @@ export function applyAiSwitchesExtension(schema: GraphQLSchema): GraphQLSchema {
       .where(and(eq(dbSchema.projects.id, args.projectId), eq(dbSchema.projects.userId, userId)))
       .returning();
     if (!project) throw new GraphQLError('Project not found', { extensions: { code: 'NOT_FOUND' } });
-    if (!args.enabled) await cancelRunsUnder(context.db, { userId, projectId: project.id });
+    if (!args.enabled) {
+      await cancelRunsUnder(context.db, { userId, projectId: project.id });
+      await dropRunRequests(context.db, { projectId: project.id });
+    }
+    return project;
+  };
+
+  mutations.setProjectAutoRun.resolve = async (
+    _parent: unknown,
+    args: { projectId: string; enabled: boolean },
+    context: Context,
+  ) => {
+    // Off is always allowed and stops nothing: what is running finishes, and
+    // nothing new starts. On is an AI action, like opening the project.
+    const userId = requireSession(context);
+    if (args.enabled) {
+      await requireAi(context);
+    }
+    const [project] = await (context.db as AnyRow)
+      .update(dbSchema.projects)
+      .set({ autoRun: args.enabled, updatedAt: new Date() })
+      .where(and(eq(dbSchema.projects.id, args.projectId), eq(dbSchema.projects.userId, userId)))
+      .returning();
+    if (project === undefined) {
+      throw new GraphQLError('Project not found', { extensions: { code: 'NOT_FOUND' } });
+    }
     return project;
   };
 
