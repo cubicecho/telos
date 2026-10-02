@@ -1,3 +1,12 @@
+# [1.13.0](https://github.com/cubicecho/telos/compare/v1.12.0...v1.13.0) (2026-10-02)
+
+
+### Features
+
+* **app:** an Activity page for runs, spend, artifacts and archive across projects ([3328e5f](https://github.com/cubicecho/telos/commit/3328e5f9e7bb539c132a7e2dbcc5ceca0e16e7ff)), closes [#15](https://github.com/cubicecho/telos/issues/15)
+* **app:** name a deleted todo on the account's artifacts, as a project's list does ([64a9252](https://github.com/cubicecho/telos/commit/64a9252f74ad3f29d6aa2475ede9d0a6a1a648f4))
+* **server:** account-wide spend and needs-attention queries ([e1745bb](https://github.com/cubicecho/telos/commit/e1745bbc5cfd48e5d10e542e757e4592349ba039)), closes [#15](https://github.com/cubicecho/telos/issues/15)
+
 # [1.12.0](https://github.com/cubicecho/telos/compare/v1.11.0...v1.12.0) (2026-10-02)
 
 
