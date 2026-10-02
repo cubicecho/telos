@@ -1,3 +1,22 @@
+# [1.15.0](https://github.com/cubicecho/telos/compare/v1.14.0...v1.15.0) (2026-10-02)
+
+
+### Features
+
+* **app:** lane presets in Settings, and a station that follows one ([c4c97b9](https://github.com/cubicecho/telos/commit/c4c97b9e817b41c9a827593e8c3a7632c0a0a07a))
+* **db:** add lane presets a lane follows, with its own overrides ([de303ef](https://github.com/cubicecho/telos/commit/de303ef40da30e44589e86a049ded84db6f8619e))
+* **server:** lane presets, followed by lanes and named by board templates ([7adfefc](https://github.com/cubicecho/telos/commit/7adfefcc6202a8e1f75e2fa143925f46d3f1b525))
+
+# [1.14.0](https://github.com/cubicecho/telos/compare/v1.13.0...v1.14.0) (2026-10-02)
+
+
+### Features
+
+* **app:** MCP servers in Settings, and the ones each agent reaches ([1bea965](https://github.com/cubicecho/telos/commit/1bea9650b2e62b42fb2135c1ae263542c6176e7b))
+* **db:** MCP servers kept once per account, and named by agents by slug ([0ff993a](https://github.com/cubicecho/telos/commit/0ff993a23e3a80de6f1a1e097c3a783d1bafc7cb))
+* **runner:** say on the run when an agent names an MCP server that is gone ([3c5a802](https://github.com/cubicecho/telos/commit/3c5a80227aed8cf4480efc52c337ca106da5d7bd))
+* **server:** the account's MCP servers, their secrets, and the ones an agent reaches ([9835b2a](https://github.com/cubicecho/telos/commit/9835b2a9ad5e8ceda5699bff106ff308dd777b48))
+
 # [1.13.0](https://github.com/cubicecho/telos/compare/v1.12.0...v1.13.0) (2026-10-02)
 
 

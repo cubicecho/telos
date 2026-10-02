@@ -63,6 +63,12 @@ export const relations = defineRelations(schema, (r) => ({
     onSuccessLane: r.one.lanes({ from: r.lanes.onSuccessLaneId, to: r.lanes.id, alias: 'laneOnSuccess' }),
     onFailureLane: r.one.lanes({ from: r.lanes.onFailureLaneId, to: r.lanes.id, alias: 'laneOnFailure' }),
     runs: r.many.runs({ from: r.lanes.id, to: r.runs.laneId }),
+    preset: r.one.lanePresets({ from: r.lanes.presetId, to: r.lanePresets.id }),
+  },
+
+  lanePresets: {
+    // The lanes that follow it, on every board.
+    lanes: r.many.lanes({ from: r.lanePresets.id, to: r.lanes.presetId }),
   },
 
   agents: {

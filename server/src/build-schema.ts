@@ -14,6 +14,7 @@ import { applyBoardChangesExtension } from './resolvers/board-changes.ts';
 import { applyBoardTemplatesExtension } from './resolvers/board-templates.ts';
 import { applyCardMarksExtension } from './resolvers/card-marks.ts';
 import { applyDraftsExtension } from './resolvers/drafts.ts';
+import { applyLanePresetsExtension } from './resolvers/lane-presets.ts';
 import { applyLanesExtension } from './resolvers/lanes.ts';
 import { applyNotesExtension } from './resolvers/notes.ts';
 import { applyRequestsExtension } from './resolvers/requests.ts';
@@ -47,7 +48,7 @@ export interface SchemaOptions {
 }
 
 /** Tables that exist in the API only while the instance has AI on. */
-const AI_TABLES = ['agents', 'runs', 'artifacts', 'drafts', 'draftMessages'];
+const AI_TABLES = ['agents', 'mcpServers', 'runs', 'artifacts', 'drafts', 'draftMessages', 'lanePresets'];
 
 /** A lane's station settings, which mean nothing without agents. */
 const AI_LANE_COLUMNS = [
@@ -59,6 +60,8 @@ const AI_LANE_COLUMNS = [
   'archiveOnSuccess',
   'wipLimit',
   'maxAttempts',
+  'presetId',
+  'presetOverrides',
 ];
 
 export function createSchema(db: AnyDb, options: SchemaOptions) {
@@ -104,10 +107,11 @@ export function createSchema(db: AnyDb, options: SchemaOptions) {
     // Nor does the instance's settings row, which belongs to no user.
     //
     // An agent's API key is write-only: `setAgentApiKey` stores it and only
-    // the runner's `claimRun` reads it back. With AI off, the agent machinery
-    // is not in the schema at all.
+    // the runner's `claimRun` reads it back. An MCP server's headers and env
+    // are the same, through `setMcpServerSecret`. With AI off, the agent
+    // machinery is not in the schema at all.
     exclude: options.ai
-      ? { tables: [...AUTH_TABLES, ...SERVER_TABLES], columns: { agents: ['apiKey'] } }
+      ? { tables: [...AUTH_TABLES, ...SERVER_TABLES], columns: { agents: ['apiKey'], mcpServers: ['headers', 'env'] } }
       : { tables: [...AUTH_TABLES, ...SERVER_TABLES, ...AI_TABLES], columns: { lanes: AI_LANE_COLUMNS } },
   });
 
@@ -126,6 +130,7 @@ export function createSchema(db: AnyDb, options: SchemaOptions) {
     schema = applyRunsExtension(schema);
     schema = applyArtifactsExtension(schema);
     schema = applyDraftsExtension(schema);
+    schema = applyLanePresetsExtension(schema);
     schema = applySessionDeletesExtension(schema);
     schema = applyAiStatusExtension(schema);
     schema = applyAiSetupExtension(schema);

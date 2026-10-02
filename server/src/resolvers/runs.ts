@@ -6,7 +6,9 @@ import { assertNoCycle, findBlocked } from '../blocking.ts';
 import type { Actor, Context } from '../context.ts';
 import { stopDraftReply } from '../draft-runs.ts';
 import { instanceAiOn } from '../instance.ts';
+import { joinPrompts } from '../lane-presets.ts';
 import { findDoneLaneId, findFirstOpenLaneId } from '../lanes.ts';
+import { runnerAgent } from '../mcp-servers.ts';
 import { stampActor } from '../provenance.ts';
 import { mintRunToken } from '../run-tokens.ts';
 import { markRunnerSeen } from '../runner-seen.ts';
@@ -54,8 +56,10 @@ const RUNS_SDL = parse(`
     toolSelectModel: String
     requestTimeoutSeconds: Int
     maxRetries: Int
-    "The agent's MCP servers, as JSON."
+    "The account's MCP servers the agent reaches, in slug order, as JSON, secrets included."
     mcpServers: String!
+    "What to say on the run about its servers: one line for each the agent names that is gone."
+    mcpNotices: [String!]!
   }
 
   "Everything an agent is told about the todo it is working, and where."
@@ -273,13 +277,21 @@ async function briefFor(tx: AnyRow, todo: AnyRow, lane: AnyRow, project: AnyRow)
   const why =
     arrival?.reason ?? (arrival?.noteId ? (thread.find((note) => note.id === arrival.noteId)?.body ?? null) : null);
 
+  // A lane that follows a preset is told the preset's prompt, then its own.
+  const [preset] = lane.presetId
+    ? await tx
+        .select({ prompt: dbSchema.lanePresets.prompt })
+        .from(dbSchema.lanePresets)
+        .where(eq(dbSchema.lanePresets.id, lane.presetId))
+    : [];
+
   return {
     projectName: project.name,
     projectDescription: project.description,
     projectContext: project.context,
     laneName: lane.name,
     contract: lane.contract,
-    lanePrompt: lane.prompt,
+    lanePrompt: joinPrompts(preset?.prompt, lane.prompt),
     title: todo.title,
     brief: todo.notes,
     acceptance: todo.acceptance,
@@ -783,7 +795,7 @@ export function applyRunsExtension(schema: GraphQLSchema): GraphQLSchema {
           leaseExpiresAt: run.leaseExpiresAt,
           turn,
           opensSession,
-          agent: { ...agent, mcpServers: JSON.stringify(agent.mcpServers ?? []) },
+          agent: await runnerAgent(tx, agent),
           brief: await briefFor(tx, todo, lane, project),
         };
       });

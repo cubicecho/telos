@@ -297,14 +297,80 @@ export const AgentFieldsFragment = graphql(`
     toolSelectModel
     requestTimeoutSeconds
     maxRetries
-    mcpServers
+    mcpServerSlugs
     hasApiKey
   }
 `);
 
+// The account's MCP servers, which its agents name by slug. `headers` and `env`
+// are not in the schema: they are written one at a time with
+// `setMcpServerSecret`, and all that comes back is their names.
+
+export const McpServerFieldsFragment = graphql(`
+  fragment McpServerFields on McpServer {
+    id
+    slug
+    name
+    url
+    command
+    args
+    hiddenTools
+    hooks
+    enabled
+    checkedAt
+    checkOk
+    checkError
+    tools
+    headerNames
+    envNames
+  }
+`);
+
+export const McpServersDocument = graphql(`
+  query McpServers {
+    mcpServers(orderBy: { slug: { direction: asc, priority: 1 } }) {
+      ...McpServerFields
+    }
+  }
+`);
+
+export const CreateMcpServerDocument = graphql(`
+  mutation CreateMcpServer($values: CreateMcpServerInput!) {
+    createMcpServer(values: $values) {
+      ...McpServerFields
+    }
+  }
+`);
+
+export const UpdateMcpServerDocument = graphql(`
+  mutation UpdateMcpServer($id: UUID!, $set: UpdateMcpServerInput!) {
+    updateMcpServer(set: $set, where: { id: { eq: $id } }) {
+      ...McpServerFields
+    }
+  }
+`);
+
+export const DeleteMcpServerDocument = graphql(`
+  mutation DeleteMcpServer($id: UUID!) {
+    deleteMcpServer(where: { id: { eq: $id } }) {
+      id
+    }
+  }
+`);
+
+export const SetMcpServerSecretDocument = graphql(`
+  mutation SetMcpServerSecret($id: ID!, $kind: McpSecretKind!, $name: String!, $value: String) {
+    setMcpServerSecret(id: $id, kind: $kind, name: $name, value: $value) {
+      id
+      headerNames
+      envNames
+    }
+  }
+`);
+
 export const TestMcpServerDocument = graphql(`
-  mutation TestMcpServer($server: String!) {
-    testMcpServer(server: $server) {
+  mutation TestMcpServer($id: ID!) {
+    testMcpServer(id: $id) {
       id
     }
   }
@@ -389,6 +455,22 @@ export const StationFieldsFragment = graphql(`
     archiveOnSuccess
     wipLimit
     maxAttempts
+    presetId
+    presetOverrides
+  }
+`);
+
+// A preset: a station's contract, prompt and limits, kept on the account. A
+// lane that follows one (`presetId`) holds its values, bar the fields named in
+// the lane's `presetOverrides`, and adds its own prompt after the preset's.
+export const LanePresetFieldsFragment = graphql(`
+  fragment LanePresetFields on LanePreset {
+    id
+    name
+    contract
+    prompt
+    wipLimit
+    maxAttempts
   }
 `);
 
@@ -400,6 +482,59 @@ export const ProjectStationsDocument = graphql(`
     agents(orderBy: { name: { direction: asc, priority: 1 } }) {
       id
       name
+    }
+    lanePresets(orderBy: { name: { direction: asc, priority: 1 } }) {
+      ...LanePresetFields
+    }
+  }
+`);
+
+// The presets with the lanes that follow each, for the settings page.
+export const LanePresetsDocument = graphql(`
+  query LanePresets {
+    lanePresets(orderBy: { name: { direction: asc, priority: 1 } }) {
+      ...LanePresetFields
+      lanes {
+        id
+        name
+        presetOverrides
+        project {
+          id
+          name
+        }
+      }
+    }
+  }
+`);
+
+export const CreateLanePresetDocument = graphql(`
+  mutation CreateLanePreset($values: CreateLanePresetInput!) {
+    createLanePreset(values: $values) {
+      ...LanePresetFields
+    }
+  }
+`);
+
+export const UpdateLanePresetDocument = graphql(`
+  mutation UpdateLanePreset($id: UUID!, $set: UpdateLanePresetInput!) {
+    updateLanePreset(set: $set, where: { id: { eq: $id } }) {
+      ...LanePresetFields
+    }
+  }
+`);
+
+export const DeleteLanePresetDocument = graphql(`
+  mutation DeleteLanePreset($id: UUID!) {
+    deleteLanePreset(where: { id: { eq: $id } }) {
+      id
+    }
+  }
+`);
+
+export const SaveLaneAsPresetDocument = graphql(`
+  mutation SaveLaneAsPreset($laneId: ID!, $name: String!, $id: ID) {
+    saveLaneAsPreset(laneId: $laneId, name: $name, id: $id) {
+      ...LanePresetFields
     }
   }
 `);

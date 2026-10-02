@@ -97,6 +97,10 @@ export function checkTemplateLanes(value: unknown): TemplateLane[] {
       archiveOnSuccess,
       wipLimit: wipLimit as number,
       maxAttempts: maxAttempts as number,
+      presetId: typeof lane.presetId === 'string' ? lane.presetId : null,
+      presetOverrides: Array.isArray(lane.presetOverrides)
+        ? dbSchema.PRESET_FIELDS.filter((field) => (lane.presetOverrides as unknown[]).includes(field))
+        : [],
     };
   });
   if (lanes.filter((lane) => lane.isDone).length > 1) throw badInput('A template may have only one done lane.');
@@ -134,6 +138,11 @@ export function applyBoardTemplatesExtension(schema: GraphQLSchema): GraphQLSche
       archiveOnSuccess: lane.archiveOnSuccess,
       wipLimit: lane.wipLimit,
       maxAttempts: lane.maxAttempts,
+      // The preset is named, not copied: `prompt` above is only what the lane
+      // adds to it, and the fields it does not override are the preset's when
+      // the template is applied, whatever they are by then.
+      presetId: lane.presetId,
+      presetOverrides: lane.presetOverrides,
     }));
     const [template] = await db
       .insert(dbSchema.boardTemplates)
@@ -186,6 +195,21 @@ export function applyBoardTemplatesExtension(schema: GraphQLSchema): GraphQLSche
           )
         : new Set<string>();
 
+      // A preset it names that is not the caller's leaves its lane with the
+      // values the template holds for it. One that was deleted never gets this
+      // far: deleting a preset writes its values into the templates naming it.
+      const followed = [...new Set(lanes.map((lane) => lane.presetId).filter((id): id is string => !!id))];
+      const presets = followed.length
+        ? new Set(
+            (
+              await tx
+                .select({ id: dbSchema.lanePresets.id })
+                .from(dbSchema.lanePresets)
+                .where(and(inArray(dbSchema.lanePresets.id, followed), eq(dbSchema.lanePresets.userId, userId)))
+            ).map((row: { id: string }) => row.id),
+          )
+        : new Set<string>();
+
       await tx.delete(dbSchema.lanes).where(eq(dbSchema.lanes.projectId, project.id));
       const inserted = await tx
         .insert(dbSchema.lanes)
@@ -202,9 +226,28 @@ export function applyBoardTemplatesExtension(schema: GraphQLSchema): GraphQLSche
             archiveOnSuccess: lane.archiveOnSuccess ?? false,
             wipLimit: lane.wipLimit ?? 1,
             maxAttempts: lane.maxAttempts ?? 3,
+            ...(lane.presetId && presets.has(lane.presetId)
+              ? { presetId: lane.presetId, presetOverrides: lane.presetOverrides ?? [] }
+              : {}),
           })),
         )
         .returning({ id: dbSchema.lanes.id, position: dbSchema.lanes.position });
+      // A preset's contract is not the template's to check ahead of time, so
+      // what the lanes came out as is checked instead.
+      const [stuck] = await tx
+        .select({ name: dbSchema.lanes.name })
+        .from(dbSchema.lanes)
+        .where(
+          and(
+            eq(dbSchema.lanes.projectId, project.id),
+            eq(dbSchema.lanes.archiveOnSuccess, true),
+            eq(dbSchema.lanes.contract, 'expand'),
+          ),
+        )
+        .limit(1);
+      if (stuck) {
+        throw badInput(`"${stuck.name}" breaks todos into pieces, so it cannot archive on success.`);
+      }
       const ids = new Map<number, string>(
         inserted.map((row: { id: string; position: number }) => [row.position, row.id]),
       );

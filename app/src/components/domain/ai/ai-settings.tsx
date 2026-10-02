@@ -9,11 +9,14 @@ import { describeError } from '@/lib/errors';
 import { AiStateDocument, SetAiEnabledDocument, SetInstanceAiEnabledDocument } from '@/lib/graphql';
 import { AgentManager } from './agent-manager';
 import { ApiKeyManager } from './api-key-manager';
+import { LanePresetManager } from './lane-preset-manager';
+import { McpServerManager } from './mcp-server-manager';
 import { RunRetention } from './run-retention';
 
 /**
  * The AI switches, and what they unlock: the API keys an MCP client signs in
- * with, and the agents the board's stations hand work to.
+ * with, the agents the board's stations hand work to, and the MCP servers
+ * those agents reach.
  *
  * An admin sees the instance's switch first, whenever the server offers AI.
  * Everyone else sees this card only once the instance has AI on. Off at the
@@ -113,6 +116,8 @@ export function AiSettings() {
         <>
           <ApiKeyManager />
           <AgentManager />
+          <McpServerManager />
+          <LanePresetManager />
           <RunRetention />
         </>
       ) : null}

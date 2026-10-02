@@ -38,9 +38,11 @@ export const USER_OWNED_TABLES = [
   'todoNotes',
   'todoEvents',
   'agents',
+  'mcpServers',
   'runs',
   'artifacts',
   'boardTemplates',
+  'lanePresets',
   'drafts',
   'draftMessages',
 ] as const;
@@ -106,9 +108,13 @@ const AI_SCOPES: Partial<Record<OwnedTable, SqlScope>> = {
   // reads the roster instead (`agentRoster`, resolvers/ai-reads.ts), which
   // carries neither.
   agents: aiNarrowed(() => sql`false`),
+  mcpServers: aiNarrowed(() => sql`false`),
   // A draft is open to AI where its project is, as the draft mutations are.
   drafts: aiNarrowed((context, table, userId) => inArray(table.projectId, aiProjectIds(context, userId))),
   draftMessages: aiNarrowed((context, table, userId) => inArray(table.draftId, aiDraftIds(context, userId))),
+  // Presets are how a person sets their stations up, as agents are. What one
+  // says reaches a run through its brief, which the server writes.
+  lanePresets: aiNarrowed(() => sql`false`),
   // By todo, so a draft's runs, which have none, stay a person's to read.
   runs: aiNarrowed((context, table, userId) => inArray(table.todoId, aiTodoIds(context, userId))),
   // By todo as well, so one whose todo was deleted is a person's to see.
@@ -168,6 +174,15 @@ export const contextValues: NonNullable<BuildSchemaConfig['contextValues']> = {
     actorKind: (context: Context) => context.actor.kind,
     actorKeyId: (context: Context) => context.actor.keyId ?? null,
     runId: (context: Context) => context.actor.runId ?? null,
+  },
+  // What a test of the server found is the runner's to say (`finishProbe`),
+  // so no client states it: a new server has never been tested.
+  mcpServers: {
+    userId: (context: Context) => requireAuth(context),
+    checkedAt: () => null,
+    checkOk: () => null,
+    checkError: () => null,
+    tools: () => [],
   },
 };
 

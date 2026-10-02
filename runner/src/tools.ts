@@ -1,7 +1,8 @@
 import { McpPool, type McpServerConfig, type ToolHook, validateHooks } from '@cubicecho/agent-mcp-pool';
 import type { Claim, McpServerRow } from './telos.ts';
 
-// The MCP servers one run may reach: the agent's own, plus telos itself, which
+// The MCP servers one run may reach: those of the account's the agent names
+// (telos works that out, and sends them in slug order), plus telos itself, which
 // the agent reaches through /mcp as the run (x-run-token). The telos door is
 // per run — its header is the run's token — so the pool is too. It opens when
 // the run starts and closes when it ends; nothing an agent reached outlives
@@ -60,7 +61,8 @@ export function serverConfig(
 }
 
 /**
- * The agent's servers out of the JSON telos sends. Garbage is no servers.
+ * The agent's servers out of the JSON telos sends, in the order it sends them.
+ * Garbage is no servers.
  *
  * @param json `agent.mcpServers`.
  * @returns The entries.
@@ -104,6 +106,7 @@ export async function openTools(
       hiddenTools: [TELOS_RECORD_ARTIFACT],
     },
   ];
+  for (const notice of claim.agent.mcpNotices ?? []) options.onNotice?.(notice);
   for (const row of readServers(claim.agent.mcpServers)) {
     const config = serverConfig(row, options.allowStdio, options.onNotice);
     if (config) configs.push(config);

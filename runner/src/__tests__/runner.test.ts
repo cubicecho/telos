@@ -61,6 +61,35 @@ afterEach(async () => {
   }
 });
 
+/** A server as these tests describe one: `id` is its slug. */
+interface TestServer {
+  id: string;
+  name: string;
+  url: string;
+  hiddenTools?: string[];
+  hooks?: unknown[];
+}
+
+/**
+ * Makes these the account's MCP servers. The board's agent names none in
+ * particular, so it reaches them all.
+ *
+ * @param rows The servers.
+ */
+async function setServers(rows: TestServer[]): Promise<void> {
+  await db.delete(dbSchema.mcpServers).where(eq(dbSchema.mcpServers.userId, board.userId));
+  await db.insert(dbSchema.mcpServers).values(
+    rows.map(({ id, name, url, hiddenTools, hooks }) => ({
+      userId: board.userId,
+      slug: id,
+      name,
+      url,
+      hiddenTools: hiddenTools ?? [],
+      hooks: hooks ?? [],
+    })),
+  );
+}
+
 /**
  * Listens on an ephemeral port.
  *
@@ -327,10 +356,7 @@ describe('the runner', () => {
 
   it('refuses to record a file no tool in the run wrote', async () => {
     const desk = await serveTools('');
-    await db
-      .update(dbSchema.agents)
-      .set({ mcpServers: [{ id: 'desk', name: 'Desk', url: desk.url }] })
-      .where(eq(dbSchema.agents.id, board.agentId));
+    await setServers([{ id: 'desk', name: 'Desk', url: desk.url }]);
     const todoId = await board.addTodo('Summarise it');
     const told: string[] = [];
     let step = 0;
@@ -352,20 +378,15 @@ describe('the runner', () => {
 
   it('runs the agent’s hooks, keeps what it made, and shows its work as it goes', async () => {
     const desk = await serveTools('The owner likes their plans short.');
-    await db
-      .update(dbSchema.agents)
-      .set({
-        mcpServers: [
-          {
-            id: 'desk',
-            name: 'Desk',
-            url: desk.url,
-            hiddenTools: ['recall'],
-            hooks: [{ id: 'memory', on: 'beforeTurn', tool: 'recall', inject: true }],
-          },
-        ],
-      })
-      .where(eq(dbSchema.agents.id, board.agentId));
+    await setServers([
+      {
+        id: 'desk',
+        name: 'Desk',
+        url: desk.url,
+        hiddenTools: ['recall'],
+        hooks: [{ id: 'memory', on: 'beforeTurn', tool: 'recall', inject: true }],
+      },
+    ]);
     const todoId = await board.addTodo('Plan it');
     const asked: string[] = [];
     let step = 0;
@@ -422,23 +443,18 @@ describe('the runner', () => {
 
   it('opens the session on a todo’s first run, and not on the ones after', async () => {
     const desk = await serveTools('What is known so far.');
-    await db
-      .update(dbSchema.agents)
-      .set({
-        mcpServers: [
-          {
-            id: 'desk',
-            name: 'Desk',
-            url: desk.url,
-            hiddenTools: ['recall'],
-            hooks: [
-              { id: 'opening', on: 'sessionStart', tool: 'recall', inject: true },
-              { id: 'memory', on: 'beforeTurn', tool: 'recall', inject: true },
-            ],
-          },
+    await setServers([
+      {
+        id: 'desk',
+        name: 'Desk',
+        url: desk.url,
+        hiddenTools: ['recall'],
+        hooks: [
+          { id: 'opening', on: 'sessionStart', tool: 'recall', inject: true },
+          { id: 'memory', on: 'beforeTurn', tool: 'recall', inject: true },
         ],
-      })
-      .where(eq(dbSchema.agents.id, board.agentId));
+      },
+    ]);
     const todoId = await board.addTodo('Plan it');
     const hooksOf = (run: typeof dbSchema.runs.$inferSelect) =>
       run.events
@@ -549,11 +565,15 @@ describe('the runner', () => {
 });
 
 describe('testing an MCP server', () => {
-  const ASK = `mutation ($server: String!) { testMcpServer(server: $server) { id } }`;
+  const ASK = `mutation ($id: ID!) { testMcpServer(id: $id) { id } }`;
   const READ = `query ($id: ID!) { mcpProbe(id: $id) { status ok tools { name } error } }`;
 
-  async function testOf(server: Record<string, unknown>, allowStdio = false) {
-    const { id } = (await board.person.expectOk(ASK, { server: JSON.stringify(server) })).testMcpServer;
+  async function testOf(server: { id: string; url?: string; command?: string }, allowStdio = false) {
+    const [row] = await db
+      .insert(dbSchema.mcpServers)
+      .values({ userId: board.userId, slug: server.id, name: server.id, url: server.url, command: server.command })
+      .returning();
+    const { id } = (await board.person.expectOk(ASK, { id: row.id })).testMcpServer;
     await Promise.all(await takeTests(createTelos({ telosUrl, runnerKey: RUNNER_KEY }), allowStdio, () => {}));
     return (await board.person.expectOk(READ, { id })).mcpProbe;
   }
@@ -585,19 +605,14 @@ describe('a deleted todo’s session', () => {
 
   /** A todo the agent has worked, then deleted for good, its agent's server hooked to hear of it. */
   async function deletedTodo(url: string): Promise<string> {
-    await db
-      .update(dbSchema.agents)
-      .set({
-        mcpServers: [
-          {
-            id: 'desk',
-            name: 'Desk',
-            url,
-            hooks: [{ id: 'forget', on: 'sessionDelete', tool: 'recall', args: { session: '{{session.id}}' } }],
-          },
-        ],
-      })
-      .where(eq(dbSchema.agents.id, board.agentId));
+    await setServers([
+      {
+        id: 'desk',
+        name: 'Desk',
+        url,
+        hooks: [{ id: 'forget', on: 'sessionDelete', tool: 'recall', args: { session: '{{session.id}}' } }],
+      },
+    ]);
     const todoId = await board.addTodo('Write it');
     await cycle();
     await board.person.expectOk(PURGE, { id: todoId });
@@ -642,10 +657,7 @@ describe('a hook bound to beforeCompact', () => {
       url: desk.url,
       hooks: [{ id: 'keep', on: 'beforeCompact', tool: 'recall' }],
     };
-    await db
-      .update(dbSchema.agents)
-      .set({ mcpServers: [server] })
-      .where(eq(dbSchema.agents.id, board.agentId));
+    await setServers([server]);
     const todoId = await board.addTodo('Write it');
     await cycle();
 
@@ -654,6 +666,30 @@ describe('a hook bound to beforeCompact', () => {
     const notices = run.events.filter((event: dbSchema.RunEvent) => event.kind === 'notice');
     expect(notices).toEqual([expect.objectContaining({ text: expect.stringMatching(/beforeCompact.*never fires/) })]);
     expect(desk.recalls).toEqual([]);
+  });
+});
+
+describe('a server the agent names that is gone', () => {
+  it('is said on the run, which uses the rest', async () => {
+    const desk = await serveTools('');
+    await setServers([{ id: 'desk', name: 'Desk', url: desk.url }]);
+    await db
+      .update(dbSchema.agents)
+      .set({ mcpServerSlugs: ['desk', 'gone'] })
+      .where(eq(dbSchema.agents.id, board.agentId));
+    const todoId = await board.addTodo('Write it');
+    let offered: string[] = [];
+    llm.script = (_messages, tools) => {
+      offered = tools.map((tool) => tool.function.name);
+      return { content: 'Done.' };
+    };
+    await cycle();
+
+    const [run] = await runsOf(todoId);
+    expect(run.status).toBe('ok');
+    const notices = run.events.filter((event: dbSchema.RunEvent) => event.kind === 'notice');
+    expect(notices).toEqual([expect.objectContaining({ text: expect.stringMatching(/"gone".*no longer exists/) })]);
+    expect(offered).toContain('desk__recall');
   });
 });
 
@@ -801,6 +837,7 @@ describe('drafts', () => {
         requestTimeoutSeconds: null,
         maxRetries: null,
         mcpServers: '[]',
+        mcpNotices: [],
       },
       projectName: 'P',
       projectDescription: null,

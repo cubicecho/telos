@@ -196,7 +196,22 @@ lane with an `agentId` is a station: its `contract` (work, verdict, expand),
 a pass: `finishRun` completes the todo, puts it in the done lane and archives
 it in one write, as the run. It is that or a success arrow, never both, and not
 for an `expand` station; the lane write guard (`assertArchiveOnSuccessFits`)
-holds both and says what to change. The runner (`@telos/runner`, which never
+holds both and says what to change. A station may follow a **lane preset**
+(`lane_presets`, the account's, managed in Settings → AI): `lanes.presetId`
+and `lanes.presetOverrides`, the list of the preset's fields (`contract`,
+`wipLimit`, `maxAttempts`) the lane keeps its own value for. The lane's columns
+always hold the values in force, kept so by the `lanes_follow_preset` trigger
+(a write that changes a followed field without naming `presetOverrides` adds
+the field to it), and an edited preset touches its lanes so the trigger reads
+it again; so nothing that reads a lane needs to know about presets. The
+prompt is never an override: `lanes.prompt` is what the lane adds after the
+preset's, and `briefFor` in `resolvers/runs.ts` joins the two for a run.
+Deleting a preset copies it into its lanes and into board templates that name
+it, in the same statement (`copy_lane_preset_before_delete`).
+`saveLaneAsPreset` makes a preset of a lane and has it follow it. A board
+template's lane names a preset by `presetId` rather than copying its prompt.
+Presets are AI surface: hidden from AI actors, closed to them and the runner.
+The runner (`@telos/runner`, which never
 imports `@telos/db`) runs inside the server's process: `index.ts` starts it
 with `startRunner` whenever AI is included, handing it a key made up at boot
 (`config.ts` `runnerKey`; `RUNNER_KEY` fixes it, for a second runner elsewhere).
@@ -238,9 +253,26 @@ it is written with `setAgentApiKey` and read only by the runner, in a claim.
 comes from `runnerQueue` and `claimRun`, and everything it does goes back
 through `finishRun` or, for the agent, through `/mcp` with the run token; its
 tests import server code only to stand a real telos up. Each run gets its own
-MCP pool, because the telos server in it carries that run's token. Agents'
-stdio MCP servers are refused unless `RUNNER_ALLOW_STDIO=true`: an agent
-belongs to a user, and a command runs on the runner's host with its rights.
+MCP pool, because the telos server in it carries that run's token. stdio MCP
+servers are refused unless `RUNNER_ALLOW_STDIO=true`: a server belongs to a
+user, and a command runs on the runner's host with its rights.
+
+**MCP servers are the account's, and an agent names the ones it reaches.**
+`mcp_servers` holds one row per server; `agents.mcp_server_slugs` is null (every
+enabled server, including ones added later), `[]` (none) or a list of slugs
+(exactly those). A list only narrows: a slug that names no server is left out
+and the run says so (`mcpNotices` on the claim, shown as a notice), never read
+as "all"; a server switched off is left out without a word. The server works
+the list out (`serversFor` in `server/src/mcp-servers.ts`) and hands the runner
+the rows in slug order, so a run's tools come in the same order every time.
+The slug is what the tools are named under (`slug__tool`), so renaming one is
+followed into agents' lists by the `mcp_servers_rename` trigger; deleting one
+is not. `headers` and `env` are secrets, as an agent's key is: excluded from
+the schema, written one at a time with `setMcpServerSecret`, readable only as
+names (`headerNames`, `envNames`) and sent only to the runner. `testMcpServer`
+tests a saved server by id, so the test has its secrets, and `finishProbe`
+keeps what it found on the row (`checked_at`, `check_ok`, `check_error`,
+`tools`), which only the server writes.
 
 **A run reports what it did; it never writes it.** The runner sends events
 (tool calls, tool results, hook notes, notices) with each heartbeat and the
@@ -269,8 +301,8 @@ detached artifact stays on the project's list until someone removes it
 (`deleteArtifact`) or the project is deleted, and is hidden from AI callers,
 whose scope is by todo.
 
-An agent's MCP
-servers may carry `hooks` (agent-mcp-pool's `ToolHook`) and `hiddenTools`;
+An MCP
+server may carry `hooks` (agent-mcp-pool's `ToolHook`) and `hiddenTools`;
 invalid hooks are dropped with a notice, and a failing hook never fails a run.
 The todo is the hooks' session and each run a turn of it: `claimRun` records
 the session in `todo_sessions` (one row per todo and agent, a server-only
