@@ -1,3 +1,13 @@
+# [1.10.0](https://github.com/cubicecho/telos/compare/v1.9.0...v1.10.0) (2026-10-02)
+
+
+### Features
+
+* **app:** show a draft's replies as runs, in the draft and the project ([a1105ce](https://github.com/cubicecho/telos/commit/a1105ceb3b6370615d4a91cadaf61b57e7662820))
+* **db:** a run can belong to a draft ([2653052](https://github.com/cubicecho/telos/commit/265305232ab88815af42e479a5a390a19a6aac53))
+* **runner:** report a draft reply's prompt, usage and events ([8abe838](https://github.com/cubicecho/telos/commit/8abe8386f99beb81f09a0ce050403078a01b301d))
+* **server:** record a draft's replies as runs ([bd47f50](https://github.com/cubicecho/telos/commit/bd47f509805b1e34320e467af3e22e6384484fa3))
+
 # [1.9.0](https://github.com/cubicecho/telos/compare/v1.8.0...v1.9.0) (2026-10-02)
 
 
