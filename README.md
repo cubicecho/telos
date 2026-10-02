@@ -158,6 +158,13 @@ where it is fixed, and the list goes away when every row is ticked. An account
 with AI off gets one line offering it on the home page, and with
 `AI_ENABLED=false` there is nothing.
 
+A card on the board says at a glance what you would otherwise open it to find:
+how many notes you or an outside client left on it, **Sent back** when a
+reviewer rejected the work and **Run failed** when the run never finished (the
+reason is one press away on either), and how many attempts the station has
+used of its limit. The marks update as the board does. The note count is there
+with AI off too.
+
 ```bash
 export AUTH_SECRET=$(openssl rand -hex 32)
 docker compose up --build
