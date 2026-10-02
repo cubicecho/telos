@@ -6,6 +6,7 @@ import { assertNoCycle, findBlocked } from '../blocking.ts';
 import type { Actor, Context } from '../context.ts';
 import { stopDraftReply } from '../draft-runs.ts';
 import { instanceAiOn } from '../instance.ts';
+import { joinPrompts } from '../lane-presets.ts';
 import { findDoneLaneId, findFirstOpenLaneId } from '../lanes.ts';
 import { stampActor } from '../provenance.ts';
 import { mintRunToken } from '../run-tokens.ts';
@@ -273,13 +274,21 @@ async function briefFor(tx: AnyRow, todo: AnyRow, lane: AnyRow, project: AnyRow)
   const why =
     arrival?.reason ?? (arrival?.noteId ? (thread.find((note) => note.id === arrival.noteId)?.body ?? null) : null);
 
+  // A lane that follows a preset is told the preset's prompt, then its own.
+  const [preset] = lane.presetId
+    ? await tx
+        .select({ prompt: dbSchema.lanePresets.prompt })
+        .from(dbSchema.lanePresets)
+        .where(eq(dbSchema.lanePresets.id, lane.presetId))
+    : [];
+
   return {
     projectName: project.name,
     projectDescription: project.description,
     projectContext: project.context,
     laneName: lane.name,
     contract: lane.contract,
-    lanePrompt: lane.prompt,
+    lanePrompt: joinPrompts(preset?.prompt, lane.prompt),
     title: todo.title,
     brief: todo.notes,
     acceptance: todo.acceptance,
