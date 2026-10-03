@@ -135,6 +135,14 @@ Two consequences worth internalising:
   required `where` and returns one row or null. `deleteTodo(where: …)` deletes
   one row — reach for `deleteTodos` when you mean every match.
 
+**Links out are built from `APP_URL`, with `appLink()`** (`server/src/config.ts`).
+`Todo.url` is `/todos/<id>` and `Project.url` is `/projects/<id>`, for other apps
+(a calendar's Today, Home Assistant, a dashboard) to link back. A todo's link
+names the todo only, so it survives a move between projects: the
+`app/app/(app)/todos/[id].tsx` route looks the project up and lands on
+`/projects/<id>?todo=<id>`, which opens the todo's dialog (an archived todo lands
+on `?view=archived`). Keep that URL shape stable; it is in other apps' data.
+
 ## Rules that carry weight
 
 **Every table needs a `scope` entry.** `server/src/tenancy.ts` maps each table to

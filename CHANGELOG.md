@@ -1,3 +1,11 @@
+# [1.20.0](https://github.com/cubicecho/telos/compare/v1.19.0...v1.20.0) (2026-10-03)
+
+
+### Features
+
+* **app:** /todos/<id> opens a todo in its project ([c83459e](https://github.com/cubicecho/telos/commit/c83459ea392b49528bd387c0eae1dd7e925f4309))
+* **server:** a url on every todo and project, for links back into the app ([31ced29](https://github.com/cubicecho/telos/commit/31ced29459cf3bc68c3465e5ef1cbd826a8e58e5))
+
 # [1.19.0](https://github.com/cubicecho/telos/compare/v1.18.0...v1.19.0) (2026-10-03)
 
 

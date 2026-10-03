@@ -1,6 +1,7 @@
 # Telos
 
-A self-hostable todo app that is *just* todos.
+A self-hostable todo app that is *just* todos. Site:
+<https://cubicecho.github.io/telos/>
 
 Projects hold todos. Todos can depend on other todos, and a todo you are waiting
 on is one you cannot tick off yet — Telos knows that and says so. Labels attach
@@ -96,7 +97,7 @@ domain.
 | --- | --- | --- |
 | `DATABASE_URL` | — | **Required.** Postgres connection string. There is no embedded fallback. |
 | `AUTH_SECRET` | — | **Required in production.** Signs sessions. `openssl rand -hex 32`. `JWT_SECRET`, its old name, is still read. |
-| `APP_URL` | `http://localhost:3001` | Public URL; magic-link URLs are built from it. |
+| `APP_URL` | `http://localhost:3001` | Public URL; magic links and each todo's and project's `url` (`/todos/<id>`, `/projects/<id>`, for other apps to link back) are built from it. |
 | `PORT` | `3001` | Port the server listens on. |
 | `AUTH_MAGIC_LINK` | `true` | Set to `false` to sign in with an address alone, no link. |
 | `EXPOSE_MAGIC_LINK` | dev only | Return the magic link in the API response so the login page can show it. |
