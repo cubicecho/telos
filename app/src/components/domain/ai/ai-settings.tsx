@@ -7,6 +7,7 @@ import { Switch } from '@/components/ui/switch';
 import { useAi } from '@/lib/ai';
 import { describeError } from '@/lib/errors';
 import { AiStateDocument, SetAiEnabledDocument, SetInstanceAiEnabledDocument } from '@/lib/graphql';
+import { AgentDefaultsForm } from './agent-defaults-form';
 import { AgentManager } from './agent-manager';
 import { ApiKeyManager } from './api-key-manager';
 import { LanePresetManager } from './lane-preset-manager';
@@ -115,6 +116,7 @@ export function AiSettings() {
       {ai.on ? (
         <>
           <ApiKeyManager />
+          <AgentDefaultsForm />
           <AgentManager />
           <McpServerManager />
           <LanePresetManager />
