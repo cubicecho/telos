@@ -480,8 +480,8 @@ export const McpProbeDocument = graphql(`
 `);
 
 export const AgentModelsDocument = graphql(`
-  query AgentModels($baseUrl: String!, $agentId: ID) {
-    agentModels(baseUrl: $baseUrl, agentId: $agentId) {
+  query AgentModels($baseUrl: String!, $agentId: ID, $apiKey: String) {
+    agentModels(baseUrl: $baseUrl, agentId: $agentId, apiKey: $apiKey) {
       id
       contextLength
     }

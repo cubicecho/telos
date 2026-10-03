@@ -147,5 +147,5 @@ export function keyFor(baseUrl: string, own: string | null, defaults: KeyedLayer
 export function unrunnable(config: Pick<ResolvedAgent, 'baseUrl' | 'model'>, name: string): string | null {
   const missing = [config.baseUrl.trim() ? null : 'endpoint', config.model.trim() ? null : 'model'].filter(Boolean);
   if (missing.length === 0) return null;
-  return `${name} has no ${missing.join(' and no ')}: give it one, or set a default in Settings → AI.`;
+  return `${name} has no ${missing.join(' and no ')}: give it one, or set a default in Settings → Agents.`;
 }

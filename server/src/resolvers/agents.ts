@@ -94,10 +94,11 @@ const AGENTS_SDL = parse(`
     """
     The models \`baseUrl\` offers, asked with the key a run would send there:
     \`agentId\`'s own when one is given and it has one, else your default key
-    when \`baseUrl\` is your default endpoint. For picking a model while
-    setting an agent, or your defaults, up.
+    when \`baseUrl\` is your default endpoint. \`apiKey\` is a key typed but not
+    yet saved, and wins over both, so a form can list its models before it is
+    saved. For picking a model while setting an agent, or your defaults, up.
     """
-    agentModels(baseUrl: String!, agentId: ID): [AgentModel!]!
+    agentModels(baseUrl: String!, agentId: ID, apiKey: String): [AgentModel!]!
   }
 
   extend type Mutation {
@@ -233,7 +234,7 @@ export function applyAgentsExtension(schema: GraphQLSchema): GraphQLSchema {
 
   queries.agentModels.resolve = async (
     _parent: unknown,
-    args: { baseUrl: string; agentId?: string | null },
+    args: { baseUrl: string; agentId?: string | null; apiKey?: string | null },
     context: Context,
   ) => {
     // A person only: an agent or a key has no business making the server
@@ -249,6 +250,8 @@ export function applyAgentsExtension(schema: GraphQLSchema): GraphQLSchema {
       if (!row) throw new GraphQLError('Agent not found', { extensions: { code: 'NOT_FOUND' } });
       own = row.apiKey;
     }
+    const typed = args.apiKey?.trim();
+    if (typed) return listModels(args.baseUrl, typed);
     const defaults = await loadAgentDefaults(context.db, userId);
     return listModels(args.baseUrl, keyFor(args.baseUrl, own, defaults));
   };
