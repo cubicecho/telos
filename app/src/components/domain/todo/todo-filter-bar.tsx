@@ -3,10 +3,10 @@ import { Text, View } from 'react-native';
 import { Tag } from '@/components/app-icons';
 import { Button } from '@/components/ui/button';
 import { ColorDot } from '@/components/ui/color-dot';
-import { Check, Search, X } from '@/components/ui/icons';
+import { Check, X } from '@/components/ui/icons';
 import type { InputHandle } from '@/components/ui/input';
-import { Input } from '@/components/ui/input';
 import { Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger } from '@/components/ui/menu';
+import { SearchInput } from '@/components/ui/search-input';
 import { SegmentedButton, SegmentedGroup } from '@/components/ui/segmented';
 import { isFiltering, labelsInUse, NO_FILTER, type TodoFilter } from '@/lib/filter-todos';
 import { cn } from '@/lib/utils';
@@ -44,16 +44,14 @@ export const TodoFilterBar = forwardRef<
   return (
     <View className="gap-2">
       <View className="flex-row flex-wrap items-center gap-2">
-        <View className="relative min-w-48 flex-1 justify-center">
-          <Search className="pointer-events-none absolute left-2.5 z-10 h-4 w-4 text-muted-foreground" />
-          <Input
+        <View className="min-w-48 flex-1">
+          <SearchInput
             ref={ref}
-            type="search"
-            aria-label="Filter todos by title or notes"
+            label="Filter todos by title or notes"
+            clearLabel="Clear the filter"
             value={filter.text}
             placeholder="Filter todos…  (press /)"
             onChangeText={(text) => onChange({ ...filter, text })}
-            className="pl-8"
           />
         </View>
 

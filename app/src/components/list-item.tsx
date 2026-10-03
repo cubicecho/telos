@@ -103,7 +103,7 @@ export function ListItem({
       testID="list-item"
       className={cn(
         'min-w-0 flex-row items-center gap-3 rounded-md px-3 py-2.5',
-        onPress && Platform.select({ web: 'transition-colors hover:bg-muted/60', default: undefined }),
+        onPress && Platform.select({ web: 'transition-colors hover:bg-muted', default: undefined }),
         className,
       )}
     >

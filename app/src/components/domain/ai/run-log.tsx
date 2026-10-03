@@ -4,6 +4,7 @@ import type { RunFieldsFragment, RunSummaryFieldsFragment } from '@/__generated_
 import { Disclosure } from '@/components/disclosure';
 import { Badge } from '@/components/ui/badge';
 import type { BadgeVariant } from '@/components/ui/badge-base';
+import { Separator } from '@/components/ui/separator';
 import { formatTimestamp } from '@/lib/dates';
 import { cn } from '@/lib/utils';
 
@@ -213,9 +214,9 @@ function LogEntry({ event }: { event: RunEvent }) {
     case 'turn':
       return (
         <View className="flex-row items-center gap-2 py-1">
-          <View className="h-px flex-1 bg-border" />
+          <Separator className="w-auto flex-1" />
           <Text className="text-muted-foreground text-xs">{text || 'Next turn'}</Text>
-          <View className="h-px flex-1 bg-border" />
+          <Separator className="w-auto flex-1" />
         </View>
       );
     case 'thinking':

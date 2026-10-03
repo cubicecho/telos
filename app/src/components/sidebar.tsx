@@ -2,7 +2,9 @@ import type { ReactNode } from 'react';
 import * as React from 'react';
 import { Platform, Pressable, Text, View } from 'react-native';
 import { type HeaderContentFooterProps, StickyHeaderContentFooter } from '@/components/header-content-footer';
+import { Badge } from '@/components/ui/badge';
 import { IconClassContext } from '@/components/ui/icons-base';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 
 /**
@@ -382,7 +384,7 @@ function rowClassName(active: boolean, className: string | undefined) {
     // The web half's icons size from here, as a `Button`'s do; device's from the context below.
     '[&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0',
     active
-      ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+      ? 'bg-selection text-selection-foreground'
       : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
     className,
   );
@@ -399,9 +401,9 @@ type SidebarNavItemBodyProps = {
 /** What is inside the row, the same for both forms: icon, label, status, count. */
 function SidebarNavItemBody({ label, icon, count, status, active }: SidebarNavItemBodyProps) {
   // Native inherits no colour, so the label, the count and the icon each carry it. The active
-  // count takes the row's foreground rather than muted: muted on the accent fill is under 4.5:1.
-  const text = active ? 'text-sidebar-accent-foreground' : 'text-sidebar-foreground';
-  const muted = active ? 'text-sidebar-accent-foreground' : 'text-muted-foreground';
+  // count takes the row's foreground rather than muted: muted on the selection fill is under 4.5:1.
+  const text = active ? 'text-selection-foreground' : 'text-sidebar-foreground';
+  const muted = active ? 'text-selection-foreground' : 'text-muted-foreground';
 
   return (
     <>
@@ -434,8 +436,8 @@ function SidebarNavItemBody({ label, icon, count, status, active }: SidebarNavIt
 
 /**
  * One row of a sidebar: a link with an optional icon, a label that truncates, an optional
- * `status` and an optional count, filled from `sidebar-accent` when it is the current page and on
- * hover.
+ * `status` and an optional count. The current page is filled with `selection`, as every chosen
+ * control is; hover fills it from `sidebar-accent`.
  *
  * Wrap it in the router's own link rather than passing a router to it:
  *
@@ -515,4 +517,124 @@ const SidebarNavItem = React.forwardRef<React.ElementRef<typeof Pressable>, Side
 );
 SidebarNavItem.displayName = 'SidebarNavItem';
 
-export { SidebarNavItem };
+export type BarNavItemProps = Omit<PressableProps, 'children' | 'className' | 'style'> & {
+  /**
+   * What the place is called. Nothing draws it, so it is the link's accessible name — an icon with
+   * no name is announced as "link" — and the tooltip a pointer or a long press brings up.
+   */
+  label: string;
+  /** The whole of what is drawn. Pass a bare `<Folder />`; the item sizes and colours it. */
+  icon: ReactNode;
+  /**
+   * Where it goes — the `<a href>` on the web. Left out when a router's link names it: TanStack's
+   * `createLink`, or expo-router's `<Link href asChild>`, both of which hand it the `href`.
+   */
+  href?: string | undefined;
+  /** The item for the page on screen — filled, and `aria-current="page"`. */
+  active?: boolean | undefined;
+  /**
+   * How many things are behind the place, as a small badge on the icon's corner and in the name:
+   * "Skills, 12". The badge has a corner to fit in, so cap a long one where it is passed — `"99+"`.
+   */
+  count?: number | string | undefined;
+  /**
+   * What state the place's thing is in, as a dot on the icon's other corner and in the name:
+   * "Servers, 2 failing". The same object `SidebarNavItem` takes, so one array feeds both; the bar
+   * has room for neither its words nor its `icon`, so the dot is all that is drawn and the `label`
+   * is what is read.
+   */
+  status?: SidebarNavItemStatus | undefined;
+  // Re-declared rather than inherited, for `exactOptionalPropertyTypes` — see `segmented.tsx`.
+  className?: string | undefined;
+};
+
+/**
+ * A place in the bar: `SidebarNavItem` with only its icon drawn, for `SidebarLayout`'s `nav` (and
+ * `TopBarLayout`'s), where a row's label has no room.
+ *
+ * It takes the row's props — `label`, `icon`, `active`, `count`, `status`, `href` — so an app's
+ * list of places is one array rendered twice, once into the rail and once into the bar:
+ *
+ * ```tsx
+ * const BarLink = createLink(BarNavItem); // beside createLink(SidebarNavItem)
+ * nav={places.map((p) => (
+ *   <BarLink key={p.to} to={p.to} label={p.label} icon={p.icon} count={p.count} active={…} />
+ * ))}
+ * ```
+ *
+ * Every app drew this by hand, as a router link with a class string, and the copies drifted on the
+ * three things that matter. **The name**: an icon-only link has none unless it is given one, so
+ * `label` is required, and it is also the tooltip, since the icon is all a sighted user has. **The
+ * current one**: filled with `selection` and `aria-current="page"`, where the copies used the grey
+ * that means hover. **The count**: a row's count had nowhere to go on the bar, so the bar dropped
+ * it — here it is a badge on the icon, a `status` is a dot, and both are in the name the way the
+ * row builds it: "Skills, MCP on, 12".
+ *
+ * It binds to a router exactly as the row does — it forwards its ref and every prop it does not
+ * name to the `Pressable`, so `createLink` and `<Link href asChild>` hand it the `href` and the
+ * press handling, and react-router's `useLinkClickHandler` goes in as `onClick` beside an `href`.
+ *
+ * It is always a link. The bar's buttons — the theme switch, sign out — are `ActionButton`s in the
+ * bar's `action`, not places in its `nav`.
+ *
+ * **The provider.** It renders its own `TooltipProvider`, as `ActionButton` does and for the same
+ * reason: an installed component cannot assume the app has one at its root.
+ */
+const BarNavItem = React.forwardRef<React.ElementRef<typeof Pressable>, BarNavItemProps>(
+  ({ href, label, icon, count, status, active = false, className, ...props }, ref) => {
+    // Native inherits no colour, so the icon carries its own; the web half's takes the link's.
+    const text = active ? 'text-selection-foreground' : 'text-muted-foreground';
+
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Pressable
+              ref={ref}
+              role="link"
+              testID="bar-nav-item"
+              // Nothing inside is text, so the name is written out on both platforms — joined the
+              // way the row's is, and before `props`, so a caller's own label still wins.
+              aria-label={[label, status?.label, count].filter((part) => part !== undefined).join(', ')}
+              accessibilityState={{ selected: active }}
+              // React Native has no `href` and no `aria-current`; the web has both, and needs both.
+              {...(Platform.OS === 'web' ? ({ href, 'aria-current': active ? 'page' : undefined } as const) : {})}
+              className={cn(
+                'relative size-8 shrink-0 items-center justify-center rounded-md transition-colors',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                '[&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0',
+                active
+                  ? 'bg-selection text-selection-foreground'
+                  : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+                className,
+              )}
+              {...props}
+            >
+              <IconClassContext.Provider value={cn('size-4 shrink-0', text)}>{icon}</IconClassContext.Provider>
+              {count === undefined ? null : (
+                // Hung off the item's top corner, in the 8px the icon leaves above it, so the count
+                // sits over the glyph's corner rather than over the glyph — and by little enough
+                // that it never reaches a neighbour's icon. The ring in the bar's own fill is what
+                // keeps it apart from what is under it. The text is its own element because a
+                // badge's label is 12px on a 16px line, which is taller than that corner.
+                <Badge variant="secondary" className="-right-1.5 -top-1.5 absolute border-background px-1 py-0">
+                  <Text className="font-medium text-[10px] text-secondary-foreground leading-3 tabular-nums">
+                    {count}
+                  </Text>
+                </Badge>
+              )}
+              {status ? (
+                // No label on the dot: it is decoration, and the words are in the link's name.
+                <Badge className="-bottom-0.5 -right-0.5 absolute h-2.5 w-2.5 border-background" />
+              ) : null}
+            </Pressable>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">{label}</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  },
+);
+BarNavItem.displayName = 'BarNavItem';
+
+export { BarNavItem, SidebarNavItem };

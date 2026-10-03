@@ -1,10 +1,11 @@
 import { useMutation, useQuery } from '@apollo/client';
 import { useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
+import { ActionButton } from '@/components/action-button';
 import { useAppForm } from '@/components/app-form';
+import { ConfirmButton } from '@/components/confirm-button';
 import { Section } from '@/components/section';
 import { Button } from '@/components/ui/button';
-import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Field, FieldContent, FieldDescription, FieldLegend, FieldSet, FieldTitle } from '@/components/ui/field';
 import { Form } from '@/components/ui/form';
 import { FormDialog, FormDialogFooter } from '@/components/ui/form-dialog';
@@ -46,21 +47,19 @@ interface KeyRow {
 export function ApiKeyManager() {
   const keysQuery = useQuery(ApiKeysDocument);
   const [creating, setCreating] = useState(false);
-  const [deleting, setDeleting] = useState<KeyRow | null>(null);
   const [switching, setSwitching] = useState<string | null>(null);
   const [deleteKey] = useMutation(DeleteApiKeyDocument, { refetchQueries: [ApiKeysDocument] });
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const keys = keysQuery.data?.apiKeys ?? [];
 
-  async function confirmDelete() {
+  async function confirmDelete(row: KeyRow) {
     setDeleteError(null);
     try {
-      if (deleting) await deleteKey({ variables: { id: deleting.id } });
+      await deleteKey({ variables: { id: row.id } });
     } catch (cause) {
       setDeleteError(describeError(cause));
     }
-    setDeleting(null);
   }
 
   return (
@@ -103,23 +102,26 @@ export function ApiKeyManager() {
                     </Text>
                     <Text className="text-muted-foreground text-xs">{describeKey(key)}</Text>
                   </View>
-                  <Button
+                  <ActionButton
                     variant="ghost"
                     size="icon-sm"
-                    aria-label={`Tools for ${key.name || 'key'}`}
+                    label={`Tools for ${key.name || 'key'}`}
                     onPress={() => setSwitching(key.id)}
                   >
                     <Settings className="h-4 w-4" />
-                  </Button>
-                  <Button
+                  </ActionButton>
+                  <ConfirmButton
                     variant="ghost"
                     size="icon-sm"
                     className="hover:text-destructive"
-                    aria-label={`Revoke ${key.name || 'key'}`}
-                    onPress={() => setDeleting(key)}
+                    label={`Revoke ${key.name || 'key'}`}
+                    title={`Revoke “${key.name || 'this key'}”?`}
+                    description="Anything signed in with it stops working at once. This cannot be undone."
+                    confirmLabel="Revoke"
+                    onConfirm={() => confirmDelete(key)}
                   >
                     <Trash2 className="h-4 w-4" />
-                  </Button>
+                  </ConfirmButton>
                 </View>
               ))}
             </View>
@@ -130,15 +132,6 @@ export function ApiKeyManager() {
           <KeyToolsDialog
             apiKey={keys.find((key) => key.id === switching) ?? null}
             onOpenChange={(open) => !open && setSwitching(null)}
-          />
-
-          <ConfirmDialog
-            open={deleting !== null}
-            onOpenChange={(open) => !open && setDeleting(null)}
-            title={`Revoke “${deleting?.name || 'this key'}”?`}
-            description="Anything signed in with it stops working at once. This cannot be undone."
-            confirmLabel="Revoke"
-            onConfirm={confirmDelete}
           />
         </View>
       }

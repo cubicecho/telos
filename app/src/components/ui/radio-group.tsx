@@ -317,7 +317,7 @@ function RadioGroupItem({
                 'min-w-0 flex-1 flex-row items-center justify-center gap-1.5 rounded-sm px-3',
                 checked
                   ? 'bg-selection text-selection-foreground'
-                  : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+                  : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
               )
             : card
               ? cn(

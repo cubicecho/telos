@@ -1,16 +1,12 @@
 import { useState } from 'react';
-import { TextInput, View } from 'react-native';
+import { View } from 'react-native';
 import { Button } from '@/components/ui/button';
 import { Plus } from '@/components/ui/icons';
-import { INPUT_CLASS } from '@/components/ui/input-base';
+import { Input } from '@/components/ui/input';
 
 /**
  * Adding a column, in the column's own place at the end of the board — the same
  * inline shape as adding a todo, for the same reason: a name and Enter.
- *
- * A bare `TextInput` rather than cubeui's `Input`, which takes neither an
- * `aria-label` nor a key handler — and this field has no visible label and
- * answers Escape.
  */
 export function LaneComposer({ onCreate }: { onCreate: (name: string) => Promise<void> }) {
   const [adding, setAdding] = useState(false);
@@ -35,19 +31,16 @@ export function LaneComposer({ onCreate }: { onCreate: (name: string) => Promise
 
   return (
     <View className="w-72 shrink-0">
-      <TextInput
+      <Input
         autoFocus
         value={name}
         placeholder="Lane name"
         aria-label="New lane"
-        className={INPUT_CLASS}
         onChangeText={setName}
         onSubmitEditing={submit}
         // Escape puts the button back rather than leaving an empty field on the
         // board; blurring an untouched field does the same.
-        onKeyPress={(event) => {
-          if (event.nativeEvent.key === 'Escape') setAdding(false);
-        }}
+        onEscape={() => setAdding(false)}
         onBlur={() => {
           if (name.trim() === '') setAdding(false);
         }}

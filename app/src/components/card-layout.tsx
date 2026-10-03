@@ -1,15 +1,7 @@
 import type { ReactNode } from 'react';
 import { Children } from 'react';
 import { Platform, Text, View } from 'react-native';
-import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 
 export type CardLayoutProps = {
@@ -74,6 +66,42 @@ const BAR = cn('h-4 rounded-md bg-accent', Platform.OS === 'web' && 'animate-pul
 const INK = 'text-card-foreground';
 
 /**
+ * The header, as a row that wraps: the title and description in one column, the action after it.
+ *
+ * The action used to be `CardAction`, which is absolute and so reserves no width — right for the
+ * badge or lone button it was written for, and wrong for anything wider, because a long title ran
+ * on underneath it. `CardAction` cannot be given a place in the flow instead: `CardHeader` is a
+ * column whose children are the title and the description, as shadcn's is, and Yoga has no grid
+ * to put a third child beside them. So the shell that owns this header's children lays them out,
+ * and the primitive stays as it is for a card composed by hand.
+ *
+ * `items-start` keeps the action in the corner `CardAction` held: level with the top of the
+ * title, at the far end. `gap-y-1.5` is `CardHeader`'s own gap, for the action's line once it has
+ * wrapped.
+ */
+const HEADER = 'flex-row flex-wrap items-start gap-x-4 gap-y-1.5';
+
+/**
+ * The header's text. `basis-40` is the floor the header wraps on: the title keeps 10rem beside
+ * the action or the action goes under it. Less than `Section`'s, because a card title truncates
+ * and so can give up more before it stops naming the card — and because the lower the floor, the
+ * narrower the card in which a single button still sits where it always did.
+ */
+const HEADER_TEXT = 'min-w-0 flex-1 basis-40 gap-1.5';
+
+/**
+ * The header's action, never shrunk and never wider than the header: on a line of its own, a
+ * fragment of controls wraps on this row instead of running out of the card.
+ */
+const HEADER_ACTION = cn(
+  'max-w-full shrink-0 flex-row flex-wrap items-center gap-2',
+  // The caller's own wrapping row, in a browser: a flex item there is as wide as its content and
+  // a react-native-web view does not shrink, so without this it runs out of the card. Yoga
+  // measures a child against its parent's width, and NativeWind has no child selector anyway.
+  Platform.select({ web: '[&>*]:max-w-full', default: undefined }),
+);
+
+/**
  * The `footerActions` row. It shrinks to the footer and wraps rather than holding its buttons on
  * one line: a view does not shrink by default on either half, so three buttons in a phone-width
  * card ran past its left edge instead of moving the last one down. `justify-end` keeps a wrapped
@@ -122,34 +150,38 @@ export function CardLayout({
   const isEmpty = Children.count(content) === 0;
   const body = loading ? <CardLayoutSkeleton /> : isEmpty && empty ? asText(empty) : content;
 
-  const hasHeader = Boolean(title || description || action);
+  const hasText = Boolean(title || description);
+  const hasHeader = Boolean(hasText || action);
   const hasFooter = Boolean(footer || footerActions);
 
   return (
     <Card testID="card-layout" className={className}>
       {hasHeader ? (
-        <CardHeader className={headerClassName}>
-          {title ? (
-            // The icon sits beside the heading rather than inside it: a heading is a `Text`, and
-            // a view inside a `Text` is not something the device lays out.
-            <View className="min-w-0 flex-row items-center gap-2">
-              {icon ? (
-                // Sized here rather than by the caller, so an icon passed as `<Plus />` and one
-                // passed as `<Plus className="size-4" />` land at the same size.
-                <View className={cn('shrink-0 text-muted-foreground', ICON)}>{icon}</View>
+        <CardHeader className={cn(HEADER, !hasText && 'justify-end', headerClassName)}>
+          {hasText ? (
+            <View className={HEADER_TEXT}>
+              {title ? (
+                // The icon sits beside the heading rather than inside it: a heading is a `Text`,
+                // and a view inside a `Text` is not something the device lays out.
+                <View className="min-w-0 flex-row items-center gap-2">
+                  {icon ? (
+                    // Sized here rather than by the caller, so an icon passed as `<Plus />` and
+                    // one passed as `<Plus className="size-4" />` land at the same size.
+                    <View className={cn('shrink-0 text-muted-foreground', ICON)}>{icon}</View>
+                  ) : null}
+                  {/* The padding is what stops `truncate` clipping the title: `CardTitle` is
+                      `leading-none`, so the line box is exactly 1em and `overflow: hidden` cuts
+                      the ascenders and descenders off it. The negative margin gives the space
+                      back, so the header keeps the height shadcn drew it at. */}
+                  <CardTitle level={level} className="-my-1 min-w-0 shrink truncate py-1">
+                    {title}
+                  </CardTitle>
+                </View>
               ) : null}
-              {/* The padding is what stops `truncate` clipping the title: `CardTitle` is
-                  `leading-none`, so the line box is exactly 1em and `overflow: hidden` cuts the
-                  ascenders and descenders off it. The negative margin gives the space back, so
-                  the header keeps the height shadcn drew it at. */}
-              <CardTitle level={level} className="-my-1 min-w-0 shrink truncate py-1">
-                {title}
-              </CardTitle>
+              {description ? <CardDescription>{description}</CardDescription> : null}
             </View>
           ) : null}
-          {description ? <CardDescription>{description}</CardDescription> : null}
-          {/* CardAction places itself at the header's far end; it needs no wrapper. */}
-          {action ? <CardAction>{action}</CardAction> : null}
+          {action ? <View className={HEADER_ACTION}>{action}</View> : null}
         </CardHeader>
       ) : null}
 

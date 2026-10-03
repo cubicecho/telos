@@ -1,12 +1,13 @@
 import { useMutation, useQuery } from '@apollo/client';
 import { useState } from 'react';
 import { Text, View } from 'react-native';
+import { ActionButton } from '@/components/action-button';
+import { ConfirmButton } from '@/components/confirm-button';
 import type { LabelSummary } from '@/components/domain/label/label-badge';
 import { LabelFormDialog } from '@/components/domain/label/label-form-dialog';
 import { Section } from '@/components/section';
 import { Button } from '@/components/ui/button';
 import { ColorDot } from '@/components/ui/color-dot';
-import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Pencil, Plus, Trash2 } from '@/components/ui/icons';
 import { LoadState } from '@/components/ui/load-failure';
 import { describeError } from '@/lib/errors';
@@ -23,20 +24,18 @@ export function LabelManager() {
   const labelsQuery = useQuery(LabelsDocument);
   const [editing, setEditing] = useState<LabelSummary | undefined>();
   const [formOpen, setFormOpen] = useState(false);
-  const [deleting, setDeleting] = useState<LabelSummary | null>(null);
   const [deleteLabel] = useMutation(DeleteLabelDocument, { refetchQueries: [LabelsDocument] });
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const labels = labelsQuery.data?.labels ?? [];
 
-  async function confirmDelete() {
+  async function confirmDelete(label: LabelSummary) {
     setDeleteError(null);
     try {
-      if (deleting) await deleteLabel({ variables: { id: deleting.id } });
+      await deleteLabel({ variables: { id: label.id } });
     } catch (cause) {
       setDeleteError(describeError(cause));
     }
-    setDeleting(null);
   }
 
   return (
@@ -84,42 +83,35 @@ export function LabelManager() {
                   <Text numberOfLines={1} className="flex-1 text-foreground text-sm">
                     {label.name}
                   </Text>
-                  <Button
+                  <ActionButton
                     variant="ghost"
                     size="icon-sm"
                     className={cn('focus-visible:opacity-100', HOVER_REVEAL)}
-                    aria-label={`Rename ${label.name}`}
+                    label={`Rename ${label.name}`}
                     onPress={() => {
                       setEditing(label);
                       setFormOpen(true);
                     }}
                   >
                     <Pencil className="h-4 w-4" />
-                  </Button>
-                  <Button
+                  </ActionButton>
+                  <ConfirmButton
                     variant="ghost"
                     size="icon-sm"
                     className={cn('hover:text-destructive focus-visible:opacity-100', HOVER_REVEAL)}
-                    aria-label={`Delete ${label.name}`}
-                    onPress={() => setDeleting(label)}
+                    label={`Delete ${label.name}`}
+                    title={`Delete “${label.name}”?`}
+                    description="It is removed from every project and todo it is attached to. Nothing else is deleted."
+                    onConfirm={() => confirmDelete(label)}
                   >
                     <Trash2 className="h-4 w-4" />
-                  </Button>
+                  </ConfirmButton>
                 </View>
               ))}
             </View>
           )}
 
           <LabelFormDialog open={formOpen} onOpenChange={setFormOpen} label={editing} />
-
-          <ConfirmDialog
-            open={deleting !== null}
-            onOpenChange={(open) => !open && setDeleting(null)}
-            title={`Delete “${deleting?.name ?? ''}”?`}
-            description="It is removed from every project and todo it is attached to. Nothing else is deleted."
-            confirmLabel="Delete"
-            onConfirm={confirmDelete}
-          />
         </View>
       }
     />

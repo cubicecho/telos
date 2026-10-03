@@ -2,7 +2,10 @@ import { useMutation } from '@apollo/client';
 import { useRouter } from 'expo-router';
 import { type ReactNode, useState } from 'react';
 import { Text, View } from 'react-native';
+import { ActionButton } from '@/components/action-button';
 import { MessageSquare } from '@/components/app-icons';
+import { ConfirmButton } from '@/components/confirm-button';
+import { DescriptionList, PropertyRow } from '@/components/description-list';
 import { AiSetupChecklist } from '@/components/domain/ai/ai-setup-checklist';
 import { type ProjectActivity, ProjectActivityLine } from '@/components/domain/ai/project-activity';
 import { ProjectAiSwitch, ProjectAutoRunSwitch } from '@/components/domain/ai/project-ai-switch';
@@ -12,8 +15,6 @@ import { LabelPicker } from '@/components/domain/label/label-picker';
 import { SaveTemplateDialog } from '@/components/domain/template/save-template-dialog';
 import { PROSE_COLUMN } from '@/components/header-content-footer';
 import { PageLayout } from '@/components/page-layout';
-import { Button } from '@/components/ui/button';
-import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Copy, Pencil, Trash2 } from '@/components/ui/icons';
 import { useAi } from '@/lib/ai';
 import { describeError } from '@/lib/errors';
@@ -57,7 +58,6 @@ export function ProjectPage({
 }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [savingTemplate, setSavingTemplate] = useState(false);
   const [drafting, setDrafting] = useState(false);
   const ai = useAi();
@@ -100,7 +100,6 @@ export function ProjectPage({
       // Stay put. Navigating away from a project that is still
       // there would look like the delete worked.
       setActionError(describeError(cause));
-      setConfirmingDelete(false);
       return;
     }
     router.replace('/');
@@ -116,54 +115,58 @@ export function ProjectPage({
         <>
           <LabelPicker attached={project.labels} onToggle={toggleLabel} align="end" />
           {canDraft ? (
-            <Button
+            <ActionButton
               variant="ghost"
               size="icon"
               onPress={() => {
                 setNotice(null);
                 setDrafting(true);
               }}
-              aria-label="Talk a request over"
+              label="Talk a request over"
             >
               <MessageSquare className="h-4 w-4" />
-            </Button>
+            </ActionButton>
           ) : null}
-          <Button
+          <ActionButton
             variant="ghost"
             size="icon"
             onPress={() => {
               setNotice(null);
               setSavingTemplate(true);
             }}
-            aria-label="Save lanes as a template"
+            label="Save lanes as a template"
           >
             <Copy className="h-4 w-4" />
-          </Button>
-          <Button variant="ghost" size="icon" onPress={() => setEditing(true)} aria-label="Edit project">
+          </ActionButton>
+          <ActionButton variant="ghost" size="icon" onPress={() => setEditing(true)} label="Edit project">
             <Pencil className="h-4 w-4" />
-          </Button>
-          <Button
+          </ActionButton>
+          <ConfirmButton
             variant="ghost"
             size="icon"
             className="hover:text-destructive"
-            onPress={() => setConfirmingDelete(true)}
-            aria-label="Delete project"
+            label="Delete project"
+            title={`Delete “${project.name}”?`}
+            description={`Its ${project.todoCount} todo${project.todoCount === 1 ? '' : 's'} go with it. This cannot be undone.`}
+            onConfirm={confirmDelete}
           >
             <Trash2 className="h-4 w-4" />
-          </Button>
+          </ConfirmButton>
         </>
       }
       headerContent={
         <View className="gap-3">
-          {/* Was a `<dl>`. A term/definition pair has no native counterpart and
-              react-native-web has no role that renders one, so each stat is a
-              group named by its term — which is what a screen reader said of the
-              `<dl>` anyway: "Open, 3". */}
-          <View className="flex-row gap-6">
-            <Stat term="Open" value={project.openTodoCount} />
-            <Stat term="Done" value={done} />
-            <Stat term="Total" value={project.todoCount} />
-          </View>
+          <DescriptionList
+            layout="stacked"
+            className="flex-row gap-6"
+            content={
+              <>
+                <Stat label="Open" value={project.openTodoCount} />
+                <Stat label="Done" value={done} />
+                <Stat label="Total" value={project.todoCount} />
+              </>
+            }
+          />
 
           <ProjectAiSwitch projectId={project.id} enabled={project.aiEnabled} />
           {project.aiEnabled ? <ProjectAutoRunSwitch projectId={project.id} enabled={project.autoRun} /> : null}
@@ -207,15 +210,6 @@ export function ProjectPage({
               onMade={(title) => setNotice(`Made the todo “${title}”.`)}
             />
           ) : null}
-
-          <ConfirmDialog
-            open={confirmingDelete}
-            onOpenChange={setConfirmingDelete}
-            title={`Delete “${project.name}”?`}
-            description={`Its ${project.todoCount} todo${project.todoCount === 1 ? '' : 's'} go with it. This cannot be undone.`}
-            confirmLabel="Delete"
-            onConfirm={confirmDelete}
-          />
         </View>
       }
       content={content}
@@ -223,15 +217,14 @@ export function ProjectPage({
   );
 }
 
-function Stat({ term, value }: { term: string; value: number }) {
+/** A count, as cubeui's `PropertyRow` drawn as a figure: a small label over a large number. */
+function Stat({ label, value }: { label: string; value: number }) {
   return (
-    <View role="group" aria-label={`${term}, ${value}`}>
-      <Text aria-hidden className="text-muted-foreground text-xs uppercase tracking-wide">
-        {term}
-      </Text>
-      <Text aria-hidden className="font-medium text-foreground text-lg tabular-nums">
-        {value}
-      </Text>
-    </View>
+    <PropertyRow
+      label={label}
+      value={value}
+      labelClassName="text-xs uppercase tracking-wide"
+      valueClassName="font-medium text-lg tabular-nums"
+    />
   );
 }

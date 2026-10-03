@@ -2,10 +2,11 @@ import { useMutation, useQuery } from '@apollo/client';
 import { useEffect, useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
 import type { LanePresetsQuery } from '@/__generated__/graphql';
+import { ActionButton } from '@/components/action-button';
 import { useAppForm } from '@/components/app-form';
+import { ConfirmButton } from '@/components/confirm-button';
 import { Section } from '@/components/section';
 import { Button } from '@/components/ui/button';
-import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Form } from '@/components/ui/form';
 import { FormDialog, FormDialogFooter } from '@/components/ui/form-dialog';
 import { Pencil, Plus, Trash2 } from '@/components/ui/icons';
@@ -77,22 +78,18 @@ export function fromPresetDraft(value: PresetDraft) {
 export function LanePresetManager() {
   const presetsQuery = useQuery(LanePresetsDocument);
   const [editing, setEditing] = useState<PresetRow | 'new' | null>(null);
-  const [deleting, setDeleting] = useState<PresetRow | null>(null);
   const [deletePreset] = useMutation(DeleteLanePresetDocument, { refetchQueries: [LanePresetsDocument] });
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const presets = presetsQuery.data?.lanePresets ?? [];
 
-  async function confirmDelete() {
+  async function confirmDelete(row: PresetRow) {
     setDeleteError(null);
     try {
-      if (deleting) {
-        await deletePreset({ variables: { id: deleting.id } });
-      }
+      await deletePreset({ variables: { id: row.id } });
     } catch (cause) {
       setDeleteError(describeError(cause));
     }
-    setDeleting(null);
   }
 
   return (
@@ -138,23 +135,26 @@ export function LanePresetManager() {
                         attempts
                       </Text>
                     </View>
-                    <Button
+                    <ActionButton
                       variant="ghost"
                       size="icon-sm"
-                      aria-label={`Edit ${preset.name}`}
+                      label={`Edit ${preset.name}`}
                       onPress={() => setEditing(preset)}
                     >
                       <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button
+                    </ActionButton>
+                    <ConfirmButton
                       variant="ghost"
                       size="icon-sm"
                       className="hover:text-destructive"
-                      aria-label={`Delete ${preset.name}`}
-                      onPress={() => setDeleting(preset)}
+                      label={`Delete ${preset.name}`}
+                      title={`Delete “${preset.name}”?`}
+                      description={deleteWarning(preset.lanes.length)}
+                      confirmLabel="Delete"
+                      onConfirm={() => confirmDelete(preset)}
                     >
                       <Trash2 className="h-4 w-4" />
-                    </Button>
+                    </ConfirmButton>
                   </View>
                   <PresetLanes preset={preset} />
                 </View>
@@ -171,15 +171,6 @@ export function LanePresetManager() {
               preset={editing === 'new' ? null : editing}
             />
           ) : null}
-
-          <ConfirmDialog
-            open={deleting !== null}
-            onOpenChange={(open) => !open && setDeleting(null)}
-            title={`Delete “${deleting?.name ?? 'this preset'}”?`}
-            description={deleteWarning(deleting?.lanes.length ?? 0)}
-            confirmLabel="Delete"
-            onConfirm={confirmDelete}
-          />
         </View>
       }
     />

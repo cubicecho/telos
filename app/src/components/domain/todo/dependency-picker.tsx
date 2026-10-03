@@ -1,9 +1,7 @@
-import { useState } from 'react';
-import { Pressable, Text } from 'react-native';
+import { Text } from 'react-native';
 import { Link2 } from '@/components/app-icons';
 import { Button } from '@/components/ui/button';
-import { Check } from '@/components/ui/icons';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Menu, MenuCheckboxItem, MenuContent, MenuTrigger } from '@/components/ui/menu';
 import { cn } from '@/lib/utils';
 import type { TodoSummary } from './types';
 
@@ -32,14 +30,10 @@ export function DependencyPicker({
   const dependencyIds = new Set(todo.dependencies.map((dependency) => dependency.id));
   const options = candidates.filter((candidate) => candidate.id !== todo.id);
   const waiting = todo.dependencies.length;
-  // Controlled only so the trigger's `onPress` can open it: on web radix opens
-  // from `onClick`, which react-native-web's `Pressable` overwrites. Local
-  // patch until cubicecho/cubeui#123.
-  const [open, setOpen] = useState(false);
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
+    <Menu>
+      <MenuTrigger asChild>
         {/* Icon only. The count the label used to carry survives in the
             accessible name and as a lit icon — a todo that waits on something
             should not look identical to one that waits on nothing. */}
@@ -48,35 +42,28 @@ export function DependencyPicker({
           size={size}
           className={className}
           aria-label={waiting > 0 ? `Dependencies, waiting on ${waiting}` : 'Dependencies'}
-          onPress={() => setOpen(!open)}
         >
           <Link2 className={cn('h-4 w-4', waiting > 0 ? 'text-foreground' : 'text-muted-foreground')} />
         </Button>
-      </PopoverTrigger>
-      <PopoverContent align={align} className="max-h-64 w-64 overflow-y-auto p-1">
+      </MenuTrigger>
+      <MenuContent align={align} aria-label="Dependencies" className="max-h-64 w-64 overflow-y-auto">
         {options.length === 0 ? (
           <Text className="px-2 py-3 text-center text-muted-foreground text-sm">Nothing else in this project yet.</Text>
         ) : (
           options.map((option) => {
             const selected = dependencyIds.has(option.id);
             return (
-              <Pressable
+              <MenuCheckboxItem
                 key={option.id}
-                role="checkbox"
-                aria-checked={selected}
-                onPress={() => onToggle(option.id, !selected)}
-                className="w-full flex-row items-center gap-2 rounded-sm px-2 py-1.5 hover:bg-accent"
-              >
-                <Text numberOfLines={1} className="flex-1 text-popover-foreground text-sm">
-                  {option.title}
-                </Text>
-                {option.completedAt ? <Text className="text-muted-foreground text-xs">done</Text> : null}
-                {selected ? <Check className="h-3.5 w-3.5" /> : null}
-              </Pressable>
+                checked={selected}
+                onCheckedChange={(add) => onToggle(option.id, add)}
+                label={option.title}
+                trailing={option.completedAt ? 'done' : undefined}
+              />
             );
           })
         )}
-      </PopoverContent>
-    </Popover>
+      </MenuContent>
+    </Menu>
   );
 }

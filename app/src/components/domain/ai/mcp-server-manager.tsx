@@ -2,11 +2,12 @@ import { useMutation, useQuery } from '@apollo/client';
 import { useEffect, useMemo, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import { McpSecretKind, type McpServerFieldsFragment } from '@/__generated__/graphql';
+import { ActionButton } from '@/components/action-button';
 import { useAppForm } from '@/components/app-form';
+import { ConfirmButton } from '@/components/confirm-button';
 import { Section } from '@/components/section';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Form } from '@/components/ui/form';
 import { FormDialog, FormDialogFooter } from '@/components/ui/form-dialog';
 import { Pencil, Plus, Trash2, X } from '@/components/ui/icons';
@@ -57,7 +58,6 @@ export function McpServerManager() {
   const agentsQuery = useQuery(AgentsDocument);
   const [editing, setEditing] = useState<ServerRow | 'new' | null>(null);
   const [keying, setKeying] = useState<string | null>(null);
-  const [deleting, setDeleting] = useState<ServerRow | null>(null);
   const [deleteServer] = useMutation(DeleteMcpServerDocument, { refetchQueries: [McpServersDocument] });
   const [updateServer] = useMutation(UpdateMcpServerDocument);
   const [error, setError] = useState<string | null>(null);
@@ -75,10 +75,8 @@ export function McpServerManager() {
     }
   }
 
-  async function confirmDelete() {
-    const server = deleting;
-    setDeleting(null);
-    if (server) await run(() => deleteServer({ variables: { id: server.id } }));
+  async function confirmDelete(server: ServerRow) {
+    await run(() => deleteServer({ variables: { id: server.id } }));
   }
 
   return (
@@ -132,23 +130,26 @@ export function McpServerManager() {
                       }
                       accessibilityLabel={`${server.name} on`}
                     />
-                    <Button
+                    <ActionButton
                       variant="ghost"
                       size="icon-sm"
-                      aria-label={`Edit ${server.name}`}
+                      label={`Edit ${server.name}`}
                       onPress={() => setEditing(server)}
                     >
                       <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button
+                    </ActionButton>
+                    <ConfirmButton
                       variant="ghost"
                       size="icon-sm"
                       className="hover:text-destructive"
-                      aria-label={`Delete ${server.name}`}
-                      onPress={() => setDeleting(server)}
+                      label={`Delete ${server.name}`}
+                      title={`Delete “${server.name}”?`}
+                      description="Its secrets go with it. An agent that names it carries on without it, and says so on its runs. This cannot be undone."
+                      confirmLabel="Delete"
+                      onConfirm={() => confirmDelete(server)}
                     >
                       <Trash2 className="h-4 w-4" />
-                    </Button>
+                    </ConfirmButton>
                   </View>
                   <Text className="text-muted-foreground text-xs">{describeUse(server, agents)}</Text>
                   <View className="flex-row flex-wrap items-center gap-2">
@@ -177,15 +178,6 @@ export function McpServerManager() {
           {keyed ? (
             <McpServerSecretsDialog open onOpenChange={(open) => !open && setKeying(null)} server={keyed} />
           ) : null}
-
-          <ConfirmDialog
-            open={deleting !== null}
-            onOpenChange={(open) => !open && setDeleting(null)}
-            title={`Delete “${deleting?.name ?? 'this server'}”?`}
-            description="Its secrets go with it. An agent that names it carries on without it, and says so on its runs. This cannot be undone."
-            confirmLabel="Delete"
-            onConfirm={confirmDelete}
-          />
         </View>
       }
     />
@@ -550,11 +542,11 @@ function McpServerSecretsDialog({
                   </Text>
                   <Text className="text-muted-foreground text-xs">{secret.what}</Text>
                 </View>
-                <Button
+                <ActionButton
                   variant="ghost"
                   size="icon-sm"
                   disabled={loading}
-                  aria-label={`Remove ${secret.name}`}
+                  label={`Remove ${secret.name}`}
                   onPress={() =>
                     run(() =>
                       setSecret({ variables: { id: server.id, kind: secret.kind, name: secret.name, value: null } }),
@@ -562,7 +554,7 @@ function McpServerSecretsDialog({
                   }
                 >
                   <X className="h-4 w-4" />
-                </Button>
+                </ActionButton>
               </View>
             ))}
           </View>
@@ -582,7 +574,7 @@ function McpServerSecretsDialog({
               name="value"
               validators={{ onChange: ({ value }) => (value === '' ? 'Paste a value.' : undefined) }}
             >
-              {(field) => <field.InputField label="Value" type="password" />}
+              {(field) => <field.PasswordField label="Value" />}
             </form.AppField>
             <FormDialogFooter onCancel={() => onOpenChange(false)} cancelLabel="Done" error={error}>
               <form.SubmitButton createLabel="Set secret" disabled={loading} />

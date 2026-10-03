@@ -1,9 +1,8 @@
 import { useMutation, useQuery } from '@apollo/client';
 import { useState } from 'react';
 import { Text, View } from 'react-native';
+import { ConfirmButton } from '@/components/confirm-button';
 import { Section } from '@/components/section';
-import { Button } from '@/components/ui/button';
-import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Trash2 } from '@/components/ui/icons';
 import { LoadState } from '@/components/ui/load-failure';
 import { describeError } from '@/lib/errors';
@@ -28,20 +27,18 @@ function laneNames(lanes: unknown): string {
  */
 export function TemplateManager() {
   const templatesQuery = useQuery(BoardTemplatesDocument);
-  const [deleting, setDeleting] = useState<TemplateSummary | null>(null);
   const [deleteTemplate] = useMutation(DeleteBoardTemplateDocument, { refetchQueries: [BoardTemplatesDocument] });
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const templates = templatesQuery.data?.boardTemplates ?? [];
 
-  async function confirmDelete() {
+  async function confirmDelete(row: TemplateSummary) {
     setDeleteError(null);
     try {
-      if (deleting) await deleteTemplate({ variables: { id: deleting.id } });
+      await deleteTemplate({ variables: { id: row.id } });
     } catch (cause) {
       setDeleteError(describeError(cause));
     }
-    setDeleting(null);
   }
 
   return (
@@ -79,28 +76,22 @@ export function TemplateManager() {
                       {laneNames(template.lanes)}
                     </Text>
                   </View>
-                  <Button
+                  <ConfirmButton
                     variant="ghost"
                     size="icon-sm"
                     className={cn('hover:text-destructive focus-visible:opacity-100', HOVER_REVEAL)}
-                    aria-label={`Delete ${template.name}`}
-                    onPress={() => setDeleting(template)}
+                    label={`Delete ${template.name}`}
+                    title={`Delete “${template.name}”?`}
+                    description="Projects already made from it keep their lanes."
+                    confirmLabel="Delete"
+                    onConfirm={() => confirmDelete(template)}
                   >
                     <Trash2 className="h-4 w-4" />
-                  </Button>
+                  </ConfirmButton>
                 </View>
               ))}
             </View>
           )}
-
-          <ConfirmDialog
-            open={deleting !== null}
-            onOpenChange={(open) => !open && setDeleting(null)}
-            title={`Delete “${deleting?.name ?? ''}”?`}
-            description="Projects already made from it keep their lanes."
-            confirmLabel="Delete"
-            onConfirm={confirmDelete}
-          />
         </View>
       }
     />

@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import * as React from 'react';
-import { Text, View } from 'react-native';
+import { Platform, Text, View } from 'react-native';
 import { cn } from '@/lib/utils';
 
 type SectionProps = {
@@ -32,6 +32,31 @@ type SectionProps = {
 };
 
 /**
+ * The title and description. `basis-48` is the floor the heading row wraps on: the text asks for
+ * 12rem — `SettingRow`'s number, for the same two sizes of type — and an action that cannot sit
+ * beside that much drops to its own line. A basis rather than a `min-w`, so in a column narrower
+ * than the floor the text still shrinks to it instead of running out of the section.
+ */
+const TEXT = 'min-w-0 flex-1 basis-48';
+
+/**
+ * The action. It never shrinks, which is what keeps one button or a badge at its own width and
+ * where it always sat. `max-w-full` is for the action wider than the section: on a line of its
+ * own it is held to the section's width, so what is in it wraps — a fragment of buttons on this
+ * row, a caller's own row inside it — rather than running out past the edge.
+ */
+const ACTION = 'max-w-full shrink-0 flex-row flex-wrap items-center gap-2';
+
+/**
+ * What makes the caller's own row wrap in a browser. A flex item's width there starts from its
+ * content, and a react-native-web view does not shrink, so a `flex-row flex-wrap` view handed in
+ * as the action stayed as wide as its buttons and ran out of the section. Yoga measures a child
+ * against the width its parent has, so the device needs nothing — and NativeWind has no child
+ * selector to give it.
+ */
+const ACTION_FIT = Platform.select({ web: '[&>*]:max-w-full', default: undefined });
+
+/**
  * A heading over a group of fields or rows — one source for both platforms.
  *
  * It is here because three projects wrote it separately and got *almost* the same: `text-xs
@@ -54,6 +79,12 @@ type SectionProps = {
  *   which is what makes it a `region` landmark. An untitled section has no name and so is not a
  *   landmark, which is correct: a landmark nobody can name is noise in the landmark list.
  *
+ * **The heading row wraps rather than squeezing.** The action never shrinks, and the row used not
+ * to wrap, so a five-button toolbar on a phone left the description one character to a line. Now
+ * it is `SettingRow`'s rule: the action sits beside the text while both fit and drops under it,
+ * at the start, when they do not — by the width the section is given, not the window's. Plain
+ * flex-wrap, so Yoga does the same on device.
+ *
  * No state, no data, no `children` — the body is `content`, like every other shell here.
  */
 export function Section({
@@ -69,7 +100,8 @@ export function Section({
   contentClassName,
 }: SectionProps) {
   const titleId = React.useId();
-  const hasHeading = Boolean(title || description || action);
+  const hasText = Boolean(title || description);
+  const hasHeading = Boolean(hasText || action);
 
   return (
     <View
@@ -85,32 +117,39 @@ export function Section({
       {hasHeading ? (
         <View
           testID="section-heading"
-          className={cn('min-w-0 flex-row items-center gap-2', divider && 'border-b border-border pb-1')}
+          className={cn(
+            'min-w-0 flex-row flex-wrap items-center gap-2',
+            // With no text there is no column to push the action along, so the row does it.
+            !hasText && 'justify-end',
+            divider && 'border-b border-border pb-1',
+          )}
         >
-          <View className="min-w-0 flex-1">
-            {title ? (
-              // biome-ignore lint/a11y/useSemanticElements: React Native has no heading element; role="heading" is the cross-platform form
-              <Text
-                testID="section-title"
-                nativeID={titleId}
-                role="heading"
-                aria-level={level}
-                className={cn(
-                  'truncate font-semibold text-muted-foreground text-xs uppercase tracking-wider',
-                  titleClassName,
-                )}
-              >
-                {title}
-              </Text>
-            ) : null}
-            {description ? (
-              <Text webAs="p" testID="section-description" className="mt-1 text-muted-foreground text-sm">
-                {description}
-              </Text>
-            ) : null}
-          </View>
+          {hasText ? (
+            <View className={TEXT}>
+              {title ? (
+                // biome-ignore lint/a11y/useSemanticElements: React Native has no heading element; role="heading" is the cross-platform form
+                <Text
+                  testID="section-title"
+                  nativeID={titleId}
+                  role="heading"
+                  aria-level={level}
+                  className={cn(
+                    'truncate font-semibold text-muted-foreground text-xs uppercase tracking-wider',
+                    titleClassName,
+                  )}
+                >
+                  {title}
+                </Text>
+              ) : null}
+              {description ? (
+                <Text webAs="p" testID="section-description" className="mt-1 text-muted-foreground text-sm">
+                  {description}
+                </Text>
+              ) : null}
+            </View>
+          ) : null}
           {action ? (
-            <View testID="section-action" className="shrink-0">
+            <View testID="section-action" className={cn(ACTION, ACTION_FIT)}>
               {action}
             </View>
           ) : null}
