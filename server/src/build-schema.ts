@@ -2,6 +2,7 @@ import { AUTH_TABLES, SERVER_TABLES } from '@telos/db/schema';
 import { buildSchema, GraphQLDateTime } from '@vantreeseba/drizzle-graphql';
 import { applyAccountActivityExtension } from './resolvers/account-activity.ts';
 import { applyActorLock } from './resolvers/actor-lock.ts';
+import { applyAgentDefaultsExtension } from './resolvers/agent-defaults.ts';
 import { applyAgentsExtension } from './resolvers/agents.ts';
 import { applyAiReadsExtension } from './resolvers/ai-reads.ts';
 import { applyAiSetupExtension } from './resolvers/ai-setup.ts';
@@ -127,6 +128,7 @@ export function createSchema(db: AnyDb, options: SchemaOptions) {
     schema = applyAiSwitchesExtension(schema);
     schema = applyRequestsExtension(schema);
     schema = applyAgentsExtension(schema);
+    schema = applyAgentDefaultsExtension(schema);
     schema = applyRunsExtension(schema);
     schema = applyArtifactsExtension(schema);
     schema = applyDraftsExtension(schema);

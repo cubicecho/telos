@@ -100,7 +100,7 @@ export async function readyTodos(
       JOIN agents a ON a.id = l.agent_id
       JOIN projects p ON p.id = t.project_id
       JOIN users u ON u.id = t.user_id
-      WHERE ${INSTANCE_AI_ON} AND u.ai_enabled AND p.ai_enabled AND NOT t.ai_ignored
+      WHERE ${INSTANCE_AI_ON} AND u.ai_enabled AND p.ai_enabled AND NOT t.ai_ignored AND a.enabled
         AND (p.auto_run OR t.run_requested_at IS NOT NULL)
         AND p.archived_at IS NULL
         AND t.completed_at IS NULL AND t.archived_at IS NULL AND NOT l.is_done
@@ -227,8 +227,9 @@ export interface LaneTally {
  * rules `readyTodos` applies, read back as a reason instead of a filter.
  *
  *   - running: a run holds it now
- *   - parked: no station will ever pick it up where it is (no lane, no agent,
- *     AI told to ignore it, an expand lane with nowhere to put what it makes)
+ *   - parked: no station will ever pick it up where it is (no lane, no agent
+ *     or one switched off, AI told to ignore it, an expand lane with nowhere
+ *     to put what it makes)
  *   - attention: a station gave up on it (more failures than the lane allows)
  *     or finished with it and has nowhere to send it
  *   - blocked: it waits on something unfinished
@@ -258,6 +259,8 @@ export async function stationStates(
     lane_id: string | null;
     lane_name: string | null;
     has_agent: boolean;
+    agent_name: string | null;
+    agent_enabled: boolean;
     ai_ignored: boolean;
     auto_run: boolean;
     run_requested: boolean;
@@ -275,6 +278,7 @@ export async function stationStates(
           t.id, t.title, t.project_id, t.lane_id, t.ai_ignored, t.position, t.created_at, p.auto_run,
           t.run_requested_at IS NOT NULL AS run_requested,
           l.name AS lane_name, l.position AS lane_position, l.agent_id IS NOT NULL AS has_agent,
+          a.name AS agent_name, coalesce(a.enabled, true) AS agent_enabled,
           (l.contract = 'expand' AND l.on_success_lane_id IS NULL) AS barren_expand,
           l.max_attempts,
           coalesce(
@@ -284,13 +288,14 @@ export async function stationStates(
         FROM todos t
         JOIN projects p ON p.id = t.project_id
         LEFT JOIN lanes l ON l.id = t.lane_id
+        LEFT JOIN agents a ON a.id = l.agent_id
         WHERE t.user_id = ${userId} AND p.ai_enabled AND p.archived_at IS NULL
           AND t.completed_at IS NULL AND t.archived_at IS NULL AND NOT coalesce(l.is_done, false)
           ${project}
       )
       SELECT
         b.id AS todo_id, b.title, b.project_id, b.lane_id, b.lane_name,
-        coalesce(b.has_agent, false) AS has_agent, b.ai_ignored, b.auto_run, b.run_requested,
+        coalesce(b.has_agent, false) AS has_agent, b.agent_name, b.agent_enabled, b.ai_ignored, b.auto_run, b.run_requested,
         coalesce(b.barren_expand, false) AS barren_expand, b.max_attempts,
         ${failuresSinceTouched(sql`b.id`)} AS failures,
         EXISTS (
@@ -356,6 +361,8 @@ function judge(row: {
   lane_id: string | null;
   lane_name: string | null;
   has_agent: boolean;
+  agent_name: string | null;
+  agent_enabled: boolean;
   ai_ignored: boolean;
   auto_run: boolean;
   run_requested: boolean;
@@ -371,6 +378,7 @@ function judge(row: {
   if (!row.lane_id) return ['parked', 'It is in no lane.'];
   if (row.ai_ignored) return ['parked', 'AI is told to ignore it.'];
   if (!row.has_agent) return ['parked', `${row.lane_name} has no agent.`];
+  if (!row.agent_enabled) return ['parked', `${row.agent_name}, who works ${row.lane_name}, is switched off.`];
   if (row.barren_expand) return ['parked', `${row.lane_name} splits todos but has nowhere to put the pieces.`];
   if (Number(row.failures) > (row.max_attempts ?? 0)) {
     return ['attention', row.last_failure?.trim() || `It failed ${row.failures} times.`];

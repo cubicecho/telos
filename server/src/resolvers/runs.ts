@@ -40,19 +40,19 @@ const RUNS_SDL = parse(`
     projectId: ID!
   }
 
-  "The agent a station names, secret included. Only ever handed to the runner."
+  "The agent a station names, secret included. Only ever handed to the runner. Null inherits from \`defaults\`."
   type RunnerAgent {
     id: ID!
     name: String!
-    baseUrl: String!
-    model: String!
+    baseUrl: String
+    model: String
     apiKey: String
     systemPrompt: String
     temperature: Float
     maxTokens: Int
     contextLength: Int
-    maxToolIterations: Int!
-    toolDiscovery: Boolean!
+    maxToolIterations: Int
+    toolDiscovery: Boolean
     toolSelectModel: String
     requestTimeoutSeconds: Int
     maxRetries: Int
@@ -60,6 +60,23 @@ const RUNS_SDL = parse(`
     mcpServers: String!
     "What to say on the run about its servers: one line for each the agent names that is gone."
     mcpNotices: [String!]!
+    "The account's defaults the agent inherits, key included. Null where the account has set none."
+    defaults: RunnerAgentDefaults
+  }
+
+  "An account's agent defaults, secret included. Only ever handed to the runner."
+  type RunnerAgentDefaults {
+    baseUrl: String
+    model: String
+    apiKey: String
+    temperature: Float
+    maxTokens: Int
+    contextLength: Int
+    maxToolIterations: Int
+    toolDiscovery: Boolean
+    toolSelectModel: String
+    requestTimeoutSeconds: Int
+    maxRetries: Int
   }
 
   "Everything an agent is told about the todo it is working, and where."
@@ -766,6 +783,7 @@ export function applyRunsExtension(schema: GraphQLSchema): GraphQLSchema {
         const [todo] = await tx.select().from(dbSchema.todos).where(eq(dbSchema.todos.id, args.todoId));
         const [project] = await tx.select().from(dbSchema.projects).where(eq(dbSchema.projects.id, todo.projectId));
         const [agent] = await tx.select().from(dbSchema.agents).where(eq(dbSchema.agents.id, lane.agentId));
+        const handed = await runnerAgent(tx, agent);
         // Counted before this run is written. The todo is the session its
         // agents' hooks file things under.
         const turn = await tx.$count(dbSchema.runs, eq(dbSchema.runs.todoId, todo.id));
@@ -781,7 +799,7 @@ export function applyRunsExtension(schema: GraphQLSchema): GraphQLSchema {
             laneId: lane.id,
             agentId: agent.id,
             contract: lane.contract,
-            model: agent.model,
+            model: handed.resolvedModel,
             leaseExpiresAt: leaseFromNow(),
           })
           .returning();
@@ -795,7 +813,7 @@ export function applyRunsExtension(schema: GraphQLSchema): GraphQLSchema {
           leaseExpiresAt: run.leaseExpiresAt,
           turn,
           opensSession,
-          agent: await runnerAgent(tx, agent),
+          agent: handed,
           brief: await briefFor(tx, todo, lane, project),
         };
       });

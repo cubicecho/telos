@@ -1,6 +1,8 @@
 import * as dbSchema from '@telos/db/schema';
+import { keyFor } from '@telos/runner/spec';
 import { and, eq } from 'drizzle-orm';
 import { extendSchema, GraphQLError, type GraphQLObjectType, type GraphQLSchema, parse } from 'graphql';
+import { loadAgentDefaults } from '../agent-defaults.ts';
 import { requireAi, requireSystem } from '../ai-gate.ts';
 import type { Context } from '../context.ts';
 import { askProbe, finishProbe, type McpProbe, readProbe, takeProbes } from '../mcp-probes.ts';
@@ -90,8 +92,10 @@ const AGENTS_SDL = parse(`
     "The MCP server tests waiting to be made. The runner's only; taking them marks them taken."
     runnerProbes: [RunnerProbe!]!
     """
-    The models \`baseUrl\` offers, asked with \`agentId\`'s stored key when one is
-    given. For picking a model while setting an agent up.
+    The models \`baseUrl\` offers, asked with the key a run would send there:
+    \`agentId\`'s own when one is given and it has one, else your default key
+    when \`baseUrl\` is your default endpoint. For picking a model while
+    setting an agent, or your defaults, up.
     """
     agentModels(baseUrl: String!, agentId: ID): [AgentModel!]!
   }
@@ -236,16 +240,17 @@ export function applyAgentsExtension(schema: GraphQLSchema): GraphQLSchema {
     // fetch a URL of its choosing.
     requireSession(context);
     const userId = await requireAi(context);
-    let apiKey: string | null = null;
+    let own: string | null = null;
     if (args.agentId) {
       const [row] = await (context.db as AnyRow)
         .select({ apiKey: dbSchema.agents.apiKey })
         .from(dbSchema.agents)
         .where(and(eq(dbSchema.agents.id, args.agentId), eq(dbSchema.agents.userId, userId)));
       if (!row) throw new GraphQLError('Agent not found', { extensions: { code: 'NOT_FOUND' } });
-      apiKey = row.apiKey;
+      own = row.apiKey;
     }
-    return listModels(args.baseUrl, apiKey);
+    const defaults = await loadAgentDefaults(context.db, userId);
+    return listModels(args.baseUrl, keyFor(args.baseUrl, own, defaults));
   };
 
   queries.mcpProbe.resolve = async (_parent: unknown, args: { id: string }, context: Context) => {

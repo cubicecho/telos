@@ -1,5 +1,6 @@
 import * as dbSchema from '@telos/db/schema';
 import { asc, eq } from 'drizzle-orm';
+import { effectiveModel, loadAgentDefaults } from './agent-defaults.ts';
 
 // The account's MCP servers an agent reaches, worked out where the secrets are:
 // the runner is handed rows it can dial, and nothing else is.
@@ -90,13 +91,22 @@ export async function serversFor(
 }
 
 /**
- * An agent as the runner is handed it: with the servers it reaches worked out.
+ * An agent as the runner is handed it: with the servers it reaches worked out,
+ * and the account's defaults under it for the runner to layer.
  *
  * @param db - The database, or the transaction the run is claimed in.
  * @param agent - The agent's row, key included.
- * @returns The row, its servers as JSON, and what to say about them.
+ * @returns The row, its servers as JSON, what to say about them, its account's
+ * defaults (key included), and the model it resolves to, for the run's record.
  */
 export async function runnerAgent(db: AnyRow, agent: dbSchema.Agent) {
   const { servers, notices } = await serversFor(db, agent);
-  return { ...agent, mcpServers: JSON.stringify(servers), mcpNotices: notices };
+  const defaults = await loadAgentDefaults(db, agent.userId);
+  return {
+    ...agent,
+    mcpServers: JSON.stringify(servers),
+    mcpNotices: notices,
+    defaults,
+    resolvedModel: effectiveModel(defaults, agent),
+  };
 }

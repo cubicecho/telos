@@ -1,5 +1,5 @@
 import * as dbSchema from '@telos/db/schema';
-import { and, asc, desc, eq, isNotNull, isNull, not } from 'drizzle-orm';
+import { and, asc, desc, eq, isNotNull, isNull, not, sql } from 'drizzle-orm';
 import { extendSchema, GraphQLError, type GraphQLObjectType, type GraphQLSchema, parse } from 'graphql';
 import { requireAi, requireSystem } from '../ai-gate.ts';
 import type { Context } from '../context.ts';
@@ -117,13 +117,17 @@ function message(value: string): string {
   return text;
 }
 
-/** The caller's agent, or NOT_FOUND. */
+/** Why a draft cannot wait on an agent that is switched off. */
+const AGENT_OFF = (name: string) => `${name} is switched off. Switch it on in Settings, or talk to another agent.`;
+
+/** The caller's agent, or NOT_FOUND; CONFLICT where it is switched off, since nothing would answer. */
 async function ownedAgent(db: AnyRow, userId: string, agentId: string) {
   const [agent] = await db
-    .select({ id: dbSchema.agents.id })
+    .select({ id: dbSchema.agents.id, name: dbSchema.agents.name, enabled: dbSchema.agents.enabled })
     .from(dbSchema.agents)
     .where(and(eq(dbSchema.agents.id, agentId), eq(dbSchema.agents.userId, userId)));
   if (!agent) throw notFound('Agent');
+  if (!agent.enabled) throw conflict(AGENT_OFF(agent.name));
   return agent;
 }
 
@@ -158,6 +162,8 @@ const takeable = () =>
     isNotNull(dbSchema.drafts.waitingSince),
     isNull(dbSchema.drafts.todoId),
     isNotNull(dbSchema.drafts.agentId),
+    // A switched-off agent answers nothing; its drafts wait until it is back.
+    sql`EXISTS (SELECT 1 FROM agents a WHERE a.id = ${dbSchema.drafts.agentId} AND a.enabled)`,
     not(draftBeingAnswered()),
   );
 
@@ -253,6 +259,7 @@ export function applyDraftsExtension(schema: GraphQLSchema): GraphQLSchema {
       unmade(draft);
       if (draft.waitingSince) throw conflict('Wait for the answer, or stop it, before saying more.');
       if (!draft.agentId) throw conflict('The agent this draft was talking to is gone. Start a new one.');
+      await ownedAgent(tx, userId, draft.agentId);
       await tx.insert(dbSchema.draftMessages).values({ userId, draftId: draft.id, role: 'user', content: text });
       const [updated] = await tx
         .update(dbSchema.drafts)
@@ -337,6 +344,7 @@ export function applyDraftsExtension(schema: GraphQLSchema): GraphQLSchema {
         const { draft, project } = row;
         const [agent] = await tx.select().from(dbSchema.agents).where(eq(dbSchema.agents.id, draft.agentId));
         if (!agent) return null;
+        const handed = await runnerAgent(tx, agent);
         // A reply whose runner died is closed, so this one can start.
         await expireLapsedDraftRuns(tx, draft.id);
         const [run] = await tx
@@ -347,7 +355,7 @@ export function applyDraftsExtension(schema: GraphQLSchema): GraphQLSchema {
             kind: 'draft',
             draftId: draft.id,
             agentId: agent.id,
-            model: agent.model,
+            model: handed.resolvedModel,
             leaseExpiresAt: new Date(Date.now() + DRAFT_LEASE_SECONDS * MS_PER_SECOND),
           })
           .returning({ id: dbSchema.runs.id });
@@ -359,7 +367,7 @@ export function applyDraftsExtension(schema: GraphQLSchema): GraphQLSchema {
         return {
           draftId: draft.id,
           runId: run.id,
-          agent: await runnerAgent(tx, agent),
+          agent: handed,
           projectName: project.name,
           projectDescription: project.description ?? null,
           projectContext: project.context ?? null,
