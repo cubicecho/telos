@@ -29,6 +29,10 @@ export default defineConfig({
         test: {
           name: 'node',
           environment: 'node',
+          // Each test builds its own database, and a test that claims a run
+          // and drives it over /mcp takes 6–8s on CI's runners: the default 5s
+          // failed main's own checks as well as this branch's.
+          testTimeout: 20_000,
           include: [
             'db/**/*.test.ts',
             'server/**/*.test.ts',
