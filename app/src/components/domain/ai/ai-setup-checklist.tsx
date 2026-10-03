@@ -12,7 +12,8 @@ import { formatDuration } from './run-log';
 /** How often the checklist asks again, so a row ticks soon after the step is taken elsewhere. */
 export const SETUP_POLL_MS = 5000;
 
-const SETTINGS = '/settings';
+const SETTINGS_AI = '/settings?tab=ai';
+const SETTINGS_AGENTS = '/settings?tab=agents';
 const MS_PER_SECOND = 1000;
 
 type Setup = AiSetupQuery['aiSetup'];
@@ -67,7 +68,7 @@ export function setupSteps(setup: Setup, projectId: string | undefined, now: num
       label: 'You have an agent',
       done: setup.agent,
       hint: 'An agent is a model behind an OpenAI-compatible endpoint. Add one in Settings.',
-      href: SETTINGS,
+      href: SETTINGS_AGENTS,
       linkLabel: 'Open Settings',
     },
     {
@@ -210,7 +211,7 @@ function Offer({ instance, admin }: { instance: boolean; admin: boolean }) {
       {instance
         ? 'Agents can work todos for you. AI is off for your account.'
         : 'Agents can work todos for you. AI is off on this instance.'}{' '}
-      <Link href={SETTINGS} className="text-foreground underline">
+      <Link href={SETTINGS_AI} className="text-foreground underline">
         Turn it on in Settings
       </Link>
     </Text>

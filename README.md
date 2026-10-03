@@ -123,7 +123,9 @@ every level:
    remove AI outright, so not even an admin can switch it on, set
    `AI_ENABLED=false`.
 2. **The account**: Settings → AI. Off, the account's API keys stop working and
-   nothing the runner does touches its rows.
+   nothing the runner does touches its rows. On, Settings gains two tabs:
+   **Agents** (the agent defaults, the agents and the lane presets) and
+   **MCP servers**.
 3. **The project**: its AI switch. Off, the project takes no requests and its
    stations sit idle.
    Under it is a second switch, **auto-run**: whether the project's stations
@@ -152,7 +154,7 @@ has the agent work it, verify it, or split it into child todos, and telos moves
 it along the lane's arrows. A station can archive what passes instead of
 moving it: the todo is completed and leaves the board, for a pipeline whose
 finished work nobody needs to see in a column. Stations that do the same job
-can follow one **lane preset** (Settings → AI): its contract, prompt, WIP limit
+can follow one **lane preset** (Settings → Agents): its contract, prompt, WIP limit
 and attempts. A lane keeps its own value for any field it overrides and follows
 the preset for the rest, and its own prompt is added after the preset's. A
 preset lists the lanes following it and what each overrides; deleting it copies
@@ -162,7 +164,7 @@ todo shows as it goes, and a list of what it made: files it wrote, and anything
 the agent chose to record. What was made for a todo outlives it: delete the
 todo for good and its artifacts stay on the project's Artifacts list, under the
 title the todo had, until you remove them or delete the project. **MCP
-servers** are kept once, under Settings → AI, and each agent reaches every one
+servers** are kept once, under Settings → MCP servers, and each agent reaches every one
 of them or only the ones you tick. A server's headers and environment are
 secrets: you can see which are set, never their values, and only the runner is
 sent them. Test a server there and it keeps what it found, so the list shows
