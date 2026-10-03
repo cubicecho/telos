@@ -5,7 +5,7 @@ import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { bearer, magicLink } from 'better-auth/plugins';
 import { and, eq, gt, isNull } from 'drizzle-orm';
-import { appUrl, authSecret } from './config.ts';
+import { appLink, appUrl, authSecret } from './config.ts';
 import type { Actor } from './context.ts';
 import { runToolsOff } from './door.ts';
 import { claimFirstAdmin, instanceAiOn } from './instance.ts';
@@ -75,7 +75,7 @@ export type Auth = ReturnType<typeof createAuth>;
 
 /** The app's verify screen, which hands the token to `verifyMagicLink`. */
 export function magicLinkUrl(token: string): string {
-  return `${appUrl()}/auth/verify?token=${encodeURIComponent(token)}`;
+  return appLink(`/auth/verify?token=${encodeURIComponent(token)}`);
 }
 
 /**

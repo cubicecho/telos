@@ -120,6 +120,18 @@ export const ProjectTodosDocument = graphql(`
   }
 `);
 
+// Where a todo's link (`Todo.url`, /todos/<id>) should land: its project, and
+// whether it is archived. `INCLUDE` so an archived todo's link still finds it.
+export const TodoLinkDocument = graphql(`
+  query TodoLink($id: UUID!) {
+    todos(where: { id: { eq: $id } }, deleted: INCLUDE, limit: 1) {
+      id
+      projectId
+      archivedAt
+    }
+  }
+`);
+
 export const ProjectLanesDocument = graphql(`
   query ProjectLanes($projectId: UUID!) {
     lanes(

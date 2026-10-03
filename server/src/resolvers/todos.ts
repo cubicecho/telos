@@ -2,6 +2,7 @@ import * as dbSchema from '@telos/db/schema';
 import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { extendSchema, GraphQLError, type GraphQLObjectType, type GraphQLSchema, parse } from 'graphql';
 import { assertNoCycle, assertNotBlocked } from '../blocking.ts';
+import { appLink } from '../config.ts';
 import { type Context, isAiActor } from '../context.ts';
 import { findDoneLaneId, findFirstOpenLaneId } from '../lanes.ts';
 import { stampActor } from '../provenance.ts';
@@ -21,11 +22,18 @@ const TODOS_SDL = parse(`
     isBlocked: Boolean!
     "The open todos standing in the way, if any."
     blockedBy: [Todo!]!
+    """
+    Where the todo opens in the app, for anything outside it that wants to link
+    back: \`APP_URL\` + \`/todos/<id>\`. It follows the todo from project to project.
+    """
+    url: String!
   }
 
   extend type Project {
     todoCount: Int!
     openTodoCount: Int!
+    "Where the project opens in the app: \`APP_URL\` + \`/projects/<id>\`."
+    url: String!
   }
 
   extend type Mutation {
@@ -163,12 +171,14 @@ export function applyTodosExtension(schema: GraphQLSchema): GraphQLSchema {
     const blockers = await context.loaders.blockers.load(String(parent.id));
     return isAiActor(context) ? visibleToAi(context, blockers) : blockers;
   };
+  todoFields.url.resolve = (parent: AnyRow) => appLink(`/todos/${parent.id}`);
 
   const projectFields = (extendedSchema.getType('Project') as GraphQLObjectType).getFields();
   projectFields.todoCount.resolve = async (parent: AnyRow, _args: unknown, context: Context) =>
     (await context.loaders.todoCounts.load(String(parent.id))).total;
   projectFields.openTodoCount.resolve = async (parent: AnyRow, _args: unknown, context: Context) =>
     (await context.loaders.todoCounts.load(String(parent.id))).open;
+  projectFields.url.resolve = (parent: AnyRow) => appLink(`/projects/${parent.id}`);
 
   const mutations = (extendedSchema.getType('Mutation') as GraphQLObjectType).getFields();
 
