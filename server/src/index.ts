@@ -45,8 +45,9 @@ try {
 }
 
 let runner: EmbeddedRunner | undefined;
-// Old runs go whenever AI does; without it there are none to prune.
-const stopPruning = ai ? startPruning(db) : undefined;
+// Old runs go whenever AI does; without it there are none to prune. The change
+// feed's old tombstones go either way.
+const stopPruning = startPruning(db, { runs: ai });
 
 const app = express();
 const httpServer = createServer(app);

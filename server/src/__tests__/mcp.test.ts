@@ -25,6 +25,7 @@ const READS = [
   'projects',
   'lanes',
   'todos',
+  'changes',
   'request',
   'todo_notes',
   'todo_history',

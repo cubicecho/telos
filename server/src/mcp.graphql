@@ -79,6 +79,56 @@ query todos(
   }
 }
 
+# What changed in the projects, todos and dependencies open to AI since a
+# cursor, for keeping a copy in step: each as it stands now, and a tombstone
+# for each that was deleted or left AI's view. Leave `since` out to read
+# everything, then pass back `cursor` each time; while `hasMore`, ask again
+# straight away. An archived todo comes with `archivedAt` set.
+query changes(
+  # The `cursor` of the last page. Left out, from the beginning.
+  $since: String
+  # How many entries at most, up to 1000.
+  $limit: Int! = 200
+) {
+  changes(since: $since, limit: $limit) {
+    projects {
+      id
+      name
+      description
+      archivedAt
+      updatedAt
+    }
+    todos {
+      id
+      projectId
+      title
+      brief: notes
+      acceptance
+      laneId
+      parentId
+      completedAt
+      dueAt
+      archivedAt
+      updatedAt
+    }
+    dependencies {
+      id
+      todoId
+      dependsOnTodoId
+    }
+    tombstones {
+      entity
+      id
+      projectId
+      todoId
+      dependsOnTodoId
+      removedAt
+    }
+    cursor
+    hasMore
+  }
+}
+
 # One todo in full: what was asked (`brief`, `acceptance`), where it sits on
 # the board, what it is part of or split into, what blocks it, its thread of
 # notes and its history of moves and edits. Works for any todo AI can see,
