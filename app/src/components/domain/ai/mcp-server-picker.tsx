@@ -36,7 +36,7 @@ export function McpServerPicker({
     <View className="gap-2">
       <Text className="font-medium text-foreground text-sm">MCP servers</Text>
       <Text className="text-muted-foreground text-xs">
-        Telos's own tools are always there. The servers themselves are kept under MCP servers, in settings.
+        Telos's own tools are chosen below. The servers themselves are kept under MCP servers, in settings.
       </Text>
       <Field orientation="horizontal">
         <Checkbox

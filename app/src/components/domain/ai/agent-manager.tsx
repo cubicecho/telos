@@ -24,6 +24,7 @@ import {
 } from '@/lib/graphql';
 import { newId } from '@/lib/ids';
 import { McpServerPicker } from './mcp-server-picker';
+import { RunToolsPicker } from './run-tools-picker';
 
 type AgentRow = AgentFieldsFragment;
 
@@ -271,6 +272,9 @@ export function AgentFormDialog({
             </form.AppField>
             <form.AppField name="mcpServerSlugs">
               {(field) => <McpServerPicker slugs={field.state.value} onChange={(next) => field.handleChange(next)} />}
+            </form.AppField>
+            <form.AppField name="toolsOff">
+              {(field) => <RunToolsPicker toolsOff={field.state.value} onChange={(next) => field.handleChange(next)} />}
             </form.AppField>
           </ScrollView>
           <FormDialogFooter onCancel={() => onOpenChange(false)} error={error ? describeError(error) : null}>

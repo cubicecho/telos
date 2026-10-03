@@ -22,6 +22,12 @@ export interface AgentDraft {
    * whatever is added later; a list is exactly those, and an empty one is none.
    */
   mcpServerSlugs: string[] | null;
+  /**
+   * The MCP door's tools switched off for its runs: null is the run default
+   * (reading, adding work and notes), whatever the door adds later; a list is
+   * exactly those off, and an empty one is every tool a run may have.
+   */
+  toolsOff: string[] | null;
 }
 
 const numberText = (value: number | null | undefined) => (value == null ? '' : String(value));
@@ -51,6 +57,8 @@ export function toAgentDraft(agent: AgentFieldsFragment | null | undefined): Age
     requestTimeoutSeconds: numberText(agent?.requestTimeoutSeconds),
     maxRetries: numberText(agent?.maxRetries),
     mcpServerSlugs: readServerSlugs(agent?.mcpServerSlugs),
+    // The same shape as the slugs: a list of names, or null for the default.
+    toolsOff: readServerSlugs(agent?.toolsOff),
   };
 }
 
@@ -73,6 +81,7 @@ export function fromAgentDraft(draft: AgentDraft): Omit<CreateAgentInput, 'id'> 
     requestTimeoutSeconds: numberOrNull(draft.requestTimeoutSeconds),
     maxRetries: numberOrNull(draft.maxRetries),
     mcpServerSlugs: draft.mcpServerSlugs,
+    toolsOff: draft.toolsOff,
   };
 }
 

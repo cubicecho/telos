@@ -18,10 +18,10 @@ const KEY = {
 };
 
 const TOOLS = [
-  { __typename: 'McpTool', name: 'projects', description: 'The projects open to AI.\nMore.', writes: false },
-  { __typename: 'McpTool', name: 'submit_request', description: 'Hands work to a project.', writes: true },
-  { __typename: 'McpTool', name: 'delete_todo', description: 'Deletes a todo for good.', writes: true },
-];
+  { name: 'projects', description: 'The projects open to AI.\nMore.', writes: false, runDefault: true },
+  { name: 'submit_request', description: 'Hands work to a project.', writes: true, runDefault: false },
+  { name: 'delete_todo', description: 'Deletes a todo for good.', writes: true, runDefault: false },
+].map((tool) => ({ __typename: 'McpTool', forRuns: true, ...tool }));
 
 const keys = { request: { query: ApiKeysDocument }, result: { data: { apiKeys: [KEY] } } };
 const tools = { request: { query: McpToolsDocument }, result: { data: { mcpTools: TOOLS } } };

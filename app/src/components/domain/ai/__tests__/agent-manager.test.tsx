@@ -7,6 +7,7 @@ import {
   AgentsDocument,
   CreateAgentDocument,
   McpServersDocument,
+  McpToolsDocument,
   UpdateAgentDocument,
 } from '@/lib/graphql';
 import { AgentManager } from '../agent-manager';
@@ -32,8 +33,20 @@ const AGENT = {
   requestTimeoutSeconds: null,
   maxRetries: null,
   mcpServerSlugs: null,
+  toolsOff: null,
   hasApiKey: false,
 };
+
+// One of each kind: a read and a write a run has by default, a write it does
+// not, and a tool no run may have.
+const TOOLS = [
+  { name: 'todos', writes: false, forRuns: true, runDefault: true },
+  { name: 'create_todo', writes: true, forRuns: true, runDefault: true },
+  { name: 'move_todo', writes: true, forRuns: true, runDefault: false },
+  { name: 'record_artifact', writes: true, forRuns: false, runDefault: false },
+].map((tool) => ({ __typename: 'McpTool', description: `What ${tool.name} does.\nMore.`, ...tool }));
+
+const tools = { request: { query: McpToolsDocument }, result: { data: { mcpTools: TOOLS } } };
 
 const SERVER = {
   __typename: 'McpServer',
@@ -102,11 +115,14 @@ describe('AgentManager', () => {
       maxRetries: null,
       // Every server the account has, which is what a new agent starts with.
       mcpServerSlugs: null,
+      // The run default: reading, adding work and notes.
+      toolsOff: null,
     };
     const create = vi.fn(() => ({ data: { createAgent: { ...AGENT, ...values } } }));
     manager([
       agents([]),
       servers([SERVER]),
+      tools,
       { request: { query: CreateAgentDocument, variables: { values } }, result: create },
       agents([AGENT]),
     ]);
@@ -119,6 +135,8 @@ describe('AgentManager', () => {
     await user.type(screen.getByLabelText('Model'), 'qwen3:14b');
     await user.type(screen.getByLabelText('Temperature'), '0.2');
     expect(screen.getByRole('checkbox', { name: 'Every server' })).toBeChecked();
+    expect(await screen.findByRole('switch', { name: 'create_todo' })).toBeChecked();
+    expect(screen.getByRole('switch', { name: 'move_todo' })).not.toBeChecked();
     await user.click(screen.getByRole('button', { name: 'Create agent' }));
 
     await waitFor(() => expect(create).toHaveBeenCalled());
@@ -204,5 +222,53 @@ describe('AgentManager', () => {
 
     await waitFor(() => expect(update).toHaveBeenCalled());
     expect(update.mock.calls[0][0]).toMatchObject({ set: { mcpServerSlugs: ['docs'] } });
+  });
+
+  it('switches a run’s tools from the defaults, without offering one no run may have', async () => {
+    const user = userEvent.setup();
+    const update = vi.fn((variables: { set: { toolsOff: string[] | null } }) => ({
+      data: { updateAgent: { ...AGENT, toolsOff: variables.set.toolsOff } },
+    }));
+    manager([
+      agents([AGENT]),
+      servers([SERVER]),
+      tools,
+      { request: { query: UpdateAgentDocument }, variableMatcher: () => true, result: update },
+    ]);
+
+    await user.click(await screen.findByRole('button', { name: 'Edit Reviewer' }));
+    expect(await screen.findByRole('switch', { name: 'todos' })).toBeChecked();
+    expect(screen.queryByRole('switch', { name: 'record_artifact' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Defaults' })).toBeDisabled();
+    // Turning one on keeps the rest as the defaults had them.
+    await user.click(screen.getByRole('switch', { name: 'move_todo' }));
+    expect(screen.getByRole('switch', { name: 'move_todo' })).toBeChecked();
+    await user.click(screen.getByRole('switch', { name: 'create_todo' }));
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(update).toHaveBeenCalled());
+    expect(update.mock.calls[0][0]).toMatchObject({ id: 'a1', set: { toolsOff: ['create_todo'] } });
+  });
+
+  it('goes back to the defaults, which follow the door', async () => {
+    const user = userEvent.setup();
+    const update = vi.fn((variables: { set: { toolsOff: string[] | null } }) => ({
+      data: { updateAgent: { ...AGENT, toolsOff: variables.set.toolsOff } },
+    }));
+    manager([
+      agents([{ ...AGENT, toolsOff: [] }]),
+      servers([SERVER]),
+      tools,
+      { request: { query: UpdateAgentDocument }, variableMatcher: () => true, result: update },
+    ]);
+
+    await user.click(await screen.findByRole('button', { name: 'Edit Reviewer' }));
+    expect(await screen.findByRole('switch', { name: 'move_todo' })).toBeChecked();
+    await user.click(screen.getByRole('button', { name: 'Defaults' }));
+    expect(screen.getByRole('switch', { name: 'move_todo' })).not.toBeChecked();
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(update).toHaveBeenCalled());
+    expect(update.mock.calls[0][0]).toMatchObject({ set: { toolsOff: null } });
   });
 });
