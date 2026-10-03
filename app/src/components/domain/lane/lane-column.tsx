@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Text, TextInput, View } from 'react-native';
+import { Text, View } from 'react-native';
 import type { StationFieldsFragment } from '@/__generated__/graphql';
 import { Ellipsis } from '@/components/app-icons';
 import type { TodoSummary } from '@/components/domain/todo/types';
@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Check, ChevronLeft, ChevronRight, CircleCheck, Pencil, Settings, Trash2 } from '@/components/ui/icons';
-import { INPUT_CLASS } from '@/components/ui/input-base';
+import { Input } from '@/components/ui/input';
 import { Menu, MenuContent, MenuItem, MenuTrigger } from '@/components/ui/menu';
 import type { CachedLane } from '@/lib/cache';
 import { cn } from '@/lib/utils';
@@ -82,16 +82,15 @@ export function LaneColumn({
     <View role="region" aria-label={lane.name} className="w-72 shrink-0 gap-2">
       <View className="h-8 flex-row items-center gap-2 px-1">
         {renaming ? (
-          <TextInput
+          <Input
             autoFocus
             value={name}
             aria-label={`Rename ${lane.name}`}
-            className={cn(INPUT_CLASS, 'h-7 flex-1 py-1')}
+            className="h-7 flex-1 py-1"
             onChangeText={setName}
             onSubmitEditing={submitName}
             onBlur={submitName}
-            onKeyPress={(event) => {
-              if (event.nativeEvent.key !== 'Escape') return;
+            onEscape={() => {
               setName(lane.name);
               setRenaming(false);
             }}
