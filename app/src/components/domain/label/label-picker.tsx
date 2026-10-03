@@ -42,15 +42,7 @@ export function LabelPicker({
         {/* Icon only, to sit in a row of icon actions. The name it lost is in
             `aria-label`. (The DOM `title` it also had is not a Pressable prop;
             a pointer hint would be cubeui's Tooltip.) */}
-        <Button
-          variant="ghost"
-          size={size}
-          className={cn('text-muted-foreground', className)}
-          aria-label="Labels"
-          // Radix opens from the trigger's `onClick`, which react-native-web's
-          // Pressable swallows. Local patch until cubicecho/cubeui#123.
-          onPress={() => setOpen(!open)}
-        >
+        <Button variant="ghost" size={size} className={cn('text-muted-foreground', className)} aria-label="Labels">
           <Tag className="h-4 w-4" />
         </Button>
       </PopoverTrigger>

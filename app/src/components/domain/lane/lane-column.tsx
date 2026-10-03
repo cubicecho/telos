@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { Text, TextInput, View } from 'react-native';
 import type { StationFieldsFragment } from '@/__generated__/graphql';
 import { Ellipsis } from '@/components/app-icons';
@@ -62,7 +62,6 @@ export function LaneColumn({
   marks?: ReadonlyMap<string, CardMark> | undefined;
 }) {
   const [renaming, setRenaming] = useState(false);
-  const renameInput = useRef<TextInput>(null);
   const [name, setName] = useState(lane.name);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
@@ -84,7 +83,6 @@ export function LaneColumn({
       <View className="h-8 flex-row items-center gap-2 px-1">
         {renaming ? (
           <TextInput
-            ref={renameInput}
             autoFocus
             value={name}
             aria-label={`Rename ${lane.name}`}
@@ -126,23 +124,13 @@ export function LaneColumn({
               <Ellipsis className="h-4 w-4" />
             </Button>
           </MenuTrigger>
-          <MenuContent
-            align="end"
-            className="w-56"
-            // Rename hands focus to its input, but the input mounts while the
-            // menu still traps focus, and radix gives it to the trigger once the
-            // menu unmounts. So the hand-off happens here, at the moment radix
-            // would return it. Web-only radix prop, so it goes past the shared
-            // types. Local patch until cubicecho/cubeui#119.
-            {...({
-              onCloseAutoFocus: (event: Event) => {
-                if (!renameInput.current) return;
-                event.preventDefault();
-                renameInput.current.focus();
-              },
-            } as object)}
-          >
-            <MenuItem label="Rename" icon={<Pencil className="h-3.5 w-3.5" />} onSelect={() => setRenaming(true)} />
+          <MenuContent align="end" className="w-56">
+            <MenuItem
+              label="Rename"
+              icon={<Pencil className="h-3.5 w-3.5" />}
+              focusesElsewhere
+              onSelect={() => setRenaming(true)}
+            />
             <MenuItem
               label="Marks work done"
               icon={<Check className={cn('h-3.5 w-3.5', !lane.isDone && 'opacity-0')} />}
