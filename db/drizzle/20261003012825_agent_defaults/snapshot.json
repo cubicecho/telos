@@ -1,9 +1,9 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "9385e13b-1d24-4557-bf4e-10ce6817c402",
+  "id": "84e83944-3328-4d93-ab77-4ae18b84cf51",
   "prevIds": [
-    "28e1f29d-8477-4b7b-ba5d-04abd1c49b3f"
+    "c8a2409f-fd87-4fb9-b559-cdbe0c673317"
   ],
   "ddl": [
     {
@@ -548,6 +548,19 @@
       "generated": null,
       "identity": null,
       "name": "mcp_server_slugs",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "agents"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "tools_off",
       "entityType": "columns",
       "schema": "public",
       "table": "agents"
