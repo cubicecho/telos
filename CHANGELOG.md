@@ -1,3 +1,10 @@
+## [1.23.1](https://github.com/cubicecho/telos/compare/v1.23.0...v1.23.1) (2026-10-03)
+
+
+### Bug Fixes
+
+* **app:** hide the AI setup checklist on a project with AI switched off ([27384cf](https://github.com/cubicecho/telos/commit/27384cf83178076207c73a4b78300fdcf1a475c4))
+
 # [1.23.0](https://github.com/cubicecho/telos/compare/v1.22.0...v1.23.0) (2026-10-03)
 
 
