@@ -1,11 +1,11 @@
 import { useMutation, useQuery } from '@apollo/client';
 import { useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import type { RunSummaryFieldsFragment } from '@/__generated__/graphql';
 import { ConfirmButton } from '@/components/confirm-button';
+import { DisclosureRow } from '@/components/disclosure-row';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ChevronDown, ChevronRight } from '@/components/ui/icons';
 import { Spinner } from '@/components/ui/spinner';
 import { describeError } from '@/lib/errors';
 import { CancelRunDocument, DeleteRunDocument, RunDocument } from '@/lib/graphql';
@@ -68,68 +68,58 @@ export function RunRow({
     );
 
   return (
-    <View role="listitem" className="gap-2 rounded-lg border border-border px-3 py-2">
-      <View className="flex-row items-center gap-2">
-        <Pressable
-          role="button"
-          aria-expanded={open}
-          aria-label={`${title}, ${running ? 'Running' : run.status}`}
-          onPress={() => setOpen(!open)}
-          className="min-w-0 flex-1 flex-row items-center gap-2"
-        >
-          {open ? (
-            <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
-          ) : (
-            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-          )}
-          <View className="min-w-0 flex-1 gap-0.5">
-            <Text numberOfLines={1} className="text-foreground text-sm">
-              {title}
-            </Text>
-            <Text className="text-muted-foreground text-xs">
-              {project ? `${project} · ${describeRun(run)}` : describeRun(run)}
-            </Text>
-          </View>
-        </Pressable>
-        {ofDraft && showTodo ? <Badge variant="outline">Draft</Badge> : null}
-        {run.verdict === 'none' ? null : (
-          <Badge variant={run.verdict === 'pass' ? 'success' : 'destructive'}>
-            {run.verdict === 'pass' ? 'Pass' : 'Fail'}
-          </Badge>
-        )}
-        <RunStatusBadge status={run.status} />
-        {/* Cancelling asks; the runner stops at its next heartbeat and the run
-            is marked stopped then. Until it does, the request is what shows.
-            A draft's reply stops at once: the turn goes back to the person. */}
-        {running && !run.cancelRequestedAt ? (
-          <Button variant="outline" size="sm" disabled={cancelling} onPress={cancel}>
-            Cancel
-          </Button>
-        ) : null}
-        {running && run.cancelRequestedAt ? <Text className="text-muted-foreground text-xs">Stopping…</Text> : null}
-        {running ? null : (
-          <ConfirmButton
-            variant="ghost"
-            size="sm"
-            disabled={deleting}
-            label={`Delete the run ${title}`}
-            tooltip={false}
-            title="Delete this run?"
-            description={ofDraft ? DELETE_DRAFT_RUN : DELETE_TODO_RUN}
-            onConfirm={remove}
-          >
-            Delete
-          </ConfirmButton>
-        )}
-      </View>
-
+    <View role="listitem" className="gap-1">
+      <DisclosureRow
+        open={open}
+        onOpenChange={setOpen}
+        title={title}
+        description={project ? `${project} · ${describeRun(run)}` : describeRun(run)}
+        meta={
+          <>
+            {ofDraft && showTodo ? <Badge variant="outline">Draft</Badge> : null}
+            {run.verdict === 'none' ? null : (
+              <Badge variant={run.verdict === 'pass' ? 'success' : 'destructive'}>
+                {run.verdict === 'pass' ? 'Pass' : 'Fail'}
+              </Badge>
+            )}
+            <RunStatusBadge status={run.status} />
+          </>
+        }
+        action={
+          <>
+            {/* Cancelling asks; the runner stops at its next heartbeat and the run
+                is marked stopped then. Until it does, the request is what shows.
+                A draft's reply stops at once: the turn goes back to the person. */}
+            {running && !run.cancelRequestedAt ? (
+              <Button variant="outline" size="sm" disabled={cancelling} onPress={cancel}>
+                Cancel
+              </Button>
+            ) : null}
+            {running && run.cancelRequestedAt ? <Text className="text-muted-foreground text-xs">Stopping…</Text> : null}
+            {running ? null : (
+              <ConfirmButton
+                variant="ghost"
+                size="sm"
+                disabled={deleting}
+                label={`Delete the run ${title}`}
+                tooltip={false}
+                title="Delete this run?"
+                description={ofDraft ? DELETE_DRAFT_RUN : DELETE_TODO_RUN}
+                onConfirm={remove}
+              >
+                Delete
+              </ConfirmButton>
+            )}
+          </>
+        }
+        content={<OpenRun id={run.id} running={running} pollMs={pollMs} />}
+      />
+      {/* Outside the row: a failed cancel or delete is said whether or not it is open. */}
       {error ? (
         <Text className="text-destructive text-sm" aria-live="polite">
           {error}
         </Text>
       ) : null}
-
-      {open ? <OpenRun id={run.id} running={running} pollMs={pollMs} /> : null}
     </View>
   );
 }
