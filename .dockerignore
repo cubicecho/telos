@@ -8,3 +8,7 @@ pgdata
 coverage
 .git
 .env
+
+# The landing page (site/) is built and deployed by its own workflow, and is
+# no part of the image.
+site
