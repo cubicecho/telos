@@ -49,6 +49,8 @@ export const agents = pgTable(
     // more tools than a small context holds.
     toolDiscovery: boolean('tool_discovery'),
     toolSelectModel: text('tool_select_model'),
+    /** agent-core's `reasoning_effort`: a level, or "off" for none. Null inherits. */
+    reasoningEffort: text('reasoning_effort'),
     requestTimeoutSeconds: integer('request_timeout_seconds'),
     maxRetries: integer('max_retries'),
     // The account's MCP servers it may reach, by slug (mcp-servers.ts). Null is

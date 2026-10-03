@@ -23,6 +23,8 @@ export interface LayerDraft {
   maxToolIterations: string;
   toolDiscovery: Discovery;
   toolSelectModel: string;
+  /** 'inherit', or a level as agent-core takes it, "off" among them. */
+  reasoningEffort: string;
   requestTimeoutSeconds: string;
   maxRetries: string;
 }
@@ -80,6 +82,7 @@ export function toLayerDraft(layer: StoredLayer | null | undefined): LayerDraft 
     maxToolIterations: numberText(layer?.maxToolIterations),
     toolDiscovery: discovery == null ? 'inherit' : discovery ? 'on' : 'off',
     toolSelectModel: layer?.toolSelectModel ?? '',
+    reasoningEffort: layer?.reasoningEffort ?? 'inherit',
     requestTimeoutSeconds: numberText(layer?.requestTimeoutSeconds),
     maxRetries: numberText(layer?.maxRetries),
   };
@@ -111,6 +114,7 @@ export function fromLayerDraft(draft: LayerDraft): Required<StoredLayer> {
     maxToolIterations: numberOrNull(draft.maxToolIterations),
     toolDiscovery: draft.toolDiscovery === 'inherit' ? null : draft.toolDiscovery === 'on',
     toolSelectModel: orNull(draft.toolSelectModel),
+    reasoningEffort: draft.reasoningEffort === 'inherit' ? null : orNull(draft.reasoningEffort),
     requestTimeoutSeconds: numberOrNull(draft.requestTimeoutSeconds),
     maxRetries: numberOrNull(draft.maxRetries),
   };
@@ -149,6 +153,7 @@ export function layerHints(inherited: Inherited | null | undefined, from: 'defau
       maxToolIterations: '',
       toolDiscovery: '',
       toolSelectModel: '',
+      reasoningEffort: '',
       requestTimeoutSeconds: '',
       maxRetries: '',
     };
@@ -165,6 +170,7 @@ export function layerHints(inherited: Inherited | null | undefined, from: 'defau
     maxToolIterations: String(inherited.maxToolIterations),
     toolDiscovery: inherited.toolDiscovery ? 'on' : 'off',
     toolSelectModel: inherited.toolSelectModel || 'None',
+    reasoningEffort: inherited.reasoningEffort || 'off',
     requestTimeoutSeconds: numberText(inherited.requestTimeoutSeconds) || 'No limit',
     maxRetries: String(inherited.maxRetries),
   };

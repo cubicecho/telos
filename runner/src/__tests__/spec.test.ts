@@ -39,6 +39,14 @@ describe('resolveAgent', () => {
     expect(config).toMatchObject({ temperature: 0, maxTokens: 0, maxRetries: 0, toolDiscovery: 'eager' });
   });
 
+  it('passes a reasoning effort down, and lets an agent turn a default one off', () => {
+    const effort = { ...DEFAULTS, reasoningEffort: 'high' };
+    expect(resolveAgent(effort, {}).config.reasoningEffort).toBe('high');
+    expect(resolveAgent(effort, { reasoningEffort: null }).config.reasoningEffort).toBe('high');
+    expect(resolveAgent(effort, { reasoningEffort: 'off' }).config.reasoningEffort).toBe('off');
+    expect(resolveAgent(DEFAULTS, {}).config.reasoningEffort).toBeUndefined();
+  });
+
   it('falls back to agent-core when nothing says anything', () => {
     const { config } = resolveAgent(null, { baseUrl: 'http://a/v1', model: 'm' });
     expect(config).toMatchObject({

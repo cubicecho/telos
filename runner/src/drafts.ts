@@ -118,6 +118,8 @@ export async function answerDraft(
         name: 'draft_turn',
         maxTokens: config.maxTokens,
         temperature: config.temperature,
+        // A level asks the model to think; none keeps agent-core's no-thinking hints.
+        ...(config.reasoningEffort ? { reasoningEffort: config.reasoningEffort } : {}),
         onNotice: (text) => events.push({ kind: 'notice', text }),
         ...(options.signal ? { signal: options.signal } : {}),
       },

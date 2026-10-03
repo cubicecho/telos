@@ -834,6 +834,7 @@ describe('drafts', () => {
         maxToolIterations: 1,
         toolDiscovery: false,
         toolSelectModel: null,
+        reasoningEffort: null,
         requestTimeoutSeconds: null,
         maxRetries: null,
         mcpServers: '[]',

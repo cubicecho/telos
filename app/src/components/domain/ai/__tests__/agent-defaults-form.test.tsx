@@ -20,6 +20,7 @@ const BUILT_IN = {
   maxToolIterations: 20,
   toolDiscovery: false,
   toolSelectModel: '',
+  reasoningEffort: '',
   requestTimeoutSeconds: null,
   maxRetries: 0,
 };
@@ -35,6 +36,7 @@ const BLANK = {
   maxToolIterations: null,
   toolDiscovery: null,
   toolSelectModel: null,
+  reasoningEffort: null,
   requestTimeoutSeconds: null,
   maxRetries: null,
   hasApiKey: false,
@@ -68,6 +70,7 @@ describe('AgentDefaultsForm', () => {
       maxToolIterations: null,
       toolDiscovery: null,
       toolSelectModel: null,
+      reasoningEffort: null,
       requestTimeoutSeconds: null,
       maxRetries: null,
     };

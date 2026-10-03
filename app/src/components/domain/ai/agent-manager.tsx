@@ -24,7 +24,14 @@ import {
   UpdateAgentDocument,
 } from '@/lib/graphql';
 import { newId } from '@/lib/ids';
-import { DISCOVERY_HELP, discoveryOptions, type NumberGroup, numbersIn } from './agent-settings-fields';
+import {
+  DISCOVERY_HELP,
+  discoveryOptions,
+  EFFORT_HELP,
+  effortOptions,
+  type NumberGroup,
+  numbersIn,
+} from './agent-settings-fields';
 import {
   BASE_URL_HELP,
   type EndpointModel,
@@ -373,6 +380,15 @@ export function AgentFormDialog({
               }}
             </form.Subscribe>
             {numbers('model')}
+            <form.AppField name="reasoningEffort">
+              {(field) => (
+                <field.SelectField
+                  label="Reasoning effort"
+                  options={effortOptions(hints.reasoningEffort, field.state.value)}
+                />
+              )}
+            </form.AppField>
+            <Text className="-mt-2 text-muted-foreground text-xs">{EFFORT_HELP}</Text>
             <form.AppField name="systemPrompt">
               {(field) => (
                 <field.TextAreaField label="System prompt" placeholder="Optional. Who the agent is, in any lane." />

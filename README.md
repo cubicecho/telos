@@ -158,7 +158,10 @@ ones. Each comes with a prompt and a temperature for its job; give it a base URL
 and a model, or leave those to your agent defaults. An agent's form, like the
 defaults', starts at its endpoint: type the base URL (and a key, if it wants
 one) and its models are listed, to pick from, with the context length each
-reports; an endpoint that lists nothing still takes a model typed by name. A station can archive what passes instead of
+reports; an endpoint that lists nothing still takes a model typed by name.
+A reasoning effort (off, or a level from none to max) is sent as
+`reasoning_effort` to a model that deliberates; an agent can turn off a level its
+defaults ask for. A station can archive what passes instead of
 moving it: the todo is completed and leaves the board, for a pipeline whose
 finished work nobody needs to see in a column. Stations that do the same job
 can follow one **lane preset** (Settings → Agents): its contract, prompt, WIP limit

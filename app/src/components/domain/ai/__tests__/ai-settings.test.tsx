@@ -61,6 +61,7 @@ const BUILT_IN = {
   maxToolIterations: 20,
   toolDiscovery: false,
   toolSelectModel: '',
+  reasoningEffort: '',
   requestTimeoutSeconds: null,
   maxRetries: 0,
 };
@@ -80,6 +81,7 @@ const defaults = {
         maxToolIterations: null,
         toolDiscovery: null,
         toolSelectModel: null,
+        reasoningEffort: null,
         requestTimeoutSeconds: null,
         maxRetries: null,
         hasApiKey: false,

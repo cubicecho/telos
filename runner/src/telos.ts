@@ -56,6 +56,7 @@ export interface ClaimedAgent {
   maxToolIterations: number | null;
   toolDiscovery: boolean | null;
   toolSelectModel: string | null;
+  reasoningEffort: string | null;
   requestTimeoutSeconds: number | null;
   maxRetries: number | null;
   /** The account's layer under it, key included; null where the account has set none. */
@@ -210,10 +211,10 @@ const QUEUE = `query ($limit: Int) { runnerQueue(limit: $limit) { todoId laneId 
 /** What the runner reads of an agent, for a run or a draft. */
 const AGENT_FIELDS = `
   id name baseUrl model apiKey systemPrompt temperature maxTokens contextLength
-  maxToolIterations toolDiscovery toolSelectModel requestTimeoutSeconds maxRetries mcpServers mcpNotices
+  maxToolIterations toolDiscovery toolSelectModel reasoningEffort requestTimeoutSeconds maxRetries mcpServers mcpNotices
   defaults {
     baseUrl model apiKey temperature maxTokens contextLength
-    maxToolIterations toolDiscovery toolSelectModel requestTimeoutSeconds maxRetries
+    maxToolIterations toolDiscovery toolSelectModel reasoningEffort requestTimeoutSeconds maxRetries
   }
 `;
 const CLAIM = `mutation ($todoId: ID!, $laneId: ID!) {

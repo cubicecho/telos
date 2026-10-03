@@ -11,7 +11,14 @@ import { LoadState } from '@/components/ui/load-failure';
 import { fromLayerDraft, type LayerDraft, layerHints, toLayerDraft } from '@/lib/agents';
 import { describeError } from '@/lib/errors';
 import { AgentDefaultsDocument, SetAgentDefaultsApiKeyDocument, SetAgentDefaultsDocument } from '@/lib/graphql';
-import { DISCOVERY_HELP, discoveryOptions, type NumberGroup, numbersIn } from './agent-settings-fields';
+import {
+  DISCOVERY_HELP,
+  discoveryOptions,
+  EFFORT_HELP,
+  effortOptions,
+  type NumberGroup,
+  numbersIn,
+} from './agent-settings-fields';
 import { BASE_URL_HELP, EndpointStatus, FormGroupTitle, ModelField, useEndpointModels } from './endpoint-fields';
 
 /** The form's values: the defaults, and a key typed for them, which is saved on its own. */
@@ -153,6 +160,15 @@ export function AgentDefaultsForm() {
                   )}
                 </form.AppField>
                 {numbers('model')}
+                <form.AppField name="reasoningEffort">
+                  {(field) => (
+                    <field.SelectField
+                      label="Reasoning effort"
+                      options={effortOptions(hints.reasoningEffort, field.state.value)}
+                    />
+                  )}
+                </form.AppField>
+                <Text className="-mt-2 text-muted-foreground text-xs">{EFFORT_HELP}</Text>
 
                 <FormGroupTitle title="Tools" />
                 {numbers('tools')}

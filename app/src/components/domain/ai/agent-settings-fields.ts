@@ -4,7 +4,10 @@ import { type LayerDraft, numberRule } from '@/lib/agents';
 // same in both forms. Each is blank to inherit, and its placeholder says what
 // the blank stands for.
 
-type NumberField = Exclude<keyof LayerDraft, 'baseUrl' | 'model' | 'toolDiscovery' | 'toolSelectModel'>;
+type NumberField = Exclude<
+  keyof LayerDraft,
+  'baseUrl' | 'model' | 'toolDiscovery' | 'toolSelectModel' | 'reasoningEffort'
+>;
 
 /** Which group of a form a number sits in: with the model, the tools, or the requests. */
 export type NumberGroup = 'model' | 'tools' | 'requests';
@@ -67,3 +70,25 @@ export function discoveryOptions(inherited: string) {
 
 export const DISCOVERY_HELP =
   'Offer the model only the tools a cheap first pass picks. For servers with more tools than a small context holds.';
+
+/** The levels min-agent offers, in order; agent-core passes any string through. */
+const EFFORTS = ['off', 'none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'] as const;
+
+/**
+ * The choices for reasoning effort, the first saying what inheriting it gives.
+ *
+ * @param inherited - The level a blank resolves to, or blank while it loads.
+ * @param current - What is stored, kept as a choice when it is none of the levels.
+ * @returns The select's options.
+ */
+export function effortOptions(inherited: string, current: string) {
+  const levels: string[] = [...EFFORTS];
+  if (current !== 'inherit' && current.trim() !== '' && !levels.includes(current)) levels.push(current);
+  return [
+    { value: 'inherit', label: inherited ? `Inherit (${inherited})` : 'Inherit' },
+    ...levels.map((level) => ({ value: level, label: level === 'off' ? 'Off: send none' : level })),
+  ];
+}
+
+export const EFFORT_HELP =
+  'How hard a reasoning model thinks before it answers. Off sends nothing, which every endpoint takes; a level the model refuses is stepped down.';
