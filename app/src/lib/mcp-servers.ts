@@ -11,6 +11,13 @@ export interface McpServerDraft {
   command: string;
   /** One argument per line. */
   args: string;
+  /** Where a command runs; blank for the runner's own directory. */
+  cwd: string;
+  /** Seconds, typed; blank for the runner's default. */
+  connectTimeout: string;
+  callTimeout: string;
+  /** Seconds a server may sit unused before it is closed; 0 is never. */
+  idleTimeout: string;
   /** One tool name per line. */
   hiddenTools: string;
   /** A JSON list, or blank for none. */
@@ -40,6 +47,14 @@ const fromLines = (value: string) =>
 
 const orNull = (value: string) => (value.trim() === '' ? null : value.trim());
 
+const MS_PER_SECOND = 1000;
+
+/** Milliseconds as the seconds the form shows, or blank for none. */
+const toSeconds = (ms: number | null | undefined) => (ms == null ? '' : String(ms / MS_PER_SECOND));
+
+/** Seconds as typed, as the milliseconds stored, or null for blank. */
+const toMs = (seconds: string) => (seconds.trim() === '' ? null : Math.round(Number(seconds) * MS_PER_SECOND));
+
 /**
  * A server's form, filled from a row or blank for a new one.
  *
@@ -54,6 +69,10 @@ export function toServerDraft(server: McpServerFieldsFragment | null): McpServer
     url: server?.url ?? '',
     command: server?.command ?? '',
     args: lines(server?.args),
+    cwd: server?.cwd ?? '',
+    connectTimeout: toSeconds(server?.connectTimeoutMs),
+    callTimeout: toSeconds(server?.callTimeoutMs),
+    idleTimeout: toSeconds(server?.idleTimeoutMs),
     hiddenTools: lines(server?.hiddenTools),
     hooks: hooks ? JSON.stringify(hooks, null, HOOK_INDENT) : '',
   };
@@ -73,6 +92,10 @@ export function fromServerDraft(draft: McpServerDraft): Omit<CreateMcpServerInpu
     url: orNull(draft.url),
     command: orNull(draft.command),
     args: fromLines(draft.args),
+    cwd: orNull(draft.cwd),
+    connectTimeoutMs: toMs(draft.connectTimeout),
+    callTimeoutMs: toMs(draft.callTimeout),
+    idleTimeoutMs: toMs(draft.idleTimeout),
     hiddenTools: fromLines(draft.hiddenTools),
     hooks: draft.hooks.trim() === '' ? [] : JSON.parse(draft.hooks),
   };
@@ -92,6 +115,24 @@ export function slugRule(taken: string[]) {
     if (slug.length > SLUG_CHARS) return `At most ${SLUG_CHARS} characters.`;
     if (slug === TELOS_SLUG) return 'That one is telos’s own, which every run already has.';
     if (taken.includes(slug)) return 'Another of your servers has that slug.';
+    return undefined;
+  };
+}
+
+/**
+ * A validator for a time typed in seconds: blank, or a number of them.
+ *
+ * @param allowZero - Whether 0 means something (an idle server never closed).
+ * @returns The rule.
+ */
+export function secondsRule(allowZero: boolean) {
+  return ({ value }: { value: string }): string | undefined => {
+    if (value.trim() === '') return undefined;
+    const seconds = Number(value);
+    if (Number.isFinite(seconds) === false) return 'A number of seconds, or blank for the default.';
+    if (allowZero ? seconds < 0 : seconds * MS_PER_SECOND < 1) {
+      return allowZero ? '0 or more. 0 keeps it open.' : 'More than 0.';
+    }
     return undefined;
   };
 }

@@ -318,6 +318,10 @@ export const McpServerFieldsFragment = graphql(`
     url
     command
     args
+    cwd
+    connectTimeoutMs
+    callTimeoutMs
+    idleTimeoutMs
     hiddenTools
     hooks
     enabled

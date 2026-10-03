@@ -27,6 +27,10 @@ const SERVER = {
   url: 'http://localhost:8080/mcp',
   command: null,
   args: [],
+  cwd: null,
+  connectTimeoutMs: null,
+  callTimeoutMs: null,
+  idleTimeoutMs: null,
   hiddenTools: [],
   hooks: [],
   enabled: true,
@@ -123,6 +127,10 @@ describe('McpServerManager', () => {
       url: null,
       command: 'npx',
       args: ['-y', 'files-mcp'],
+      cwd: '/srv/files',
+      connectTimeoutMs: 120_000,
+      callTimeoutMs: null,
+      idleTimeoutMs: 0,
       hiddenTools: ['recall'],
       hooks: [{ id: 'memory', on: 'beforeTurn', tool: 'recall' }],
     };
@@ -140,6 +148,9 @@ describe('McpServerManager', () => {
     await user.type(screen.getByLabelText('Slug'), 'files');
     await user.type(screen.getByLabelText('Or a command (stdio)'), 'npx');
     await user.type(screen.getByLabelText('Arguments'), '-y\nfiles-mcp');
+    await user.type(screen.getByLabelText('Working directory'), '/srv/files');
+    await user.type(screen.getByLabelText('Connect (s)'), '120');
+    await user.type(screen.getByLabelText('Idle (s)'), '0');
     await user.type(screen.getByLabelText('Hidden tools'), 'recall');
     await user.click(screen.getByLabelText('Hooks'));
     await user.paste(JSON.stringify(values.hooks));
@@ -164,6 +175,8 @@ describe('McpServerManager', () => {
     await user.click(screen.getByRole('button', { name: 'Create server' }));
 
     expect(await screen.findByText('A server needs a URL or a command.')).toBeInTheDocument();
+    await user.type(screen.getByLabelText('Connect (s)'), '0');
+    expect(await screen.findByText('More than 0.')).toBeInTheDocument();
     expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 
