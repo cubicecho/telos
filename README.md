@@ -1,6 +1,7 @@
 # Telos
 
-A self-hostable todo app that is *just* todos.
+A self-hostable todo app that is *just* todos. Site:
+<https://cubicecho.github.io/telos/>
 
 Projects hold todos. Todos can depend on other todos, and a todo you are waiting
 on is one you cannot tick off yet — Telos knows that and says so. Labels attach
