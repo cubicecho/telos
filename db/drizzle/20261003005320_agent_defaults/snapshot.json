@@ -1,9 +1,9 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "fb367f29-3a09-4950-8d4b-1d121f0a60b4",
+  "id": "9385e13b-1d24-4557-bf4e-10ce6817c402",
   "prevIds": [
-    "6ca649e9-a0d9-42d1-875e-c1538859fb7e"
+    "28e1f29d-8477-4b7b-ba5d-04abd1c49b3f"
   ],
   "ddl": [
     {
@@ -2347,6 +2347,19 @@
       "table": "mcp_servers"
     },
     {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "cwd",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "mcp_servers"
+    },
+    {
       "type": "jsonb",
       "typeSchema": null,
       "notNull": true,
@@ -2394,6 +2407,45 @@
       "generated": null,
       "identity": null,
       "name": "hidden_tools",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "mcp_servers"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "connect_timeout_ms",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "mcp_servers"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "call_timeout_ms",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "mcp_servers"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "idle_timeout_ms",
       "entityType": "columns",
       "schema": "public",
       "table": "mcp_servers"
@@ -6619,6 +6671,13 @@
     {
       "value": "\"url\" IS NOT NULL OR \"command\" IS NOT NULL",
       "name": "ck_mcp_servers_target",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "mcp_servers"
+    },
+    {
+      "value": "(\"connect_timeout_ms\" IS NULL OR \"connect_timeout_ms\" > 0) AND (\"call_timeout_ms\" IS NULL OR \"call_timeout_ms\" > 0) AND (\"idle_timeout_ms\" IS NULL OR \"idle_timeout_ms\" >= 0)",
+      "name": "ck_mcp_servers_timeouts",
       "entityType": "checks",
       "schema": "public",
       "table": "mcp_servers"
