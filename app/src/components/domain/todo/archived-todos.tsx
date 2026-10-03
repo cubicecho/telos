@@ -1,10 +1,9 @@
 import { type DocumentNode, useMutation, useQuery } from '@apollo/client';
 import { type ComponentProps, type ReactNode, useState } from 'react';
 import { Text, View } from 'react-native';
-import { ActionButton } from '@/components/action-button';
 import { ArchiveRestore } from '@/components/app-icons';
+import { ConfirmButton } from '@/components/confirm-button';
 import { Button } from '@/components/ui/button';
-import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Trash2 } from '@/components/ui/icons';
 import { LoadState } from '@/components/ui/load-failure';
 import { formatTimestamp } from '@/lib/dates';
@@ -69,7 +68,6 @@ export function ArchivedTodoList({
   footer?: ReactNode;
 }) {
   const [error, setError] = useState<string | null>(null);
-  const [deleting, setDeleting] = useState<Archived | null>(null);
   const [restoreTodo, restoreState] = useMutation(RestoreTodoDocument, { refetchQueries: onRestore });
   const [deleteForGood, deleteState] = useMutation(DeleteTodoForGoodDocument, { refetchQueries: onDelete });
   const busy = restoreState.loading || deleteState.loading;
@@ -127,34 +125,23 @@ export function ArchivedTodoList({
                 <ArchiveRestore className="h-4 w-4" />
                 Restore
               </Button>
-              <ActionButton
+              <ConfirmButton
                 variant="ghost"
                 size="icon-xs"
                 className="hover:text-destructive"
                 disabled={busy}
                 label={`Delete ${todo.title} for good`}
-                onPress={() => setDeleting(todo)}
+                title="Delete this todo for good?"
+                description={`“${todo.title}”, its history, notes, runs and dependency links are removed. This cannot be undone.`}
+                onConfirm={() => void run(() => deleteForGood({ variables: { id: todo.id } }))}
               >
                 <Trash2 className="h-4 w-4" />
-              </ActionButton>
+              </ConfirmButton>
             </View>
           ))}
         </View>
       ) : null}
       {footer}
-
-      <ConfirmDialog
-        open={deleting !== null}
-        onOpenChange={(open) => !open && setDeleting(null)}
-        title="Delete this todo for good?"
-        description={`“${deleting?.title ?? ''}”, its history, notes, runs and dependency links are removed. This cannot be undone.`}
-        confirmLabel="Delete"
-        onConfirm={() => {
-          const target = deleting;
-          setDeleting(null);
-          if (target) void run(() => deleteForGood({ variables: { id: target.id } }));
-        }}
-      />
     </View>
   );
 }

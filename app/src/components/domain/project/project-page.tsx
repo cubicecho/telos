@@ -4,6 +4,7 @@ import { type ReactNode, useState } from 'react';
 import { Text, View } from 'react-native';
 import { ActionButton } from '@/components/action-button';
 import { MessageSquare } from '@/components/app-icons';
+import { ConfirmButton } from '@/components/confirm-button';
 import { AiSetupChecklist } from '@/components/domain/ai/ai-setup-checklist';
 import { type ProjectActivity, ProjectActivityLine } from '@/components/domain/ai/project-activity';
 import { ProjectAiSwitch, ProjectAutoRunSwitch } from '@/components/domain/ai/project-ai-switch';
@@ -13,7 +14,6 @@ import { LabelPicker } from '@/components/domain/label/label-picker';
 import { SaveTemplateDialog } from '@/components/domain/template/save-template-dialog';
 import { PROSE_COLUMN } from '@/components/header-content-footer';
 import { PageLayout } from '@/components/page-layout';
-import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Copy, Pencil, Trash2 } from '@/components/ui/icons';
 import { useAi } from '@/lib/ai';
 import { describeError } from '@/lib/errors';
@@ -57,7 +57,6 @@ export function ProjectPage({
 }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [savingTemplate, setSavingTemplate] = useState(false);
   const [drafting, setDrafting] = useState(false);
   const ai = useAi();
@@ -100,7 +99,6 @@ export function ProjectPage({
       // Stay put. Navigating away from a project that is still
       // there would look like the delete worked.
       setActionError(describeError(cause));
-      setConfirmingDelete(false);
       return;
     }
     router.replace('/');
@@ -142,15 +140,17 @@ export function ProjectPage({
           <ActionButton variant="ghost" size="icon" onPress={() => setEditing(true)} label="Edit project">
             <Pencil className="h-4 w-4" />
           </ActionButton>
-          <ActionButton
+          <ConfirmButton
             variant="ghost"
             size="icon"
             className="hover:text-destructive"
-            onPress={() => setConfirmingDelete(true)}
             label="Delete project"
+            title={`Delete “${project.name}”?`}
+            description={`Its ${project.todoCount} todo${project.todoCount === 1 ? '' : 's'} go with it. This cannot be undone.`}
+            onConfirm={confirmDelete}
           >
             <Trash2 className="h-4 w-4" />
-          </ActionButton>
+          </ConfirmButton>
         </>
       }
       headerContent={
@@ -207,15 +207,6 @@ export function ProjectPage({
               onMade={(title) => setNotice(`Made the todo “${title}”.`)}
             />
           ) : null}
-
-          <ConfirmDialog
-            open={confirmingDelete}
-            onOpenChange={setConfirmingDelete}
-            title={`Delete “${project.name}”?`}
-            description={`Its ${project.todoCount} todo${project.todoCount === 1 ? '' : 's'} go with it. This cannot be undone.`}
-            confirmLabel="Delete"
-            onConfirm={confirmDelete}
-          />
         </View>
       }
       content={content}

@@ -4,10 +4,10 @@ import { ScrollView, Text, View } from 'react-native';
 import type { AgentFieldsFragment } from '@/__generated__/graphql';
 import { ActionButton } from '@/components/action-button';
 import { useAppForm } from '@/components/app-form';
+import { ConfirmButton } from '@/components/confirm-button';
 import { Section } from '@/components/section';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Form } from '@/components/ui/form';
 import { FormDialog, FormDialogFooter } from '@/components/ui/form-dialog';
 import { ChevronDown, Pencil, Plus, Trash2 } from '@/components/ui/icons';
@@ -63,20 +63,18 @@ export function AgentManager() {
   const inherited = useQuery(AgentDefaultsDocument).data?.agentDefaults.resolved;
   const [editing, setEditing] = useState<Editing | null>(null);
   const [keying, setKeying] = useState<AgentRow | null>(null);
-  const [deleting, setDeleting] = useState<AgentRow | null>(null);
   const [deleteAgent] = useMutation(DeleteAgentDocument, { refetchQueries: [AgentsDocument] });
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const agents = agentsQuery.data?.agents ?? [];
 
-  async function confirmDelete() {
+  async function confirmDelete(row: AgentRow) {
     setDeleteError(null);
     try {
-      if (deleting) await deleteAgent({ variables: { id: deleting.id } });
+      await deleteAgent({ variables: { id: row.id } });
     } catch (cause) {
       setDeleteError(describeError(cause));
     }
-    setDeleting(null);
   }
 
   return (
@@ -156,15 +154,18 @@ export function AgentManager() {
                   >
                     <Pencil className="h-4 w-4" />
                   </ActionButton>
-                  <ActionButton
+                  <ConfirmButton
                     variant="ghost"
                     size="icon-sm"
                     className="hover:text-destructive"
                     label={`Delete ${agent.name}`}
-                    onPress={() => setDeleting(agent)}
+                    title={`Delete “${agent.name}”?`}
+                    description="Lanes it works stop being stations, and its runs lose their agent. This cannot be undone."
+                    confirmLabel="Delete"
+                    onConfirm={() => confirmDelete(agent)}
                   >
                     <Trash2 className="h-4 w-4" />
-                  </ActionButton>
+                  </ConfirmButton>
                 </View>
               ))}
             </View>
@@ -184,15 +185,6 @@ export function AgentManager() {
           {keying ? (
             <AgentKeyDialog key={keying.id} open onOpenChange={(open) => !open && setKeying(null)} agent={keying} />
           ) : null}
-
-          <ConfirmDialog
-            open={deleting !== null}
-            onOpenChange={(open) => !open && setDeleting(null)}
-            title={`Delete “${deleting?.name ?? 'this agent'}”?`}
-            description="Lanes it works stop being stations, and its runs lose their agent. This cannot be undone."
-            confirmLabel="Delete"
-            onConfirm={confirmDelete}
-          />
         </View>
       }
     />

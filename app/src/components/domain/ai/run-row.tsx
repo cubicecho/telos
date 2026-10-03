@@ -2,9 +2,9 @@ import { useMutation, useQuery } from '@apollo/client';
 import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import type { RunSummaryFieldsFragment } from '@/__generated__/graphql';
+import { ConfirmButton } from '@/components/confirm-button';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { ChevronDown, ChevronRight } from '@/components/ui/icons';
 import { Spinner } from '@/components/ui/spinner';
 import { describeError } from '@/lib/errors';
@@ -40,7 +40,6 @@ export function RunRow({
   const [open, setOpen] = useState(false);
   const [cancelRun, { loading: cancelling }] = useMutation(CancelRunDocument);
   const [deleteRun, { loading: deleting }] = useMutation(DeleteRunDocument);
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const running = run.status === 'running';
   const ofDraft = run.kind === DRAFT_RUN;
@@ -109,15 +108,18 @@ export function RunRow({
         ) : null}
         {running && run.cancelRequestedAt ? <Text className="text-muted-foreground text-xs">Stopping…</Text> : null}
         {running ? null : (
-          <Button
+          <ConfirmButton
             variant="ghost"
             size="sm"
             disabled={deleting}
-            aria-label={`Delete the run ${title}`}
-            onPress={() => setConfirmingDelete(true)}
+            label={`Delete the run ${title}`}
+            tooltip={false}
+            title="Delete this run?"
+            description={ofDraft ? DELETE_DRAFT_RUN : DELETE_TODO_RUN}
+            onConfirm={remove}
           >
             Delete
-          </Button>
+          </ConfirmButton>
         )}
       </View>
 
@@ -128,15 +130,6 @@ export function RunRow({
       ) : null}
 
       {open ? <OpenRun id={run.id} running={running} pollMs={pollMs} /> : null}
-
-      <ConfirmDialog
-        open={confirmingDelete}
-        onOpenChange={setConfirmingDelete}
-        title="Delete this run?"
-        description={ofDraft ? DELETE_DRAFT_RUN : DELETE_TODO_RUN}
-        confirmLabel="Delete"
-        onConfirm={remove}
-      />
     </View>
   );
 }
