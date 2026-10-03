@@ -61,6 +61,7 @@ telos/
 │       ├── blocking.ts      # The dependency rules, in one place
 │       ├── lanes.ts         # The lane rules, in one place
 │       ├── stations.ts      # Which todos an agent may start on, and stopping runs
+│       ├── agent-defaults.ts # An account's agent defaults, and what an agent resolves to over them
 │       ├── instance.ts      # The instance's AI switch, and its admins
 │       ├── run-tokens.ts    # Per-run tokens, and the runner's key check
 │       ├── loaders.ts       # Per-request DataLoaders
@@ -82,6 +83,7 @@ telos/
 │       ├── config.ts        # Env -> RunnerConfig
 │       ├── telos.ts         # The runner's GraphQL client (queue, claim, heartbeat, finish)
 │       ├── loop.ts          # Poll the queue, claim up to the concurrency, execute
+│       ├── spec.ts          # An agent over its account's defaults, as agent-core spec layers (also @telos/runner/spec)
 │       ├── execute.ts       # One run: agent-core's runAgentLoop over a per-run MCP pool
 │       ├── tools.ts         # The pool: telos's /mcp with the run token, plus the agent's servers and hooks
 │       ├── artifacts.ts     # What a run made: record_artifact, and writes read off tool calls
@@ -248,6 +250,23 @@ only reports. A switch turned off (`ai-switches.ts`, `aiIgnored`) sets
 `cancelRequestedAt` on live runs, the next heartbeat tells the runner to stop,
 and a stopped run writes nothing. `agents.apiKey` is excluded from the schema;
 it is written with `setAgentApiKey` and read only by the runner, in a claim.
+
+**An agent says only what is different about it.** `agent_defaults` (one row
+per account, a server-only table, `resolvers/agent-defaults.ts`) is the layer
+under every agent the account has: endpoint, model, sampling, tool discovery,
+the tool-picking model, iterations, timeout and retries. A null on the agent
+inherits the default, a null there agent-core's `RESOLVED_DEFAULTS`; zero and
+an empty string are values, never "inherit". The claim (`claimRun`,
+`claimDraft`) hands the runner the agent and its account's `defaults`, and
+`runner/src/spec.ts` resolves them with agent-core's `parseSpec` and
+`resolveAgentSpec`: do not write a second merge. The server imports that same
+module (`@telos/runner/spec`) for what Settings shows a blank will be and for
+the model a run records. The default key is write-only, as an agent's is
+(`setAgentDefaultsApiKey`, `hasApiKey`), and goes through `resolveApiKey`: an
+agent with a base URL of its own never gets the key entered for another, and
+the runner's own environment key is never used. An agent with `enabled` off
+is not queued (`readyTodos`), its drafts are not claimed, `startDraft` and
+`sayToDraft` refuse it, and `aiStatus` parks its stations' todos saying so.
 
 **The runner never imports the server or the database.** Everything it knows
 comes from `runnerQueue` and `claimRun`, and everything it does goes back
