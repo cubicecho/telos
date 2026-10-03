@@ -5,6 +5,7 @@ import { Text, View } from 'react-native';
 import { ActionButton } from '@/components/action-button';
 import { MessageSquare } from '@/components/app-icons';
 import { ConfirmButton } from '@/components/confirm-button';
+import { DescriptionList, PropertyRow } from '@/components/description-list';
 import { AiSetupChecklist } from '@/components/domain/ai/ai-setup-checklist';
 import { type ProjectActivity, ProjectActivityLine } from '@/components/domain/ai/project-activity';
 import { ProjectAiSwitch, ProjectAutoRunSwitch } from '@/components/domain/ai/project-ai-switch';
@@ -155,15 +156,17 @@ export function ProjectPage({
       }
       headerContent={
         <View className="gap-3">
-          {/* Was a `<dl>`. A term/definition pair has no native counterpart and
-              react-native-web has no role that renders one, so each stat is a
-              group named by its term — which is what a screen reader said of the
-              `<dl>` anyway: "Open, 3". */}
-          <View className="flex-row gap-6">
-            <Stat term="Open" value={project.openTodoCount} />
-            <Stat term="Done" value={done} />
-            <Stat term="Total" value={project.todoCount} />
-          </View>
+          <DescriptionList
+            layout="stacked"
+            className="flex-row gap-6"
+            content={
+              <>
+                <Stat label="Open" value={project.openTodoCount} />
+                <Stat label="Done" value={done} />
+                <Stat label="Total" value={project.todoCount} />
+              </>
+            }
+          />
 
           <ProjectAiSwitch projectId={project.id} enabled={project.aiEnabled} />
           {project.aiEnabled ? <ProjectAutoRunSwitch projectId={project.id} enabled={project.autoRun} /> : null}
@@ -214,15 +217,14 @@ export function ProjectPage({
   );
 }
 
-function Stat({ term, value }: { term: string; value: number }) {
+/** A count, as cubeui's `PropertyRow` drawn as a figure: a small label over a large number. */
+function Stat({ label, value }: { label: string; value: number }) {
   return (
-    <View role="group" aria-label={`${term}, ${value}`}>
-      <Text aria-hidden className="text-muted-foreground text-xs uppercase tracking-wide">
-        {term}
-      </Text>
-      <Text aria-hidden className="font-medium text-foreground text-lg tabular-nums">
-        {value}
-      </Text>
-    </View>
+    <PropertyRow
+      label={label}
+      value={value}
+      labelClassName="text-xs uppercase tracking-wide"
+      valueClassName="font-medium text-lg tabular-nums"
+    />
   );
 }
