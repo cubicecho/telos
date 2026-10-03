@@ -8,8 +8,9 @@ import { stampActor } from '../provenance.ts';
 
 // How AI hands work to the board. A request is a todo — there is no second
 // table — dropped into the project's first open lane, where the board's own
-// agents (or its person) pick it up. The caller adds work and talks about it;
-// it never moves it, which is what actor-lock.ts enforces.
+// agents (or its person) pick it up. It is the one way to add work without
+// naming a lane; the rest of what AI may do to the board is the generated
+// writes actor-lock.ts lets through (AI_MUTATIONS).
 //
 // Every mutation here is answered NOT_FOUND for anything AI may not see: an
 // account or project with AI off, a todo the user told AI to ignore. From the

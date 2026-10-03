@@ -160,7 +160,8 @@ export interface ActorOptions {
  *   were stopped; the queue is empty then, and nothing can be claimed.
  * - `x-run-token`: an agent at work, for exactly as long as its run is live
  *   and its user, project and todo are all still open to AI.
- * - `x-api-key`: an MCP client, while its owner has AI on.
+ * - `x-api-key`: an MCP client, while its owner has AI on. It carries the
+ *   tools its owner switched off for it.
  *
  * A credential that fails any check is anonymous rather than an error, so the
  * caller gets UNAUTHENTICATED from the first field that needs a user.
@@ -188,7 +189,7 @@ export async function resolveActor(auth: Auth, db: AnyDb, headers: Headers, opti
       .from(dbSchema.users)
       .where(eq(dbSchema.users.id, userId));
     if (!owner?.aiEnabled) return ANONYMOUS;
-    return { kind: 'apiKey', userId, keyId: result.key.id };
+    return { kind: 'apiKey', userId, keyId: result.key.id, toolsOff: await keyToolsOff(db, result.key.id) };
   }
 
   // Case-sensitive on purpose: it is what the client sends, and the bearer
@@ -199,6 +200,22 @@ export async function resolveActor(auth: Auth, db: AnyDb, headers: Headers, opti
   }
 
   return ANONYMOUS;
+}
+
+/**
+ * The door's tools a key has switched off. A key nobody has changed a switch
+ * for has no row, and every tool on.
+ *
+ * @param db The database.
+ * @param keyId The key.
+ * @returns The names of the tools that are off for it.
+ */
+async function keyToolsOff(db: AnyDb, keyId: string): Promise<ReadonlySet<string>> {
+  const [row] = await db
+    .select({ off: dbSchema.apiKeyTools.off })
+    .from(dbSchema.apiKeyTools)
+    .where(eq(dbSchema.apiKeyTools.keyId, keyId));
+  return new Set<string>(row?.off ?? []);
 }
 
 /**

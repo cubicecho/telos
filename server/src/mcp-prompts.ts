@@ -4,8 +4,8 @@ import { z } from 'zod/v3';
 // The prompts offered beside the MCP door's tools (mcp.ts).
 //
 // A tool's description has room to say what it does, not how the board works:
-// that a lane with an agent is a station, that a request is a todo, that an MCP
-// client hands work over and never works the board itself. A prompt does have
+// that a lane with an agent is a station, that a request is a todo, that the
+// stations do the work and a client steers it. A prompt does have
 // that room. It is fetched deliberately, once, so it is the one place a client
 // can be given the model rather than the schema.
 //
@@ -44,20 +44,41 @@ A station's contract is one of three things. \`work\` does the todo and reports.
 \`verdict\` judges it against its acceptance and rules PASS or FAIL. \`expand\` splits it
 into child todos, which is the one place work is broken up. After a run the todo
 moves along the lane's success or failure arrow, if it has one. A station gives up on a
-todo after a few failed attempts, until a person touches it.
+todo after a few failed attempts, until a person touches it or someone retries it.
 
 A todo is *blocked* while another it depends on is unfinished: stations skip it until
 then. That is queued, not stuck.
 
 ## What you can do, and what you cannot
 
-You can read (\`projects\`, \`todos\`, \`request\`), hand work over (\`submit_request\`),
-say more about it (\`add_todo_note\`), correct or take back a note you signed
-(\`edit_todo_note\`, \`delete_todo_note\`), point the board at something you made
-for it elsewhere (\`record_artifact\`), and withdraw it (\`cancel_request\`). You
-cannot move, edit, complete, retry or delete a todo, create a project, or change a
-lane: the board belongs to a person, and its stations do the work. When something
-needs one of those, say what and why, and leave it to the person.
+You can read the board and what happened on it: \`projects\`, \`lanes\`, \`todos\`,
+\`request\`, \`todo_notes\`, \`todo_history\`, \`blockers\`, \`runs\`, \`run_events\`,
+\`artifacts\`, \`agents\`, \`spend\`, \`board_templates\`, \`drafts\` and \`draft\`.
+
+You can work it too. Make and rename projects (\`create_project\`, \`update_project\`).
+Hand work over (\`submit_request\`, or \`create_todo\` for a lane you choose), talk it
+over with an agent first (\`start_draft\`, \`say_to_draft\`, \`stop_draft\`,
+\`make_todo_from_draft\`, \`discard_draft\`), and change what a todo says
+(\`update_todo\`). Move a todo (\`move_todo\`; into the done lane completes it), make it
+wait on others (\`set_todo_dependencies\`), send it round its station again
+(\`retry_todo\`), ask for it to be worked now (\`run_todo\`), stop a run (\`stop_run\`),
+archive or restore it (\`archive_todo\`, \`restore_todo\`) or delete it for good
+(\`delete_todo\`). Say more about it (\`add_todo_note\`, \`edit_todo_note\`,
+\`delete_todo_note\`), point the board at something you made for it elsewhere
+(\`record_artifact\`), and withdraw a request (\`cancel_request\`). Save a board's
+lanes as a template, or give an empty board one (\`save_board_template\`,
+\`apply_board_template\`).
+
+What stays a person's: switching AI on or off, for a project or a todo; whether a
+project's stations run by themselves; agents, their keys and their MCP servers;
+changing a lane or its station, beyond giving an empty board a template; archiving or deleting a project; and changing many todos
+at once. The owner may also have switched some of the tools above off for your key,
+in which case they are not listed to you. When something needs one of those, say what
+and why, and leave it to the person.
+
+The stations still do the board's work. Moving a todo past a station, or completing
+it, skips what that station would have checked: do it when you were asked to, not
+to hurry the board along.
 
 ## Start here
 
@@ -90,8 +111,8 @@ export const PROMPTS: readonly Prompt[] = [
     name: 'start_project',
     title: 'Get new work started on a fitting board',
     description:
-      'Finds the board a new body of work belongs on, or, since an MCP client cannot create ' +
-      'one, says exactly what its owner should set up, then puts the first request onto it.',
+      'Finds the board a new body of work belongs on, or makes one with the context its agents ' +
+      'need, then puts the first request onto it.',
     args: {
       goal: z.string().describe('What the work is for, in as much detail as you have.'),
       name: z.string().optional().describe('What the board should be called, if a new one is needed.'),
@@ -103,14 +124,16 @@ export const PROMPTS: readonly Prompt[] = [
 
 1. \`projects\`. Look for a board this work belongs on, by name, description and context.
    Only boards whose owner has switched AI on are listed.
-2. If none fits, stop and tell the person what to set up, since you cannot create a
-   project: its name; the context every agent on it should be shown (what the project is,
-   where the work lives, the constraints that apply to everything in it); a board template
-   to start it from, if they keep one that fits; and that AI must be switched on for it.
-   Then wait for them.
-3. With a board, read its lanes in order. The request lands in the first open lane, so
-   check what that lane is: if it has no agent, nothing will happen until a person moves
-   the todo on.
+2. If none fits, \`create_project\`: its name, a line of description, and the context every
+   agent on it should be shown (what the project is, where the work lives, the constraints
+   that apply to everything in it). It starts with the default lanes. If
+   \`board_templates\` has one that fits, \`apply_board_template\` before adding any work.
+   If \`create_project\` is not listed to you, stop and tell the person what to set up
+   instead, and wait for them.
+3. With a board, read its lanes in order with \`lanes\`. The request lands in the first
+   open lane, so check what that lane is: if it has no agent, nothing will happen until
+   someone moves the todo on. Whether the stations run by themselves is the owner's
+   setting; \`run_todo\` asks for one run when they do not.
 4. \`submit_request\`. Put the work in whole, in \`brief\`: what is wanted, where it lives,
    what must not change. Put how anyone could tell it was done in \`acceptance\`, as checks
    a reviewer could make. A station that expands will break it up; do not pre-divide it.
@@ -152,8 +175,8 @@ carry the stations' reports and verdicts.`,
     title: 'Find out what is stuck on a board',
     description:
       "Reads a board's todos, threads and histories, explains why each stuck todo is where it " +
-      'is, and proposes one thing per todo: a note for the next agent, a withdrawal, or what its ' +
-      'owner should do.',
+      'is, and proposes one thing per todo: a note and a retry, a move, a withdrawal, or what ' +
+      'its owner should do.',
     args: { project },
     render: (args) => `Work out what is stuck on this Telos board, and what should be done about it.
 
@@ -163,17 +186,22 @@ carry the stations' reports and verdicts.`,
 2. \`todos\` for it. Say what the board looks like: how many todos in each lane, which are
    blocked, which are complete.
 3. For each open todo that is not blocked, call \`request\` and read its thread and history,
-   newest first. It is stuck if a station's last verdict was FAIL, if its reports say it
-   could not be done, if it has failed at a station more than once, or if it sits in a lane
-   with no agent. Say why, from what the thread and history say, rather than that it is.
-4. Blocked todos are queued, not stuck, unless what blocks them will never be done. Say so
-   when that is the case.
+   newest first; \`runs\` and \`run_events\` say what its agents tried. It is stuck if a
+   station's last verdict was FAIL, if its reports say it could not be done, if it has
+   failed at a station more than once, or if it sits in a lane with no agent. Say why,
+   from what the thread, history and runs say, rather than that it is.
+4. Blocked todos are queued, not stuck, unless what blocks them will never be done
+   (\`blockers\` lists them). Say so when that is the case.
 5. Propose one thing per stuck todo:
-   - \`add_todo_note\`: the todo is right and the agent went wrong, and you can tell the next
-     one why. It still needs its owner to retry it from the board.
-   - \`cancel_request\`: nobody wants it any more.
-   - For its owner: retry it, move it to another lane, edit what it asks for, or put an
-     agent on a lane that needs one. You cannot do these; say which and why.
+   - \`add_todo_note\` then \`retry_todo\`: the todo is right and the agent went wrong, and
+     you can tell the next one why.
+   - \`update_todo\`: what it asks for is unclear or wrong. Then \`retry_todo\`.
+   - \`move_todo\`: it is in the wrong lane, or waits in a lane with no agent.
+   - \`set_todo_dependencies\`: it waits on something it should not, or should wait on
+     something it does not.
+   - \`cancel_request\` or \`archive_todo\`: nobody wants it any more.
+   - For its owner: put an agent on a lane that needs one, or let AI at a todo it was told
+     to ignore. You cannot do these; say which and why.
 
 Say what you would do before doing any of it, unless you were told to go ahead.`,
   },

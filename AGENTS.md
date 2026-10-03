@@ -162,18 +162,32 @@ answers NOT_FOUND rather than FORBIDDEN, because for someone who turned AI off
 the surface is not there. Key management needs a session (`requireSession`): a
 key cannot mint its own successor.
 
-**AI adds work; it does not work the board.** An `apiKey` or `agent` actor
-(`isAiActor`) is held to two narrower rules. What it sees: `tenancy.ts` narrows
-its scope to projects with `aiEnabled` and, in them, todos without `aiIgnored`,
-and hides everything hanging off a hidden todo. A resolver that reads rows
-directly (a loader, a hand-written mutation) has to apply the same narrowing
-itself — see `visibleToAi` in `resolvers/todos.ts` and `loadAiTodo` in
-`resolvers/requests.ts`. What it writes: `resolvers/actor-lock.ts` wraps every
-mutation and refuses AI all but `AI_MUTATIONS` (`submitRequest`,
-`cancelRequest`, `addTodoNote`, `editTodoNote` and `deleteTodoNote` for
-the notes it signed, and `recordArtifact`). A new mutation is closed to AI until it is added there. The MCP door (`mcp.ts`) serves only the operations written in
-`mcp.graphql` — the tool list is the menu, the lock is the lock. `/mcp` is
-a 404 unless the instance's switch is on.
+**AI works the board as far as its owner lets it, and no further.** An
+`apiKey` or `agent` actor (`isAiActor`) is held to narrower rules. What it
+sees: `tenancy.ts` narrows its scope to projects with `aiEnabled` and, in them,
+todos without `aiIgnored`, and hides everything hanging off a hidden todo; the
+`agents` table is closed to it outright, and `agentRoster` (`resolvers/ai-reads.ts`)
+is all it learns of agents — no key, prompt, base URL or MCP servers. A
+resolver that reads rows directly (a loader, a hand-written mutation) has to
+apply the same narrowing itself — see `visibleToAi`/`hiddenFromAi` in
+`resolvers/todos.ts`, `loadAiTodo` in `resolvers/requests.ts`, and
+`resolvers/ai-reach.ts`, which checks the ids a hand-written mutation is handed
+and answers NOT_FOUND for what AI cannot see. What it writes:
+`resolvers/actor-lock.ts` wraps every mutation and refuses AI all but
+`AI_MUTATIONS` — projects (create and rename, nothing else:
+`holdAiProjectWrite`), todos (create, edit, move, retry, run, stop a run,
+dependencies, archive, restore, delete), notes, artifacts, drafts and board
+templates. Still a person's: the AI switches, auto-run, agents and their keys
+and MCP servers, API keys, lanes and stations, bulk mutations, and archiving
+or deleting a project. A new mutation is closed to AI until it is added there.
+The MCP door (`mcp.ts`) serves only the operations written in `mcp.graphql`,
+and a test pins its mutations to `AI_MUTATIONS`: the tool list is the menu,
+the lock is the lock. Each key has a switch per tool (`api_key_tools`,
+`door.ts`): every tool is on until its owner turns it off in Settings, and one
+that is off is left out of the key's listing (`mcp.ts`) *and* refused by the
+lock (`toolsOff` on the actor, read in `auth.ts`), for the root fields the tool
+uses. The AI switches sit above the switches; a run's `agent` actor has none
+and gets the whole door. `/mcp` is a 404 unless the instance's switch is on.
 
 **Agents work the board only at stations, and only through the runner.** A
 lane with an `agentId` is a station: its `contract` (work, verdict, expand),

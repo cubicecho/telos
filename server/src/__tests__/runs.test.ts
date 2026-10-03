@@ -504,9 +504,8 @@ describe('who may do what', () => {
     ).toBeNull();
     expect(
       (
-        await agent.expectError(`mutation ($id: ID!, $laneId: ID!) { moveTodo(id: $id, laneId: $laneId) { id } }`, {
-          id: todoId,
-          laneId: board.lanes[2].id,
+        await agent.expectError(`mutation ($id: ID!) { setProjectAiEnabled(projectId: $id, enabled: false) { id } }`, {
+          id: board.projectId,
         })
       ).code,
     ).toBe('FORBIDDEN');

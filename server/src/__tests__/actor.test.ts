@@ -68,7 +68,7 @@ describe('API keys', () => {
 
   it('resolve to their owner, marked as a key', async () => {
     const { userId, keyId, key } = await keyFor('a@example.com');
-    expect(await resolve({ 'x-api-key': key })).toEqual({ kind: 'apiKey', userId, keyId });
+    expect(await resolve({ 'x-api-key': key })).toEqual({ kind: 'apiKey', userId, keyId, toolsOff: new Set() });
   });
 
   it('start with the prefix, so a leaked one is recognisable', async () => {

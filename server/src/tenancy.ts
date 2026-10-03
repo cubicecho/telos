@@ -50,7 +50,12 @@ export const USER_OWNED_TABLES = [
 /** Every table drizzle-graphql will generate fields for. */
 export const ALL_TABLES = ['users', ...USER_OWNED_TABLES] as const;
 
-const scopeByUserId: RowScope<Context> = (context, table) => eq((table as AnyTable).userId, requireAuth(context));
+type OwnedTable = (typeof USER_OWNED_TABLES)[number];
+
+/** A row scope that is always SQL, so code outside the library can use it too. */
+type SqlScope = (context: Context, table: AnyTable) => SQL | undefined;
+
+const scopeByUserId: SqlScope = (context, table) => eq(table.userId, requireAuth(context));
 
 // What AI sees is narrower than what its user sees: only projects with AI
 // switched on, and in them only the todos nobody told AI to ignore. Everything
@@ -82,26 +87,35 @@ function aiTodoIds(context: Context, userId: string) {
 }
 
 /** The user scope, and for an AI caller whatever `narrow` adds to it. */
-function aiNarrowed(narrow: (context: Context, table: AnyTable, userId: string) => SQL | undefined): RowScope<Context> {
+function aiNarrowed(narrow: (context: Context, table: AnyTable, userId: string) => SQL | undefined): SqlScope {
   return (context, table) => {
     const userId = requireAuth(context);
-    const own = eq((table as AnyTable).userId, userId);
-    return isAiActor(context) ? and(own, narrow(context, table as AnyTable, userId)) : own;
+    const own = eq(table.userId, userId);
+    return isAiActor(context) ? and(own, narrow(context, table, userId)) : own;
   };
 }
 
-const AI_SCOPES: Partial<Record<(typeof USER_OWNED_TABLES)[number], RowScope<Context>>> = {
-  // Agents are the board's own machinery, configured by a person. Nothing
-  // on the AI side has a reason to read them.
+/** The caller's drafts in projects with AI on, as a subquery. */
+function aiDraftIds(context: Context, userId: string) {
+  return (context.db as AnyTable)
+    .select({ id: dbSchema.drafts.id })
+    .from(dbSchema.drafts)
+    .where(and(eq(dbSchema.drafts.userId, userId), inArray(dbSchema.drafts.projectId, aiProjectIds(context, userId))));
+}
+
+const AI_SCOPES: Partial<Record<OwnedTable, SqlScope>> = {
+  // An agent's row holds its key and its MCP servers' secrets. The AI side
+  // reads the roster instead (`agentRoster`, resolvers/ai-reads.ts), which
+  // carries neither.
   agents: aiNarrowed(() => sql`false`),
   mcpServers: aiNarrowed(() => sql`false`),
-  // Drafts are a person's conversation with their own agent, not work yet.
-  drafts: aiNarrowed(() => sql`false`),
-  draftMessages: aiNarrowed(() => sql`false`),
+  // A draft is open to AI where its project is, as the draft mutations are.
+  drafts: aiNarrowed((context, table, userId) => inArray(table.projectId, aiProjectIds(context, userId))),
+  draftMessages: aiNarrowed((context, table, userId) => inArray(table.draftId, aiDraftIds(context, userId))),
   // Presets are how a person sets their stations up, as agents are. What one
   // says reaches a run through its brief, which the server writes.
   lanePresets: aiNarrowed(() => sql`false`),
-  // By todo, so a draft's runs, which have none, are hidden as drafts are.
+  // By todo, so a draft's runs, which have none, stay a person's to read.
   runs: aiNarrowed((context, table, userId) => inArray(table.todoId, aiTodoIds(context, userId))),
   // By todo as well, so one whose todo was deleted is a person's to see.
   artifacts: aiNarrowed((context, table, userId) => inArray(table.todoId, aiTodoIds(context, userId))),
@@ -119,10 +133,29 @@ const AI_SCOPES: Partial<Record<(typeof USER_OWNED_TABLES)[number], RowScope<Con
   ),
 };
 
+/**
+ * The rows of a table the caller may reach, as SQL: theirs, and for an AI
+ * caller only what AI may see of them. What the generated resolvers are
+ * confined to, for the hand-written checks that must agree with them.
+ *
+ * @param context The request.
+ * @param name The table's drizzle-graphql key.
+ * @param table The table, or the alias of it the statement runs against.
+ * @returns The predicate.
+ */
+export function reachable(context: Context, name: OwnedTable, table: AnyTable): SQL | undefined {
+  return (AI_SCOPES[name] ?? scopeByUserId)(context, table);
+}
+
 export const scope: NonNullable<BuildSchemaConfig['scope']> = {
   // A user row is only ever visible to its owner. There is no directory here.
   users: (context, table) => eq((table as AnyTable).id, requireAuth(context as Context)),
-  ...Object.fromEntries(USER_OWNED_TABLES.map((name) => [name, AI_SCOPES[name] ?? scopeByUserId])),
+  ...Object.fromEntries(
+    USER_OWNED_TABLES.map((name): [string, RowScope<Context>] => [
+      name,
+      (context, table) => reachable(context, name, table),
+    ]),
+  ),
 };
 
 /**
@@ -166,8 +199,8 @@ export const contextValues: NonNullable<BuildSchemaConfig['contextValues']> = {
  * `artifacts` are what a finished run reports (`finishRun`) or a client says it
  * made (`recordArtifact`), each stamped with where it came from; a person may
  * take one off the board (`deleteArtifact`), and nothing else.
- * `drafts` and their messages are a conversation (resolvers/drafts.ts): the
- * person says something and the runner answers, and neither is edited after.
+ * `drafts` and their messages are a conversation (resolvers/drafts.ts): someone
+ * says something and the runner answers, and neither is edited after.
  */
 const WRITES_RESERVED = new Set<string>([
   'users',

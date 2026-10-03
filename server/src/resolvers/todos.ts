@@ -123,6 +123,36 @@ async function visibleToAi(context: Context, blockers: AnyRow[]): Promise<AnyRow
   return candidates.filter((row) => openIds.has(String(row.projectId)));
 }
 
+/**
+ * Which of a caller's todos AI may not see: ignored, archived, or in a project
+ * closed to AI.
+ *
+ * @param context The request.
+ * @param userId The caller.
+ * @param ids The todos to ask about.
+ * @returns The ids among them that are hidden.
+ */
+async function hiddenFromAi(context: Context, userId: string, ids: string[]): Promise<string[]> {
+  if (ids.length === 0) {
+    return [];
+  }
+  const seen: Array<{ id: string }> = await (context.db as AnyRow)
+    .select({ id: dbSchema.todos.id })
+    .from(dbSchema.todos)
+    .innerJoin(dbSchema.projects, eq(dbSchema.projects.id, dbSchema.todos.projectId))
+    .where(
+      and(
+        inArray(dbSchema.todos.id, ids),
+        eq(dbSchema.todos.userId, userId),
+        eq(dbSchema.todos.aiIgnored, false),
+        isNull(dbSchema.todos.archivedAt),
+        eq(dbSchema.projects.aiEnabled, true),
+      ),
+    );
+  const seenIds = new Set(seen.map((row) => String(row.id)));
+  return ids.filter((id) => !seenIds.has(id));
+}
+
 export function applyTodosExtension(schema: GraphQLSchema): GraphQLSchema {
   const extendedSchema = extendSchema(schema, TODOS_SDL);
 
@@ -209,6 +239,11 @@ export function applyTodosExtension(schema: GraphQLSchema): GraphQLSchema {
       .from(dbSchema.todoDependencies)
       .where(and(eq(dbSchema.todoDependencies.userId, userId), eq(dbSchema.todoDependencies.todoId, todo.id)));
     const kept = new Set(existing.map((row) => String(row.dependsOnTodoId)));
+    // An AI caller sends back the list it read, which leaves out what it may
+    // not see. Those edges are not its to drop.
+    for (const id of isAiActor(context) ? await hiddenFromAi(context, userId, [...kept]) : []) {
+      wanted.add(id);
+    }
     const dropped = [...kept].filter((id) => wanted.has(id) === false);
     // An edge already there is kept as it stands, so a caller can send back the
     // list it read. Only the new ones are held to what `addTodoDependency` asks.

@@ -134,11 +134,18 @@ every level:
 4. **The todo**: "AI ignores this". The runner leaves it alone.
 
 With AI on there are two doors in. **`/mcp`** is for your own agents (Claude
-Code and the like): with an API key from Settings they can submit requests,
-read the board, add notes and correct or take back the notes they signed, and
-record what they made for a todo (`record_artifact`: where it is and what to
-call it), but not move todos. Nothing checks what a client records, so the
-board lists it as unverified, signed with the key that said it. **The runner** is telos's own
+Code and the like): with an API key from Settings they can read the board and
+what happened on it (lanes, runs and their logs, history, notes, blockers,
+spend, artifacts, drafts, templates, and the agents without their keys), and
+work it: make and rename projects, add, edit, move, retry, run, stop, archive,
+restore and delete todos, set what they wait on, talk a todo over in a draft,
+write notes, record what they made for a todo (`record_artifact`: where it is
+and what to call it), and save or apply a board template. Each key has a switch
+per tool in Settings, all on until you turn one off; a tool that is off is
+neither offered to the key nor allowed to it, so a read-only key is one with
+its writing tools off. The AI switches, agents, keys, lanes and stations, bulk
+changes and deleting a project stay yours. Nothing checks what a client
+records, so the board lists it as unverified, signed with the key that said it. **The runner** is telos's own
 worker. A lane with an agent is a *station*: the runner claims a todo there,
 has the agent work it, verify it, or split it into child todos, and telos moves
 it along the lane's arrows. A station can archive what passes instead of

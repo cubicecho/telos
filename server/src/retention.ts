@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import { resultRows } from './blocking.ts';
+import { TOUCHED } from './stations.ts';
 
 // Old runs, pruned: each account says how many days a finished run and its log
 // are kept (users.runRetentionDays; null is for good), and the server deletes
@@ -53,9 +54,9 @@ export async function pruneRuns(db: AnyDb, now: Date = new Date()): Promise<numb
       AND (
         t.completed_at IS NOT NULL
         OR NOT (
-          -- A failure since a person last touched the todo: one of its attempts.
+          -- A failure since the todo was last touched: one of its attempts.
           ((r.status = 'error' OR r.verdict = 'fail') AND r.started_at > coalesce(
-            (SELECT max(e.at) FROM todo_events e WHERE e.todo_id = t.id AND e.actor_kind = 'user'),
+            (SELECT max(e.at) FROM todo_events e WHERE e.todo_id = t.id AND ${TOUCHED}),
             '-infinity'::timestamptz
           ))
           -- A success here since it arrived: the station is done with it.

@@ -44,7 +44,14 @@ export interface ReadyTodo {
 export const RUN_FAILED = sql`(r.status = 'error' OR r.verdict = 'fail')`;
 
 /**
- * How many of a todo's runs failed since a person last touched it: the count a
+ * What forgets a todo's failures, in a query that names the event `e`: a
+ * person touching it, or anyone at all sending it round again (`retryTodo`,
+ * `runTodo`), which a key or an agent may do from the MCP door.
+ */
+export const TOUCHED = sql`(e.actor_kind = 'user' OR e.kind IN ('retry', 'run'))`;
+
+/**
+ * How many of a todo's runs failed since it was last touched: the count a
  * lane's `maxAttempts` is held against.
  *
  * @param todoId - The todo's id column, as the surrounding query names it.
@@ -55,7 +62,7 @@ export function failuresSinceTouched(todoId: SQL): SQL {
     SELECT count(*)::int FROM runs r
     WHERE r.todo_id = ${todoId} AND ${RUN_FAILED}
       AND r.started_at > coalesce(
-        (SELECT max(e.at) FROM todo_events e WHERE e.todo_id = ${todoId} AND e.actor_kind = 'user'),
+        (SELECT max(e.at) FROM todo_events e WHERE e.todo_id = ${todoId} AND ${TOUCHED}),
         '-infinity'::timestamptz
       )
   )`;
