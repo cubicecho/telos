@@ -1,3 +1,19 @@
+# [1.19.0](https://github.com/cubicecho/telos/compare/v1.18.0...v1.19.0) (2026-10-03)
+
+
+### Bug Fixes
+
+* **db:** regenerate the agent defaults migration after main's agent tools_off ([6fb99c1](https://github.com/cubicecho/telos/commit/6fb99c15f8447aeca6698c4ab2ca931abdeaebbd))
+* **db:** regenerate the agent defaults migration after main's MCP server timeouts ([91cd801](https://github.com/cubicecho/telos/commit/91cd801dee954091c2605f1e8abeef863b059def))
+
+
+### Features
+
+* **app:** agent defaults in Settings, and agents that inherit them ([abf319d](https://github.com/cubicecho/telos/commit/abf319d4b34f43fb6e2c004d8a74128d701d5686))
+* **db:** account agent defaults, optional endpoint and model, and an enabled switch on agents ([11c8ab4](https://github.com/cubicecho/telos/commit/11c8ab4c3f3e071c0b0772122922ceffce0c789d))
+* **runner:** resolve an agent over its account's defaults with the agent spec ([feaaead](https://github.com/cubicecho/telos/commit/feaaead7b9cf640384fa449052ff1332c4f417b7))
+* **server:** account agent defaults, handed to the runner with each claim, and an agent's enabled switch ([0bcb56b](https://github.com/cubicecho/telos/commit/0bcb56b2402cce11c01b6e4b485b5802b997127e))
+
 # [1.18.0](https://github.com/cubicecho/telos/compare/v1.17.0...v1.18.0) (2026-10-03)
 
 
