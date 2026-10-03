@@ -1,5 +1,16 @@
 import { sql } from 'drizzle-orm';
-import { boolean, check, index, jsonb, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
+import {
+  boolean,
+  check,
+  index,
+  integer,
+  jsonb,
+  pgTable,
+  text,
+  timestamp,
+  uniqueIndex,
+  uuid,
+} from 'drizzle-orm/pg-core';
 
 import { users } from './users.ts';
 
@@ -33,12 +44,20 @@ export const mcpServers = pgTable(
     // Spawned on the runner's host, and only when it sets RUNNER_ALLOW_STDIO.
     command: text('command'),
     args: jsonb('args').$type<string[]>().notNull().default([]),
+    // Where the command runs. Absent, the runner's own directory. Nothing for a URL.
+    cwd: text('cwd'),
     headers: jsonb('headers').$type<Record<string, string>>().notNull().default({}),
     env: jsonb('env').$type<Record<string, string>>().notNull().default({}),
     // `ToolHook`s, as @cubicecho/agent-mcp-pool reads them. The runner checks them.
     hooks: jsonb('hooks').$type<unknown[]>().notNull().default([]),
     // Tools the model is not offered, for the hooks' use.
     hiddenTools: jsonb('hidden_tools').$type<string[]>().notNull().default([]),
+    // Overrides of the pool's own limits, in milliseconds; null is the pool's.
+    // Connecting is `initialize` and listing its tools; a call is one tool call.
+    connectTimeoutMs: integer('connect_timeout_ms'),
+    callTimeoutMs: integer('call_timeout_ms'),
+    // How long it may sit unused before it is closed. 0 is never.
+    idleTimeoutMs: integer('idle_timeout_ms'),
     // Off, no agent reaches it, whatever its list says.
     enabled: boolean('enabled').notNull().default(true),
     // What the last test found (`testMcpServer`). Written only by the server.
@@ -58,6 +77,10 @@ export const mcpServers = pgTable(
     // `telos` is the board's own door, which every run already has.
     check('ck_mcp_servers_slug', sql`${t.slug} ~ '^[A-Za-z0-9_-]+$' AND ${t.slug} <> 'telos'`),
     check('ck_mcp_servers_target', sql`${t.url} IS NOT NULL OR ${t.command} IS NOT NULL`),
+    check(
+      'ck_mcp_servers_timeouts',
+      sql`(${t.connectTimeoutMs} IS NULL OR ${t.connectTimeoutMs} > 0) AND (${t.callTimeoutMs} IS NULL OR ${t.callTimeoutMs} > 0) AND (${t.idleTimeoutMs} IS NULL OR ${t.idleTimeoutMs} >= 0)`,
+    ),
   ],
 );
 
