@@ -1,7 +1,7 @@
 import { useQuery } from '@apollo/client';
 import { Link, usePathname } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Platform, Pressable, Text, View } from 'react-native';
+import { Platform, Text, View } from 'react-native';
 import { Activity, History, LogOut } from '@/components/app-icons';
 import { useAttentionCount } from '@/components/domain/ai/ai-status';
 import { ProjectFormDialog } from '@/components/domain/project/project-form-dialog';
@@ -81,16 +81,14 @@ export function Sidebar() {
         }
         footer={
           <>
-            <Pressable
-              role="button"
-              onPress={() => setSearching(true)}
+            <SidebarNavItem
+              label="Search"
+              icon={<Search />}
+              // The shortcut is a web keyboard's; on device there is none to show.
+              count={Platform.OS === 'web' ? 'Ctrl K' : undefined}
               aria-label="Search todos"
-              className="min-h-8 flex-row items-center gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-sidebar-accent"
-            >
-              <Search className="size-4 text-sidebar-foreground" />
-              <Text className="flex-1 text-sidebar-foreground text-sm">Search</Text>
-              {Platform.OS === 'web' ? <Text className="text-muted-foreground text-xs">Ctrl K</Text> : null}
-            </Pressable>
+              onPress={() => setSearching(true)}
+            />
             {ai.on ? (
               <Link href="/stations" asChild>
                 <SidebarNavItem
@@ -115,16 +113,8 @@ export function Sidebar() {
             <Link href="/settings" asChild>
               <SidebarNavItem href="/settings" label="Settings" icon={<Settings />} active={pathname === '/settings'} />
             </Link>
-            {/* A button, not a link: it does something rather than going somewhere.
-                Drawn like the row above it so the footer reads as one list. */}
-            <Pressable
-              role="button"
-              onPress={signOut}
-              className="min-h-8 flex-row items-center gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-sidebar-accent"
-            >
-              <LogOut className="size-4 text-sidebar-foreground" />
-              <Text className="text-sidebar-foreground text-sm">Sign out</Text>
-            </Pressable>
+            {/* A button, not a link: it does something rather than going somewhere. */}
+            <SidebarNavItem label="Sign out" icon={<LogOut />} onPress={signOut} />
           </>
         }
       />
