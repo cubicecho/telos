@@ -574,7 +574,7 @@ function McpServerSecretsDialog({
               name="value"
               validators={{ onChange: ({ value }) => (value === '' ? 'Paste a value.' : undefined) }}
             >
-              {(field) => <field.InputField label="Value" type="password" />}
+              {(field) => <field.PasswordField label="Value" />}
             </form.AppField>
             <FormDialogFooter onCancel={() => onOpenChange(false)} cancelLabel="Done" error={error}>
               <form.SubmitButton createLabel="Set secret" disabled={loading} />

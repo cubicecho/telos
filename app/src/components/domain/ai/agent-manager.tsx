@@ -329,9 +329,8 @@ export function AgentFormDialog({
             <Text className="-mt-2 text-muted-foreground text-xs">{BASE_URL_HELP}</Text>
             <form.AppField name="apiKey" listeners={{ onBlur: () => askModels() }}>
               {(field) => (
-                <field.InputField
+                <field.PasswordField
                   label="API key"
-                  type="password"
                   placeholder={
                     agent?.hasApiKey
                       ? 'A key is set: leave blank to keep it'
@@ -469,7 +468,7 @@ function AgentKeyDialog({
             name="apiKey"
             validators={{ onChange: ({ value }) => (value.trim() === '' ? 'Paste a key, or cancel.' : undefined) }}
           >
-            {(field) => <field.InputField label="API key" type="password" autoFocus />}
+            {(field) => <field.PasswordField label="API key" autoFocus />}
           </form.AppField>
           <FormDialogFooter
             onCancel={() => onOpenChange(false)}
