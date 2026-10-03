@@ -58,6 +58,7 @@ const AGENT = {
   requestTimeoutSeconds: null,
   maxRetries: null,
   mcpServerSlugs: null,
+  toolsOff: null,
   hasApiKey: false,
 };
 

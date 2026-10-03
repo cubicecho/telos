@@ -260,13 +260,16 @@ export const DeleteApiKeyDocument = graphql(`
   }
 `);
 
-// The MCP door's tools, in the order a client is shown them, for a key's switches.
+// The MCP door's tools, in the order a client is shown them, for a key's
+// switches and an agent's.
 export const McpToolsDocument = graphql(`
   query McpTools {
     mcpTools {
       name
       description
       writes
+      forRuns
+      runDefault
     }
   }
 `);
@@ -298,6 +301,7 @@ export const AgentFieldsFragment = graphql(`
     requestTimeoutSeconds
     maxRetries
     mcpServerSlugs
+    toolsOff
     hasApiKey
   }
 `);

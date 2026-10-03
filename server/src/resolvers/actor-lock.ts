@@ -1,7 +1,8 @@
 import { defaultFieldResolver, GraphQLError, type GraphQLObjectType, type GraphQLSchema } from 'graphql';
 import { type Context, isAiActor } from '../context.ts';
-import { DOOR_TOOLS, switchedOff } from '../door.ts';
+import { DOOR_TOOLS, switchedOff, switchOwner } from '../door.ts';
 import { assertAiReach } from './ai-reach.ts';
+import { assertRunReach } from './run-reach.ts';
 
 // What AI may write. An MCP client or an agent can work the board: make a
 // project, talk a draft over, add todos and move them, send one round again,
@@ -12,9 +13,11 @@ import { assertAiReach } from './ai-reach.ts';
 // Two things narrow that for a caller. What it sees is less than its user
 // does (tenancy.ts), and a mutation is held to that before it runs
 // (ai-reach.ts). And a key has a switch per tool of the door (door.ts,
-// `setApiKeyTools`): a mutation every tool of which is off for the key is
-// refused here, and so is a query, whichever endpoint it came in by. A run has
-// no switches and gets all of it.
+// `setApiKeyTools`), as a run does through its agent (`agents.tools_off`, off
+// but for reading, adding work and notes unless a person says otherwise): a
+// mutation every tool of which is off for the caller is refused here, and so
+// is a query, whichever endpoint it came in by. A run is held further, to its
+// own todo's tree and its own board, whatever its switches say (run-reach.ts).
 //
 // A note is its author's to take back: `editTodoNote` and `deleteTodoNote`
 // hold a caller to the notes it signed (resolvers/notes.ts). `recordArtifact`
@@ -87,7 +90,7 @@ function refusal(name: string, args: Record<string, unknown>, context: Context):
   if (isAiActor(context) && !AI_MUTATIONS.has(name)) {
     return `${name} is not open to AI.`;
   }
-  return switchedOff(name, args, context.actor) ? `${name} is switched off for this key.` : null;
+  return switchedOff(name, args, context.actor) ? `${name} is switched off for ${switchOwner(context.actor)}.` : null;
 }
 
 function forbidden(message: string): GraphQLError {
@@ -115,7 +118,7 @@ function lockQueries(schema: GraphQLSchema): void {
     const resolve = field.resolve ?? defaultFieldResolver;
     field.resolve = (parent, args, context: Context, info) => {
       if (switchedOff(name, args, context.actor)) {
-        throw forbidden(`${name} is switched off for this key.`);
+        throw forbidden(`${name} is switched off for ${switchOwner(context.actor)}.`);
       }
       return resolve(parent, args, context, info);
     };
@@ -132,6 +135,7 @@ export function applyActorLock(schema: GraphQLSchema): GraphQLSchema {
       const refused = refusal(name, args, context);
       if (refused) throw forbidden(refused);
       if (isAiActor(context)) await assertAiReach(name, args, context);
+      if (context.actor.kind === 'agent') await assertRunReach(name, args, context);
       return resolve(parent, args, context, info);
     };
   }
