@@ -66,6 +66,7 @@ telos/
 │       ├── run-tokens.ts    # Per-run tokens, and the runner's key check
 │       ├── loaders.ts       # Per-request DataLoaders
 │       ├── board-events.ts  # Relays the board_notify trigger's NOTIFYs to `boardChanged`
+│       ├── changes.ts       # The change feed: `changes(since:)`, its cursor, tombstone pruning
 │       ├── routes/          # /graphql over HTTP, and its socket for subscriptions
 │       ├── resolvers/       # SDL extensions for what CRUD cannot express
 │       └── __tests__/       # Server tests
@@ -456,6 +457,23 @@ again as a menu: `LanePicker` ("Move to") on each todo row and each card, and th
 lane header's own menu for renaming, reordering, the done flag and deletion. A
 board action added without a keyboard route is a board action half the people
 using it cannot reach.
+
+**The change feed is written by triggers, not resolvers.** `change_log` (a
+server table: no CRUD, no `scope`) holds one row per project, todo and
+dependency edge, upserted by triggers in its migration on every insert, real
+update (`OLD.* IS DISTINCT FROM NEW.*`) and delete, cascades included. So a
+new write path needs nothing to appear in the feed, and nothing may write
+`change_log` by hand. Its position is the writing transaction's id and a
+sequence, and `server/src/changes.ts` serves only what is below the oldest
+transaction still running, so nothing can commit behind a cursor; a long
+transaction holds the feed up until it ends. Rows are read back through
+`reachable()`, so the feed's scope is tenancy's: what a caller cannot see now
+is a tombstone, but for AI only if `ai_seen` says AI was ever shown it. The
+triggers re-stamp what a change moves in or out of AI's view (a project's AI
+switch, a todo's `aiIgnored`, archive or project), and `project_open_to_ai` /
+`edge_end_open_to_ai` in the migration mirror `tenancy.ts`'s AI narrowing:
+change one, change the other, and `changes.test.ts` holds them to each other.
+Tombstones are pruned after 30 days and cursors expire a day before.
 
 **Dependency edges have no generated mutations.** `features` in `tenancy.ts`
 turns off insert/update/delete for `todoDependencies` so every edge goes through
