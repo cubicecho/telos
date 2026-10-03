@@ -81,8 +81,8 @@ query todos(
 
 # One todo in full: what was asked (`brief`, `acceptance`), where it sits on
 # the board, what it is part of or split into, what blocks it, its thread of
-# notes and its history of moves and edits. Works for any todo AI can see,
-# not only ones submitted as requests.
+# notes and its history of moves and edits, and `url`, the link that opens it
+# in telos. Works for any todo AI can see, not only ones submitted as requests.
 query request(
   # A todo id, as `submit_request` or `todos` returned it.
   $id: UUID!
@@ -91,6 +91,7 @@ query request(
     id
     projectId
     title
+    url
     brief: notes
     acceptance
     completedAt

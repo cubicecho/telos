@@ -58,6 +58,15 @@ export function appUrl(): string {
 }
 
 /**
+ * A page of the app as a full URL, for a link that leaves it: an email, or a
+ * todo's `url` handed to another app. A trailing slash on APP_URL is dropped
+ * so the path does not start with two.
+ */
+export function appLink(path: string): string {
+  return `${appUrl().replace(/\/+$/, '')}${path}`;
+}
+
+/**
  * Whether this server offers AI at all, which it does unless `AI_ENABLED` is
  * false. Offered, an admin turns it on or off in Settings (instance.ts), and it
  * starts off. With `AI_ENABLED=false` the AI surface does not exist: no `/mcp`,
