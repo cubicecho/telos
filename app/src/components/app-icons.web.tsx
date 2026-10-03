@@ -9,6 +9,7 @@ export {
   ArchiveRestore,
   Columns3,
   Ellipsis,
+  History,
   Link2,
   List,
   LogOut,
