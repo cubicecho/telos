@@ -53,7 +53,8 @@ then. That is queued, not stuck.
 
 You can read the board and what happened on it: \`projects\`, \`lanes\`, \`todos\`,
 \`request\`, \`todo_notes\`, \`todo_history\`, \`blockers\`, \`runs\`, \`run_events\`,
-\`artifacts\`, \`agents\`, \`spend\`, \`board_templates\`, \`drafts\` and \`draft\`.
+\`artifacts\`, \`agents\`, \`spend\`, \`board_templates\`, \`drafts\` and \`draft\`. To keep a
+copy of the board in step, read \`changes\` from the cursor it handed you last time.
 
 You can work it too. Make and rename projects (\`create_project\`, \`update_project\`).
 Hand work over (\`submit_request\`, or \`create_todo\` for a lane you choose), talk it

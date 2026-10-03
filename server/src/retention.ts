@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import { resultRows } from './blocking.ts';
+import { pruneTombstones } from './changes.ts';
 import { TOUCHED } from './stations.ts';
 
 // Old runs, pruned: each account says how many days a finished run and its log
@@ -75,21 +76,37 @@ export async function pruneRuns(db: AnyDb, now: Date = new Date()): Promise<numb
  * Prunes now, then every `everyMs`, until stopped.
  *
  * @param db The database.
- * @param options How often, and where to say what happened.
+ * @param options How often, what, and where to say what happened.
  * @param options.everyMs The interval.
+ * @param options.runs Whether to prune runs, which there are only with AI.
+ *   The change feed's old tombstones (changes.ts) go either way.
  * @param options.log Told how many went, and about failures.
  * @returns Stops it.
  */
 export function startPruning(
   db: AnyDb,
-  { everyMs = PRUNE_EVERY_MS, log = console.log }: { everyMs?: number; log?: (text: string) => void } = {},
+  {
+    everyMs = PRUNE_EVERY_MS,
+    runs = true,
+    log = console.log,
+  }: { everyMs?: number; runs?: boolean; log?: (text: string) => void } = {},
 ): () => void {
-  const prune = () =>
-    pruneRuns(db)
+  const failed = (error: unknown) =>
+    log(`[retention] pruning failed: ${error instanceof Error ? error.message : error}`);
+  const prune = () => {
+    if (runs) {
+      pruneRuns(db)
+        .then((count) => {
+          if (count > 0) log(`[retention] pruned ${count} old run${count === 1 ? '' : 's'}`);
+        })
+        .catch(failed);
+    }
+    pruneTombstones(db)
       .then((count) => {
-        if (count > 0) log(`[retention] pruned ${count} old run${count === 1 ? '' : 's'}`);
+        if (count > 0) log(`[retention] pruned ${count} old tombstone${count === 1 ? '' : 's'}`);
       })
-      .catch((error: unknown) => log(`[retention] pruning failed: ${error instanceof Error ? error.message : error}`));
+      .catch(failed);
+  };
   void prune();
   const timer = setInterval(prune, everyMs);
   timer.unref();

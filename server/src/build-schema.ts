@@ -14,6 +14,7 @@ import { applyAuthExtension } from './resolvers/auth.ts';
 import { applyBoardChangesExtension } from './resolvers/board-changes.ts';
 import { applyBoardTemplatesExtension } from './resolvers/board-templates.ts';
 import { applyCardMarksExtension } from './resolvers/card-marks.ts';
+import { applyChangesExtension } from './resolvers/changes.ts';
 import { applyDraftsExtension } from './resolvers/drafts.ts';
 import { applyLanePresetsExtension } from './resolvers/lane-presets.ts';
 import { applyLanesExtension } from './resolvers/lanes.ts';
@@ -123,6 +124,7 @@ export function createSchema(db: AnyDb, options: SchemaOptions) {
   schema = applyBoardTemplatesExtension(schema);
   schema = applyBoardChangesExtension(schema);
   schema = applyCardMarksExtension(schema, { ai: options.ai });
+  schema = applyChangesExtension(schema);
   if (options.ai) {
     schema = applyApiKeysExtension(schema);
     schema = applyAiSwitchesExtension(schema);

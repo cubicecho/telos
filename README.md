@@ -234,6 +234,20 @@ agent's base URL and the account's MCP servers are fetched from the server's hos
 a shared instance keep it where it cannot reach anything private, and leave
 `RUNNER_ALLOW_STDIO` off.
 
+## Keeping a copy in step
+
+`changes(since:)` on `/graphql` (and the `changes` tool on `/mcp`) hands back
+what changed in your projects, todos and dependencies since a cursor: the rows
+as they stand now, tombstones for what went, and the cursor to ask with next.
+Leave `since` out to start from everything. An archived todo comes as an
+update with `archivedAt` set; one deleted for good, or a project with
+everything in it, comes as tombstones. Pages hold up to 200 entries by default
+and 1000 at most; `hasMore` says to ask again straight away. A cursor is good
+for 29 days and tombstones are kept for 30, so a client that is away longer
+gets `CURSOR_EXPIRED` and starts again. An API key reads it too, and sees only
+what AI may: when a todo or project leaves its view (ignored, or the project's
+AI switched off) it gets a tombstone, and the row again if it comes back.
+
 ## Before you expose it
 
 Registration is **open**: any address that completes a sign-in gets an account.
