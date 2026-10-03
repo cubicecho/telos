@@ -40,7 +40,9 @@ beforeEach(async () => {
   lastAuth = undefined;
 });
 
-const MODELS = `query ($baseUrl: String!, $agentId: ID) { agentModels(baseUrl: $baseUrl, agentId: $agentId) { id contextLength } }`;
+const MODELS = `query ($baseUrl: String!, $agentId: ID, $apiKey: String) {
+  agentModels(baseUrl: $baseUrl, agentId: $agentId, apiKey: $apiKey) { id contextLength }
+}`;
 
 describe('agentModels', () => {
   it('lists what the endpoint serves, sorted, once each', async () => {
@@ -55,6 +57,11 @@ describe('agentModels', () => {
   it("asks with the agent's stored key", async () => {
     await board.person.expectOk(MODELS, { baseUrl, agentId: board.agentId });
     expect(lastAuth).toBe('Bearer sk-secret');
+  });
+
+  it('asks with a key typed but not yet saved, over the stored one', async () => {
+    await board.person.expectOk(MODELS, { baseUrl, agentId: board.agentId, apiKey: ' sk-typed ' });
+    expect(lastAuth).toBe('Bearer sk-typed');
   });
 
   it('says why when the endpoint will not list them', async () => {

@@ -12,7 +12,7 @@ import { createClient, createTestDb, type TestClient, type TestDb } from './help
 const READ = `query {
   agentDefaults {
     id baseUrl model temperature maxTokens contextLength maxToolIterations toolDiscovery
-    toolSelectModel requestTimeoutSeconds maxRetries hasApiKey
+    toolSelectModel reasoningEffort requestTimeoutSeconds maxRetries hasApiKey
     resolved { baseUrl model temperature maxTokens maxToolIterations toolDiscovery requestTimeoutSeconds maxRetries }
   }
 }`;
@@ -64,6 +64,28 @@ describe('agentDefaults', () => {
     // A save is the whole layer: what is left out is cleared.
     const again = (await board.person.expectOk(SET, { values: { model: '  ' } })).setAgentDefaults;
     expect(again).toMatchObject({ baseUrl: null, model: null, temperature: null, maxRetries: null });
+  });
+
+  it('stores a reasoning effort, which an agent can turn off and the runner is handed', async () => {
+    await board.person.expectOk(SET, { values: { baseUrl: 'http://llm.local/v1', reasoningEffort: ' high ' } });
+    const { agentDefaults } = await board.person.expectOk(
+      'query { agentDefaults { reasoningEffort resolved { reasoningEffort } builtIn { reasoningEffort } } }',
+    );
+    expect(agentDefaults).toEqual({
+      reasoningEffort: 'high',
+      resolved: { reasoningEffort: 'high' },
+      builtIn: { reasoningEffort: '' },
+    });
+
+    await board.person.expectOk(UPDATE_AGENT, { id: board.agentId, set: { reasoningEffort: 'off' } });
+    const todoId = await board.addTodo('Think less');
+    const { claimRun } = await runner.expectOk(
+      `mutation ($todoId: ID!, $laneId: ID!) {
+        claimRun(todoId: $todoId, laneId: $laneId) { agent { reasoningEffort defaults { reasoningEffort } } }
+      }`,
+      { todoId, laneId: board.lanes[0].id },
+    );
+    expect(claimRun.agent).toEqual({ reasoningEffort: 'off', defaults: { reasoningEffort: 'high' } });
   });
 
   it('refuses a value the runner would drop', async () => {

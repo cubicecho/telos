@@ -27,6 +27,8 @@ export interface AgentLayer {
   /** On is agent-core's `ondemand` discovery, off its `eager`. */
   toolDiscovery?: boolean | null;
   toolSelectModel?: string | null;
+  /** A level, or "off" for none, which an agent can say over a default's level. */
+  reasoningEffort?: string | null;
   requestTimeoutSeconds?: number | null;
   maxRetries?: number | null;
 }
@@ -70,6 +72,7 @@ export function specLayer(layer: AgentLayer): AgentSpec {
     maxTokens: layer.maxTokens,
     temperature: layer.temperature,
     contextLength: layer.contextLength,
+    reasoningEffort: layer.reasoningEffort,
   });
   const tools = section({
     discovery: has(layer.toolDiscovery) ? (layer.toolDiscovery ? 'ondemand' : 'eager') : undefined,
@@ -147,5 +150,5 @@ export function keyFor(baseUrl: string, own: string | null, defaults: KeyedLayer
 export function unrunnable(config: Pick<ResolvedAgent, 'baseUrl' | 'model'>, name: string): string | null {
   const missing = [config.baseUrl.trim() ? null : 'endpoint', config.model.trim() ? null : 'model'].filter(Boolean);
   if (missing.length === 0) return null;
-  return `${name} has no ${missing.join(' and no ')}: give it one, or set a default in Settings → AI.`;
+  return `${name} has no ${missing.join(' and no ')}: give it one, or set a default in Settings → Agents.`;
 }

@@ -25,6 +25,7 @@ const AGENT = {
   maxToolIterations: 20,
   toolDiscovery: false,
   toolSelectModel: null,
+  reasoningEffort: null,
   requestTimeoutSeconds: null,
   maxRetries: null,
   mcpServerSlugs: null,

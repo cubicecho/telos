@@ -29,6 +29,7 @@ export const agentDefaults = pgTable(
     maxToolIterations: integer('max_tool_iterations'),
     toolDiscovery: boolean('tool_discovery'),
     toolSelectModel: text('tool_select_model'),
+    reasoningEffort: text('reasoning_effort'),
     requestTimeoutSeconds: integer('request_timeout_seconds'),
     maxRetries: integer('max_retries'),
     updatedAt: timestamp('updated_at', { withTimezone: true })

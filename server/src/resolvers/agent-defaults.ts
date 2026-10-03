@@ -34,6 +34,7 @@ const AGENT_DEFAULTS_SDL = parse(`
     maxToolIterations: Int
     toolDiscovery: Boolean
     toolSelectModel: String
+    reasoningEffort: String
     requestTimeoutSeconds: Int
     maxRetries: Int
     "Whether a default API key is stored. The key itself is never readable."
@@ -57,6 +58,8 @@ const AGENT_DEFAULTS_SDL = parse(`
     toolDiscovery: Boolean!
     "Empty is none: tools are not preselected."
     toolSelectModel: String!
+    "Empty or off sends none: the endpoint's own."
+    reasoningEffort: String!
     "Null is no limit."
     requestTimeoutSeconds: Int
     maxRetries: Int!
@@ -72,6 +75,7 @@ const AGENT_DEFAULTS_SDL = parse(`
     maxToolIterations: Int
     toolDiscovery: Boolean
     toolSelectModel: String
+    reasoningEffort: String
     requestTimeoutSeconds: Int
     maxRetries: Int
   }
@@ -123,6 +127,7 @@ function settings(row: dbSchema.AgentDefaults | null) {
     maxToolIterations: config.maxToolIterations,
     toolDiscovery: config.toolDiscovery !== 'eager',
     toolSelectModel: config.toolSelectModel,
+    reasoningEffort: config.reasoningEffort ?? '',
     requestTimeoutSeconds: config.requestTimeoutSeconds ?? null,
     maxRetries: config.maxRetries,
   };

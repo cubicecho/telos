@@ -1,8 +1,13 @@
 import { MockedProvider } from '@apollo/client/testing';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { AgentDefaultsDocument, SetAgentDefaultsApiKeyDocument, SetAgentDefaultsDocument } from '@/lib/graphql';
+import {
+  AgentDefaultsDocument,
+  AgentModelsDocument,
+  SetAgentDefaultsApiKeyDocument,
+  SetAgentDefaultsDocument,
+} from '@/lib/graphql';
 import { AgentDefaultsForm } from '../agent-defaults-form';
 
 const BUILT_IN = {
@@ -15,6 +20,7 @@ const BUILT_IN = {
   maxToolIterations: 20,
   toolDiscovery: false,
   toolSelectModel: '',
+  reasoningEffort: '',
   requestTimeoutSeconds: null,
   maxRetries: 0,
 };
@@ -22,7 +28,7 @@ const BUILT_IN = {
 const BLANK = {
   __typename: 'AgentDefaults',
   id: 'u1',
-  baseUrl: null,
+  baseUrl: null as string | null,
   model: null,
   temperature: null,
   maxTokens: null,
@@ -30,6 +36,7 @@ const BLANK = {
   maxToolIterations: null,
   toolDiscovery: null,
   toolSelectModel: null,
+  reasoningEffort: null,
   requestTimeoutSeconds: null,
   maxRetries: null,
   hasApiKey: false,
@@ -63,6 +70,7 @@ describe('AgentDefaultsForm', () => {
       maxToolIterations: null,
       toolDiscovery: null,
       toolSelectModel: null,
+      reasoningEffort: null,
       requestTimeoutSeconds: null,
       maxRetries: null,
     };
@@ -103,10 +111,44 @@ describe('AgentDefaultsForm', () => {
     ]);
 
     await user.click(await screen.findByRole('button', { name: 'Set default key' }));
-    await user.type(screen.getByLabelText('API key'), 'sk-default');
-    await user.click(screen.getByRole('button', { name: 'Set key' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.type(within(dialog).getByLabelText('API key'), 'sk-default');
+    await user.click(within(dialog).getByRole('button', { name: 'Set key' }));
 
     await waitFor(() => expect(setKey).toHaveBeenCalled());
     expect(await screen.findByText('Key set')).toBeInTheDocument();
+  });
+
+  it('lists the stored endpoint’s models, and saves a key typed beside it', async () => {
+    const user = userEvent.setup();
+    const stored = { ...BLANK, baseUrl: 'http://llm.local/v1' };
+    const setKey = vi.fn(() => ({
+      data: { setAgentDefaultsApiKey: { __typename: 'AgentDefaults', id: 'u1', hasApiKey: true } },
+    }));
+    form([
+      read(stored),
+      {
+        request: {
+          query: AgentModelsDocument,
+          variables: { baseUrl: 'http://llm.local/v1', agentId: null, apiKey: null },
+        },
+        result: { data: { agentModels: [{ __typename: 'AgentModel', id: 'qwen3:14b', contextLength: 40960 }] } },
+      },
+      {
+        request: { query: SetAgentDefaultsDocument },
+        variableMatcher: () => true,
+        result: { data: { setAgentDefaults: stored } },
+      },
+      { request: { query: SetAgentDefaultsApiKeyDocument, variables: { apiKey: 'sk-inline' } }, result: setKey },
+    ]);
+
+    expect(await screen.findByText('1 model at http://llm.local/v1')).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Model' })).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText('API key'), 'sk-inline');
+    await user.click(screen.getByRole('button', { name: 'Save defaults' }));
+
+    await waitFor(() => expect(setKey).toHaveBeenCalled());
+    expect(screen.getByLabelText('API key')).toHaveValue('');
   });
 });

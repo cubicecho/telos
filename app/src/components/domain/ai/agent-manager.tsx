@@ -1,4 +1,4 @@
-import { useLazyQuery, useMutation, useQuery } from '@apollo/client';
+import { useMutation, useQuery } from '@apollo/client';
 import { useEffect, useMemo, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import type { AgentFieldsFragment } from '@/__generated__/graphql';
@@ -17,7 +17,6 @@ import { type AgentDraft, fromAgentDraft, layerHints, missingSetup, toAgentDraft
 import { describeError } from '@/lib/errors';
 import {
   AgentDefaultsDocument,
-  AgentModelsDocument,
   AgentsDocument,
   CreateAgentDocument,
   DeleteAgentDocument,
@@ -25,7 +24,22 @@ import {
   UpdateAgentDocument,
 } from '@/lib/graphql';
 import { newId } from '@/lib/ids';
-import { DISCOVERY_HELP, discoveryOptions, NUMBER_FIELDS } from './agent-settings-fields';
+import {
+  DISCOVERY_HELP,
+  discoveryOptions,
+  EFFORT_HELP,
+  effortOptions,
+  type NumberGroup,
+  numbersIn,
+} from './agent-settings-fields';
+import {
+  BASE_URL_HELP,
+  type EndpointModel,
+  EndpointStatus,
+  FormGroupTitle,
+  ModelField,
+  useEndpointModels,
+} from './endpoint-fields';
 import { McpServerPicker } from './mcp-server-picker';
 import { RunToolsPicker } from './run-tools-picker';
 
@@ -195,10 +209,14 @@ function inheritedText(value: string | undefined): string {
   return value ? `${value} (default)` : 'none';
 }
 
+/** The form's values: the agent, and a key typed for it, which is saved on its own. */
+type AgentFormValues = AgentDraft & { apiKey: string };
+
 /**
- * Creating an agent or editing one. Everything but the API key, which is
- * write-only and has its own dialog, so an edit never has to say whether the
- * blank key box means "keep it" or "clear it". A new agent can start from a
+ * Creating an agent or editing one, endpoint first: a base URL and a key,
+ * the models it lists, then the rest. The key box is write-only, as the key
+ * is: blank keeps what is stored, and clearing one is the key dialog's job,
+ * so a blank box never has to mean both. A new agent can start from a
  * template, which fills in all but the endpoint and the model.
  */
 export function AgentFormDialog({
@@ -215,10 +233,15 @@ export function AgentFormDialog({
   const isEdit = agent !== null;
   const [createAgent, createState] = useMutation(CreateAgentDocument, { refetchQueries: [AgentsDocument] });
   const [updateAgent, updateState] = useMutation(UpdateAgentDocument);
-  const error = createState.error ?? updateState.error;
+  const [setKey, keyState] = useMutation(SetAgentApiKeyDocument, { refetchQueries: [AgentsDocument] });
+  const error = createState.error ?? updateState.error ?? keyState.error;
   const inherited = useQuery(AgentDefaultsDocument).data?.agentDefaults.resolved;
   const hints = layerHints(inherited, 'defaults');
-  const initial = useMemo(() => (agent ? toAgentDraft(agent) : draftFromTemplate(template)), [agent, template]);
+  const endpoint = useEndpointModels(agent?.id ?? null);
+  const initial = useMemo<AgentFormValues>(
+    () => ({ ...(agent ? toAgentDraft(agent) : draftFromTemplate(template)), apiKey: '' }),
+    [agent, template],
+  );
   const form = useAppForm({
     defaultValues: initial,
     onSubmit: ({ value }) => save(value),
@@ -228,11 +251,25 @@ export function AgentFormDialog({
     if (open) form.reset(initial);
   }, [open, initial, form]);
 
-  async function save(value: AgentDraft) {
+  /** The base URL a run would use: its own, else the default. */
+  const effectiveBaseUrl = () => form.getFieldValue('baseUrl').trim() || inherited?.baseUrl || '';
+  const askModels = (force = false) => endpoint.ask(effectiveBaseUrl(), form.getFieldValue('apiKey'), force);
+
+  // With an endpoint already set, its own or the default, its models are listed
+  // straight away, as min-agent lists the stored endpoint's.
+  const defaultBaseUrl = inherited?.baseUrl;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: asked once the default is known, not on every keystroke
+  useEffect(() => {
+    if (open) askModels();
+  }, [open, defaultBaseUrl]);
+
+  async function save({ apiKey, ...value }: AgentFormValues) {
     const values = fromAgentDraft(value);
+    const id = agent?.id ?? newId();
     try {
-      if (agent) await updateAgent({ variables: { id: agent.id, set: values } });
-      else await createAgent({ variables: { values: { id: newId(), ...values } } });
+      if (agent) await updateAgent({ variables: { id, set: values } });
+      else await createAgent({ variables: { values: { id, ...values } } });
+      if (apiKey.trim()) await setKey({ variables: { agentId: id, apiKey: apiKey.trim() } });
     } catch {
       // `error` says why, beside the buttons; what was typed stays.
       return;
@@ -243,6 +280,24 @@ export function AgentFormDialog({
   const required = (what: string) => ({
     onChange: ({ value }: { value: string }) => (value.trim() === '' ? `An agent needs ${what}.` : undefined),
   });
+  const numbers = (group: NumberGroup) => (
+    <View className="flex-row flex-wrap gap-4">
+      {numbersIn(group).map((spec) => (
+        <View key={spec.name} className="min-w-[140px] flex-1">
+          <form.AppField name={spec.name} validators={{ onChange: spec.rule }}>
+            {(field) => (
+              <field.InputField label={spec.label} inputMode={spec.inputMode} placeholder={hints[spec.name]} />
+            )}
+          </form.AppField>
+        </View>
+      ))}
+    </View>
+  );
+  const pickModel = (model: EndpointModel) => {
+    if (model.contextLength && !form.getFieldValue('contextLength').trim()) {
+      form.setFieldValue('contextLength', String(model.contextLength));
+    }
+  };
 
   return (
     <FormDialog
@@ -273,26 +328,47 @@ export function AgentFormDialog({
                 />
               )}
             </form.AppField>
-            <form.AppField name="baseUrl">
+
+            <FormGroupTitle title="Endpoint" description="Where it runs. Its models are listed from here." />
+            <form.AppField name="baseUrl" listeners={{ onBlur: () => askModels() }}>
               {(field) => <field.InputField label="Base URL" type="url" placeholder={hints.baseUrl} />}
             </form.AppField>
-            <View className="flex-row items-end gap-2">
-              <View className="min-w-0 flex-1">
-                <form.AppField name="model">
-                  {(field) => <field.InputField label="Model" placeholder={hints.model} />}
-                </form.AppField>
-              </View>
-              <ModelMenu
-                agentId={agent?.id ?? null}
-                baseUrl={() => form.getFieldValue('baseUrl').trim() || inherited?.baseUrl || ''}
-                onPick={(model) => {
-                  form.setFieldValue('model', model.id);
-                  if (model.contextLength && !form.getFieldValue('contextLength').trim()) {
-                    form.setFieldValue('contextLength', String(model.contextLength));
+            <Text className="-mt-2 text-muted-foreground text-xs">{BASE_URL_HELP}</Text>
+            <form.AppField name="apiKey" listeners={{ onBlur: () => askModels() }}>
+              {(field) => (
+                <field.InputField
+                  label="API key"
+                  type="password"
+                  placeholder={
+                    agent?.hasApiKey
+                      ? 'A key is set: leave blank to keep it'
+                      : 'Optional. Local servers such as Ollama need none.'
                   }
-                }}
-              />
-            </View>
+                />
+              )}
+            </form.AppField>
+            <form.Subscribe selector={(state) => state.values.baseUrl}>
+              {(baseUrl) => (
+                <EndpointStatus
+                  endpoint={endpoint}
+                  canLoad={Boolean(baseUrl.trim() || inherited?.baseUrl)}
+                  onLoad={() => askModels(true)}
+                />
+              )}
+            </form.Subscribe>
+
+            <FormGroupTitle title="Model" />
+            <form.AppField name="model">
+              {() => (
+                <ModelField
+                  label="Model"
+                  models={endpoint.models}
+                  blankLabel={`Inherit (${hints.model || 'default'})`}
+                  placeholder={hints.model}
+                  onPick={pickModel}
+                />
+              )}
+            </form.AppField>
             <form.Subscribe selector={(state) => ({ baseUrl: state.values.baseUrl, model: state.values.model })}>
               {(own) => {
                 const missing = missingSetup(own, inherited);
@@ -303,24 +379,37 @@ export function AgentFormDialog({
                 ) : null;
               }}
             </form.Subscribe>
+            {numbers('model')}
+            <form.AppField name="reasoningEffort">
+              {(field) => (
+                <field.SelectField
+                  label="Reasoning effort"
+                  options={effortOptions(hints.reasoningEffort, field.state.value)}
+                />
+              )}
+            </form.AppField>
+            <Text className="-mt-2 text-muted-foreground text-xs">{EFFORT_HELP}</Text>
             <form.AppField name="systemPrompt">
               {(field) => (
                 <field.TextAreaField label="System prompt" placeholder="Optional. Who the agent is, in any lane." />
               )}
             </form.AppField>
-            {NUMBER_FIELDS.map((spec) => (
-              <form.AppField key={spec.name} name={spec.name} validators={{ onChange: spec.rule }}>
-                {(field) => (
-                  <field.InputField label={spec.label} inputMode={spec.inputMode} placeholder={hints[spec.name]} />
-                )}
-              </form.AppField>
-            ))}
+
+            <FormGroupTitle title="Tools" />
+            {numbers('tools')}
             <form.AppField name="toolDiscovery">
               {(field) => <field.SelectField label="Tool discovery" options={discoveryOptions(hints.toolDiscovery)} />}
             </form.AppField>
             <Text className="-mt-2 text-muted-foreground text-xs">{DISCOVERY_HELP}</Text>
             <form.AppField name="toolSelectModel">
-              {(field) => <field.InputField label="Tool selection model" placeholder={hints.toolSelectModel} />}
+              {() => (
+                <ModelField
+                  label="Tool selection model"
+                  models={endpoint.models}
+                  blankLabel={`Inherit (${hints.toolSelectModel || 'none'})`}
+                  placeholder={hints.toolSelectModel}
+                />
+              )}
             </form.AppField>
             <form.AppField name="mcpServerSlugs">
               {(field) => <McpServerPicker slugs={field.state.value} onChange={(next) => field.handleChange(next)} />}
@@ -328,6 +417,9 @@ export function AgentFormDialog({
             <form.AppField name="toolsOff">
               {(field) => <RunToolsPicker toolsOff={field.state.value} onChange={(next) => field.handleChange(next)} />}
             </form.AppField>
+
+            <FormGroupTitle title="Requests" />
+            {numbers('requests')}
           </ScrollView>
           <FormDialogFooter onCancel={() => onOpenChange(false)} error={error ? describeError(error) : null}>
             <form.SubmitButton isEdit={isEdit} createLabel="Create agent" editLabel="Save" />
@@ -335,57 +427,6 @@ export function AgentFormDialog({
         </Form>
       </form.AppForm>
     </FormDialog>
-  );
-}
-
-/**
- * The models the base URL offers, asked for when the menu opens: the server
- * reads the endpoint's `/models`, with the key a run would send there.
- * Typing a model in is always still there, for an endpoint that lists nothing.
- */
-function ModelMenu({
-  agentId,
-  baseUrl,
-  onPick,
-}: {
-  agentId: string | null;
-  baseUrl: () => string;
-  onPick: (model: { id: string; contextLength?: number | null }) => void;
-}) {
-  const [load, query] = useLazyQuery(AgentModelsDocument, { fetchPolicy: 'network-only' });
-  const models = query.data?.agentModels ?? [];
-
-  function opened(open: boolean) {
-    const url = baseUrl().trim();
-    if (open && url) void load({ variables: { baseUrl: url, agentId } }).catch(() => undefined);
-  }
-
-  let status: string | null = null;
-  if (!query.called) status = 'Give a base URL first.';
-  else if (query.loading) status = 'Asking the endpoint…';
-  else if (query.error) status = describeError(query.error);
-  else if (models.length === 0) status = 'It lists no models.';
-
-  return (
-    <Menu onOpenChange={opened}>
-      <MenuTrigger asChild>
-        <Button variant="outline" aria-label="Pick from the endpoint’s models">
-          Models
-          <ChevronDown className="h-4 w-4" />
-        </Button>
-      </MenuTrigger>
-      <MenuContent align="end" aria-label="Models" className="max-h-80 overflow-y-auto">
-        {status ? <MenuItem label={status} disabled /> : null}
-        {models.map((model) => (
-          <MenuItem
-            key={model.id}
-            label={model.id}
-            trailing={model.contextLength ? `${model.contextLength.toLocaleString()} ctx` : undefined}
-            onSelect={() => onPick(model)}
-          />
-        ))}
-      </MenuContent>
-    </Menu>
   );
 }
 

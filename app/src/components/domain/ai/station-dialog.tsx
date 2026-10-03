@@ -322,7 +322,7 @@ export function StationDialog({
             {(field) => <field.SelectField label="Agent" options={agentOptions} />}
           </form.AppField>
           {agents.length === 0 ? (
-            <Text className="text-muted-foreground text-xs">Add an agent in Settings → AI first.</Text>
+            <Text className="text-muted-foreground text-xs">Add an agent in Settings → Agents first.</Text>
           ) : null}
           <form.Subscribe
             selector={(state) => ({

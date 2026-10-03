@@ -54,6 +54,7 @@ const RUNS_SDL = parse(`
     maxToolIterations: Int
     toolDiscovery: Boolean
     toolSelectModel: String
+    reasoningEffort: String
     requestTimeoutSeconds: Int
     maxRetries: Int
     "The account's MCP servers the agent reaches, in slug order, as JSON, secrets included."
@@ -75,6 +76,7 @@ const RUNS_SDL = parse(`
     maxToolIterations: Int
     toolDiscovery: Boolean
     toolSelectModel: String
+    reasoningEffort: String
     requestTimeoutSeconds: Int
     maxRetries: Int
   }
