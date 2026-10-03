@@ -12,9 +12,10 @@ import { FormDialog, FormDialogFooter } from '@/components/ui/form-dialog';
 import { ChevronDown, Pencil, Plus, Trash2 } from '@/components/ui/icons';
 import { LoadState } from '@/components/ui/load-failure';
 import { Menu, MenuContent, MenuItem, MenuTrigger } from '@/components/ui/menu';
-import { type AgentDraft, fromAgentDraft, numberRule, toAgentDraft } from '@/lib/agents';
+import { type AgentDraft, fromAgentDraft, layerHints, missingSetup, toAgentDraft } from '@/lib/agents';
 import { describeError } from '@/lib/errors';
 import {
+  AgentDefaultsDocument,
   AgentModelsDocument,
   AgentsDocument,
   CreateAgentDocument,
@@ -23,6 +24,7 @@ import {
   UpdateAgentDocument,
 } from '@/lib/graphql';
 import { newId } from '@/lib/ids';
+import { DISCOVERY_HELP, discoveryOptions, NUMBER_FIELDS } from './agent-settings-fields';
 import { McpServerPicker } from './mcp-server-picker';
 import { RunToolsPicker } from './run-tools-picker';
 
@@ -34,10 +36,12 @@ type AgentRow = AgentFieldsFragment;
  *
  * An agent does nothing on its own. It is named by a lane (a station), and the
  * runner works it there, so deleting one quietly turns its stations back into
- * ordinary lanes rather than failing.
+ * ordinary lanes rather than failing. What it leaves blank it inherits from
+ * the account's defaults (AgentDefaultsForm).
  */
 export function AgentManager() {
   const agentsQuery = useQuery(AgentsDocument);
+  const inherited = useQuery(AgentDefaultsDocument).data?.agentDefaults.resolved;
   const [editing, setEditing] = useState<AgentRow | 'new' | null>(null);
   const [keying, setKeying] = useState<AgentRow | null>(null);
   const [deleting, setDeleting] = useState<AgentRow | null>(null);
@@ -94,9 +98,11 @@ export function AgentManager() {
                       {agent.name}
                     </Text>
                     <Text numberOfLines={1} className="text-muted-foreground text-xs">
-                      {agent.model} · {agent.baseUrl}
+                      {agent.model ?? inheritedText(inherited?.model)} ·{' '}
+                      {agent.baseUrl ?? inheritedText(inherited?.baseUrl)}
                     </Text>
                   </View>
+                  {agent.enabled ? null : <Badge variant="outline">Off</Badge>}
                   <Badge variant={agent.hasApiKey ? 'secondary' : 'outline'}>
                     {agent.hasApiKey ? 'Key set' : 'No key'}
                   </Badge>
@@ -154,6 +160,17 @@ export function AgentManager() {
 }
 
 /**
+ * A blank field of an agent's, in its row: what it inherits.
+ *
+ * @param value - The default, empty when there is none, or undefined while it loads.
+ * @returns The text.
+ */
+function inheritedText(value: string | undefined): string {
+  if (value === undefined) return 'default';
+  return value ? `${value} (default)` : 'none';
+}
+
+/**
  * Creating an agent or editing one. Everything but the API key, which is
  * write-only and has its own dialog, so an edit never has to say whether the
  * blank key box means "keep it" or "clear it".
@@ -171,6 +188,8 @@ export function AgentFormDialog({
   const [createAgent, createState] = useMutation(CreateAgentDocument, { refetchQueries: [AgentsDocument] });
   const [updateAgent, updateState] = useMutation(UpdateAgentDocument);
   const error = createState.error ?? updateState.error;
+  const inherited = useQuery(AgentDefaultsDocument).data?.agentDefaults.resolved;
+  const hints = layerHints(inherited, 'defaults');
   const initial = useMemo(() => toAgentDraft(agent), [agent]);
   const form = useAppForm({
     defaultValues: initial,
@@ -202,7 +221,7 @@ export function AgentFormDialog({
       open={open}
       onOpenChange={onOpenChange}
       title={isEdit ? `Edit ${agent.name}` : 'New agent'}
-      description="Any OpenAI-compatible endpoint: Ollama, llama.cpp, vLLM or a hosted API."
+      description="Any OpenAI-compatible endpoint: Ollama, llama.cpp, vLLM or a hosted API. A blank field inherits your agent defaults, shown greyed."
       className="sm:max-w-[560px]"
     >
       <form.AppForm>
@@ -214,18 +233,26 @@ export function AgentFormDialog({
             <form.AppField name="name" validators={required('a name')}>
               {(field) => <field.InputField label="Name" autoFocus placeholder="Reviewer" />}
             </form.AppField>
-            <form.AppField name="baseUrl" validators={required('a base URL')}>
-              {(field) => <field.InputField label="Base URL" type="url" placeholder="http://localhost:11434/v1" />}
+            <form.AppField name="enabled">
+              {(field) => (
+                <field.SwitchField
+                  label="On"
+                  description="Off, it takes no runs and no drafts, and its stations wait."
+                />
+              )}
+            </form.AppField>
+            <form.AppField name="baseUrl">
+              {(field) => <field.InputField label="Base URL" type="url" placeholder={hints.baseUrl} />}
             </form.AppField>
             <View className="flex-row items-end gap-2">
               <View className="min-w-0 flex-1">
-                <form.AppField name="model" validators={required('a model')}>
-                  {(field) => <field.InputField label="Model" placeholder="qwen3:14b" />}
+                <form.AppField name="model">
+                  {(field) => <field.InputField label="Model" placeholder={hints.model} />}
                 </form.AppField>
               </View>
               <ModelMenu
                 agentId={agent?.id ?? null}
-                baseUrl={() => form.getFieldValue('baseUrl')}
+                baseUrl={() => form.getFieldValue('baseUrl').trim() || inherited?.baseUrl || ''}
                 onPick={(model) => {
                   form.setFieldValue('model', model.id);
                   if (model.contextLength && !form.getFieldValue('contextLength').trim()) {
@@ -234,41 +261,34 @@ export function AgentFormDialog({
                 }}
               />
             </View>
+            <form.Subscribe selector={(state) => ({ baseUrl: state.values.baseUrl, model: state.values.model })}>
+              {(own) => {
+                const missing = missingSetup(own, inherited);
+                return missing ? (
+                  <Text className="text-destructive text-sm" aria-live="polite">
+                    {missing}
+                  </Text>
+                ) : null;
+              }}
+            </form.Subscribe>
             <form.AppField name="systemPrompt">
               {(field) => (
                 <field.TextAreaField label="System prompt" placeholder="Optional. Who the agent is, in any lane." />
               )}
             </form.AppField>
-            <form.AppField name="temperature" validators={{ onChange: numberRule({ min: 0, integer: false }) }}>
-              {(field) => <field.InputField label="Temperature" inputMode="decimal" placeholder="Model default" />}
-            </form.AppField>
-            <form.AppField name="maxTokens" validators={{ onChange: numberRule({ min: 1 }) }}>
-              {(field) => <field.InputField label="Max tokens" inputMode="numeric" placeholder="Model default" />}
-            </form.AppField>
-            <form.AppField name="contextLength" validators={{ onChange: numberRule({ min: 1 }) }}>
-              {(field) => <field.InputField label="Context length" inputMode="numeric" placeholder="Model default" />}
-            </form.AppField>
-            <form.AppField name="maxToolIterations" validators={{ onChange: numberRule({ min: 1, required: true }) }}>
-              {(field) => <field.InputField label="Max tool iterations" inputMode="numeric" />}
-            </form.AppField>
-            <form.AppField name="requestTimeoutSeconds" validators={{ onChange: numberRule({ min: 1 }) }}>
-              {(field) => (
-                <field.InputField label="Request timeout (seconds)" inputMode="numeric" placeholder="Default" />
-              )}
-            </form.AppField>
-            <form.AppField name="maxRetries" validators={{ onChange: numberRule({ min: 0 }) }}>
-              {(field) => <field.InputField label="Max retries" inputMode="numeric" placeholder="Default" />}
-            </form.AppField>
+            {NUMBER_FIELDS.map((spec) => (
+              <form.AppField key={spec.name} name={spec.name} validators={{ onChange: spec.rule }}>
+                {(field) => (
+                  <field.InputField label={spec.label} inputMode={spec.inputMode} placeholder={hints[spec.name]} />
+                )}
+              </form.AppField>
+            ))}
             <form.AppField name="toolDiscovery">
-              {(field) => (
-                <field.CheckboxField
-                  label="Tool discovery"
-                  description="Offer the model only the tools a cheap first pass picks. For servers with more tools than a small context holds."
-                />
-              )}
+              {(field) => <field.SelectField label="Tool discovery" options={discoveryOptions(hints.toolDiscovery)} />}
             </form.AppField>
+            <Text className="-mt-2 text-muted-foreground text-xs">{DISCOVERY_HELP}</Text>
             <form.AppField name="toolSelectModel">
-              {(field) => <field.InputField label="Tool selection model" placeholder="The agent's own model" />}
+              {(field) => <field.InputField label="Tool selection model" placeholder={hints.toolSelectModel} />}
             </form.AppField>
             <form.AppField name="mcpServerSlugs">
               {(field) => <McpServerPicker slugs={field.state.value} onChange={(next) => field.handleChange(next)} />}
@@ -288,7 +308,7 @@ export function AgentFormDialog({
 
 /**
  * The models the base URL offers, asked for when the menu opens: the server
- * reads the endpoint's `/models`, with the agent's stored key when it has one.
+ * reads the endpoint's `/models`, with the key a run would send there.
  * Typing a model in is always still there, for an endpoint that lists nothing.
  */
 function ModelMenu({

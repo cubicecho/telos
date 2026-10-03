@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import {
+  AgentDefaultsDocument,
   AgentModelsDocument,
   AgentsDocument,
   CreateAgentDocument,
@@ -33,9 +34,52 @@ const AGENT = {
   requestTimeoutSeconds: null,
   maxRetries: null,
   mcpServerSlugs: null,
+  enabled: true,
   toolsOff: null,
   hasApiKey: false,
 };
+
+const BUILT_IN = {
+  __typename: 'ResolvedAgentSettings',
+  baseUrl: '',
+  model: '',
+  temperature: 0.7,
+  maxTokens: 0,
+  contextLength: 0,
+  maxToolIterations: 20,
+  toolDiscovery: false,
+  toolSelectModel: '',
+  requestTimeoutSeconds: null,
+  maxRetries: 0,
+};
+
+/** The account's defaults, `resolved` over agent-core's own. */
+function defaults(resolved: Partial<typeof BUILT_IN> = {}) {
+  return {
+    request: { query: AgentDefaultsDocument },
+    result: {
+      data: {
+        agentDefaults: {
+          __typename: 'AgentDefaults',
+          id: 'u1',
+          baseUrl: resolved.baseUrl || null,
+          model: resolved.model || null,
+          temperature: null,
+          maxTokens: null,
+          contextLength: null,
+          maxToolIterations: null,
+          toolDiscovery: null,
+          toolSelectModel: null,
+          requestTimeoutSeconds: null,
+          maxRetries: null,
+          hasApiKey: false,
+          resolved: { ...BUILT_IN, ...resolved },
+          builtIn: BUILT_IN,
+        },
+      },
+    },
+  };
+}
 
 // One of each kind: a read and a write a run has by default, a write it does
 // not, and a tool no run may have.
@@ -80,9 +124,9 @@ function agents(rows: unknown[]) {
 }
 
 // biome-ignore lint/suspicious/noExplicitAny: MockedProvider's mock array type
-function manager(mocks: any[]) {
+function manager(mocks: any[], inherited = defaults()) {
   render(
-    <MockedProvider mocks={mocks}>
+    <MockedProvider mocks={[inherited, inherited, ...mocks]}>
       <AgentManager />
     </MockedProvider>,
   );
@@ -112,11 +156,13 @@ describe('AgentManager', () => {
       temperature: 0.2,
       maxTokens: null,
       contextLength: null,
-      maxToolIterations: 20,
-      toolDiscovery: false,
+      // Blank inherits: none of these is sent as a value it was not given.
+      maxToolIterations: null,
+      toolDiscovery: null,
       toolSelectModel: null,
       requestTimeoutSeconds: null,
       maxRetries: null,
+      enabled: true,
       // Every server the account has, which is what a new agent starts with.
       mcpServerSlugs: null,
       // The run default: reading, adding work and notes.
@@ -147,17 +193,28 @@ describe('AgentManager', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
 
-  it('will not create an agent without a model', async () => {
+  it('says what a blank field inherits, and warns while it would have no model', async () => {
     const user = userEvent.setup();
-    manager([agents([])]);
+    manager([agents([])], defaults({ baseUrl: 'http://llm.local/v1', temperature: 0.2 }));
 
     await user.click(await screen.findByRole('button', { name: 'New agent' }));
-    await user.type(screen.getByLabelText('Name'), 'Reviewer');
-    await user.type(screen.getByLabelText('Base URL'), 'http://localhost:11434/v1');
-    await user.click(screen.getByRole('button', { name: 'Create agent' }));
+    expect(await screen.findByPlaceholderText('http://llm.local/v1')).toBe(screen.getByLabelText('Base URL'));
+    expect(screen.getByLabelText('Temperature')).toHaveAttribute('placeholder', '0.2');
+    expect(screen.getByLabelText('Max tokens')).toHaveAttribute('placeholder', 'No limit');
+    expect(screen.getByText(/^No model: give it one here/)).toBeInTheDocument();
 
-    expect(await screen.findByText('An agent needs a model.')).toBeInTheDocument();
-    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    await user.type(screen.getByLabelText('Model'), 'qwen3:14b');
+    expect(screen.queryByText(/^No model/)).not.toBeInTheDocument();
+  });
+
+  it('shows an agent that is switched off, and what its blanks inherit', async () => {
+    manager(
+      [agents([{ ...AGENT, enabled: false, model: null }])],
+      defaults({ baseUrl: 'http://llm.local/v1', model: 'big' }),
+    );
+
+    expect(await screen.findByText('Off')).toBeInTheDocument();
+    expect(await screen.findByText('big (default) · http://localhost:11434/v1')).toBeInTheDocument();
   });
 
   it('picks a model from what the endpoint lists, and takes its context length', async () => {

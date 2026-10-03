@@ -301,8 +301,76 @@ export const AgentFieldsFragment = graphql(`
     requestTimeoutSeconds
     maxRetries
     mcpServerSlugs
+    enabled
     toolsOff
     hasApiKey
+  }
+`);
+
+// What the account's agents inherit. The default key is write-only too, set
+// with `setAgentDefaultsApiKey`. `resolved` is what an agent that leaves a field
+// blank gets for it, and `builtIn` what a field left blank here falls to.
+
+export const ResolvedAgentSettingsFieldsFragment = graphql(`
+  fragment ResolvedAgentSettingsFields on ResolvedAgentSettings {
+    baseUrl
+    model
+    temperature
+    maxTokens
+    contextLength
+    maxToolIterations
+    toolDiscovery
+    toolSelectModel
+    requestTimeoutSeconds
+    maxRetries
+  }
+`);
+
+export const AgentDefaultsFieldsFragment = graphql(`
+  fragment AgentDefaultsFields on AgentDefaults {
+    id
+    baseUrl
+    model
+    temperature
+    maxTokens
+    contextLength
+    maxToolIterations
+    toolDiscovery
+    toolSelectModel
+    requestTimeoutSeconds
+    maxRetries
+    hasApiKey
+    resolved {
+      ...ResolvedAgentSettingsFields
+    }
+    builtIn {
+      ...ResolvedAgentSettingsFields
+    }
+  }
+`);
+
+export const AgentDefaultsDocument = graphql(`
+  query AgentDefaults {
+    agentDefaults {
+      ...AgentDefaultsFields
+    }
+  }
+`);
+
+export const SetAgentDefaultsDocument = graphql(`
+  mutation SetAgentDefaults($values: AgentDefaultsInput!) {
+    setAgentDefaults(values: $values) {
+      ...AgentDefaultsFields
+    }
+  }
+`);
+
+export const SetAgentDefaultsApiKeyDocument = graphql(`
+  mutation SetAgentDefaultsApiKey($apiKey: String) {
+    setAgentDefaultsApiKey(apiKey: $apiKey) {
+      id
+      hasApiKey
+    }
   }
 `);
 

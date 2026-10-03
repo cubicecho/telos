@@ -18,6 +18,6 @@ export const instanceSettings = pgTable(
 );
 
 /** The drizzle-graphql keys of tables only the server touches, which the schema excludes. */
-export const SERVER_TABLES = ['instanceSettings', 'todoSessions', 'apiKeyTools'] as const;
+export const SERVER_TABLES = ['instanceSettings', 'todoSessions', 'apiKeyTools', 'agentDefaults'] as const;
 
 export type InstanceSettings = typeof instanceSettings.$inferSelect;

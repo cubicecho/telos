@@ -67,7 +67,7 @@ async function readSetup(db: AnyDb, userId: string): Promise<SetupRow> {
       SELECT EXISTS (SELECT 1 FROM runs r WHERE r.user_id = ${userId} AND r.kind = 'todo') AS yes
     )
     SELECT
-      EXISTS (SELECT 1 FROM agents a WHERE a.user_id = ${userId}) AS agent,
+      EXISTS (SELECT 1 FROM agents a WHERE a.user_id = ${userId} AND a.enabled) AS agent,
       COALESCE(
         (SELECT json_agg(s.id ORDER BY s.ai_enabled DESC, s.auto_run DESC, s.created_at) FROM station_projects s),
         '[]'::json

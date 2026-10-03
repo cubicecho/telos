@@ -1,3 +1,4 @@
+export * from './agent-defaults.ts';
 export * from './agents.ts';
 export * from './api-key-tools.ts';
 export * from './artifacts.ts';

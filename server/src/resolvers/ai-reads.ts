@@ -36,7 +36,10 @@ const AI_READS_SDL = parse(`
   type AgentSummary {
     id: ID!
     name: String!
+    "The model it runs: its own, else your default. Empty when neither names one."
     model: String!
+    "Whether it is switched on. One switched off takes no runs and no drafts."
+    enabled: Boolean!
     "Whether a key is stored for it. The key itself is never read back."
     hasApiKey: Boolean!
     "The lanes it works, in projects with AI on."
@@ -84,14 +87,16 @@ export function applyAiReadsExtension(schema: GraphQLSchema): GraphQLSchema {
     const userId = await requireAi(context);
     const db = context.db as AnyRow;
     // Named columns, never the row: the key and the servers stay where they are.
-    const agents: Array<{ id: string; name: string; model: string; hasApiKey: boolean }> = await db
+    const agents: Array<{ id: string; name: string; model: string; enabled: boolean; hasApiKey: boolean }> = await db
       .select({
         id: dbSchema.agents.id,
         name: dbSchema.agents.name,
-        model: dbSchema.agents.model,
+        model: sql<string>`coalesce(${dbSchema.agents.model}, ${dbSchema.agentDefaults.model}, '')`,
+        enabled: dbSchema.agents.enabled,
         hasApiKey: sql<boolean>`${dbSchema.agents.apiKey} is not null and ${dbSchema.agents.apiKey} <> ''`,
       })
       .from(dbSchema.agents)
+      .leftJoin(dbSchema.agentDefaults, eq(dbSchema.agentDefaults.userId, dbSchema.agents.userId))
       .where(eq(dbSchema.agents.userId, userId))
       .orderBy(asc(dbSchema.agents.name), asc(dbSchema.agents.createdAt));
     const stations: StationRow[] = await db
