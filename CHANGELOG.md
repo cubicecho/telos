@@ -1,3 +1,12 @@
+# [1.16.0](https://github.com/cubicecho/telos/compare/v1.15.0...v1.16.0) (2026-10-03)
+
+
+### Features
+
+* **app:** switch a key's MCP tools on and off in Settings ([e23310d](https://github.com/cubicecho/telos/commit/e23310dcd51d1fdb7cdcf426494a387c0ebe45ce))
+* **db:** per-key switches for the MCP door's tools ([ae461ff](https://github.com/cubicecho/telos/commit/ae461ff3df34a5b2356456ff43cf6626ba60de0b))
+* **server:** the MCP door works the board, with a switch per tool per key ([2982b6b](https://github.com/cubicecho/telos/commit/2982b6bd834f805d28a2ab7c165377cc64e332cf)), closes [#18](https://github.com/cubicecho/telos/issues/18)
+
 # [1.15.0](https://github.com/cubicecho/telos/compare/v1.14.0...v1.15.0) (2026-10-02)
 
 
