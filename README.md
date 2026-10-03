@@ -151,7 +151,11 @@ changes and deleting a project stay yours. Nothing checks what a client
 records, so the board lists it as unverified, signed with the key that said it. **The runner** is telos's own
 worker. A lane with an agent is a *station*: the runner claims a todo there,
 has the agent work it, verify it, or split it into child todos, and telos moves
-it along the lane's arrows. A station can archive what passes instead of
+it along the lane's arrows. A new agent can start from one of four templates
+(Settings → Agents → From template): a **Refiner** for drafts, a **Planner** for
+Expand stations, a **Worker** for Work stations and a **Reviewer** for Verdict
+ones. Each comes with a prompt and a temperature for its job; give it a base URL
+and a model, or leave those to your agent defaults. A station can archive what passes instead of
 moving it: the todo is completed and leaves the board, for a pipeline whose
 finished work nobody needs to see in a column. Stations that do the same job
 can follow one **lane preset** (Settings → Agents): its contract, prompt, WIP limit

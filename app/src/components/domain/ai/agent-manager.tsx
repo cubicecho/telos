@@ -12,6 +12,7 @@ import { FormDialog, FormDialogFooter } from '@/components/ui/form-dialog';
 import { ChevronDown, Pencil, Plus, Trash2 } from '@/components/ui/icons';
 import { LoadState } from '@/components/ui/load-failure';
 import { Menu, MenuContent, MenuItem, MenuTrigger } from '@/components/ui/menu';
+import { AGENT_TEMPLATES, type AgentTemplate, draftFromTemplate } from '@/lib/agent-templates';
 import { type AgentDraft, fromAgentDraft, layerHints, missingSetup, toAgentDraft } from '@/lib/agents';
 import { describeError } from '@/lib/errors';
 import {
@@ -30,6 +31,9 @@ import { RunToolsPicker } from './run-tools-picker';
 
 type AgentRow = AgentFieldsFragment;
 
+/** What the form is open on: an agent, or a new one, blank or from a template. */
+type Editing = { agent: AgentRow } | { template: AgentTemplate | null };
+
 /**
  * Agents: the models a lane can hand its todos to. Rendered only while AI is
  * on for the instance and the account — the schema has no agents otherwise.
@@ -42,7 +46,7 @@ type AgentRow = AgentFieldsFragment;
 export function AgentManager() {
   const agentsQuery = useQuery(AgentsDocument);
   const inherited = useQuery(AgentDefaultsDocument).data?.agentDefaults.resolved;
-  const [editing, setEditing] = useState<AgentRow | 'new' | null>(null);
+  const [editing, setEditing] = useState<Editing | null>(null);
   const [keying, setKeying] = useState<AgentRow | null>(null);
   const [deleting, setDeleting] = useState<AgentRow | null>(null);
   const [deleteAgent] = useMutation(DeleteAgentDocument, { refetchQueries: [AgentsDocument] });
@@ -66,10 +70,30 @@ export function AgentManager() {
       title="Agents"
       description="Models a lane can hand its todos to. A lane with an agent is a station."
       action={
-        <Button size="sm" onPress={() => setEditing('new')}>
-          <Plus className="h-4 w-4" />
-          New agent
-        </Button>
+        <View className="flex-row gap-2">
+          <Menu>
+            <MenuTrigger asChild>
+              <Button variant="outline" size="sm">
+                From template
+                <ChevronDown className="h-4 w-4" />
+              </Button>
+            </MenuTrigger>
+            <MenuContent align="end" aria-label="Agent templates">
+              {AGENT_TEMPLATES.map((template) => (
+                <MenuItem
+                  key={template.id}
+                  label={template.name}
+                  trailing={template.use}
+                  onSelect={() => setEditing({ template })}
+                />
+              ))}
+            </MenuContent>
+          </Menu>
+          <Button size="sm" onPress={() => setEditing({ template: null })}>
+            <Plus className="h-4 w-4" />
+            New agent
+          </Button>
+        </View>
       }
       content={
         <View className="gap-4">
@@ -113,7 +137,7 @@ export function AgentManager() {
                     variant="ghost"
                     size="icon-sm"
                     aria-label={`Edit ${agent.name}`}
-                    onPress={() => setEditing(agent)}
+                    onPress={() => setEditing({ agent })}
                   >
                     <Pencil className="h-4 w-4" />
                   </Button>
@@ -134,10 +158,11 @@ export function AgentManager() {
           {/* Keyed so switching from one agent to another starts a fresh form. */}
           {editing ? (
             <AgentFormDialog
-              key={editing === 'new' ? 'new' : editing.id}
+              key={'agent' in editing ? editing.agent.id : `new-${editing.template?.id ?? 'blank'}`}
               open
               onOpenChange={(open) => !open && setEditing(null)}
-              agent={editing === 'new' ? null : editing}
+              agent={'agent' in editing ? editing.agent : null}
+              template={'template' in editing ? editing.template : null}
             />
           ) : null}
 
@@ -173,16 +198,19 @@ function inheritedText(value: string | undefined): string {
 /**
  * Creating an agent or editing one. Everything but the API key, which is
  * write-only and has its own dialog, so an edit never has to say whether the
- * blank key box means "keep it" or "clear it".
+ * blank key box means "keep it" or "clear it". A new agent can start from a
+ * template, which fills in all but the endpoint and the model.
  */
 export function AgentFormDialog({
   open,
   onOpenChange,
   agent,
+  template = null,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   agent: AgentRow | null;
+  template?: AgentTemplate | null;
 }) {
   const isEdit = agent !== null;
   const [createAgent, createState] = useMutation(CreateAgentDocument, { refetchQueries: [AgentsDocument] });
@@ -190,7 +218,7 @@ export function AgentFormDialog({
   const error = createState.error ?? updateState.error;
   const inherited = useQuery(AgentDefaultsDocument).data?.agentDefaults.resolved;
   const hints = layerHints(inherited, 'defaults');
-  const initial = useMemo(() => toAgentDraft(agent), [agent]);
+  const initial = useMemo(() => (agent ? toAgentDraft(agent) : draftFromTemplate(template)), [agent, template]);
   const form = useAppForm({
     defaultValues: initial,
     onSubmit: ({ value }) => save(value),
@@ -220,8 +248,12 @@ export function AgentFormDialog({
     <FormDialog
       open={open}
       onOpenChange={onOpenChange}
-      title={isEdit ? `Edit ${agent.name}` : 'New agent'}
-      description="Any OpenAI-compatible endpoint: Ollama, llama.cpp, vLLM or a hosted API. A blank field inherits your agent defaults, shown greyed."
+      title={isEdit ? `Edit ${agent.name}` : template ? `New ${template.name}` : 'New agent'}
+      description={
+        template
+          ? `${template.description} Its prompt and settings are filled in: give it a base URL and a model, or leave them to your agent defaults.`
+          : 'Any OpenAI-compatible endpoint: Ollama, llama.cpp, vLLM or a hosted API. A blank field inherits your agent defaults, shown greyed.'
+      }
       className="sm:max-w-[560px]"
     >
       <form.AppForm>

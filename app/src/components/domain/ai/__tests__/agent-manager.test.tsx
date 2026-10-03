@@ -2,6 +2,7 @@ import { MockedProvider } from '@apollo/client/testing';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import { AGENT_TEMPLATES } from '@/lib/agent-templates';
 import {
   AgentDefaultsDocument,
   AgentModelsDocument,
@@ -191,6 +192,67 @@ describe('AgentManager', () => {
 
     await waitFor(() => expect(create).toHaveBeenCalled());
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  });
+
+  it('creates an agent from a template, needing only an endpoint and a model', async () => {
+    minted = 0;
+    const user = userEvent.setup();
+    const reviewer = AGENT_TEMPLATES.find((template) => template.id === 'reviewer');
+    const values = {
+      id: 'id-1',
+      name: 'Reviewer',
+      baseUrl: 'http://localhost:11434/v1',
+      model: 'qwen3:14b',
+      systemPrompt: reviewer?.draft.systemPrompt,
+      temperature: 0,
+      maxTokens: null,
+      contextLength: null,
+      maxToolIterations: null,
+      toolDiscovery: null,
+      toolSelectModel: null,
+      requestTimeoutSeconds: null,
+      maxRetries: null,
+      enabled: true,
+      mcpServerSlugs: null,
+      toolsOff: null,
+    };
+    const create = vi.fn(() => ({ data: { createAgent: { ...AGENT, ...values } } }));
+    manager([
+      agents([]),
+      servers([SERVER]),
+      tools,
+      { request: { query: CreateAgentDocument, variables: { values } }, result: create },
+      agents([AGENT]),
+    ]);
+
+    expect(await screen.findByText('No agents yet.')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'From template' }));
+    expect((await screen.findAllByRole('menuitem')).map((item) => item.textContent)).toEqual([
+      'RefinerDrafts',
+      'PlannerExpand',
+      'WorkerWork',
+      'ReviewerVerdict',
+    ]);
+    await user.click(screen.getByRole('menuitem', { name: /Reviewer/ }));
+
+    expect(await screen.findByRole('heading', { name: 'New Reviewer' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Name')).toHaveValue('Reviewer');
+    expect(screen.getByLabelText('Temperature')).toHaveValue('0');
+    await user.type(screen.getByLabelText('Base URL'), 'http://localhost:11434/v1');
+    await user.type(screen.getByLabelText('Model'), 'qwen3:14b');
+    await user.click(screen.getByRole('button', { name: 'Create agent' }));
+
+    await waitFor(() => expect(create).toHaveBeenCalled());
+  });
+
+  it('starts a Refiner reaching no servers, since a draft has no use for tools', async () => {
+    const user = userEvent.setup();
+    manager([agents([]), servers([SERVER]), tools]);
+
+    await user.click(await screen.findByRole('button', { name: 'From template' }));
+    await user.click(await screen.findByRole('menuitem', { name: /Refiner/ }));
+
+    expect(await screen.findByRole('checkbox', { name: 'Every server' })).not.toBeChecked();
   });
 
   it('says what a blank field inherits, and warns while it would have no model', async () => {
