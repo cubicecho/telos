@@ -3,8 +3,8 @@ import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Platform, Pressable, Text, View } from 'react-native';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
 import { LoadState } from '@/components/ui/load-failure';
+import { SearchInput } from '@/components/ui/search-input';
 import { SearchTodosDocument } from '@/lib/graphql';
 import { cn } from '@/lib/utils';
 import { TodoFormDialog } from './todo-form-dialog';
@@ -92,8 +92,7 @@ export function TodoSearch({ open, onOpenChange }: { open: boolean; onOpenChange
             <DialogTitle>Find a todo</DialogTitle>
             <DialogDescription>By title or notes, in every project.</DialogDescription>
           </DialogHeader>
-          <Input
-            type="search"
+          <SearchInput
             autoFocus
             value={text}
             onChangeText={(next) => {
@@ -102,7 +101,7 @@ export function TodoSearch({ open, onOpenChange }: { open: boolean; onOpenChange
             }}
             onSubmitEditing={() => pick(found[active])}
             placeholder="Search todos"
-            aria-label="Search todos"
+            label="Search todos"
           />
           {asked === '' ? null : (
             <LoadState
