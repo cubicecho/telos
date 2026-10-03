@@ -1,3 +1,12 @@
+# [1.23.0](https://github.com/cubicecho/telos/compare/v1.22.0...v1.23.0) (2026-10-03)
+
+
+### Features
+
+* **app:** set an agent up endpoint first, picking its model from what the endpoint lists ([9b12e09](https://github.com/cubicecho/telos/commit/9b12e0976b4edf7d69b59d8c4239f65d399dab50))
+* give agents and their defaults a reasoning effort ([bf71afa](https://github.com/cubicecho/telos/commit/bf71afa53cc880e928cb27c93315e831981980e2))
+* **server:** list an endpoint's models with a key typed but not yet saved ([384d9e4](https://github.com/cubicecho/telos/commit/384d9e4bb5c4806a4451b18eea22b7752f2a07fb))
+
 # [1.22.0](https://github.com/cubicecho/telos/compare/v1.21.1...v1.22.0) (2026-10-03)
 
 
