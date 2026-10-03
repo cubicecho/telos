@@ -55,6 +55,12 @@ export const agents = pgTable(
     // every server, an empty list is none, a list is exactly those: the three
     // states of the agent spec's `tools.servers`.
     mcpServerSlugs: jsonb('mcp_server_slugs').$type<string[]>(),
+    // The MCP door's tools its runs have off, by name, as a key's switches are
+    // (api_key_tools). Null is the default for a run (door.ts
+    // `RUN_DEFAULT_OFF`): it reads, adds work and leaves notes, and the rest is
+    // off until a person turns it on. Kept null rather than written out, so a
+    // writing tool added to the door later is off for these agents too.
+    toolsOff: jsonb('tools_off').$type<string[]>(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true })
       .notNull()

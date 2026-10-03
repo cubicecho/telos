@@ -188,8 +188,19 @@ the lock is the lock. Each key has a switch per tool (`api_key_tools`,
 `door.ts`): every tool is on until its owner turns it off in Settings, and one
 that is off is left out of the key's listing (`mcp.ts`) *and* refused by the
 lock (`toolsOff` on the actor, read in `auth.ts`), for the root fields the tool
-uses. The AI switches sit above the switches; a run's `agent` actor has none
-and gets the whole door. `/mcp` is a 404 unless the instance's switch is on.
+uses. A run has the same switches through its agent (`agents.tools_off`,
+edited in the agent form): null is the run default (`runToolsOff` in
+`door.ts`: every read, `create_todo`, `set_todo_dependencies` and the note
+tools), computed in code so a tool the door gains later is off for a run until
+someone switches it on; `record_artifact` is never a run's (`NOT_FOR_RUNS`).
+Whatever its switches say, a run writes only its own todo, the todos under it
+and the todos a run of its todo created, and its own board
+(`resolvers/run-reach.ts`, applied by the lock after `ai-reach.ts`): out of
+reach is NOT_FOUND, and moving, finishing, archiving, deleting, re-running or
+re-pointing the dependencies of its own todo is FORBIDDEN, since that is
+`finishRun`'s to decide. A mutation added to `AI_MUTATIONS` needs an entry in
+`RUN_REACH` or `RUN_REACH_EXEMPT`, which a test holds. The AI switches sit
+above all of this. `/mcp` is a 404 unless the instance's switch is on.
 
 **Agents work the board only at stations, and only through the runner.** A
 lane with an `agentId` is a station: its `contract` (work, verdict, expand),

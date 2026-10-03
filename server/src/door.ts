@@ -3,8 +3,9 @@ import { Kind, type OperationDefinitionNode, parse } from 'graphql';
 import type { Actor } from './context.ts';
 
 // The MCP door's tools, read from mcp.graphql: the one list the door serves
-// (mcp.ts), Settings shows a switch for per key (resolvers/api-keys.ts), and
-// the actor lock holds a key to (resolvers/actor-lock.ts). A tool is an
+// (mcp.ts), Settings shows a switch for per key (resolvers/api-keys.ts) and
+// per agent (`agents.tools_off`), and the actor lock holds a key or a run to
+// (resolvers/actor-lock.ts). A tool is an
 // operation in that file and nothing else, so this is never a second list to
 // keep in step with it.
 
@@ -105,14 +106,80 @@ export function toolsCalling(field: string, args: Record<string, unknown>): stri
 }
 
 /**
- * The tools a caller has switched off. Only a key has switches: a person is
- * not behind the door, and a run gets all of it.
+ * The writing tools a run has unless its agent says otherwise: it adds work,
+ * leaves notes and takes back its own. Every reading tool is on as well. What
+ * changes work already on the board, or reaches past it (projects, requests,
+ * drafts, templates), a person turns on for an agent that should have it.
+ */
+export const RUN_DEFAULT_WRITES: ReadonlySet<string> = new Set([
+  'create_todo',
+  'set_todo_dependencies',
+  'add_todo_note',
+  'edit_todo_note',
+  'delete_todo_note',
+]);
+
+/**
+ * Door tools a run never has, whatever its agent says. A run records what it
+ * made with the runner's own `record_artifact`, which the runner checks; the
+ * door's is a client's word, and is refused for a run (resolvers/artifacts.ts).
+ */
+export const NOT_FOR_RUNS: ReadonlySet<string> = new Set(['record_artifact']);
+
+/**
+ * Whether a run has a tool when its agent has never said: every read, and the
+ * writes in `RUN_DEFAULT_WRITES`. A tool added to the door later follows the
+ * same rule, so a new write is off for runs until a person turns it on.
+ *
+ * @param tool The tool.
+ * @returns Whether it is on by default for a run.
+ */
+export function onForRuns(tool: DoorTool): boolean {
+  return !NOT_FOR_RUNS.has(tool.name) && (!tool.writes || RUN_DEFAULT_WRITES.has(tool.name));
+}
+
+/** The tools a run has off when its agent has never said. */
+export const RUN_DEFAULT_OFF: readonly string[] = DOOR_TOOLS.filter((tool) => !onForRuns(tool)).map(
+  (tool) => tool.name,
+);
+
+/**
+ * The tools a run has off: its agent's list (`agents.tools_off`), or the
+ * default when the agent has none or is gone. The ones no run has are off
+ * either way.
+ *
+ * @param stored The agent's list, as stored. Null when it has none.
+ * @returns The names of the tools that are off for its runs.
+ */
+export function runToolsOff(stored: unknown): ReadonlySet<string> {
+  const list = Array.isArray(stored) ? stored.filter((name): name is string => typeof name === 'string') : null;
+  return new Set([...(list ?? RUN_DEFAULT_OFF), ...NOT_FOR_RUNS]);
+}
+
+/**
+ * The tools a caller has switched off. A key has its owner's switches, and a
+ * run its agent's (both put on the actor by auth.ts); a person is not behind
+ * the door. A run whose actor carries none, which only a test builds, gets the
+ * default rather than everything.
  *
  * @param actor Who is calling.
  * @returns The names of the tools that are off for them.
  */
 export function toolsOff(actor: Actor): ReadonlySet<string> {
+  if (actor.kind === 'agent') {
+    return actor.toolsOff ?? runToolsOff(null);
+  }
   return actor.kind === 'apiKey' && actor.toolsOff ? actor.toolsOff : NONE_OFF;
+}
+
+/**
+ * Whose switch a refusal names.
+ *
+ * @param actor Who is calling.
+ * @returns The words for it.
+ */
+export function switchOwner(actor: Actor): string {
+  return actor.kind === 'agent' ? "this run's agent" : 'this key';
 }
 
 const NONE_OFF: ReadonlySet<string> = new Set();

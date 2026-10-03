@@ -7,6 +7,7 @@ import { bearer, magicLink } from 'better-auth/plugins';
 import { and, eq, gt, isNull } from 'drizzle-orm';
 import { appUrl, authSecret } from './config.ts';
 import type { Actor } from './context.ts';
+import { runToolsOff } from './door.ts';
 import { claimFirstAdmin, instanceAiOn } from './instance.ts';
 import { readRunToken, runnerKeyMatches } from './run-tokens.ts';
 
@@ -159,7 +160,8 @@ export interface ActorOptions {
  *   resolves with the instance switch off too, so it can hear that its runs
  *   were stopped; the queue is empty then, and nothing can be claimed.
  * - `x-run-token`: an agent at work, for exactly as long as its run is live
- *   and its user, project and todo are all still open to AI.
+ *   and its user, project and todo are all still open to AI. It carries the
+ *   tools its agent has off for runs, or the default for a run.
  * - `x-api-key`: an MCP client, while its owner has AI on. It carries the
  *   tools its owner switched off for it.
  *
@@ -220,7 +222,8 @@ async function keyToolsOff(db: AnyDb, keyId: string): Promise<ReadonlySet<string
 
 /**
  * The agent working a run, while the run may still act: running, inside its
- * lease, not asked to stop, and every AI switch over it still on.
+ * lease, not asked to stop, and every AI switch over it still on. Read with its
+ * agent's tool switches, once per request as a key's are.
  *
  * @param db The database.
  * @param runId The run a token named.
@@ -228,8 +231,9 @@ async function keyToolsOff(db: AnyDb, keyId: string): Promise<ReadonlySet<string
  */
 async function resolveRun(db: AnyDb, runId: string): Promise<Actor> {
   const [row] = await db
-    .select({ userId: dbSchema.runs.userId })
+    .select({ userId: dbSchema.runs.userId, toolsOff: dbSchema.agents.toolsOff })
     .from(dbSchema.runs)
+    .leftJoin(dbSchema.agents, eq(dbSchema.agents.id, dbSchema.runs.agentId))
     .innerJoin(dbSchema.users, eq(dbSchema.users.id, dbSchema.runs.userId))
     .innerJoin(dbSchema.projects, eq(dbSchema.projects.id, dbSchema.runs.projectId))
     .innerJoin(dbSchema.todos, eq(dbSchema.todos.id, dbSchema.runs.todoId))
@@ -244,7 +248,7 @@ async function resolveRun(db: AnyDb, runId: string): Promise<Actor> {
         eq(dbSchema.todos.aiIgnored, false),
       ),
     );
-  return row ? { kind: 'agent', userId: row.userId, runId } : ANONYMOUS;
+  return row ? { kind: 'agent', userId: row.userId, runId, toolsOff: runToolsOff(row.toolsOff) } : ANONYMOUS;
 }
 
 /** Express's header bag as a fetch `Headers`, which is what better-auth reads. */

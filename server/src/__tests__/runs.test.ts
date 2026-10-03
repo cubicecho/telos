@@ -3,6 +3,7 @@ import { and, eq } from 'drizzle-orm';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { resolveActor } from '../auth.ts';
 import type { Actor } from '../context.ts';
+import { runToolsOff } from '../door.ts';
 import { mintRunToken } from '../run-tokens.ts';
 import { type Board, CLAIM, createBoard, FINISH, HEARTBEAT, QUEUE, runnerClient, setLane } from './board.ts';
 import { authFor, createClient, createTestDb, type TestClient, type TestDb } from './helpers.ts';
@@ -484,7 +485,13 @@ describe('who may do what', () => {
   it('lets a run token act as the run’s agent, only while the run is live', async () => {
     const todoId = await board.addTodo('Write it');
     const { runId, token } = await claim(todoId);
-    expect(await actorFor({ 'x-run-token': token })).toEqual({ kind: 'agent', userId: board.userId, runId });
+    // An agent nobody has switched tools on or off for has the run default.
+    expect(await actorFor({ 'x-run-token': token })).toEqual({
+      kind: 'agent',
+      userId: board.userId,
+      runId,
+      toolsOff: runToolsOff(null),
+    });
     expect(await actorFor({ 'x-run-token': `${token}x` })).toMatchObject({ kind: 'anonymous' });
     await finish(runId, { status: 'ok', output: 'Wrote it.' });
     expect(await actorFor({ 'x-run-token': token })).toMatchObject({ kind: 'anonymous' });

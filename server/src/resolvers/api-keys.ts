@@ -4,7 +4,7 @@ import { extendSchema, GraphQLError, type GraphQLObjectType, type GraphQLSchema,
 import { requireAi } from '../ai-gate.ts';
 import { mintApiKey } from '../auth.ts';
 import type { Context } from '../context.ts';
-import { DOOR_TOOL_NAMES, DOOR_TOOLS } from '../door.ts';
+import { DOOR_TOOL_NAMES, DOOR_TOOLS, NOT_FOR_RUNS, onForRuns } from '../door.ts';
 import { requireSession } from './auth.ts';
 
 // API keys: how an MCP host reaches this server as one of its users. They are
@@ -40,18 +40,22 @@ const API_KEYS_SDL = parse(`
     key: String!
   }
 
-  "One tool of the MCP door, as a key's switches list it."
+  "One tool of the MCP door, as a key's or an agent's switches list it."
   type McpTool {
     name: String!
     "What the tool does, as an MCP client is told."
     description: String!
     "Whether it changes anything, rather than only reading."
     writes: Boolean!
+    "Whether an agent's runs may have it at all. One that may not is off for every run."
+    forRuns: Boolean!
+    "Whether a run has it when its agent's \`toolsOff\` is null: every read, and adding work and notes."
+    runDefault: Boolean!
   }
 
   extend type Query {
     apiKeys: [ApiKey!]!
-    "Every tool of the MCP door, in the order a client is shown them."
+    "Every tool of the MCP door, in the order a client is shown them. Settings lists a key's and an agent's switches from it."
     mcpTools: [McpTool!]!
   }
 
@@ -134,7 +138,7 @@ export function applyApiKeysExtension(schema: GraphQLSchema): GraphQLSchema {
 
   query.mcpTools.resolve = async (_parent: unknown, _args: unknown, ctx: Context) => {
     await requireKeyManager(ctx);
-    return DOOR_TOOLS;
+    return DOOR_TOOLS.map((tool) => ({ ...tool, forRuns: !NOT_FOR_RUNS.has(tool.name), runDefault: onForRuns(tool) }));
   };
 
   const mutation = (extended.getType('Mutation') as GraphQLObjectType).getFields();

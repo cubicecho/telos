@@ -171,6 +171,8 @@ describe('recording an artifact as a client', () => {
   });
 
   it('is not a run’s to call: a run has the runner’s, which is checked', async () => {
+    // A run's agent can never switch it on (door.ts, NOT_FOR_RUNS), so the
+    // lock refuses it before the resolver's own refusal is reached.
     const todoId = await board.addTodo('Write it');
     const { claimRun } = await runner.expectOk(CLAIM, { todoId, laneId: board.lanes[0].id });
     const agent = createClient(db, board.userId, {
@@ -179,7 +181,7 @@ describe('recording an artifact as a client', () => {
     });
     const error = await agent.expectError(RECORD, { todoId, ...PAGE });
     expect(error.code).toBe('FORBIDDEN');
-    expect(error.message).toMatch(/record_artifact/);
+    expect(error.message).toMatch(/recordArtifact is switched off for this run's agent/);
     expect(await db.select().from(dbSchema.artifacts)).toEqual([]);
   });
 
