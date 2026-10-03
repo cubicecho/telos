@@ -1,3 +1,10 @@
+## [1.21.1](https://github.com/cubicecho/telos/compare/v1.21.0...v1.21.1) (2026-10-03)
+
+
+### Bug Fixes
+
+* **app:** export History from the web icons, so the sidebar renders on web ([af74277](https://github.com/cubicecho/telos/commit/af74277024745d0f31b35ed139acc90bc45d2df7))
+
 # [1.21.0](https://github.com/cubicecho/telos/compare/v1.20.0...v1.21.0) (2026-10-03)
 
 
