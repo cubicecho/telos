@@ -2,6 +2,7 @@ import { useMutation, useQuery } from '@apollo/client';
 import { useEffect, useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
 import type { LanePresetsQuery } from '@/__generated__/graphql';
+import { ActionButton } from '@/components/action-button';
 import { useAppForm } from '@/components/app-form';
 import { Section } from '@/components/section';
 import { Button } from '@/components/ui/button';
@@ -138,23 +139,23 @@ export function LanePresetManager() {
                         attempts
                       </Text>
                     </View>
-                    <Button
+                    <ActionButton
                       variant="ghost"
                       size="icon-sm"
-                      aria-label={`Edit ${preset.name}`}
+                      label={`Edit ${preset.name}`}
                       onPress={() => setEditing(preset)}
                     >
                       <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button
+                    </ActionButton>
+                    <ActionButton
                       variant="ghost"
                       size="icon-sm"
                       className="hover:text-destructive"
-                      aria-label={`Delete ${preset.name}`}
+                      label={`Delete ${preset.name}`}
                       onPress={() => setDeleting(preset)}
                     >
                       <Trash2 className="h-4 w-4" />
-                    </Button>
+                    </ActionButton>
                   </View>
                   <PresetLanes preset={preset} />
                 </View>

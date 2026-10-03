@@ -2,6 +2,7 @@ import { useMutation, useQuery } from '@apollo/client';
 import { useEffect, useMemo, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import type { AgentFieldsFragment } from '@/__generated__/graphql';
+import { ActionButton } from '@/components/action-button';
 import { useAppForm } from '@/components/app-form';
 import { Section } from '@/components/section';
 import { Badge } from '@/components/ui/badge';
@@ -147,23 +148,23 @@ export function AgentManager() {
                   <Button variant="outline" size="sm" onPress={() => setKeying(agent)}>
                     {agent.hasApiKey ? 'Replace key' : 'Set key'}
                   </Button>
-                  <Button
+                  <ActionButton
                     variant="ghost"
                     size="icon-sm"
-                    aria-label={`Edit ${agent.name}`}
+                    label={`Edit ${agent.name}`}
                     onPress={() => setEditing({ agent })}
                   >
                     <Pencil className="h-4 w-4" />
-                  </Button>
-                  <Button
+                  </ActionButton>
+                  <ActionButton
                     variant="ghost"
                     size="icon-sm"
                     className="hover:text-destructive"
-                    aria-label={`Delete ${agent.name}`}
+                    label={`Delete ${agent.name}`}
                     onPress={() => setDeleting(agent)}
                   >
                     <Trash2 className="h-4 w-4" />
-                  </Button>
+                  </ActionButton>
                 </View>
               ))}
             </View>

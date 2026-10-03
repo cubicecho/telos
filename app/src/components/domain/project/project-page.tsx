@@ -2,6 +2,7 @@ import { useMutation } from '@apollo/client';
 import { useRouter } from 'expo-router';
 import { type ReactNode, useState } from 'react';
 import { Text, View } from 'react-native';
+import { ActionButton } from '@/components/action-button';
 import { MessageSquare } from '@/components/app-icons';
 import { AiSetupChecklist } from '@/components/domain/ai/ai-setup-checklist';
 import { type ProjectActivity, ProjectActivityLine } from '@/components/domain/ai/project-activity';
@@ -12,7 +13,6 @@ import { LabelPicker } from '@/components/domain/label/label-picker';
 import { SaveTemplateDialog } from '@/components/domain/template/save-template-dialog';
 import { PROSE_COLUMN } from '@/components/header-content-footer';
 import { PageLayout } from '@/components/page-layout';
-import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Copy, Pencil, Trash2 } from '@/components/ui/icons';
 import { useAi } from '@/lib/ai';
@@ -116,41 +116,41 @@ export function ProjectPage({
         <>
           <LabelPicker attached={project.labels} onToggle={toggleLabel} align="end" />
           {canDraft ? (
-            <Button
+            <ActionButton
               variant="ghost"
               size="icon"
               onPress={() => {
                 setNotice(null);
                 setDrafting(true);
               }}
-              aria-label="Talk a request over"
+              label="Talk a request over"
             >
               <MessageSquare className="h-4 w-4" />
-            </Button>
+            </ActionButton>
           ) : null}
-          <Button
+          <ActionButton
             variant="ghost"
             size="icon"
             onPress={() => {
               setNotice(null);
               setSavingTemplate(true);
             }}
-            aria-label="Save lanes as a template"
+            label="Save lanes as a template"
           >
             <Copy className="h-4 w-4" />
-          </Button>
-          <Button variant="ghost" size="icon" onPress={() => setEditing(true)} aria-label="Edit project">
+          </ActionButton>
+          <ActionButton variant="ghost" size="icon" onPress={() => setEditing(true)} label="Edit project">
             <Pencil className="h-4 w-4" />
-          </Button>
-          <Button
+          </ActionButton>
+          <ActionButton
             variant="ghost"
             size="icon"
             className="hover:text-destructive"
             onPress={() => setConfirmingDelete(true)}
-            aria-label="Delete project"
+            label="Delete project"
           >
             <Trash2 className="h-4 w-4" />
-          </Button>
+          </ActionButton>
         </>
       }
       headerContent={

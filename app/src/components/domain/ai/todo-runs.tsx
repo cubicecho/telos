@@ -2,9 +2,9 @@ import { useMutation, useQuery } from '@apollo/client';
 import { type ReactNode, useEffect, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import type { ArtifactFieldsFragment } from '@/__generated__/graphql';
+import { ActionButton } from '@/components/action-button';
 import { MessageSquare } from '@/components/app-icons';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Trash2 } from '@/components/ui/icons';
 import { LoadState } from '@/components/ui/load-failure';
 import { describeError } from '@/lib/errors';
@@ -194,16 +194,16 @@ export function ArtifactRow({
     <View role="listitem" className="gap-1 rounded-lg border border-border px-3 py-2">
       <View className="flex-row items-center gap-2">
         {body}
-        <Button
+        <ActionButton
           variant="ghost"
           size="icon-sm"
           className="hover:text-destructive"
           disabled={removing}
-          aria-label={`Remove ${label} from the board`}
+          label={`Remove ${label} from the board`}
           onPress={remove}
         >
           <Trash2 className="h-4 w-4" />
-        </Button>
+        </ActionButton>
       </View>
       {error ? (
         <Text className="text-destructive text-sm" aria-live="polite">

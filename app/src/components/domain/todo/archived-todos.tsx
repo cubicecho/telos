@@ -1,6 +1,7 @@
 import { type DocumentNode, useMutation, useQuery } from '@apollo/client';
 import { type ComponentProps, type ReactNode, useState } from 'react';
 import { Text, View } from 'react-native';
+import { ActionButton } from '@/components/action-button';
 import { ArchiveRestore } from '@/components/app-icons';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -126,16 +127,16 @@ export function ArchivedTodoList({
                 <ArchiveRestore className="h-4 w-4" />
                 Restore
               </Button>
-              <Button
+              <ActionButton
                 variant="ghost"
                 size="icon-xs"
                 className="hover:text-destructive"
                 disabled={busy}
-                aria-label={`Delete ${todo.title} for good`}
+                label={`Delete ${todo.title} for good`}
                 onPress={() => setDeleting(todo)}
               >
                 <Trash2 className="h-4 w-4" />
-              </Button>
+              </ActionButton>
             </View>
           ))}
         </View>

@@ -2,6 +2,7 @@ import { useMutation, useQuery } from '@apollo/client';
 import { useEffect, useMemo, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import { McpSecretKind, type McpServerFieldsFragment } from '@/__generated__/graphql';
+import { ActionButton } from '@/components/action-button';
 import { useAppForm } from '@/components/app-form';
 import { Section } from '@/components/section';
 import { Badge } from '@/components/ui/badge';
@@ -132,23 +133,23 @@ export function McpServerManager() {
                       }
                       accessibilityLabel={`${server.name} on`}
                     />
-                    <Button
+                    <ActionButton
                       variant="ghost"
                       size="icon-sm"
-                      aria-label={`Edit ${server.name}`}
+                      label={`Edit ${server.name}`}
                       onPress={() => setEditing(server)}
                     >
                       <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button
+                    </ActionButton>
+                    <ActionButton
                       variant="ghost"
                       size="icon-sm"
                       className="hover:text-destructive"
-                      aria-label={`Delete ${server.name}`}
+                      label={`Delete ${server.name}`}
                       onPress={() => setDeleting(server)}
                     >
                       <Trash2 className="h-4 w-4" />
-                    </Button>
+                    </ActionButton>
                   </View>
                   <Text className="text-muted-foreground text-xs">{describeUse(server, agents)}</Text>
                   <View className="flex-row flex-wrap items-center gap-2">
@@ -550,11 +551,11 @@ function McpServerSecretsDialog({
                   </Text>
                   <Text className="text-muted-foreground text-xs">{secret.what}</Text>
                 </View>
-                <Button
+                <ActionButton
                   variant="ghost"
                   size="icon-sm"
                   disabled={loading}
-                  aria-label={`Remove ${secret.name}`}
+                  label={`Remove ${secret.name}`}
                   onPress={() =>
                     run(() =>
                       setSecret({ variables: { id: server.id, kind: secret.kind, name: secret.name, value: null } }),
@@ -562,7 +563,7 @@ function McpServerSecretsDialog({
                   }
                 >
                   <X className="h-4 w-4" />
-                </Button>
+                </ActionButton>
               </View>
             ))}
           </View>

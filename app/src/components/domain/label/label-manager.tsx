@@ -1,6 +1,7 @@
 import { useMutation, useQuery } from '@apollo/client';
 import { useState } from 'react';
 import { Text, View } from 'react-native';
+import { ActionButton } from '@/components/action-button';
 import type { LabelSummary } from '@/components/domain/label/label-badge';
 import { LabelFormDialog } from '@/components/domain/label/label-form-dialog';
 import { Section } from '@/components/section';
@@ -84,27 +85,27 @@ export function LabelManager() {
                   <Text numberOfLines={1} className="flex-1 text-foreground text-sm">
                     {label.name}
                   </Text>
-                  <Button
+                  <ActionButton
                     variant="ghost"
                     size="icon-sm"
                     className={cn('focus-visible:opacity-100', HOVER_REVEAL)}
-                    aria-label={`Rename ${label.name}`}
+                    label={`Rename ${label.name}`}
                     onPress={() => {
                       setEditing(label);
                       setFormOpen(true);
                     }}
                   >
                     <Pencil className="h-4 w-4" />
-                  </Button>
-                  <Button
+                  </ActionButton>
+                  <ActionButton
                     variant="ghost"
                     size="icon-sm"
                     className={cn('hover:text-destructive focus-visible:opacity-100', HOVER_REVEAL)}
-                    aria-label={`Delete ${label.name}`}
+                    label={`Delete ${label.name}`}
                     onPress={() => setDeleting(label)}
                   >
                     <Trash2 className="h-4 w-4" />
-                  </Button>
+                  </ActionButton>
                 </View>
               ))}
             </View>

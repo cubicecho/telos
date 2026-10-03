@@ -1,6 +1,7 @@
 import { useMutation, useQuery } from '@apollo/client';
 import { useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
+import { ActionButton } from '@/components/action-button';
 import { useAppForm } from '@/components/app-form';
 import { Section } from '@/components/section';
 import { Button } from '@/components/ui/button';
@@ -103,23 +104,23 @@ export function ApiKeyManager() {
                     </Text>
                     <Text className="text-muted-foreground text-xs">{describeKey(key)}</Text>
                   </View>
-                  <Button
+                  <ActionButton
                     variant="ghost"
                     size="icon-sm"
-                    aria-label={`Tools for ${key.name || 'key'}`}
+                    label={`Tools for ${key.name || 'key'}`}
                     onPress={() => setSwitching(key.id)}
                   >
                     <Settings className="h-4 w-4" />
-                  </Button>
-                  <Button
+                  </ActionButton>
+                  <ActionButton
                     variant="ghost"
                     size="icon-sm"
                     className="hover:text-destructive"
-                    aria-label={`Revoke ${key.name || 'key'}`}
+                    label={`Revoke ${key.name || 'key'}`}
                     onPress={() => setDeleting(key)}
                   >
                     <Trash2 className="h-4 w-4" />
-                  </Button>
+                  </ActionButton>
                 </View>
               ))}
             </View>

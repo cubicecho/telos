@@ -1,8 +1,8 @@
 import { useMutation, useQuery } from '@apollo/client';
 import { useState } from 'react';
 import { Text, View } from 'react-native';
+import { ActionButton } from '@/components/action-button';
 import { Section } from '@/components/section';
-import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Trash2 } from '@/components/ui/icons';
 import { LoadState } from '@/components/ui/load-failure';
@@ -79,15 +79,15 @@ export function TemplateManager() {
                       {laneNames(template.lanes)}
                     </Text>
                   </View>
-                  <Button
+                  <ActionButton
                     variant="ghost"
                     size="icon-sm"
                     className={cn('hover:text-destructive focus-visible:opacity-100', HOVER_REVEAL)}
-                    aria-label={`Delete ${template.name}`}
+                    label={`Delete ${template.name}`}
                     onPress={() => setDeleting(template)}
                   >
                     <Trash2 className="h-4 w-4" />
-                  </Button>
+                  </ActionButton>
                 </View>
               ))}
             </View>

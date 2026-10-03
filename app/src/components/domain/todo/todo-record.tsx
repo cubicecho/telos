@@ -2,6 +2,7 @@ import { useMutation, useQuery } from '@apollo/client';
 import { useState } from 'react';
 import { Platform, Text, View } from 'react-native';
 import type { RunSummaryFieldsFragment, TodoNoteFieldsFragment } from '@/__generated__/graphql';
+import { ActionButton } from '@/components/action-button';
 import { RunDialog } from '@/components/domain/ai/run-dialog';
 import { DRAFT_RUN, describeRun, RunStatusBadge } from '@/components/domain/ai/run-log';
 import { Badge } from '@/components/ui/badge';
@@ -150,20 +151,20 @@ function ThreadNote({
           </Badge>
         )}
         {canEdit(note) && draft === null ? (
-          <Button variant="ghost" size="icon-sm" aria-label="Edit note" onPress={() => setDraft(note.body)}>
+          <ActionButton variant="ghost" size="icon-sm" label="Edit note" onPress={() => setDraft(note.body)}>
             <Pencil className="h-4 w-4" />
-          </Button>
+          </ActionButton>
         ) : null}
         {canDelete(note) ? (
-          <Button
+          <ActionButton
             variant="ghost"
             size="icon-sm"
             className="hover:text-destructive"
-            aria-label="Delete note"
+            label="Delete note"
             onPress={() => onDelete(note.id)}
           >
             <Trash2 className="h-4 w-4" />
-          </Button>
+          </ActionButton>
         ) : null}
       </View>
       {draft === null ? (
