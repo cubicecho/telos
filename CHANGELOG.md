@@ -1,3 +1,13 @@
+# [1.17.0](https://github.com/cubicecho/telos/compare/v1.16.0...v1.17.0) (2026-10-03)
+
+
+### Features
+
+* **app:** working directory and timeouts in the MCP server form ([58c65a6](https://github.com/cubicecho/telos/commit/58c65a6292d84459261419e3b15281dced750284))
+* **db:** an MCP server's working directory and timeouts ([1e94f4a](https://github.com/cubicecho/telos/commit/1e94f4a00048321090e07c2f817bec5a0562144f))
+* **runner:** hand a server's limits and working directory to the pool and its test ([bb051a1](https://github.com/cubicecho/telos/commit/bb051a1991db4d15e681d3d07eaf6c8c718ad589))
+* **server:** pass a server's working directory and timeouts to the runner ([34d9590](https://github.com/cubicecho/telos/commit/34d959022001bda21b488d848a7f4ae934979ad4))
+
 # [1.16.0](https://github.com/cubicecho/telos/compare/v1.15.0...v1.16.0) (2026-10-03)
 
 
