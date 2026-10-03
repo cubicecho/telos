@@ -6,29 +6,50 @@ import { type LayerDraft, numberRule } from '@/lib/agents';
 
 type NumberField = Exclude<keyof LayerDraft, 'baseUrl' | 'model' | 'toolDiscovery' | 'toolSelectModel'>;
 
+/** Which group of a form a number sits in: with the model, the tools, or the requests. */
+export type NumberGroup = 'model' | 'tools' | 'requests';
+
 export const NUMBER_FIELDS: ReadonlyArray<{
   name: NumberField;
   label: string;
+  group: NumberGroup;
   inputMode: 'decimal' | 'numeric';
   rule: ReturnType<typeof numberRule>;
 }> = [
   {
     name: 'temperature',
     label: 'Temperature',
+    group: 'model',
     inputMode: 'decimal',
     rule: numberRule({ min: 0, max: 2, integer: false }),
   },
-  { name: 'maxTokens', label: 'Max tokens', inputMode: 'numeric', rule: numberRule({ min: 0 }) },
-  { name: 'contextLength', label: 'Context length', inputMode: 'numeric', rule: numberRule({ min: 0 }) },
-  { name: 'maxToolIterations', label: 'Max tool iterations', inputMode: 'numeric', rule: numberRule({ min: 1 }) },
+  { name: 'maxTokens', label: 'Max tokens', group: 'model', inputMode: 'numeric', rule: numberRule({ min: 0 }) },
   {
-    name: 'requestTimeoutSeconds',
-    label: 'Request timeout (seconds)',
+    name: 'contextLength',
+    label: 'Context length',
+    group: 'model',
+    inputMode: 'numeric',
+    rule: numberRule({ min: 0 }),
+  },
+  {
+    name: 'maxToolIterations',
+    label: 'Max tool iterations',
+    group: 'tools',
     inputMode: 'numeric',
     rule: numberRule({ min: 1 }),
   },
-  { name: 'maxRetries', label: 'Max retries', inputMode: 'numeric', rule: numberRule({ min: 0 }) },
+  {
+    name: 'requestTimeoutSeconds',
+    label: 'Request timeout (seconds)',
+    group: 'requests',
+    inputMode: 'numeric',
+    rule: numberRule({ min: 1 }),
+  },
+  { name: 'maxRetries', label: 'Max retries', group: 'requests', inputMode: 'numeric', rule: numberRule({ min: 0 }) },
 ];
+
+/** The numbers in one group, in order. */
+export const numbersIn = (group: NumberGroup) => NUMBER_FIELDS.filter((spec) => spec.group === group);
 
 /**
  * The choices for tool discovery, the first saying what inheriting it gives.

@@ -1,6 +1,7 @@
 import { MockedProvider } from '@apollo/client/testing';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { GraphQLError } from 'graphql';
 import { describe, expect, it, vi } from 'vitest';
 import { AGENT_TEMPLATES } from '@/lib/agent-templates';
 import {
@@ -10,6 +11,7 @@ import {
   CreateAgentDocument,
   McpServersDocument,
   McpToolsDocument,
+  SetAgentApiKeyDocument,
   UpdateAgentDocument,
 } from '@/lib/graphql';
 import { AgentManager } from '../agent-manager';
@@ -279,12 +281,15 @@ describe('AgentManager', () => {
     expect(await screen.findByText('big (default) · http://localhost:11434/v1')).toBeInTheDocument();
   });
 
-  it('picks a model from what the endpoint lists, and takes its context length', async () => {
+  it('lists the endpoint’s models on opening, picks one, and takes its context length', async () => {
     const user = userEvent.setup();
     manager([
       agents([AGENT]),
       {
-        request: { query: AgentModelsDocument, variables: { baseUrl: 'http://localhost:11434/v1', agentId: 'a1' } },
+        request: {
+          query: AgentModelsDocument,
+          variables: { baseUrl: 'http://localhost:11434/v1', agentId: 'a1', apiKey: null },
+        },
         result: {
           data: {
             agentModels: [
@@ -297,11 +302,71 @@ describe('AgentManager', () => {
     ]);
 
     await user.click(await screen.findByRole('button', { name: 'Edit Reviewer' }));
-    await user.click(screen.getByRole('button', { name: 'Pick from the endpoint’s models' }));
-    await user.click(await screen.findByRole('menuitem', { name: /llama3:8b/ }));
+    expect(await screen.findByText('Connected')).toBeInTheDocument();
+    expect(screen.getByText('2 models at http://localhost:11434/v1')).toBeInTheDocument();
 
-    expect(screen.getByLabelText('Model')).toHaveValue('llama3:8b');
+    await user.click(screen.getByRole('combobox', { name: 'Model' }));
+    await user.click(await screen.findByRole('option', { name: /llama3:8b/ }));
+
+    expect(screen.getByRole('combobox', { name: 'Model' })).toHaveTextContent('llama3:8b');
     expect(screen.getByLabelText('Context length')).toHaveValue('8192');
+  });
+
+  it('says when the endpoint will not list its models, and lets one be typed', async () => {
+    const user = userEvent.setup();
+    manager([
+      agents([AGENT]),
+      {
+        request: {
+          query: AgentModelsDocument,
+          variables: { baseUrl: 'http://localhost:11434/v1', agentId: 'a1', apiKey: null },
+        },
+        result: { errors: [new GraphQLError('The endpoint did not answer.')] },
+      },
+    ]);
+
+    await user.click(await screen.findByRole('button', { name: 'Edit Reviewer' }));
+    expect(await screen.findByText('Failed')).toBeInTheDocument();
+    expect(screen.getByLabelText('Model')).toHaveRole('textbox');
+  });
+
+  it('saves a key typed with the agent, and asks the endpoint with it before then', async () => {
+    const user = userEvent.setup();
+    const setKey = vi.fn(() => ({
+      data: { setAgentApiKey: { ...AGENT, hasApiKey: true } },
+    }));
+    const listed = vi.fn(() => ({ data: { agentModels: [] } }));
+    manager([
+      agents([AGENT]),
+      {
+        request: {
+          query: AgentModelsDocument,
+          variables: { baseUrl: 'http://localhost:11434/v1', agentId: 'a1', apiKey: null },
+        },
+        result: { data: { agentModels: [] } },
+      },
+      {
+        request: {
+          query: AgentModelsDocument,
+          variables: { baseUrl: 'http://localhost:11434/v1', agentId: 'a1', apiKey: 'sk-new' },
+        },
+        result: listed,
+      },
+      {
+        request: { query: UpdateAgentDocument },
+        variableMatcher: () => true,
+        result: { data: { updateAgent: AGENT } },
+      },
+      { request: { query: SetAgentApiKeyDocument, variables: { agentId: 'a1', apiKey: 'sk-new' } }, result: setKey },
+    ]);
+
+    await user.click(await screen.findByRole('button', { name: 'Edit Reviewer' }));
+    await user.type(screen.getByLabelText('API key'), 'sk-new');
+    await user.tab();
+    await waitFor(() => expect(listed).toHaveBeenCalled());
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(setKey).toHaveBeenCalled());
   });
 
   it('narrows an agent to the servers ticked, starting from the ones it reaches now', async () => {
