@@ -6,7 +6,7 @@ import { readServers, serverConfig } from './tools.ts';
 // an agent's tools are reached from, so a server that answers the runner is
 // one a run can use, whatever the person's own machine can see.
 
-/** How long a server gets to answer a test. */
+/** How long a server gets to answer a test, unless it sets its own connect timeout. */
 export const PROBE_TIMEOUT_MS = 10_000;
 
 /**
@@ -35,7 +35,9 @@ export async function testServer(
         : 'The server has no URL or command this runner can use.',
     };
   }
-  const found = await dial(config, 'telos-runner', { timeoutMs: PROBE_TIMEOUT_MS });
+  // A server given longer to connect is given it here too, or one slow to start
+  // would fail every test and still work in a run.
+  const found = await dial(config, 'telos-runner', { timeoutMs: config.connectTimeoutMs ?? PROBE_TIMEOUT_MS });
   if (!found.ok) return { ok: false, tools: [], error: found.error || 'The server could not be reached.' };
   return {
     ok: true,

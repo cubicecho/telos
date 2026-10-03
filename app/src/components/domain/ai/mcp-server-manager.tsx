@@ -26,7 +26,15 @@ import {
   UpdateMcpServerDocument,
 } from '@/lib/graphql';
 import { newId } from '@/lib/ids';
-import { fromServerDraft, hooksRule, type McpServerDraft, readTools, slugRule, toServerDraft } from '@/lib/mcp-servers';
+import {
+  fromServerDraft,
+  hooksRule,
+  type McpServerDraft,
+  readTools,
+  secondsRule,
+  slugRule,
+  toServerDraft,
+} from '@/lib/mcp-servers';
 
 type ServerRow = McpServerFieldsFragment;
 
@@ -398,6 +406,37 @@ export function McpServerFormDialog({
             <form.AppField name="args">
               {(field) => <field.TextAreaField label="Arguments" placeholder="For a command, one per line" rows={2} />}
             </form.AppField>
+            <form.AppField name="cwd">
+              {(field) => (
+                <View className="gap-1">
+                  <field.InputField label="Working directory" placeholder="/srv/files" />
+                  <Hint>Where a command runs, on the runner's host. Blank is the runner's own directory.</Hint>
+                </View>
+              )}
+            </form.AppField>
+            <View className="gap-1">
+              <View className="flex-row gap-3">
+                <View className="flex-1">
+                  <form.AppField name="connectTimeout" validators={{ onChange: secondsRule(false) }}>
+                    {(field) => <field.InputField label="Connect (s)" inputMode="decimal" placeholder="Default" />}
+                  </form.AppField>
+                </View>
+                <View className="flex-1">
+                  <form.AppField name="callTimeout" validators={{ onChange: secondsRule(false) }}>
+                    {(field) => <field.InputField label="Call (s)" inputMode="decimal" placeholder="Default" />}
+                  </form.AppField>
+                </View>
+                <View className="flex-1">
+                  <form.AppField name="idleTimeout" validators={{ onChange: secondsRule(true) }}>
+                    {(field) => <field.InputField label="Idle (s)" inputMode="decimal" placeholder="Default" />}
+                  </form.AppField>
+                </View>
+              </View>
+              <Hint>
+                How long it gets to start and list its tools, to answer one call, and to sit unused before it is closed
+                (0 keeps it open). Blank is the runner's default.
+              </Hint>
+            </View>
             <form.AppField name="hiddenTools">
               {(field) => (
                 <View className="gap-1">

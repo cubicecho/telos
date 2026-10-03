@@ -16,8 +16,15 @@ export interface McpServerRow {
   url?: string;
   command?: string;
   args?: string[];
+  /** Where a command runs. Absent, this process's own directory. */
+  cwd?: string;
   headers?: Record<string, string>;
   env?: Record<string, string>;
+  /** Overrides of the pool's limits, in milliseconds. Absent, the pool's. */
+  connectTimeoutMs?: number;
+  callTimeoutMs?: number;
+  /** How long it may sit unused before it is closed; 0 is never. */
+  idleTimeoutMs?: number;
   /** This server's tools the model is not offered, for its hooks' use. */
   hiddenTools?: string[];
   /** Tool calls it wants made around a run: `ToolHook`s, as agent-mcp-pool reads them. */

@@ -16,6 +16,11 @@ const TELOS_RECORD_ARTIFACT = 'record_artifact';
 /** The one hook event telos has no moment for: a run's transcript is never compacted. */
 const NEVER_FIRED = 'beforeCompact';
 
+/** A limit the row sets, or null for the pool's own when it sets none it could mean. */
+function limit(value: number | undefined, least: number): number | null {
+  return Number.isInteger(value) && (value as number) >= least ? (value as number) : null;
+}
+
 /**
  * An agent's server as the pool reads it, or null when this runner will not
  * reach it (a command, with stdio off).
@@ -52,10 +57,20 @@ export function serverConfig(
     enabled: true,
     hiddenTools: Array.isArray(row.hiddenTools) ? row.hiddenTools.filter((name) => typeof name === 'string') : null,
     hooks: row.hooks?.length && problems.length === 0 ? (row.hooks as ToolHook[]) : null,
+    connectTimeoutMs: limit(row.connectTimeoutMs, 1),
+    callTimeoutMs: limit(row.callTimeoutMs, 1),
+    idleTimeoutMs: limit(row.idleTimeoutMs, 0),
   };
   if (row.url) return { ...base, transport: 'http', url: row.url, headers: row.headers ?? null };
   if (row.command && allowStdio) {
-    return { ...base, transport: 'stdio', command: row.command, args: row.args ?? null, env: row.env ?? null };
+    return {
+      ...base,
+      transport: 'stdio',
+      command: row.command,
+      args: row.args ?? null,
+      env: row.env ?? null,
+      cwd: row.cwd || null,
+    };
   }
   return null;
 }

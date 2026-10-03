@@ -16,10 +16,14 @@ export interface RunnerServer {
   url?: string;
   command?: string;
   args?: string[];
+  cwd?: string;
   headers?: Record<string, string>;
   env?: Record<string, string>;
   hiddenTools?: string[];
   hooks?: unknown[];
+  connectTimeoutMs?: number;
+  callTimeoutMs?: number;
+  idleTimeoutMs?: number;
 }
 
 /** The servers an agent reaches, and what its list named that is not there. */
@@ -42,10 +46,14 @@ export function runnerServer(server: dbSchema.McpServer): RunnerServer {
     ...(server.url ? { url: server.url } : {}),
     ...(server.command ? { command: server.command } : {}),
     ...(server.args.length > 0 ? { args: server.args } : {}),
+    ...(server.cwd ? { cwd: server.cwd } : {}),
     ...(Object.keys(server.headers).length > 0 ? { headers: server.headers } : {}),
     ...(Object.keys(server.env).length > 0 ? { env: server.env } : {}),
     ...(server.hiddenTools.length > 0 ? { hiddenTools: server.hiddenTools } : {}),
     ...(server.hooks.length > 0 ? { hooks: server.hooks } : {}),
+    ...(server.connectTimeoutMs === null ? {} : { connectTimeoutMs: server.connectTimeoutMs }),
+    ...(server.callTimeoutMs === null ? {} : { callTimeoutMs: server.callTimeoutMs }),
+    ...(server.idleTimeoutMs === null ? {} : { idleTimeoutMs: server.idleTimeoutMs }),
   };
 }
 

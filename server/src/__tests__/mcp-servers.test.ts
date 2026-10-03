@@ -112,6 +112,10 @@ describe('the registry', () => {
     expect((await refused({ url: 'file:///etc/passwd' })).message).toMatch(/http or https/);
     expect((await refused({ url: null })).message).toMatch(/URL or a command/);
     expect((await refused({ args: [1] })).message).toMatch(/list of strings/);
+    expect((await refused({ cwd: ' ' })).message).toMatch(/working directory is a path/);
+    expect((await refused({ connectTimeoutMs: 0 })).message).toMatch(/connectTimeoutMs is a whole number/);
+    expect((await refused({ callTimeoutMs: -5 })).message).toMatch(/callTimeoutMs is a whole number/);
+    expect((await refused({ idleTimeoutMs: -1 })).message).toMatch(/idleTimeoutMs is a whole number/);
     await addServer('docs');
     expect((await refused({})).message).toMatch(/already have an MCP server with the slug "docs"/);
   });
@@ -167,6 +171,16 @@ describe("an agent's servers", () => {
       { id: 'zeta', name: 'zeta', url: 'http://zeta.test/mcp' },
     ]);
     expect(notices).toEqual([]);
+  });
+
+  it('carry where a command runs and how long a server is given, when those are set', async () => {
+    const [mid] = await db.select().from(dbSchema.mcpServers).where(eq(dbSchema.mcpServers.slug, 'mid'));
+    const set = { cwd: '/srv/mid', connectTimeoutMs: 120_000, callTimeoutMs: 90_000, idleTimeoutMs: 0 };
+    await board.person.expectOk(UPDATE, { id: mid.id, set });
+    await nameServers(['mid']);
+    expect((await claimed()).servers).toEqual([
+      { id: 'mid', name: 'mid', command: 'npx', args: ['-y', 'mid-server'], ...set },
+    ]);
   });
 
   it('are none when its list is empty', async () => {

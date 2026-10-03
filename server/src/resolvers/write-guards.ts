@@ -387,6 +387,21 @@ async function assertServersSound(tx: AnyTable, userId: string, rows: Row[], ins
     if ('hooks' in row && Array.isArray(row.hooks) === false) {
       throw badServer('hooks is a list.');
     }
+    if ('cwd' in row && row.cwd !== null && (typeof row.cwd !== 'string' || row.cwd.trim() === '')) {
+      throw badServer("A working directory is a path, or null for the runner's own.");
+    }
+    for (const [key, least] of [
+      ['connectTimeoutMs', 1],
+      ['callTimeoutMs', 1],
+      ['idleTimeoutMs', 0],
+    ] as const) {
+      const value = row[key];
+      if (key in row && value !== null && (Number.isInteger(value) === false || (value as number) < least)) {
+        throw badServer(
+          `${key} is a whole number of milliseconds, ${least} or more, or null for the runner's default.`,
+        );
+      }
+    }
     if (inserting && typeof slug === 'string') {
       const taken = await tx.$count(
         dbSchema.mcpServers,
