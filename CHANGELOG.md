@@ -1,3 +1,11 @@
+# [1.18.0](https://github.com/cubicecho/telos/compare/v1.17.0...v1.18.0) (2026-10-03)
+
+
+### Features
+
+* **app:** switch a run's tools in the agent form ([6e2bf1a](https://github.com/cubicecho/telos/commit/6e2bf1aab5b759b57f94def3caf089e350946ed8)), closes [#20](https://github.com/cubicecho/telos/issues/20)
+* **server:** a run's tools are its agent's, and its writes stay in its todo's tree ([3cfe3c4](https://github.com/cubicecho/telos/commit/3cfe3c40319534b2c49c13ea679c26945432ca49)), closes [#20](https://github.com/cubicecho/telos/issues/20)
+
 # [1.17.0](https://github.com/cubicecho/telos/compare/v1.16.0...v1.17.0) (2026-10-03)
 
 
