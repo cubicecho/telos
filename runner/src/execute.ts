@@ -19,6 +19,7 @@ import {
   splitToolName,
 } from './artifacts.ts';
 import { briefPrompt, proposedTodos, systemPromptFor } from './prompts.ts';
+import { type ResolvedRunAgent, resolveAgent, unrunnable } from './spec.ts';
 import type { Beat, Claim, RunEvent, RunPrompt, RunResult, RunUsage, Telos } from './telos.ts';
 import { openTools, TELOS_SERVER } from './tools.ts';
 
@@ -152,9 +153,6 @@ export class EventFeed {
   }
 }
 
-/** Defaults for what an agent left blank. */
-const DEFAULTS = { maxTokens: 4096, temperature: 0.2, requestTimeoutSeconds: 300, maxRetries: 2 };
-
 export interface ExecuteOptions {
   telos: Telos;
   telosUrl: string;
@@ -233,6 +231,15 @@ export async function execute(claim: Claim, options: ExecuteOptions): Promise<Ru
     vars: { todoId: claim.todoId, runId: claim.runId, lane: claim.brief.laneName, contract: claim.brief.contract },
   };
   try {
+    // What the agent leaves blank comes from its account's defaults. One that
+    // resolves to nowhere fails here, before any tool is opened for it.
+    const resolved = resolveAgent(claim.agent.defaults, claim.agent);
+    const cannot = unrunnable(resolved.config, claim.agent.name);
+    if (cannot) throw new Error(cannot);
+    for (const warning of resolved.warnings) {
+      feed.push({ kind: 'notice', text: `A setting was left out: ${warning}` });
+      log(warning);
+    }
     pool = await (options.open ?? openTools)(claim, {
       telosUrl: options.telosUrl,
       allowStdio: options.allowStdio,
@@ -241,7 +248,7 @@ export async function execute(claim: Claim, options: ExecuteOptions): Promise<Ru
         log(text);
       },
     });
-    result = await work(claim, pool, { signal: stop.signal, log, feed, artifacts, hookContext });
+    result = await work(claim, pool, resolved, { signal: stop.signal, log, feed, artifacts, hookContext });
   } catch (error) {
     result = stop.signal.aborted ? { status: 'stopped' } : { status: 'error', error: messageOf(error) };
   } finally {
@@ -306,28 +313,21 @@ interface WorkOptions {
  * @param options Its signal, and where what it does goes.
  * @returns The result to report.
  */
-async function work(claim: Claim, pool: McpPool, options: WorkOptions): Promise<RunResult> {
+async function work(
+  claim: Claim,
+  pool: McpPool,
+  { config }: ResolvedRunAgent,
+  options: WorkOptions,
+): Promise<RunResult> {
   const { signal, log, feed, artifacts } = options;
   const { agent, brief } = claim;
   const prompt = briefPrompt(brief);
   const system = systemPromptFor(brief, agent.systemPrompt);
   feed.prompt({ system, user: prompt });
-  const config = {
-    baseUrl: agent.baseUrl,
-    apiKey: agent.apiKey ?? '',
-    model: agent.model,
-    maxTokens: agent.maxTokens ?? DEFAULTS.maxTokens,
-    temperature: agent.temperature ?? DEFAULTS.temperature,
-    requestTimeoutSeconds: agent.requestTimeoutSeconds ?? DEFAULTS.requestTimeoutSeconds,
-    maxRetries: agent.maxRetries ?? DEFAULTS.maxRetries,
-    maxToolIterations: agent.maxToolIterations,
-    toolDiscovery: agent.toolDiscovery ? ('ondemand' as const) : ('eager' as const),
-    ...(agent.contextLength ? { contextLength: agent.contextLength } : {}),
-  };
-  const catalog = agent.toolDiscovery ? pool.catalog() : undefined;
+  const catalog = config.toolDiscovery === 'eager' ? undefined : pool.catalog();
   const preselected =
-    catalog?.length && agent.toolSelectModel
-      ? await preselect(config, agent.toolSelectModel, catalog, prompt, { signal, onNotice: log }).catch(() => [])
+    catalog?.length && config.toolSelectModel
+      ? await preselect(config, config.toolSelectModel, catalog, prompt, { signal, onNotice: log }).catch(() => [])
       : [];
 
   // Only an agent with somewhere to store things besides the board is offered

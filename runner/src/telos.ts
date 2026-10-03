@@ -1,4 +1,5 @@
 import type { ArtifactDraft } from './artifacts.ts';
+import type { KeyedLayer } from './spec.ts';
 // The runner's whole view of telos: a handful of operations over GraphQL, as the
 // system principal. The runner never touches the database; every rule about
 // what may run, and what a finished run does to a todo, is telos's.
@@ -31,21 +32,27 @@ export interface RunEvent {
   text?: string | null;
 }
 
+/**
+ * An agent as telos stores it: what it says, null where it inherits from its
+ * account's `defaults`. `resolveAgent` (spec.ts) layers the two.
+ */
 export interface ClaimedAgent {
   id: string;
   name: string;
-  baseUrl: string;
-  model: string;
+  baseUrl: string | null;
+  model: string | null;
   apiKey: string | null;
   systemPrompt: string | null;
   temperature: number | null;
   maxTokens: number | null;
   contextLength: number | null;
-  maxToolIterations: number;
-  toolDiscovery: boolean;
+  maxToolIterations: number | null;
+  toolDiscovery: boolean | null;
   toolSelectModel: string | null;
   requestTimeoutSeconds: number | null;
   maxRetries: number | null;
+  /** The account's layer under it, key included; null where the account has set none. */
+  defaults: (KeyedLayer & { apiKey: string | null }) | null;
   /** The account's servers it reaches, as JSON, as telos sends it. */
   mcpServers: string;
   /** What telos has to say about them: a server the agent names that is gone. */
@@ -197,6 +204,10 @@ const QUEUE = `query ($limit: Int) { runnerQueue(limit: $limit) { todoId laneId 
 const AGENT_FIELDS = `
   id name baseUrl model apiKey systemPrompt temperature maxTokens contextLength
   maxToolIterations toolDiscovery toolSelectModel requestTimeoutSeconds maxRetries mcpServers mcpNotices
+  defaults {
+    baseUrl model apiKey temperature maxTokens contextLength
+    maxToolIterations toolDiscovery toolSelectModel requestTimeoutSeconds maxRetries
+  }
 `;
 const CLAIM = `mutation ($todoId: ID!, $laneId: ID!) {
   claimRun(todoId: $todoId, laneId: $laneId) {

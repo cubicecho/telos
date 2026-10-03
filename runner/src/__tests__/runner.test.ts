@@ -838,6 +838,7 @@ describe('drafts', () => {
         maxRetries: null,
         mcpServers: '[]',
         mcpNotices: [],
+        defaults: null,
       },
       projectName: 'P',
       projectDescription: null,

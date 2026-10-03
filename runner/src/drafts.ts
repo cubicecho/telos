@@ -1,5 +1,6 @@
 import { askJson, errorMessage, estimateTokens } from '@cubicecho/agent-core';
-import type { ClaimedAgent, DraftAnswer, DraftClaim, RunEvent, Telos } from './telos.ts';
+import { resolveAgent, unrunnable } from './spec.ts';
+import type { DraftAnswer, DraftClaim, RunEvent, Telos } from './telos.ts';
 
 // A draft's turn: the agent reads the conversation so far and answers it,
 // rewriting the draft's title and brief as it goes. Ported from kanban_server's
@@ -38,8 +39,6 @@ const ANSWER_SCHEMA = {
   required: ['reply', 'title', 'brief'],
   additionalProperties: false,
 };
-
-const DEFAULTS = { maxTokens: 4096, temperature: 0.3, requestTimeoutSeconds: 300 };
 
 /** Said on every draft run, so nobody reads its token counts as the endpoint's. */
 export const ESTIMATED_NOTICE =
@@ -86,10 +85,13 @@ export async function answerDraft(
   claim: DraftClaim,
   options: { signal?: AbortSignal; ask?: typeof askJson } = {},
 ): Promise<DraftAnswer> {
-  const agent: ClaimedAgent = claim.agent;
+  const { config, warnings } = resolveAgent(claim.agent.defaults, claim.agent);
   const prompt = { system: refineSystem(claim), user: refinePrompt(claim) };
   const asked = estimateTokens(prompt.system) + estimateTokens(prompt.user);
-  const events: RunEvent[] = [{ kind: 'notice', text: ESTIMATED_NOTICE }];
+  const events: RunEvent[] = [
+    { kind: 'notice', text: ESTIMATED_NOTICE },
+    ...warnings.map((warning): RunEvent => ({ kind: 'notice', text: `A setting was left out: ${warning}` })),
+  ];
   /** What the turn is recorded with, given what the model sent back. */
   const spend = (said: string) => {
     const completionTokens = said ? estimateTokens(said) : 0;
@@ -99,21 +101,23 @@ export async function answerDraft(
       events,
     };
   };
+  const cannot = unrunnable(config, claim.agent.name);
+  if (cannot) return { error: cannot, ...spend('') };
   try {
     const answer = await (options.ask ?? askJson)<{ reply?: unknown; title?: unknown; brief?: unknown }>(
       {
-        baseUrl: agent.baseUrl,
-        apiKey: agent.apiKey ?? '',
-        requestTimeoutSeconds: agent.requestTimeoutSeconds ?? DEFAULTS.requestTimeoutSeconds,
+        baseUrl: config.baseUrl,
+        apiKey: config.apiKey,
+        ...(config.requestTimeoutSeconds === undefined ? {} : { requestTimeoutSeconds: config.requestTimeoutSeconds }),
       },
-      agent.model,
+      config.model,
       prompt.system,
       prompt.user,
       ANSWER_SCHEMA,
       {
         name: 'draft_turn',
-        maxTokens: agent.maxTokens ?? DEFAULTS.maxTokens,
-        temperature: agent.temperature ?? DEFAULTS.temperature,
+        maxTokens: config.maxTokens,
+        temperature: config.temperature,
         onNotice: (text) => events.push({ kind: 'notice', text }),
         ...(options.signal ? { signal: options.signal } : {}),
       },
