@@ -219,7 +219,7 @@ a pass: `finishRun` completes the todo, puts it in the done lane and archives
 it in one write, as the run. It is that or a success arrow, never both, and not
 for an `expand` station; the lane write guard (`assertArchiveOnSuccessFits`)
 holds both and says what to change. A station may follow a **lane preset**
-(`lane_presets`, the account's, managed in Settings → AI): `lanes.presetId`
+(`lane_presets`, the account's, managed in Settings → Agents): `lanes.presetId`
 and `lanes.presetOverrides`, the list of the preset's fields (`contract`,
 `wipLimit`, `maxAttempts`) the lane keeps its own value for. The lane's columns
 always hold the values in force, kept so by the `lanes_follow_preset` trigger

@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import {
+  AgentDefaultsDocument,
   AgentsDocument,
   AiStateDocument,
   ApiKeysDocument,
@@ -11,7 +12,7 @@ import {
   SetAiEnabledDocument,
   SetInstanceAiEnabledDocument,
 } from '@/lib/graphql';
-import { AiSettings } from '../ai-settings';
+import { AgentSettings, AiSettings } from '../ai-settings';
 
 function aiState(instance: boolean, account: boolean, { available = instance, admin = false } = {}) {
   return {
@@ -42,13 +43,52 @@ const presets = { request: { query: LanePresetsDocument }, result: { data: { lan
 const servers = { request: { query: McpServersDocument }, result: { data: { mcpServers: [] } } };
 
 // biome-ignore lint/suspicious/noExplicitAny: MockedProvider's mock array type
-function settings(mocks: any[]) {
+function settings(mocks: any[], Component = AiSettings) {
   render(
     <MockedProvider mocks={mocks}>
-      <AiSettings />
+      <Component />
     </MockedProvider>,
   );
 }
+
+const BUILT_IN = {
+  __typename: 'ResolvedAgentSettings',
+  baseUrl: '',
+  model: '',
+  temperature: 0.7,
+  maxTokens: 0,
+  contextLength: 0,
+  maxToolIterations: 20,
+  toolDiscovery: false,
+  toolSelectModel: '',
+  requestTimeoutSeconds: null,
+  maxRetries: 0,
+};
+
+const defaults = {
+  request: { query: AgentDefaultsDocument },
+  result: {
+    data: {
+      agentDefaults: {
+        __typename: 'AgentDefaults',
+        id: 'u1',
+        baseUrl: null,
+        model: null,
+        temperature: null,
+        maxTokens: null,
+        contextLength: null,
+        maxToolIterations: null,
+        toolDiscovery: null,
+        toolSelectModel: null,
+        requestTimeoutSeconds: null,
+        maxRetries: null,
+        hasApiKey: false,
+        resolved: BUILT_IN,
+        builtIn: BUILT_IN,
+      },
+    },
+  },
+};
 
 describe('AiSettings', () => {
   it('draws nothing at all when the instance has no AI', async () => {
@@ -100,7 +140,7 @@ describe('AiSettings', () => {
     expect(screen.queryByText('API keys')).not.toBeInTheDocument();
   });
 
-  it('turns AI on and then lists the keys, the agents, the servers and the lane presets', async () => {
+  it('turns AI on and then lists the keys, leaving the agents and servers to their own tabs', async () => {
     const user = userEvent.setup();
     settings([
       aiState(true, false),
@@ -109,17 +149,27 @@ describe('AiSettings', () => {
         result: { data: { setAiEnabled: { __typename: 'User', id: 'u1', aiEnabled: true } } },
       },
       keys,
-      agents,
-      presets,
-      servers,
     ]);
 
     await user.click(await screen.findByRole('switch', { name: 'Use AI on this account' }));
 
     expect(await screen.findByText('API keys')).toBeInTheDocument();
     await waitFor(() => expect(screen.getByText('Claude Code')).toBeInTheDocument());
+    expect(screen.queryByText('No agents yet.')).not.toBeInTheDocument();
+    expect(screen.queryByText('No servers yet.')).not.toBeInTheDocument();
+  });
+});
+
+describe('AgentSettings', () => {
+  it('draws nothing while the account has AI off', async () => {
+    settings([aiState(true, false)], AgentSettings);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(screen.queryByText('No agents yet.')).not.toBeInTheDocument();
+  });
+
+  it('lists the agents and the lane presets once AI is on', async () => {
+    settings([aiState(true, true), defaults, defaults, defaults, agents, presets, servers], AgentSettings);
     expect(await screen.findByText('No agents yet.')).toBeInTheDocument();
-    expect(await screen.findByText('No servers yet.')).toBeInTheDocument();
     expect(await screen.findByText('No presets yet.')).toBeInTheDocument();
   });
 });

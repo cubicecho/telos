@@ -81,7 +81,7 @@ describe('AiSetupChecklist', () => {
     const setup = aiSetup(NOTHING);
     checklist([aiState({ account: false }), setup]);
     expect(await screen.findByText(/AI is off for your account/)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Turn it on in Settings' })).toHaveAttribute('href', '/settings');
+    expect(screen.getByRole('link', { name: 'Turn it on in Settings' })).toHaveAttribute('href', '/settings?tab=ai');
     expect(screen.queryByRole('list')).not.toBeInTheDocument();
     expect(setup.result).not.toHaveBeenCalled();
   });
@@ -110,7 +110,7 @@ describe('AiSetupChecklist', () => {
     expect(row('AI is on for this instance: done')).toBeInTheDocument();
     expect(row('AI is on for your account: done')).toBeInTheDocument();
     const agent = row('You have an agent: not done');
-    expect(within(agent).getByRole('link', { name: 'Open Settings' })).toHaveAttribute('href', '/settings');
+    expect(within(agent).getByRole('link', { name: 'Open Settings' })).toHaveAttribute('href', '/settings?tab=agents');
     // No project yet, so no board to send anyone to.
     expect(within(row('A project has a station: not done')).queryByRole('link')).not.toBeInTheDocument();
     expect(row('The runner is asking for work: not done')).toHaveTextContent('has not asked since the server started');
