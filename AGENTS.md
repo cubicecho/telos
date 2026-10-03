@@ -272,7 +272,11 @@ the schema, written one at a time with `setMcpServerSecret`, readable only as
 names (`headerNames`, `envNames`) and sent only to the runner. `testMcpServer`
 tests a saved server by id, so the test has its secrets, and `finishProbe`
 keeps what it found on the row (`checked_at`, `check_ok`, `check_error`,
-`tools`), which only the server writes.
+`tools`), which only the server writes. A row may override the pool's limits
+(`connect_timeout_ms`, `call_timeout_ms`, `idle_timeout_ms`, null for the
+pool's) and say where a command runs (`cwd`, which only a runner with
+`RUNNER_ALLOW_STDIO` ever uses); a test waits as long as the row's connect
+timeout rather than its own 10s.
 
 **A run reports what it did; it never writes it.** The runner sends events
 (tool calls, tool results, hook notes, notices) with each heartbeat and the
