@@ -2,7 +2,7 @@ import { useMutation } from '@apollo/client';
 import { useState } from 'react';
 import { Text, View } from 'react-native';
 import { Section } from '@/components/section';
-import { Field, FieldContent, FieldDescription, FieldTitle } from '@/components/ui/field';
+import { SettingRow } from '@/components/setting-row';
 import { Switch } from '@/components/ui/switch';
 import { useAi } from '@/lib/ai';
 import { describeError } from '@/lib/errors';
@@ -71,38 +71,32 @@ export function AiSettings() {
         content={
           <View className="gap-3">
             {adminSwitch ? (
-              <Field orientation="horizontal">
-                <Switch
-                  checked={ai.instance}
-                  onCheckedChange={toggleInstance}
-                  disabled={instanceLoading}
-                  accessibilityLabel="AI on this instance"
-                />
-                <FieldContent>
-                  <FieldTitle>AI on this instance</FieldTitle>
-                  <FieldDescription>
-                    For everyone on this server; only admins see this. Turned off, no account can use AI, the MCP
-                    endpoint closes, and anything agents are working on is stopped.
-                  </FieldDescription>
-                </FieldContent>
-              </Field>
+              <SettingRow
+                title="AI on this instance"
+                description="For everyone on this server; only admins see this. Turned off, no account can use AI, the MCP endpoint closes, and anything agents are working on is stopped."
+                action={
+                  <Switch
+                    checked={ai.instance}
+                    onCheckedChange={toggleInstance}
+                    disabled={instanceLoading}
+                    accessibilityLabel="AI on this instance"
+                  />
+                }
+              />
             ) : null}
             {ai.instance ? (
-              <Field orientation="horizontal">
-                <Switch
-                  checked={ai.account}
-                  onCheckedChange={toggle}
-                  disabled={loading}
-                  accessibilityLabel="Use AI on this account"
-                />
-                <FieldContent>
-                  <FieldTitle>Use AI on this account</FieldTitle>
-                  <FieldDescription>
-                    Lets AI clients reach your projects with an API key. Turned off, every key stops working and nothing
-                    AI is shown; your todos, notes and history are untouched.
-                  </FieldDescription>
-                </FieldContent>
-              </Field>
+              <SettingRow
+                title="Use AI on this account"
+                description="Lets AI clients reach your projects with an API key. Turned off, every key stops working and nothing AI is shown; your todos, notes and history are untouched."
+                action={
+                  <Switch
+                    checked={ai.account}
+                    onCheckedChange={toggle}
+                    disabled={loading}
+                    accessibilityLabel="Use AI on this account"
+                  />
+                }
+              />
             ) : null}
             {error ? (
               <Text className="text-destructive text-sm" aria-live="polite">
