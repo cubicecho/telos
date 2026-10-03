@@ -10,6 +10,7 @@ import { ProjectPage } from '@/components/domain/project/project-page';
 import { ArchivedTodos } from '@/components/domain/todo/archived-todos';
 import { TodoComposer } from '@/components/domain/todo/todo-composer';
 import { TodoFilterBar } from '@/components/domain/todo/todo-filter-bar';
+import { TodoFormDialog } from '@/components/domain/todo/todo-form-dialog';
 import { TodoRow } from '@/components/domain/todo/todo-row';
 import type { TodoSummary } from '@/components/domain/todo/types';
 import { PROSE_COLUMN } from '@/components/header-content-footer';
@@ -43,12 +44,22 @@ export default function ProjectScreen() {
   // same reason: they survive a reload, they are linkable — a filtered board is
   // a thing worth sending someone — and Back undoes them the way it undoes
   // everything else.
-  const { id, view, q, label, sort } = useLocalSearchParams<{
+  // `todo` is the one open in its dialog, which is where a todo's own link
+  // (/todos/<id>) lands. Closing the dialog takes it off the URL.
+  const {
+    id,
+    view,
+    q,
+    label,
+    sort,
+    todo: linkedId,
+  } = useLocalSearchParams<{
     id: string;
     view?: string;
     q?: string;
     label?: string;
     sort?: string;
+    todo?: string;
   }>();
   const [showCompleted, setShowCompleted] = useState(false);
   const composerRef = useRef<InputHandle>(null);
@@ -185,6 +196,9 @@ export default function ProjectScreen() {
   // Over every todo, not the filtered ones: a new todo goes at the end of the
   // project, and a filter is a way of looking at it rather than a part of it.
   const nextPosition = all.reduce((max, todo) => Math.max(max, todo.position ?? 0), -1) + 1;
+  // Looked for among all of them, not the filtered ones: a link opens its todo
+  // whatever the filter on the URL hides.
+  const linked = linkedId ? all.find((todo) => todo.id === linkedId) : undefined;
 
   return (
     // The page is full width so the board can be as wide as its columns need,
@@ -348,6 +362,14 @@ export default function ProjectScreen() {
               </>
             )}
           </Tabs>
+          {linked ? (
+            <TodoFormDialog
+              key={linked.id}
+              open
+              onOpenChange={(next) => !next && router.setParams({ todo: undefined })}
+              todo={linked}
+            />
+          ) : null}
         </View>
       }
     />
