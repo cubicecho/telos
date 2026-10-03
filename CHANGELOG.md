@@ -1,3 +1,11 @@
+# [1.21.0](https://github.com/cubicecho/telos/compare/v1.20.0...v1.21.0) (2026-10-03)
+
+
+### Features
+
+* **db:** change_log table and triggers for the change feed ([ea308f4](https://github.com/cubicecho/telos/commit/ea308f43f1553d887b8da8b922c0e9ad0bcfb071))
+* **server:** changes(since:) query and MCP tool ([4617f06](https://github.com/cubicecho/telos/commit/4617f064b2a4d43fba214e355d41b1d31eab9f66))
+
 # [1.20.0](https://github.com/cubicecho/telos/compare/v1.19.0...v1.20.0) (2026-10-03)
 
 
