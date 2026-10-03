@@ -51,10 +51,10 @@ function aiSetup(setup: typeof NOTHING) {
 }
 
 // biome-ignore lint/suspicious/noExplicitAny: MockedProvider's mock array type
-function checklist(mocks: any[], projectId?: string) {
+function checklist(mocks: any[], projectId?: string, projectAi?: boolean) {
   render(
     <MockedProvider mocks={mocks}>
-      <AiSetupChecklist projectId={projectId} />
+      <AiSetupChecklist projectId={projectId} projectAi={projectAi} />
     </MockedProvider>,
   );
 }
@@ -102,6 +102,14 @@ describe('AiSetupChecklist', () => {
     checklist([aiState({ account: false })], 'p1');
     await settle();
     expect(document.body).toHaveTextContent('');
+  });
+
+  it('says nothing, and asks nothing, on a project with AI switched off', async () => {
+    const setup = aiSetup(NOTHING);
+    checklist([aiState({}), setup], 'p1', false);
+    await settle();
+    expect(screen.queryByText('Getting AI running')).not.toBeInTheDocument();
+    expect(setup.result).not.toHaveBeenCalled();
   });
 
   it('lists every step, the two switches ticked, and where the next is taken', async () => {

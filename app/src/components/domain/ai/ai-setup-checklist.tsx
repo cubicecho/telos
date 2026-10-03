@@ -128,18 +128,31 @@ export function setupSteps(setup: Setup, projectId: string | undefined, now: num
  * left it off.
  *
  * On a project it shows where the project has no station, and on the project
- * the list points at, so the later steps have somewhere to be read.
+ * the list points at, so the later steps have somewhere to be read. A project
+ * with AI switched off shows nothing: its switch, beside it, is the one step
+ * that matters there, and it was left off on purpose.
+ *
+ * @param projectId - The project on screen, or nothing on the home page.
+ * @param projectAi - Whether that project has AI on; false hides the list.
  */
-export function AiSetupChecklist({ projectId }: { projectId?: string | undefined }) {
+export function AiSetupChecklist({
+  projectId,
+  projectAi = true,
+}: {
+  projectId?: string | undefined;
+  projectAi?: boolean;
+}) {
   const ai = useAi();
+  const shown = ai.on && projectAi;
   const { data } = useQuery(AiSetupDocument, {
-    skip: !ai.on,
-    pollInterval: ai.on ? SETUP_POLL_MS : 0,
+    skip: !shown,
+    pollInterval: shown ? SETUP_POLL_MS : 0,
     fetchPolicy: 'cache-and-network',
   });
 
   if (!ai.available) return null;
   if (!ai.on) return projectId ? null : <Offer instance={ai.instance} admin={ai.admin} />;
+  if (!projectAi) return null;
 
   // No answer, no list: a checklist that could not be read has nothing true to say.
   const setup = data?.aiSetup;

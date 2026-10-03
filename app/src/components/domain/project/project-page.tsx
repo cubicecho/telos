@@ -168,7 +168,7 @@ export function ProjectPage({
           <ProjectAiSwitch projectId={project.id} enabled={project.aiEnabled} />
           {project.aiEnabled ? <ProjectAutoRunSwitch projectId={project.id} enabled={project.autoRun} /> : null}
           {activity ? <ProjectActivityLine activity={activity} /> : null}
-          <AiSetupChecklist projectId={project.id} />
+          <AiSetupChecklist projectId={project.id} projectAi={project.aiEnabled} />
 
           {actionError ? (
             <Text className="text-destructive text-sm" aria-live="polite">
