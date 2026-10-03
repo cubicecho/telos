@@ -4,6 +4,7 @@ import { and, eq, inArray, sql } from 'drizzle-orm';
 import { GraphQLError } from 'graphql';
 import { assertNoBlockedCompletions, resultRows } from '../blocking.ts';
 import { type Context, isAiActor } from '../context.ts';
+import { DOOR_TOOL_NAMES } from '../door.ts';
 import { assertCompletionMatchesLane, assertEveryProjectHasLanes, realignLanes, seedMissingLanes } from '../lanes.ts';
 import { stampActor } from '../provenance.ts';
 import { cancelRunsUnder } from '../stations.ts';
@@ -443,6 +444,26 @@ function assertServerListSound(rows: Row[]): void {
   }
 }
 
+/**
+ * An agent's tools for its runs are absent (null: a run's default), or a list
+ * of the door's tools that are off. A name the door does not have would be a
+ * switch that switches nothing, so it is refused, as `setApiKeyTools` refuses
+ * it for a key.
+ */
+function assertRunToolsSound(rows: Row[]): void {
+  for (const row of rows) {
+    if (!('toolsOff' in row) || row.toolsOff === null) continue;
+    if (isStrings(row.toolsOff) === false) {
+      throw badServer("toolsOff is null for a run's default, or a list of the MCP door's tools.");
+    }
+    const unknown = (row.toolsOff as string[]).filter((name) => !DOOR_TOOL_NAMES.has(name));
+    if (unknown.length > 0) {
+      throw badServer(`The MCP door has no tool ${unknown.join(', ')}.`);
+    }
+    row.toolsOff = [...new Set(row.toolsOff as string[])];
+  }
+}
+
 export const onWrite: NonNullable<BuildSchemaConfig['onWrite']> = {
   ...Object.fromEntries(
     Object.entries(FOREIGN_KEYS).map(([table, foreignKeys]) => [
@@ -479,7 +500,10 @@ export const onWrite: NonNullable<BuildSchemaConfig['onWrite']> = {
     },
   },
   agents: {
-    before: async ({ args }: WriteHookPayload) => assertServerListSound(writtenRows(args)),
+    before: async ({ args }: WriteHookPayload) => {
+      assertServerListSound(writtenRows(args));
+      assertRunToolsSound(writtenRows(args));
+    },
   },
   mcpServers: {
     before: async ({ args, context, operation, tx }: WriteHookPayload) =>

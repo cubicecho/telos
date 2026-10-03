@@ -25,10 +25,11 @@ import type { ContextFactory } from './request-context.ts';
 // write but the ones meant for AI (resolvers/actor-lock.ts); the tool list is
 // the menu, not the lock.
 //
-// A key has a switch per tool (door.ts). A tool that is off for the key is
-// taken out of the listing it is sent and answered as a tool that is not
-// there, here; the lock refuses what the tool would have done as well, so a
-// key that reaches /graphql instead gets no further.
+// A key has a switch per tool (door.ts), and so does a run, through its agent.
+// A tool that is off for the caller is taken out of the listing it is sent and
+// answered as a tool that is not there, here; the lock refuses what the tool
+// would have done as well, so a caller that reaches /graphql instead gets no
+// further.
 //
 // Mounted only when the instance has AI on. Off, /mcp is a plain 404.
 

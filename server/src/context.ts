@@ -23,7 +23,10 @@ export interface Actor {
   userId: string | null;
   /** The `apikeys` row, for an `apiKey` actor. */
   keyId?: string | undefined;
-  /** The door's tools this key has switched off (door.ts), for an `apiKey` actor. */
+  /**
+   * The door's tools that are off (door.ts): an `apiKey` actor's key's, or an
+   * `agent` actor's agent's.
+   */
   toolsOff?: ReadonlySet<string> | undefined;
   /** The run, for an `agent` actor. */
   runId?: string | undefined;

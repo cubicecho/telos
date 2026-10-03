@@ -13,6 +13,7 @@ import { DOOR_TOOLS } from '../door.ts';
 import { mountMcp } from '../mcp.ts';
 import { createContextFactory } from '../request-context.ts';
 import { AI_MUTATIONS } from '../resolvers/actor-lock.ts';
+import { RUN_REACH_EXEMPT, RUN_REACH_MUTATIONS } from '../resolvers/run-reach.ts';
 import { CLAIM, createBoard, FINISH, runnerClient, SET_AUTO_RUN } from './board.ts';
 import { authFor, createClient, createTestDb, createUser, type TestDb } from './helpers.ts';
 
@@ -113,6 +114,14 @@ async function connect(url: URL, key: string): Promise<Client> {
   return client;
 }
 
+/** Connects to the door as a live run, by its token, as the runner hands it to a model's tools. */
+async function connectRun(url: URL, token: string): Promise<Client> {
+  const client = new Client({ name: 'telos-run', version: '0' });
+  await client.connect(new StreamableHTTPClientTransport(url, { requestInit: { headers: { 'x-run-token': token } } }));
+  clients.push(client);
+  return client;
+}
+
 /** Calls a tool and returns its structured result, throwing on a tool error. */
 // biome-ignore lint/suspicious/noExplicitAny: callers shape the result
 async function call(client: Client, name: string, args: Record<string, unknown> = {}): Promise<any> {
@@ -199,6 +208,12 @@ describe('the tool surface', () => {
   it('writes with exactly the mutations the lock opens to AI', () => {
     const fields = new Set(DOOR_TOOLS.filter((tool) => tool.writes).flatMap((tool) => tool.fields));
     expect([...fields].sort()).toEqual([...AI_MUTATIONS].sort());
+  });
+
+  it('says how far a run takes every mutation open to AI', () => {
+    const said = new Set([...RUN_REACH_MUTATIONS, ...Object.keys(RUN_REACH_EXEMPT)]);
+    expect([...AI_MUTATIONS].filter((name) => !said.has(name))).toEqual([]);
+    expect([...said].filter((name) => !AI_MUTATIONS.has(name))).toEqual([]);
   });
 
   it('describes every tool', () => {
@@ -589,19 +604,135 @@ describe('the board’s agents and runs', () => {
     );
   });
 
-  it('lets a run do what a key does, without switches', async () => {
+  /** A run of a fresh todo on the station's board, and its token. */
+  async function liveRun(b: Awaited<ReturnType<typeof station>>) {
+    const todoId = await b.addTodo('Worked');
+    await b.person.expectOk('mutation ($id: ID!) { runTodo(id: $id) { id } }', { id: todoId });
+    const { runId, token } = (await runnerClient(db).expectOk(CLAIM, { todoId, laneId: b.lanes[0].id })).claimRun;
+    return { todoId, runId, token: token as string };
+  }
+
+  const SET_AGENT = `mutation ($id: UUID!, $set: UpdateAgentInput!) {
+    updateAgent(set: $set, where: { id: { eq: $id } }) { id toolsOff }
+  }`;
+
+  /** Sets which door tools the station's agent has off for its runs; null is the run default. */
+  async function setRunTools(b: Awaited<ReturnType<typeof station>>, off: string[] | null) {
+    await b.person.expectOk(SET_AGENT, { id: b.agentId, set: { toolsOff: off } });
+  }
+
+  it('gives a run reading, adding work and notes, unless its agent says otherwise', async () => {
     const b = await station();
-    const todo = await b.addTodo('Worked');
-    await b.person.expectOk('mutation ($id: ID!) { runTodo(id: $id) { id } }', { id: todo });
-    const { runId } = (await runnerClient(db).expectOk(CLAIM, { todoId: todo, laneId: b.lanes[0].id })).claimRun;
-    const agent = createClient(db, b.userId, { ai: true, actor: { kind: 'agent', userId: b.userId, runId } });
-    await agent.expectOk('mutation ($id: ID!, $lane: ID!) { moveTodo(id: $id, laneId: $lane) { id } }', {
-      id: await b.addTodo('Moved by a run'),
-      lane: b.lanes[1].id,
+    const { todoId, token } = await liveRun(b);
+    const url = await serve();
+    const run = await connectRun(url, token);
+    const defaults = [
+      ...READS,
+      'create_todo',
+      'set_todo_dependencies',
+      'add_todo_note',
+      'edit_todo_note',
+      'delete_todo_note',
+    ];
+    expect((await run.listTools()).tools.map((tool) => tool.name).sort()).toEqual([...defaults].sort());
+    expect(await callError(run, 'move_todo', { id: todoId, laneId: b.lanes[1].id })).toMatch(
+      /Tool move_todo not found/,
+    );
+    const { createTodo } = await call(run, 'create_todo', { projectId: b.projectId, title: 'Follow-up' });
+    expect((await rowOf(createTodo.id)).title).toBe('Follow-up');
+    await call(run, 'add_todo_note', { todoId, body: 'Halfway.' });
+
+    // Its agent switches the rest on, all but `record_artifact`: a run has the runner's.
+    await setRunTools(b, []);
+    const opened = await connectRun(url, token);
+    expect((await opened.listTools()).tools.map((tool) => tool.name).sort()).toEqual(
+      TOOLS.filter((name) => name !== 'record_artifact').sort(),
+    );
+    expect(await callError(opened, 'record_artifact', { todoId })).toMatch(/Tool record_artifact not found/);
+
+    // And can switch a default one off.
+    await setRunTools(b, ['create_todo']);
+    const narrowed = await connectRun(url, token);
+    expect(await callError(narrowed, 'create_todo', { projectId: b.projectId, title: 'Again' })).toMatch(
+      /Tool create_todo not found/,
+    );
+  });
+
+  it('holds a run to its own todo’s tree and what it made, whatever its switches say', async () => {
+    const b = await station();
+    await setRunTools(b, []);
+    const { todoId, token } = await liveRun(b);
+    const elsewhere = await b.addTodo('Someone else’s');
+    const child = await b.addTodo('A part of it');
+    await db.update(dbSchema.todos).set({ parentId: todoId }).where(eq(dbSchema.todos.id, child));
+    const run = await connectRun(await serve(), token);
+    const move = (id: string) => callError(run, 'move_todo', { id, laneId: b.lanes[1].id });
+
+    // Out of reach is not found, as a todo AI cannot see is.
+    expect(await move(elsewhere)).toMatch(/Todo not found/);
+    expect(await callError(run, 'archive_todo', { id: elsewhere })).toMatch(/Todo not found/);
+    expect(await callError(run, 'add_todo_note', { todoId: elsewhere, body: 'Hi' })).toMatch(/Todo not found/);
+    expect((await rowOf(elsewhere)).laneId).toBe(b.lanes[0].id);
+
+    // Its own todo is the run's outcome to decide, not the run's.
+    expect(await move(todoId)).toMatch(/A run cannot move its own todo/);
+    expect(await callError(run, 'archive_todo', { id: todoId })).toMatch(/cannot archive its own todo/);
+    expect(await callError(run, 'delete_todo', { id: todoId })).toMatch(/cannot delete its own todo/);
+    expect(await callError(run, 'set_todo_dependencies', { id: todoId, dependsOn: [child] })).toMatch(
+      /cannot change what waits on its own todo/,
+    );
+    expect(await rowOf(todoId)).toMatchObject({ laneId: b.lanes[0].id, archivedAt: null });
+    // Its text and its thread are fine.
+    await call(run, 'update_todo', { id: todoId, brief: 'Narrowed down.' });
+    await call(run, 'add_todo_note', { todoId, body: 'Split it.' });
+
+    // What is under its todo, and what it made, are its to work.
+    await call(run, 'move_todo', { id: child, laneId: b.lanes[1].id });
+    const { createTodo } = await call(run, 'create_todo', { projectId: b.projectId, title: 'Follow-up' });
+    await call(run, 'set_todo_dependencies', { id: createTodo.id, dependsOn: [child] });
+    await call(run, 'archive_todo', { id: createTodo.id });
+    await call(run, 'restore_todo', { id: createTodo.id });
+    // And may not put a todo under one out of reach.
+    expect(
+      await callError(run, 'create_todo', { projectId: b.projectId, title: 'Stray', parentId: elsewhere }),
+    ).toMatch(/Todo not found/);
+    expect(await callError(run, 'update_todo', { id: createTodo.id, parentId: elsewhere })).toMatch(/Todo not found/);
+  });
+
+  it('holds a run to its own board', async () => {
+    const b = await station();
+    await setRunTools(b, []);
+    const { token } = await liveRun(b);
+    const { createProject } = await b.person.expectOk('mutation { createProject(values: { name: "Other" }) { id } }');
+    const run = await connectRun(await serve(), token);
+    expect(await callError(run, 'create_todo', { projectId: createProject.id, title: 'Stray' })).toMatch(
+      /Project not found/,
+    );
+  });
+
+  it('keeps an agent’s switches to tools the door has', async () => {
+    const b = await station();
+    const unknown = await b.person.expectError(SET_AGENT, {
+      id: b.agentId,
+      set: { toolsOff: ['move_todo', 'teleport'] },
     });
-    await agent.expectOk('mutation ($p: UUID!) { createTodo(values: { projectId: $p, title: "Follow-up" }) { id } }', {
-      p: b.projectId,
-    });
+    expect(unknown.code).toBe('BAD_USER_INPUT');
+    expect(unknown.message).toMatch(/teleport/);
+    const shape = await b.person.expectError(SET_AGENT, { id: b.agentId, set: { toolsOff: 'move_todo' } });
+    expect(shape.code).toBe('BAD_USER_INPUT');
+    await setRunTools(b, ['move_todo', 'move_todo']);
+    const [agent] = await db.select().from(dbSchema.agents).where(eq(dbSchema.agents.id, b.agentId));
+    expect(agent.toolsOff).toEqual(['move_todo']);
+  });
+
+  it('lists which tools a run may have, and which it has by default', async () => {
+    const b = await station();
+    const { mcpTools } = await b.person.expectOk('{ mcpTools { name forRuns runDefault } }');
+    const named = (name: string) => mcpTools.find((tool: { name: string }) => tool.name === name);
+    expect(named('todos')).toEqual({ name: 'todos', forRuns: true, runDefault: true });
+    expect(named('create_todo')).toEqual({ name: 'create_todo', forRuns: true, runDefault: true });
+    expect(named('move_todo')).toEqual({ name: 'move_todo', forRuns: true, runDefault: false });
+    expect(named('record_artifact')).toEqual({ name: 'record_artifact', forRuns: false, runDefault: false });
   });
 });
 
