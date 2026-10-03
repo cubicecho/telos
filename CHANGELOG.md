@@ -1,3 +1,11 @@
+# [1.22.0](https://github.com/cubicecho/telos/compare/v1.21.1...v1.22.0) (2026-10-03)
+
+
+### Features
+
+* **app:** give agents and MCP servers their own settings tabs once AI is on ([2c575e3](https://github.com/cubicecho/telos/commit/2c575e3b524df3d07b34c9c983a5d3c77264fcfa))
+* **app:** start a new agent from one of four templates ([efe8740](https://github.com/cubicecho/telos/commit/efe8740f0dae38b53c22585de8de313c0a1e9d1f))
+
 ## [1.21.1](https://github.com/cubicecho/telos/compare/v1.21.0...v1.21.1) (2026-10-03)
 
 
