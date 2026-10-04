@@ -81,7 +81,7 @@ const RUNS_SDL = parse(`
   }
 
   "Everything an agent is told about the todo it is working, and where."
-  type RunBrief {
+  type RunAssignment {
     projectName: String!
     projectDescription: String
     projectContext: String
@@ -109,7 +109,7 @@ const RUNS_SDL = parse(`
     "Whether no agent has worked the todo before: its hooks' session opens with this run."
     opensSession: Boolean!
     agent: RunnerAgent!
-    brief: RunBrief!
+    assignment: RunAssignment!
   }
 
   "A todo a run proposes."
@@ -289,9 +289,9 @@ async function loadRunForUpdate(tx: AnyRow, runId: string) {
  * @param todo The todo being worked.
  * @param lane The lane it is in.
  * @param project The todo's project.
- * @returns The brief.
+ * @returns The assignment.
  */
-async function briefFor(tx: AnyRow, todo: AnyRow, lane: AnyRow, project: AnyRow) {
+async function assignmentFor(tx: AnyRow, todo: AnyRow, lane: AnyRow, project: AnyRow) {
   const thread: AnyRow[] = await tx
     .select()
     .from(dbSchema.todoNotes)
@@ -819,7 +819,7 @@ export function applyRunsExtension(schema: GraphQLSchema): GraphQLSchema {
           turn,
           opensSession,
           agent: handed,
-          brief: await briefFor(tx, todo, lane, project),
+          assignment: await assignmentFor(tx, todo, lane, project),
         };
       });
     } catch (error) {

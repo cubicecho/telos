@@ -17,7 +17,7 @@ import {
   RECORD_ARTIFACT_DEFINITION,
   splitToolName,
 } from './artifacts.ts';
-import { briefPrompt, readReply, systemPromptFor } from './prompts.ts';
+import { assignmentPrompt, readReply, systemPromptFor } from './prompts.ts';
 import { type ResolvedRunAgent, resolveAgent, unrunnable } from './spec.ts';
 import type { Beat, Claim, RunEvent, RunPrompt, RunResult, RunUsage, Telos } from './telos.ts';
 import { openTools, TELOS_SERVER } from './tools.ts';
@@ -227,7 +227,7 @@ export async function execute(claim: Claim, options: ExecuteOptions): Promise<Ru
     session: { id: claim.todoId },
     host: HOST,
     turn: { index: claim.turn },
-    vars: { todoId: claim.todoId, runId: claim.runId, lane: claim.brief.laneName },
+    vars: { todoId: claim.todoId, runId: claim.runId, lane: claim.assignment.laneName },
   };
   try {
     // What the agent leaves blank comes from its account's defaults. One that
@@ -319,9 +319,9 @@ async function work(
   options: WorkOptions,
 ): Promise<RunResult> {
   const { signal, log, feed, artifacts } = options;
-  const { agent, brief } = claim;
-  const prompt = briefPrompt(brief);
-  const system = systemPromptFor(brief, agent.systemPrompt);
+  const { agent, assignment } = claim;
+  const prompt = assignmentPrompt(assignment);
+  const system = systemPromptFor(assignment, agent.systemPrompt);
   feed.prompt({ system, user: prompt });
   const catalog = config.toolDiscovery === 'eager' ? undefined : pool.catalog();
   const preselected =

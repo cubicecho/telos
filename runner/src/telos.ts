@@ -67,7 +67,7 @@ export interface ClaimedAgent {
   mcpNotices: string[];
 }
 
-export interface Brief {
+export interface Assignment {
   projectName: string;
   projectDescription: string | null;
   projectContext: string | null;
@@ -90,7 +90,7 @@ export interface Claim {
   /** Whether no agent has worked the todo before: its hooks' session opens with this run. */
   opensSession: boolean;
   agent: ClaimedAgent;
-  brief: Brief;
+  assignment: Assignment;
 }
 
 export interface ProposedTodo {
@@ -219,7 +219,7 @@ const CLAIM = `mutation ($todoId: ID!, $laneId: ID!) {
   claimRun(todoId: $todoId, laneId: $laneId) {
     runId todoId token leaseExpiresAt turn opensSession
     agent { ${AGENT_FIELDS} }
-    brief {
+    assignment {
       projectName projectDescription projectContext laneName
       title brief acceptance report why notes
     }

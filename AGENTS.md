@@ -235,7 +235,7 @@ and the todo waits on them where it is. `archiveOnSuccess` is the other answer
 to a pass: `finishRun` completes the todo, puts it in the done lane and
 archives it in one write, as the run. It is that or a success route, never
 both; the lane write guard (`assertArchiveOnSuccessFits`) holds it and says
-what to change. `briefFor` in `resolvers/runs.ts` assembles what a run is
+what to change. `assignmentFor` in `resolvers/runs.ts` assembles what a run is
 handed; the runner adds the agent's instructions and one standing protocol
 (`STANDING_SYSTEM` in `runner/src/prompts.ts`).
 The runner (`@telos/runner`, which never
@@ -501,7 +501,7 @@ may change a note is not something a `where` can say. `editTodoNote` and
 `deleteTodoNote` hold the rule: a report or a verdict is what a run said and
 nobody changes it; a plain note is rewritten only by whoever signed it (a
 person, an API key by `actorKeyId`, a run by `runId`); a person may delete any
-plain note on their own board. An edit stamps `editedAt`. `briefFor` reads the
+plain note on their own board. An edit stamps `editedAt`. `assignmentFor` reads the
 thread when a run is claimed, so an edit reaches later runs only, and the app
 says so beside the editor.
 

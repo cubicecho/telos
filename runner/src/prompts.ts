@@ -1,5 +1,5 @@
 import { parseJson } from '@cubicecho/agent-core';
-import type { Brief, ProposedTodo } from './telos.ts';
+import type { Assignment, ProposedTodo } from './telos.ts';
 
 // What an agent is told. The agent's own instructions say what to do with a
 // todo; the standing protocol after them says how a reply is read, which is
@@ -37,15 +37,15 @@ The todo then waits until they are done. Order them so none depends on a later o
  * The system prompt for a run: where it is, who the agent is and what it does
  * (its own instructions), then the standing protocol every agent shares.
  *
- * @param brief - What telos said about the run.
+ * @param assignment - What telos said about the run.
  * @param instructions - The agent's own instructions, if it has any.
  * @returns The system prompt.
  */
-export function systemPromptFor(brief: Brief, instructions: string | null): string {
+export function systemPromptFor(assignment: Assignment, instructions: string | null): string {
   const where = [
-    `Project: ${brief.projectName}`,
-    brief.projectDescription ? `\n${brief.projectDescription}` : '',
-    brief.projectContext ? `\n\n${brief.projectContext}` : '',
+    `Project: ${assignment.projectName}`,
+    assignment.projectDescription ? `\n${assignment.projectDescription}` : '',
+    assignment.projectContext ? `\n\n${assignment.projectContext}` : '',
   ]
     .join('')
     .trim();
@@ -60,17 +60,17 @@ export function systemPromptFor(brief: Brief, instructions: string | null): stri
  * `why` is why it came back to this lane — a reviewer's FAIL, or what a person
  * said moving it — and a person's notes come last, as the latest word.
  *
- * @param brief What telos said about the run.
+ * @param assignment What telos said about the run.
  * @returns The user message.
  */
-export function briefPrompt(brief: Brief): string {
-  const standing = brief.notes.filter((note) => note !== brief.why);
+export function assignmentPrompt(assignment: Assignment): string {
+  const standing = assignment.notes.filter((note) => note !== assignment.why);
   return [
-    `Todo: ${brief.title}`,
-    brief.brief ? `\n\n${brief.brief}` : '',
-    brief.acceptance ? `\n\nDone when:\n${brief.acceptance}` : '',
-    brief.report ? `\n\nWhat the last agent reported:\n${brief.report}` : '',
-    brief.why ? `\n\nWhy this came back:\n${brief.why}` : '',
+    `Todo: ${assignment.title}`,
+    assignment.brief ? `\n\n${assignment.brief}` : '',
+    assignment.acceptance ? `\n\nDone when:\n${assignment.acceptance}` : '',
+    assignment.report ? `\n\nWhat the last agent reported:\n${assignment.report}` : '',
+    assignment.why ? `\n\nWhy this came back:\n${assignment.why}` : '',
     standing.length
       ? `\n\nNotes on this todo, to take into account:\n${standing.map((note) => `- ${note}`).join('\n')}`
       : '',

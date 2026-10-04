@@ -133,7 +133,7 @@ describe('claimRun', () => {
     );
     const claimed = await claim(todoId);
     expect(claimed.agent).toMatchObject({ name: 'Worker', apiKey: 'sk-secret', model: 'tiny', mcpServers: '[]' });
-    expect(claimed.brief).toMatchObject({
+    expect(claimed.assignment).toMatchObject({
       projectName: 'P',
       projectContext: 'A test board.',
       laneName: 'To do',

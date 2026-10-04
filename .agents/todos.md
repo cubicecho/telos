@@ -145,6 +145,8 @@ Implements the glossary.
 
 ### R3 [readability] — Runner `Brief` → `Assignment`
 
+**Status:** done (`Assignment`, `RunAssignment`, `RunClaim.assignment`, `assignmentFor`, `assignmentPrompt`).
+
 **Files:** `runner/src/telos.ts`, `prompts.ts`, `execute.ts`; server's claim type in
 `runs.ts:91`. "Brief" stays for the todo's brief only. GraphQL type rename is part of A2's
 breaking change, so it costs no extra release.

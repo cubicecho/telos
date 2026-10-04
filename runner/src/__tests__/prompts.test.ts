@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { briefPrompt, readReply, STANDING_SYSTEM, systemPromptFor } from '../prompts.ts';
-import type { Brief } from '../telos.ts';
+import { assignmentPrompt, readReply, STANDING_SYSTEM, systemPromptFor } from '../prompts.ts';
+import type { Assignment } from '../telos.ts';
 
-const BRIEF: Brief = {
+const ASSIGNMENT: Assignment = {
   projectName: 'Telos',
   projectDescription: 'A board.',
   projectContext: 'TypeScript, npm.',
@@ -17,7 +17,7 @@ const BRIEF: Brief = {
 
 describe('systemPromptFor', () => {
   it('says where the agent is first, then who it is', () => {
-    const system = systemPromptFor(BRIEF, 'You are careful.');
+    const system = systemPromptFor(ASSIGNMENT, 'You are careful.');
     const where = system.indexOf('Project: Telos');
     const who = system.indexOf('You are careful.');
 
@@ -29,16 +29,16 @@ describe('systemPromptFor', () => {
   });
 
   it('leaves out what the agent has not got', () => {
-    const system = systemPromptFor({ ...BRIEF, projectDescription: null, projectContext: null }, null);
+    const system = systemPromptFor({ ...ASSIGNMENT, projectDescription: null, projectContext: null }, null);
 
     expect(system.startsWith('Project: Telos\n\n')).toBe(true);
     expect(system).not.toContain('null');
   });
 });
 
-describe('briefPrompt', () => {
+describe('assignmentPrompt', () => {
   it('gives the todo, its criteria, the last report, why it came back, then the other notes', () => {
-    const prompt = briefPrompt(BRIEF);
+    const prompt = assignmentPrompt(ASSIGNMENT);
     const order = [
       'Todo: Add a search box',
       'On the todos page.',

@@ -97,7 +97,7 @@ export const CLAIM = `mutation ($todoId: ID!, $laneId: ID!) {
   claimRun(todoId: $todoId, laneId: $laneId) {
     runId todoId token leaseExpiresAt
     agent { id name baseUrl model apiKey maxToolIterations mcpServers }
-    brief { projectName projectContext laneName title brief acceptance report why notes }
+    assignment { projectName projectContext laneName title brief acceptance report why notes }
   }
 }`;
 export const HEARTBEAT = `mutation ($id: ID!, $events: [RunEventInput!], $prompt: RunPromptInput, $usage: RunUsageInput) {
