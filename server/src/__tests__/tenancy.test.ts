@@ -34,7 +34,6 @@ describe('tenancy configuration', () => {
       'draftMessages',
       'drafts',
       'labels',
-      'lanePresets',
       'lanes',
       'mcpServers',
       'projectLabels',

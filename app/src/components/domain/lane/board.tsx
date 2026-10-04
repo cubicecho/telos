@@ -1,8 +1,8 @@
 import { useMutation, useQuery } from '@apollo/client';
 import { useMemo, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
+import { LaneAgentDialog } from '@/components/domain/ai/lane-agent-dialog';
 import type { LiveRun, StuckTodo, WaitingTodo } from '@/components/domain/ai/project-activity';
-import { StationDialog } from '@/components/domain/ai/station-dialog';
 import { WatchRunDialog } from '@/components/domain/ai/watch-run-dialog';
 import { TodoFormDialog } from '@/components/domain/todo/todo-form-dialog';
 import type { TodoSummary } from '@/components/domain/todo/types';
@@ -217,15 +217,14 @@ export function Board({
       ) : null}
 
       {stationLane && stationsOn ? (
-        <StationDialog
+        <LaneAgentDialog
           key={stationLane.id}
           open
           onOpenChange={(next) => !next && setStationLane(null)}
           lane={stationLane}
           lanes={lanes}
-          station={stations.get(stationLane.id) ?? null}
+          settings={stations.get(stationLane.id) ?? null}
           agents={agents}
-          presets={stationsQuery.data?.lanePresets ?? []}
         />
       ) : null}
     </View>

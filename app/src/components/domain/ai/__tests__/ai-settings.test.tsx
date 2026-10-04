@@ -7,7 +7,6 @@ import {
   AgentsDocument,
   AiStateDocument,
   ApiKeysDocument,
-  LanePresetsDocument,
   McpServersDocument,
   SetAiEnabledDocument,
   SetInstanceAiEnabledDocument,
@@ -39,7 +38,6 @@ const KEY = {
 
 const keys = { request: { query: ApiKeysDocument }, result: { data: { apiKeys: [KEY] } } };
 const agents = { request: { query: AgentsDocument }, result: { data: { agents: [] } } };
-const presets = { request: { query: LanePresetsDocument }, result: { data: { lanePresets: [] } } };
 const servers = { request: { query: McpServersDocument }, result: { data: { mcpServers: [] } } };
 
 // biome-ignore lint/suspicious/noExplicitAny: MockedProvider's mock array type
@@ -169,9 +167,8 @@ describe('AgentSettings', () => {
     expect(screen.queryByText('No agents yet.')).not.toBeInTheDocument();
   });
 
-  it('lists the agents and the lane presets once AI is on', async () => {
-    settings([aiState(true, true), defaults, defaults, defaults, agents, presets, servers], AgentSettings);
+  it('lists the agents once AI is on', async () => {
+    settings([aiState(true, true), defaults, defaults, defaults, agents, servers], AgentSettings);
     expect(await screen.findByText('No agents yet.')).toBeInTheDocument();
-    expect(await screen.findByText('No presets yet.')).toBeInTheDocument();
   });
 });

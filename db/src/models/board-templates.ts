@@ -1,20 +1,16 @@
 import { index, jsonb, pgTable, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core';
 
-import type { PresetField } from './lane-presets.ts';
-import type { LaneContract } from './lanes.ts';
 import { users } from './users.ts';
 
 /**
- * One lane of a saved board. Where a station sends its todos is kept as the
- * position of the lane it sends them to, since the lanes a template is applied
- * to are new ones with new ids.
+ * One lane of a saved board. Its routes are kept as the position of the lane
+ * they send todos to, since the lanes a template is applied to are new ones
+ * with new ids.
  */
 export interface TemplateLane {
   name: string;
   isDone: boolean;
   agentId?: string | null;
-  contract?: LaneContract;
-  prompt?: string | null;
   /** The index, in this template's lanes, of the lane a success goes to. */
   onSuccess?: number | null;
   /** The index of the lane a failure goes to. */
@@ -23,17 +19,10 @@ export interface TemplateLane {
   archiveOnSuccess?: boolean;
   wipLimit?: number;
   maxAttempts?: number;
-  /**
-   * The lane preset the lane follows. With one, `prompt` is only what the lane
-   * adds after the preset's, so the preset's prompt is not copied here.
-   */
-  presetId?: string | null;
-  /** Which of the preset's fields the lane keeps its own value for. */
-  presetOverrides?: PresetField[];
 }
 
-// A board saved to start new projects from: its lanes, in order, and their
-// station settings. Saved from a project (saveBoardTemplate) and applied to one
+// A board saved to start new projects from: its lanes, in order, with their
+// agents and routes. Saved from a project (saveBoardTemplate) and applied to one
 // that has no todos yet (applyBoardTemplate), which is where the lanes are
 // checked, since a person may also edit a template's lanes directly.
 export const boardTemplates = pgTable(

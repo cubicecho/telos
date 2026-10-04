@@ -37,15 +37,11 @@ function station(id: string, agentId: string | null) {
     __typename: 'Lane',
     id,
     agentId,
-    contract: 'verdict',
-    prompt: null,
     onSuccessLaneId: null,
     onFailureLaneId: null,
     archiveOnSuccess: false,
     wipLimit: 1,
     maxAttempts: 3,
-    presetId: null,
-    presetOverrides: [],
   };
 }
 
@@ -104,7 +100,6 @@ const STATIONS = {
     data: {
       lanes: [station('l1', null), station('l2', 'a1')],
       agents: [{ __typename: 'Agent', id: 'a1', name: 'Reviewer' }],
-      lanePresets: [],
     },
   },
 };
@@ -176,7 +171,6 @@ describe('Board stations', () => {
             data: {
               lanes: [station('l1', null), station('l2', 'a1')],
               agents: [{ __typename: 'Agent', id: 'a1', name: 'Reviewer' }],
-              lanePresets: [],
             },
           },
         },

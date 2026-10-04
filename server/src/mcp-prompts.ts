@@ -27,9 +27,9 @@ the first call. The tools say what each one does; this says how the board works.
 - **Project**: a board, and a body of work. Its \`context\` is the standing description
   every agent working on it is shown. You only see projects whose owner has switched AI
   on for them.
-- **Lane**: a column, in board order. A lane with an agent is a *station*: the agent
-  works each todo that arrives there, and the lane says where the todo goes when that
-  run succeeds or fails. A lane without an agent is a resting place, for a person to act
+- **Lane**: a column, in board order. A lane may have an agent: the agent works each
+  todo that arrives there, and the lane says where the todo goes when that run succeeds
+  (its success route) or fails (its failure route). A lane without an agent is a resting place, for a person to act
   on. One lane per project may be the done lane: a todo that reaches it is complete.
 - **Todo**: the unit of work. A *request* is simply a todo you submitted: its \`brief\`
   and \`acceptance\` are all the first agent gets, beside the project's context.
@@ -38,15 +38,16 @@ the first call. The tools say what each one does; this says how the board works.
   is handed to the next agent that works the todo.
 - **History**: each move, edit, completion and reopening, with who did it and why.
 
-## What a station does
+## What a run does
 
-A station's contract is one of three things. \`work\` does the todo and reports.
-\`verdict\` judges it against its acceptance and rules PASS or FAIL. \`expand\` splits it
-into child todos, which is the one place work is broken up. After a run the todo
-moves along the lane's success or failure arrow, if it has one. A station gives up on a
-todo after a few failed attempts, until a person touches it or someone retries it.
+An agent's instructions say what it does with a todo. Every run ends the same way: a
+reply that starts with FAIL fails, and anything else passes. The todo then follows the
+lane's success or failure route, if it has one. A run may also propose new todos; they
+land where the project's new todos do, and the todo it was working waits on them. A lane
+gives up on a todo after a few failed attempts, until a person touches it or someone
+retries it.
 
-A todo is *blocked* while another it depends on is unfinished: stations skip it until
+A todo is *blocked* while another it depends on is unfinished: agents skip it until
 then. That is queued, not stuck.
 
 ## What you can do, and what you cannot

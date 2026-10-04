@@ -10,7 +10,6 @@ import { AiStateDocument, SetAiEnabledDocument, SetInstanceAiEnabledDocument } f
 import { AgentDefaultsForm } from './agent-defaults-form';
 import { AgentManager } from './agent-manager';
 import { ApiKeyManager } from './api-key-manager';
-import { LanePresetManager } from './lane-preset-manager';
 import { RunRetention } from './run-retention';
 
 /**
@@ -117,9 +116,8 @@ export function AiSettings() {
 }
 
 /**
- * What the board's stations hand work to: the account's defaults every agent
- * inherits, the agents themselves, and the lane presets that pair an agent
- * with a job. Drawn only while AI is on.
+ * What a lane hands its todos to: the account's defaults every agent inherits,
+ * and the agents themselves. Drawn only while AI is on.
  */
 export function AgentSettings() {
   const ai = useAi();
@@ -128,7 +126,6 @@ export function AgentSettings() {
     <>
       <AgentDefaultsForm />
       <AgentManager />
-      <LanePresetManager />
     </>
   );
 }

@@ -171,13 +171,11 @@ async function whyNotRunnable(db: AnyRow, todo: AnyRow): Promise<string | null> 
     lane_name: string;
     is_done: boolean;
     has_agent: boolean;
-    barren_expand: boolean;
     blockers: string | null;
   }>(
     await db.execute(sql`
       SELECT
         p.ai_enabled, p.archived_at IS NOT NULL AS project_archived, l.name AS lane_name, l.is_done, l.agent_id IS NOT NULL AS has_agent,
-        (l.contract = 'expand' AND l.on_success_lane_id IS NULL) AS barren_expand,
         (
           SELECT string_agg(b.title, ', ' ORDER BY b.title) FROM todo_dependencies d
           JOIN todos b ON b.id = d.depends_on_todo_id
@@ -203,9 +201,6 @@ async function whyNotRunnable(db: AnyRow, todo: AnyRow): Promise<string | null> 
   }
   if (row.has_agent === false) {
     return `${row.lane_name} has no agent.`;
-  }
-  if (row.barren_expand) {
-    return `${row.lane_name} splits todos but has nowhere to put the pieces.`;
   }
   if (row.blockers !== null) {
     return `It is waiting on ${row.blockers}.`;

@@ -61,7 +61,7 @@ describe('cardMarks', () => {
   });
 
   it('says a reviewer sent it back, with the reason and the run', async () => {
-    await setLane(board.person, board.lanes[0].id, { contract: 'verdict', onFailureLaneId: board.lanes[1].id });
+    await setLane(board.person, board.lanes[0].id, { onFailureLaneId: board.lanes[1].id });
     const todoId = await board.addTodo('Review it');
     const runId = await runOnce(todoId, { status: 'ok', output: 'FAIL: the second paragraph is missing.' });
 

@@ -23,13 +23,11 @@ type AnyRow = any;
 
 const AI_READS_SDL = parse(`
   "A lane an agent works, on a board open to AI."
-  type AgentStation {
+  type AgentLane {
     laneId: ID!
     laneName: String!
     projectId: ID!
     projectName: String!
-    "work, verdict or expand."
-    contract: String!
   }
 
   "An agent as the AI side may know it. Never its key, its endpoint, its prompt or its MCP servers."
@@ -43,7 +41,7 @@ const AI_READS_SDL = parse(`
     "Whether a key is stored for it. The key itself is never read back."
     hasApiKey: Boolean!
     "The lanes it works, in projects with AI on."
-    stations: [AgentStation!]!
+    lanes: [AgentLane!]!
   }
 
   "What the runs in projects open to AI spent since a moment."
@@ -64,13 +62,12 @@ const AI_READS_SDL = parse(`
   }
 `);
 
-interface StationRow {
+interface AgentLaneRow {
   agentId: string;
   laneId: string;
   laneName: string;
   projectId: string;
   projectName: string;
-  contract: string;
 }
 
 /**
@@ -99,14 +96,13 @@ export function applyAiReadsExtension(schema: GraphQLSchema): GraphQLSchema {
       .leftJoin(dbSchema.agentDefaults, eq(dbSchema.agentDefaults.userId, dbSchema.agents.userId))
       .where(eq(dbSchema.agents.userId, userId))
       .orderBy(asc(dbSchema.agents.name), asc(dbSchema.agents.createdAt));
-    const stations: StationRow[] = await db
+    const lanes: AgentLaneRow[] = await db
       .select({
         agentId: dbSchema.lanes.agentId,
         laneId: dbSchema.lanes.id,
         laneName: dbSchema.lanes.name,
         projectId: dbSchema.projects.id,
         projectName: dbSchema.projects.name,
-        contract: dbSchema.lanes.contract,
       })
       .from(dbSchema.lanes)
       .innerJoin(dbSchema.projects, eq(dbSchema.projects.id, dbSchema.lanes.projectId))
@@ -121,7 +117,7 @@ export function applyAiReadsExtension(schema: GraphQLSchema): GraphQLSchema {
       .orderBy(asc(dbSchema.projects.name), asc(dbSchema.lanes.position));
     return agents.map((agent) => ({
       ...agent,
-      stations: stations.filter((station) => station.agentId === agent.id),
+      lanes: lanes.filter((lane) => lane.agentId === agent.id),
     }));
   };
 

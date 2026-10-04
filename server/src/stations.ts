@@ -104,7 +104,6 @@ export async function readyTodos(
         AND (p.auto_run OR t.run_requested_at IS NOT NULL)
         AND p.archived_at IS NULL
         AND t.completed_at IS NULL AND t.archived_at IS NULL AND NOT l.is_done
-        AND (l.contract <> 'expand' OR l.on_success_lane_id IS NOT NULL)
         ${sql.join(narrow, sql` `)}
         AND NOT EXISTS (
           SELECT 1 FROM todo_dependencies d JOIN todos b ON b.id = d.depends_on_todo_id
@@ -264,7 +263,6 @@ export async function stationStates(
     ai_ignored: boolean;
     auto_run: boolean;
     run_requested: boolean;
-    barren_expand: boolean;
     max_attempts: number | null;
     failures: number;
     finished_here: boolean;
@@ -279,7 +277,6 @@ export async function stationStates(
           t.run_requested_at IS NOT NULL AS run_requested,
           l.name AS lane_name, l.position AS lane_position, l.agent_id IS NOT NULL AS has_agent,
           a.name AS agent_name, coalesce(a.enabled, true) AS agent_enabled,
-          (l.contract = 'expand' AND l.on_success_lane_id IS NULL) AS barren_expand,
           l.max_attempts,
           coalesce(
             (SELECT max(e.at) FROM todo_events e WHERE e.todo_id = t.id AND e.to_lane_id = l.id),
@@ -296,7 +293,7 @@ export async function stationStates(
       SELECT
         b.id AS todo_id, b.title, b.project_id, b.lane_id, b.lane_name,
         coalesce(b.has_agent, false) AS has_agent, b.agent_name, b.agent_enabled, b.ai_ignored, b.auto_run, b.run_requested,
-        coalesce(b.barren_expand, false) AS barren_expand, b.max_attempts,
+        b.max_attempts,
         ${failuresSinceTouched(sql`b.id`)} AS failures,
         EXISTS (
           SELECT 1 FROM runs r
@@ -366,7 +363,6 @@ function judge(row: {
   ai_ignored: boolean;
   auto_run: boolean;
   run_requested: boolean;
-  barren_expand: boolean;
   max_attempts: number | null;
   failures: number;
   finished_here: boolean;
@@ -379,7 +375,6 @@ function judge(row: {
   if (row.ai_ignored) return ['parked', 'AI is told to ignore it.'];
   if (!row.has_agent) return ['parked', `${row.lane_name} has no agent.`];
   if (!row.agent_enabled) return ['parked', `${row.agent_name}, who works ${row.lane_name}, is switched off.`];
-  if (row.barren_expand) return ['parked', `${row.lane_name} splits todos but has nowhere to put the pieces.`];
   if (Number(row.failures) > (row.max_attempts ?? 0)) {
     return ['attention', row.last_failure?.trim() || `It failed ${row.failures} times.`];
   }

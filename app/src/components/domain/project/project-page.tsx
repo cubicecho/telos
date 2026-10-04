@@ -34,8 +34,10 @@ export interface ProjectOverviewData {
   openTodoCount: number;
   /** The project's AI switch. Meaningless, and not shown, unless AI is on for the account. */
   aiEnabled: boolean;
-  /** Whether its stations start on todos by themselves. Means nothing, and is not shown, while its AI is off. */
+  /** Whether its lanes' agents start on todos by themselves. Means nothing, and is not shown, while its AI is off. */
   autoRun: boolean;
+  /** The lane new todos land in, or null for the first open lane. */
+  newTodoLaneId: string | null;
   labels: readonly LabelSummary[];
 }
 

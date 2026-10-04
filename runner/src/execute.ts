@@ -3,7 +3,6 @@ import {
   type HookNote,
   type HookRunner,
   notify,
-  parseJson,
   preselect,
   type RunEventInput,
   runAgentLoop,
@@ -18,7 +17,7 @@ import {
   RECORD_ARTIFACT_DEFINITION,
   splitToolName,
 } from './artifacts.ts';
-import { briefPrompt, proposedTodos, systemPromptFor } from './prompts.ts';
+import { briefPrompt, readReply, systemPromptFor } from './prompts.ts';
 import { type ResolvedRunAgent, resolveAgent, unrunnable } from './spec.ts';
 import type { Beat, Claim, RunEvent, RunPrompt, RunResult, RunUsage, Telos } from './telos.ts';
 import { openTools, TELOS_SERVER } from './tools.ts';
@@ -228,7 +227,7 @@ export async function execute(claim: Claim, options: ExecuteOptions): Promise<Ru
     session: { id: claim.todoId },
     host: HOST,
     turn: { index: claim.turn },
-    vars: { todoId: claim.todoId, runId: claim.runId, lane: claim.brief.laneName, contract: claim.brief.contract },
+    vars: { todoId: claim.todoId, runId: claim.runId, lane: claim.brief.laneName },
   };
   try {
     // What the agent leaves blank comes from its account's defaults. One that
@@ -376,15 +375,12 @@ async function work(
     },
   });
 
-  const output = loop.turn.content.trim();
+  const { report, todos } = readReply(loop.turn.content.trim());
   const spent = {
     toolCalls: loop.toolCalls.length,
     promptTokens: loop.usage.prompt,
     completionTokens: loop.usage.completion,
     totalTokens: loop.usage.total,
   };
-  if (brief.contract === 'expand') {
-    return { status: 'ok', output, todos: proposedTodos(parseJson<unknown>(output)), ...spent };
-  }
-  return { status: 'ok', output, ...spent };
+  return { status: 'ok', output: report, todos, ...spent };
 }

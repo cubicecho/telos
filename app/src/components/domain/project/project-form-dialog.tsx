@@ -1,6 +1,7 @@
 import { useMutation, useQuery } from '@apollo/client';
 import { useRouter } from 'expo-router';
 import { useEffect } from 'react';
+import { Text, View } from 'react-native';
 import { useAppForm } from '@/components/app-form';
 import { Form } from '@/components/ui/form';
 import { FormDialog, FormDialogFooter } from '@/components/ui/form-dialog';
@@ -10,6 +11,7 @@ import {
   BoardTemplatesDocument,
   CreateProjectDocument,
   ProjectDocument,
+  ProjectLanesDocument,
   ProjectsDocument,
   UpdateProjectDocument,
 } from '@/lib/graphql';
@@ -18,10 +20,38 @@ import { newId } from '@/lib/ids';
 /** The "Start from" choice for the lanes every new project is given. */
 const DEFAULT_LANES = 'default';
 
+/** "The first open lane" as the place new todos land: a select refuses an empty value. */
+const FIRST_OPEN_LANE = 'first';
+
 export interface ProjectDraft {
   id: string;
   name: string;
   description: string | null;
+  /** The lane new todos land in, or null for the first open lane. */
+  newTodoLaneId: string | null;
+}
+
+interface ProjectFormValues {
+  name: string;
+  description: string;
+  template: string;
+  /** A lane's id, or `FIRST_OPEN_LANE`. */
+  newTodoLane: string;
+}
+
+/**
+ * What the form starts with: the project's own values, or blanks for a new one.
+ *
+ * @param project - The project being edited, or undefined for a new one.
+ * @returns The form's values.
+ */
+function toValues(project: ProjectDraft | undefined): ProjectFormValues {
+  return {
+    name: project?.name ?? '',
+    description: project?.description ?? '',
+    template: DEFAULT_LANES,
+    newTodoLane: project?.newTodoLaneId ?? FIRST_OPEN_LANE,
+  };
 }
 
 export function ProjectFormDialog({
@@ -44,8 +74,15 @@ export function ProjectFormDialog({
   const templates = templatesQuery.data?.boardTemplates ?? [];
   const [applyTemplate] = useMutation(ApplyBoardTemplateDocument);
 
+  // Only a project that exists has lanes for its new todos to land in.
+  const lanesQuery = useQuery(ProjectLanesDocument, {
+    variables: { projectId: project?.id ?? '' },
+    skip: !open || project === undefined,
+  });
+  const openLanes = (lanesQuery.data?.lanes ?? []).filter((lane) => lane.isDone === false);
+
   const form = useAppForm({
-    defaultValues: { name: '', description: '', template: DEFAULT_LANES },
+    defaultValues: toValues(undefined),
     onSubmit: ({ value }) => save(value),
   });
 
@@ -54,15 +91,16 @@ export function ProjectFormDialog({
   // what was last typed and abandoned.
   useEffect(() => {
     if (!open) return;
-    form.reset({ name: project?.name ?? '', description: project?.description ?? '', template: DEFAULT_LANES });
+    form.reset(toValues(project));
   }, [open, project, form]);
 
-  async function save({ name, description, template }: { name: string; description: string; template: string }) {
+  async function save({ name, description, template, newTodoLane }: ProjectFormValues) {
     const values = { name: name.trim(), description: description.trim() === '' ? null : description.trim() };
     if (creating || updating) return;
     try {
       if (project) {
-        await updateProject({ variables: { id: project.id, set: values } });
+        const newTodoLaneId = newTodoLane === FIRST_OPEN_LANE ? null : newTodoLane;
+        await updateProject({ variables: { id: project.id, set: { ...values, newTodoLaneId } } });
       } else {
         const id = newId();
         await createProject({
@@ -142,6 +180,24 @@ export function ProjectFormDialog({
                 />
               )}
             </form.AppField>
+          ) : null}
+          {project !== undefined && openLanes.length > 0 ? (
+            <View className="gap-1">
+              <form.AppField name="newTodoLane">
+                {(field) => (
+                  <field.SelectField
+                    label="New todos land in"
+                    options={[
+                      { label: 'The first open lane', value: FIRST_OPEN_LANE },
+                      ...openLanes.map((lane) => ({ label: lane.name, value: lane.id })),
+                    ]}
+                  />
+                )}
+              </form.AppField>
+              <Text className="text-muted-foreground text-xs">
+                A request, a finished draft, and the todos an agent splits one into.
+              </Text>
+            </View>
           ) : null}
           <FormDialogFooter onCancel={() => onOpenChange(false)} error={error ? describeError(error) : null}>
             <form.SubmitButton isEdit={project !== undefined} editLabel="Save" />

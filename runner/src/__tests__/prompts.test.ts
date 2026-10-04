@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { briefPrompt, systemPromptFor } from '../prompts.ts';
+import { briefPrompt, readReply, STANDING_SYSTEM, systemPromptFor } from '../prompts.ts';
 import type { Brief } from '../telos.ts';
 
 const BRIEF: Brief = {
@@ -7,8 +7,6 @@ const BRIEF: Brief = {
   projectDescription: 'A board.',
   projectContext: 'TypeScript, npm.',
   laneName: 'Doing',
-  contract: 'work',
-  lanePrompt: null,
   title: 'Add a search box',
   brief: 'On the todos page.',
   acceptance: 'Typing filters the list.',
@@ -27,6 +25,7 @@ describe('systemPromptFor', () => {
     expect(system).toContain('A board.');
     expect(system).toContain('TypeScript, npm.');
     expect(who).toBeGreaterThan(where);
+    expect(system.endsWith(STANDING_SYSTEM)).toBe(true);
   });
 
   it('leaves out what the agent has not got', () => {
@@ -52,5 +51,24 @@ describe('briefPrompt', () => {
     expect(order.every((at) => at >= 0)).toBe(true);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
     expect(prompt.match(/It does not filter\./g)).toHaveLength(1);
+  });
+});
+
+describe('readReply', () => {
+  it('takes a todos block out of the report and reads its todos', () => {
+    const reply = 'PASS\nLooks right.\n\n```todos\n[{"title":"Add tests","dependsOn":[]},{"brief":"no title"}]\n```';
+
+    expect(readReply(reply)).toEqual({
+      report: 'PASS\nLooks right.',
+      todos: [{ title: 'Add tests', brief: null, acceptance: null, dependsOn: [] }],
+    });
+  });
+
+  it('leaves a reply with no todos block as it is', () => {
+    expect(readReply('Done: added the box.')).toEqual({ report: 'Done: added the box.', todos: [] });
+  });
+
+  it('reads no todos from a block that is not JSON', () => {
+    expect(readReply('Done.\n```todos\nnot json\n```').todos).toEqual([]);
   });
 });

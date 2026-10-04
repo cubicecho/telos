@@ -130,6 +130,25 @@ export async function findFirstOpenLaneId(db: AnyDb, projectId: string): Promise
 }
 
 /**
+ * Where a project's new todos land: a submitted request, a finished draft, the
+ * todos a run proposes. That is the lane the project names, unless it names
+ * none or the done lane, when it is the first open lane.
+ *
+ * @param db - The database or transaction to read with.
+ * @param projectId - The project the todos are for.
+ * @returns The lane's id, or null when the project has no open lane.
+ */
+export async function findNewTodoLaneId(db: AnyDb, projectId: string): Promise<string | null> {
+  const rows: Array<{ id: string }> = await db
+    .select({ id: dbSchema.lanes.id })
+    .from(dbSchema.projects)
+    .innerJoin(dbSchema.lanes, eq(dbSchema.lanes.id, dbSchema.projects.newTodoLaneId))
+    .where(and(eq(dbSchema.projects.id, projectId), eq(dbSchema.lanes.isDone, false)))
+    .limit(1);
+  return rows[0]?.id ?? (await findFirstOpenLaneId(db, projectId));
+}
+
+/**
  * Throws if any of `userId`'s todos sits in a lane that contradicts its own
  * completion — done in an open lane, or open in the done lane.
  *

@@ -72,8 +72,6 @@ export interface Brief {
   projectDescription: string | null;
   projectContext: string | null;
   laneName: string;
-  contract: 'work' | 'verdict' | 'expand';
-  lanePrompt: string | null;
   title: string;
   brief: string | null;
   acceptance: string | null;
@@ -222,7 +220,7 @@ const CLAIM = `mutation ($todoId: ID!, $laneId: ID!) {
     runId todoId token leaseExpiresAt turn opensSession
     agent { ${AGENT_FIELDS} }
     brief {
-      projectName projectDescription projectContext laneName contract lanePrompt
+      projectName projectDescription projectContext laneName
       title brief acceptance report why notes
     }
   }

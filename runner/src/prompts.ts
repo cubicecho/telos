@@ -1,31 +1,25 @@
+import { parseJson } from '@cubicecho/agent-core';
 import type { Brief, ProposedTodo } from './telos.ts';
 
-// What an agent is told, ported from kanban_server's runner. Three contracts,
-// each with a standing job; a lane's own prompt is added after the job, never
-// in place of it, so a board can say "the criteria are in the brief" without
-// rewriting what a reviewer is for.
+// What an agent is told. The agent's own instructions say what to do with a
+// todo; the standing protocol after them says how a reply is read, which is
+// the same for every agent: a reply opening with PASS or FAIL is a verdict,
+// anything else a report, and new todos come in a fenced `todos` block.
 
-export const WORK_SYSTEM = `You carry out one todo using the tools available to you.
+export const STANDING_SYSTEM = `You work one todo on a Telos board, as your instructions above say.
 
 Do the work rather than describing it. When a tool fails, say so plainly and say what you tried;
-do not report success you did not have. Finish by stating what you changed and how it can be
-checked against the todo's acceptance criteria.`;
+do not report success you did not have.
 
-export const VERDICT_SYSTEM = `You review one todo that another agent has worked.
+Your reply goes on the todo for the next agent and the person to read. When your instructions ask
+you to rule on the todo, begin with PASS or FAIL on its own line, then say why; FAIL sends it back,
+so name what is not met. Otherwise report what you did and how it can be checked against the
+todo's acceptance criteria.
 
-Check it against the todo's acceptance criteria and nothing else — not style, not what you would
-have done differently. Begin your reply with PASS or FAIL on its own line, then say why in a
-sentence or two. FAIL means a criterion is not met; say which one.`;
+When the todo is better done as several smaller ones, propose them in a fenced block marked
+todos, holding a JSON array, after anything else you say:
 
-export const EXPAND_SYSTEM = `You break one todo into the todos that would carry it out.
-
-A todo is one sitting of work with a result someone could check. Split where the work genuinely
-changes shape — a migration, then the endpoint that reads it, then the page that calls it — and
-not merely to make the list longer. Between three and ten todos is usual; one is a fine answer
-for a small piece of work.
-
-Answer with a JSON array and nothing else:
-
+\`\`\`todos
 [
   {
     "title": "imperative, under about ten words",
@@ -34,26 +28,20 @@ Answer with a JSON array and nothing else:
     "dependsOn": ["exact titles of todos in this list that must finish first"]
   }
 ]
+\`\`\`
 
-Order the array so a todo never depends on one after it. Use "dependsOn" only for a real
-ordering constraint; parallel todos should have none.`;
-
-const JOBS: Record<Brief['contract'], string> = {
-  work: WORK_SYSTEM,
-  verdict: VERDICT_SYSTEM,
-  expand: EXPAND_SYSTEM,
-};
+The todo then waits until they are done. Order them so none depends on a later one, and use
+"dependsOn" only for a real ordering constraint.`;
 
 /**
- * The system prompt for a run: where it is, who the agent is, then the job and
- * the lane's addendum. The lane speaks last: the agent says who it is, and the
- * lane says what to do.
+ * The system prompt for a run: where it is, who the agent is and what it does
+ * (its own instructions), then the standing protocol every agent shares.
  *
- * @param brief What telos said about the run.
- * @param identity The agent's own standing instruction, if it has one.
+ * @param brief - What telos said about the run.
+ * @param instructions - The agent's own instructions, if it has any.
  * @returns The system prompt.
  */
-export function systemPromptFor(brief: Brief, identity: string | null): string {
+export function systemPromptFor(brief: Brief, instructions: string | null): string {
   const where = [
     `Project: ${brief.projectName}`,
     brief.projectDescription ? `\n${brief.projectDescription}` : '',
@@ -61,7 +49,7 @@ export function systemPromptFor(brief: Brief, identity: string | null): string {
   ]
     .join('')
     .trim();
-  return [where, identity, JOBS[brief.contract], brief.lanePrompt]
+  return [where, instructions, STANDING_SYSTEM]
     .map((layer) => (layer ?? '').trim())
     .filter(Boolean)
     .join('\n\n');
@@ -91,11 +79,32 @@ export function briefPrompt(brief: Brief): string {
     .trim();
 }
 
+/** A fenced block marked `todos`, anywhere in a reply. */
+const TODOS_BLOCK = /```todos[^\S\n]*\n([\s\S]*?)```/;
+
 /**
- * The todos an expansion's answer proposes, read forgivingly: a model that says
- * "here you go:" before the JSON has still answered.
+ * Splits a reply into what the agent said and the todos it proposed. The
+ * `todos` block is taken out of what it said, since the todos are written as
+ * todos and the JSON is nothing anyone would read back.
  *
- * @param parsed What `parseJson` made of the answer.
+ * @param reply - The agent's whole reply.
+ * @returns The report without the block, and the todos it held; none when there was no block.
+ */
+export function readReply(reply: string): { report: string; todos: ProposedTodo[] } {
+  const block = TODOS_BLOCK.exec(reply);
+  if (block === null) {
+    return { report: reply, todos: [] };
+  }
+  return {
+    report: reply.replace(block[0], '').trim(),
+    todos: proposedTodos(parseJson<unknown>(block[1])),
+  };
+}
+
+/**
+ * The todos a `todos` block proposes, read forgivingly.
+ *
+ * @param parsed - What `parseJson` made of the block.
  * @returns The proposals with a title; none when there were none to read.
  */
 export function proposedTodos(parsed: unknown): ProposedTodo[] {

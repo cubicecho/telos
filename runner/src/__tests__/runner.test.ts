@@ -321,7 +321,7 @@ describe('the runner', () => {
     expect(await cycle()).toBe(1);
 
     expect(seen[0]).toContain('Project: P');
-    expect(seen[0]).toContain('Do the work.');
+    expect(seen[0]).toContain('Do the work rather than describing it.');
     expect(seen[1]).toContain('Todo: Write it');
     const todo = await todoRow(todoId);
     expect(todo.laneId).toBe(board.lanes[2].id);
@@ -476,14 +476,13 @@ describe('the runner', () => {
     expect(hooksOf(second)).not.toContain('sessionStart');
   });
 
-  it('turns an expansion’s JSON into child todos', async () => {
-    await setLane(board.person, board.lanes[0].id, { contract: 'expand', onSuccessLaneId: board.lanes[1].id });
+  it('turns a todos block into child todos, and keeps it out of the report', async () => {
     const parentId = await board.addTodo('Build the thing');
     llm.script = () => ({
-      content: `Here you go:\n${JSON.stringify([
+      content: `Here you go:\n\n\`\`\`todos\n${JSON.stringify([
         { title: 'Design it', body: 'Sketch first.', acceptance: 'A sketch.' },
         { title: 'Make it', dependsOn: ['Design it'] },
-      ])}`,
+      ])}\n\`\`\``,
     });
 
     await cycle();
@@ -493,6 +492,8 @@ describe('the runner', () => {
       ['Design it', 'Sketch first.'],
       ['Make it', null],
     ]);
+    const [run] = await runsOf(parentId);
+    expect(run.output).toBe('Here you go:');
   });
 
   it('reports a model that fails as a failed run, and leaves the todo', async () => {

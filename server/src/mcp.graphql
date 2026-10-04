@@ -32,10 +32,10 @@ query projects {
   }
 }
 
-# One project's lanes in board order, with what makes a lane a station: its
-# agent, what the agent is asked to do there (`contract`, `prompt`), where a
-# todo goes after a run (`onSuccessLaneId`, `onFailureLaneId`), how many it
-# works at once and how often it tries.
+# One project's lanes in board order, with the agent that works each (if any),
+# where a todo goes after a run (the success and failure routes,
+# `onSuccessLaneId` and `onFailureLaneId`), how many it works at once and how
+# often it tries.
 query lanes(
   # From `projects`.
   $projectId: UUID!
@@ -46,8 +46,6 @@ query lanes(
     position
     isDone
     agentId
-    contract
-    prompt
     onSuccessLaneId
     onFailureLaneId
     archiveOnSuccess
@@ -270,7 +268,6 @@ query runs(
     id
     laneId
     agentId
-    contract
     model
     status
     verdict
@@ -335,12 +332,11 @@ query agents {
     name
     model
     hasApiKey
-    stations {
+    lanes {
       laneId
       laneName
       projectId
       projectName
-      contract
     }
   }
 }
@@ -439,8 +435,8 @@ query draft(
 }
 
 # Makes a project, with a board of the default lanes. It is open to AI from
-# the start. Whether its stations run by themselves, and archiving it, stay
-# its owner's to decide.
+# the start. Whether its agents run by themselves, where its new todos land,
+# and archiving it, stay its owner's to decide.
 mutation createProject(
   # What the board is called.
   $name: String!
@@ -623,8 +619,8 @@ mutation retryTodo(
 }
 
 # Asks for a todo to be worked once where it stands, whether or not its
-# project's stations run by themselves. Refused, with the reason, when no
-# station would take it: its lane has no agent, it is blocked, it is done.
+# project's agents run by themselves. Refused, with the reason, when its lane's
+# agent would not take it: the lane has no agent, it is blocked, it is done.
 mutation runTodo(
   # The todo.
   $id: ID!

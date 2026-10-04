@@ -3,8 +3,8 @@ import { eq } from 'drizzle-orm';
 import { createClient, createUser, type TestClient, type TestDb } from './helpers.ts';
 
 // A board wired for agents, for the runner's tests: a user with AI on, a
-// project with AI and auto-run on, and its first lane made a station whose agent sends
-// finished work to Done. Everything goes through the API a person would use,
+// project with AI and auto-run on, and its first lane given an agent whose
+// success route is Done. Everything goes through the API a person would use,
 // so the setup itself exercises the generated agent and lane writes.
 
 export interface Board {
@@ -12,10 +12,10 @@ export interface Board {
   /** The board's person, signed in, on an instance with AI on. */
   person: TestClient;
   projectId: string;
-  /** To do (the station), In progress, Done. */
+  /** To do (with the agent), In progress, Done. */
   lanes: Array<{ id: string; name: string; isDone: boolean }>;
   agentId: string;
-  /** Adds a todo to the station's lane. */
+  /** Adds a todo to the agent's lane. */
   addTodo: (title: string) => Promise<string>;
 }
 
@@ -25,7 +25,7 @@ export function runnerClient(db: TestDb): TestClient {
 }
 
 /**
- * Builds a board with one station.
+ * Builds a board with one lane that has an agent.
  *
  * @param db The test database.
  * @param email The board owner's address.
@@ -58,7 +58,7 @@ export async function createBoard(db: TestDb, email: string): Promise<Board> {
   await person.expectOk(`mutation ($id: ID!) { setAgentApiKey(agentId: $id, apiKey: "sk-secret") { id } }`, {
     id: agentId,
   });
-  await setLane(person, lanes[0].id, { agentId, onSuccessLaneId: lanes[2].id, prompt: 'Do the work.' });
+  await setLane(person, lanes[0].id, { agentId, onSuccessLaneId: lanes[2].id });
 
   const addTodo = async (title: string) =>
     (
@@ -72,7 +72,7 @@ export async function createBoard(db: TestDb, email: string): Promise<Board> {
 }
 
 /**
- * Changes a lane's station settings as its person.
+ * Changes a lane's agent and routes as its person.
  *
  * @param person The lane's owner.
  * @param id The lane.
@@ -97,7 +97,7 @@ export const CLAIM = `mutation ($todoId: ID!, $laneId: ID!) {
   claimRun(todoId: $todoId, laneId: $laneId) {
     runId todoId token leaseExpiresAt
     agent { id name baseUrl model apiKey maxToolIterations mcpServers }
-    brief { projectName projectContext laneName contract lanePrompt title brief acceptance report why notes }
+    brief { projectName projectContext laneName title brief acceptance report why notes }
   }
 }`;
 export const HEARTBEAT = `mutation ($id: ID!, $events: [RunEventInput!], $prompt: RunPromptInput, $usage: RunUsageInput) {

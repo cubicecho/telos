@@ -42,7 +42,6 @@ export const USER_OWNED_TABLES = [
   'runs',
   'artifacts',
   'boardTemplates',
-  'lanePresets',
   'drafts',
   'draftMessages',
 ] as const;
@@ -112,9 +111,6 @@ const AI_SCOPES: Partial<Record<OwnedTable, SqlScope>> = {
   // A draft is open to AI where its project is, as the draft mutations are.
   drafts: aiNarrowed((context, table, userId) => inArray(table.projectId, aiProjectIds(context, userId))),
   draftMessages: aiNarrowed((context, table, userId) => inArray(table.draftId, aiDraftIds(context, userId))),
-  // Presets are how a person sets their stations up, as agents are. What one
-  // says reaches a run through its brief, which the server writes.
-  lanePresets: aiNarrowed(() => sql`false`),
   // By todo, so a draft's runs, which have none, stay a person's to read.
   runs: aiNarrowed((context, table, userId) => inArray(table.todoId, aiTodoIds(context, userId))),
   // By todo as well, so one whose todo was deleted is a person's to see.

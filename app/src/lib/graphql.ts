@@ -101,6 +101,7 @@ export const ProjectDocument = graphql(`
       openTodoCount
       aiEnabled
       autoRun
+      newTodoLaneId
       ...ProjectLabelFields
     }
   }
@@ -539,27 +540,9 @@ export const StationFieldsFragment = graphql(`
   fragment StationFields on Lane {
     id
     agentId
-    contract
-    prompt
     onSuccessLaneId
     onFailureLaneId
     archiveOnSuccess
-    wipLimit
-    maxAttempts
-    presetId
-    presetOverrides
-  }
-`);
-
-// A preset: a station's contract, prompt and limits, kept on the account. A
-// lane that follows one (`presetId`) holds its values, bar the fields named in
-// the lane's `presetOverrides`, and adds its own prompt after the preset's.
-export const LanePresetFieldsFragment = graphql(`
-  fragment LanePresetFields on LanePreset {
-    id
-    name
-    contract
-    prompt
     wipLimit
     maxAttempts
   }
@@ -573,59 +556,6 @@ export const ProjectStationsDocument = graphql(`
     agents(orderBy: { name: { direction: asc, priority: 1 } }) {
       id
       name
-    }
-    lanePresets(orderBy: { name: { direction: asc, priority: 1 } }) {
-      ...LanePresetFields
-    }
-  }
-`);
-
-// The presets with the lanes that follow each, for the settings page.
-export const LanePresetsDocument = graphql(`
-  query LanePresets {
-    lanePresets(orderBy: { name: { direction: asc, priority: 1 } }) {
-      ...LanePresetFields
-      lanes {
-        id
-        name
-        presetOverrides
-        project {
-          id
-          name
-        }
-      }
-    }
-  }
-`);
-
-export const CreateLanePresetDocument = graphql(`
-  mutation CreateLanePreset($values: CreateLanePresetInput!) {
-    createLanePreset(values: $values) {
-      ...LanePresetFields
-    }
-  }
-`);
-
-export const UpdateLanePresetDocument = graphql(`
-  mutation UpdateLanePreset($id: UUID!, $set: UpdateLanePresetInput!) {
-    updateLanePreset(set: $set, where: { id: { eq: $id } }) {
-      ...LanePresetFields
-    }
-  }
-`);
-
-export const DeleteLanePresetDocument = graphql(`
-  mutation DeleteLanePreset($id: UUID!) {
-    deleteLanePreset(where: { id: { eq: $id } }) {
-      id
-    }
-  }
-`);
-
-export const SaveLaneAsPresetDocument = graphql(`
-  mutation SaveLaneAsPreset($laneId: ID!, $name: String!, $id: ID) {
-    saveLaneAsPreset(laneId: $laneId, name: $name, id: $id) {
-      ...LanePresetFields
     }
   }
 `);
@@ -652,7 +582,6 @@ export const RunSummaryFieldsFragment = graphql(`
     kind
     status
     verdict
-    contract
     error
     toolCalls
     promptTokens

@@ -503,7 +503,7 @@ describe('the board’s agents and runs', () => {
     return { ...b, keyId, key };
   }
 
-  it('lists the agents and their stations, and nothing secret about them', async () => {
+  it('lists the agents and their lanes, and nothing secret about them', async () => {
     const b = await station();
     const client = await connect(await serve(), b.key);
     const result = await call(client, 'agents');
@@ -513,7 +513,7 @@ describe('the board’s agents and runs', () => {
         name: 'Worker',
         model: 'tiny',
         hasApiKey: true,
-        stations: [expect.objectContaining({ laneId: b.lanes[0].id })],
+        lanes: [expect.objectContaining({ laneId: b.lanes[0].id })],
       }),
     ]);
     const text = JSON.stringify(result);

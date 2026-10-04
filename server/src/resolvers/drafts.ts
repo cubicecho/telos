@@ -5,7 +5,7 @@ import { requireAi, requireSystem } from '../ai-gate.ts';
 import type { Context } from '../context.ts';
 import { DRAFT_LEASE_SECONDS, draftBeingAnswered, expireLapsedDraftRuns, stopDraftReply } from '../draft-runs.ts';
 import { instanceAiOn } from '../instance.ts';
-import { findFirstOpenLaneId } from '../lanes.ts';
+import { findNewTodoLaneId } from '../lanes.ts';
 import { runnerAgent } from '../mcp-servers.ts';
 import { stampActor } from '../provenance.ts';
 import { markRunnerSeen } from '../runner-seen.ts';
@@ -292,7 +292,7 @@ export function applyDraftsExtension(schema: GraphQLSchema): GraphQLSchema {
       const title = ((args.title ?? draft.title).trim() || brief.split('\n')[0]).slice(0, MAX_TITLE);
 
       await stampActor(tx, context.actor);
-      const laneId = await findFirstOpenLaneId(tx, draft.projectId);
+      const laneId = await findNewTodoLaneId(tx, draft.projectId);
       const [todo] = await tx
         .insert(dbSchema.todos)
         .values({

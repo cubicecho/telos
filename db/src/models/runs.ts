@@ -3,7 +3,7 @@ import { check, index, integer, jsonb, pgTable, text, timestamp, uniqueIndex, uu
 
 import { agents } from './agents.ts';
 import { drafts } from './drafts.ts';
-import { type LaneContract, lanes } from './lanes.ts';
+import { lanes } from './lanes.ts';
 import { projects } from './projects.ts';
 import { todos } from './todos.ts';
 import { users } from './users.ts';
@@ -70,9 +70,6 @@ export const runs = pgTable(
     // `set null` for both: a run is history, and outlives the station it ran at.
     laneId: uuid('lane_id').references(() => lanes.id, { onDelete: 'set null' }),
     agentId: uuid('agent_id').references(() => agents.id, { onDelete: 'set null' }),
-    // The lane's contract when the run was claimed, which is what its output is
-    // read against. Null for a draft's run, which has no lane.
-    contract: text('contract').$type<LaneContract>(),
     // The agent's model when the run was claimed: the agent can change after.
     model: text('model'),
     // What the agent was told, exactly, as the runner built it. Reported once,
@@ -112,12 +109,11 @@ export const runs = pgTable(
     check('ck_runs_kind', sql`${t.kind} in ('todo', 'draft')`),
     check(
       'ck_runs_owner',
-      sql`(${t.kind} = 'todo' and ${t.todoId} is not null and ${t.draftId} is null and ${t.contract} is not null)
-        or (${t.kind} = 'draft' and ${t.draftId} is not null and ${t.todoId} is null and ${t.contract} is null)`,
+      sql`(${t.kind} = 'todo' and ${t.todoId} is not null and ${t.draftId} is null)
+        or (${t.kind} = 'draft' and ${t.draftId} is not null and ${t.todoId} is null)`,
     ),
     check('ck_runs_status', sql`${t.status} in ('running', 'ok', 'error', 'stopped')`),
     check('ck_runs_verdict', sql`${t.verdict} in ('none', 'pass', 'fail')`),
-    check('ck_runs_contract', sql`${t.contract} in ('work', 'verdict', 'expand')`),
   ],
 );
 

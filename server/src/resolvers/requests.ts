@@ -3,7 +3,7 @@ import { and, eq, isNull, sql } from 'drizzle-orm';
 import { extendSchema, GraphQLError, type GraphQLObjectType, type GraphQLSchema, parse } from 'graphql';
 import { requireAi } from '../ai-gate.ts';
 import type { Context } from '../context.ts';
-import { findFirstOpenLaneId } from '../lanes.ts';
+import { findNewTodoLaneId } from '../lanes.ts';
 import { stampActor } from '../provenance.ts';
 
 // How AI hands work to the board. A request is a todo — there is no second
@@ -148,7 +148,7 @@ export function applyRequestsExtension(schema: GraphQLSchema): GraphQLSchema {
     }
     return (context.db as AnyRow).transaction(async (tx: AnyRow) => {
       await stampActor(tx, context.actor);
-      const laneId = await findFirstOpenLaneId(tx, project.id);
+      const laneId = await findNewTodoLaneId(tx, project.id);
       const [todo] = await tx
         .insert(dbSchema.todos)
         .values({
