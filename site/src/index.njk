@@ -13,10 +13,11 @@ layout: base.njk
 <section class="section">
   <h2>What it does</h2>
   <p class="section-intro">
-    Projects hold todos. Todos can depend on other todos, and a todo you are
-    waiting on is one you cannot tick off yet — Telos knows that and says so.
-    You run it yourself: one container plus Postgres, with the app and the API
-    on the same origin. AI is off unless you turn it on.
+    Projects hold todos, laid out as a board of lanes. Todos can depend on
+    other todos, and a todo you are waiting on is one you cannot tick off yet —
+    Telos knows that and says so. Give a lane an agent and it works each todo
+    that arrives there. You run it yourself: one container plus Postgres, with
+    the app and the API on the same origin. AI is off unless you turn it on.
   </p>
 
   <ul class="card-grid">
@@ -29,13 +30,13 @@ layout: base.njk
     <li>
       <article class="card">
         <h3>A board, or a list</h3>
-        <p>The same todos as columns you name yourself, one of which means done: drag a card there and it is ticked off.</p>
+        <p>The same todos as lanes you name yourself, one of which means done: drag a card there and it is ticked off. Labels attach to projects and todos alike.</p>
       </article>
     </li>
     <li>
       <article class="card">
-        <h3>Labels</h3>
-        <p>One colour, one name, attachable to projects and todos alike.</p>
+        <h3>Agents, if you want them</h3>
+        <p>An agent is a model and its instructions. Put one on a lane and each todo there becomes a run that passes or fails and moves on. Your own tools can reach the board over MCP.</p>
       </article>
     </li>
   </ul>
