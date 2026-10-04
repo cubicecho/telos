@@ -1,0 +1,158 @@
+---
+layout: base.njk
+title: Get started
+permalink: /get-started/
+description: Run telos with Docker Compose, sign in, and optionally put an agent on a lane.
+---
+<section class="page-hero">
+  <p class="eyebrow">Get started</p>
+  <h1>From nothing to a board in a few minutes</h1>
+  <p class="lede">
+    Telos runs as one container plus Postgres. Nothing to clone and nothing to
+    build: save a compose file, make two secrets, start it. Steps 5 and 6 are
+    only for the AI side, and you can skip them.
+  </p>
+</section>
+
+<div class="steps">
+  <section class="step">
+    <h2>Save the compose file</h2>
+    <p>Make an empty directory and save this in it as <code>docker-compose.yml</code>:</p>
+    <pre class="code"><code>name: telos
+
+services:
+  telos:
+    image: vantreeseba/telos:latest
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      AUTH_SECRET: ${AUTH_SECRET:?generate one with `openssl rand -hex 32`}
+      DATABASE_URL: postgres://telos:${POSTGRES_PASSWORD:?set a database password}@postgres:5432/telos
+      <span class="cmt"># The address you actually reach Telos at. Magic-link URLs are built from it.</span>
+      APP_URL: ${APP_URL:-http://localhost:3001}
+      NODE_ENV: production
+    ports:
+      - "${PORT:-3001}:3001"
+
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: telos
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set a database password}
+      POSTGRES_DB: telos
+    volumes:
+      - telos_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U telos -d telos"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  telos_pgdata:</code></pre>
+  </section>
+
+  <section class="step">
+    <h2>Make the secrets and start it</h2>
+    <p>It refuses to start without both, so generate them into <code>.env</code> beside the compose file:</p>
+    <pre class="code"><code>printf 'AUTH_SECRET=%s\nPOSTGRES_PASSWORD=%s\n' \
+  "$(openssl rand -hex 32)" "$(openssl rand -hex 24)" &gt; .env
+
+docker compose up -d</code></pre>
+    <p>
+      Migrations run at boot, so there is no setup step. Keep that
+      <code>.env</code>: <code>AUTH_SECRET</code> signs sessions and
+      <code>POSTGRES_PASSWORD</code> is the database's own.
+    </p>
+    <div class="gs-callout">
+      <strong>Upgrading</strong> is <code>docker compose pull &amp;&amp; docker compose up -d</code>.
+      Your data lives in the <code>telos_pgdata</code> volume, which survives
+      <code>docker compose down</code>.
+    </div>
+  </section>
+
+  <section class="step">
+    <h2>Sign in</h2>
+    <p>
+      Open <code>http://localhost:3001</code> and sign in with any email
+      address. Telos ships no mail provider, so the magic link goes to the log:
+    </p>
+    <pre class="code"><code>docker compose logs -f telos</code></pre>
+    <p>The first account to sign up is the admin.</p>
+  </section>
+
+  <section class="step">
+    <h2>Make a project and its lanes</h2>
+    <p>
+      A project's todos show as a list or as a board of lanes you name
+      yourself, one of which means done. Add a todo in a sentence and Enter,
+      then set what it waits on and label it.
+    </p>
+    <ul>
+      <li>A todo that waits on an open one shows as <strong>blocked</strong>, with its blockers named.</li>
+      <li>Dragging a card into the done lane ticks it off, and ticking it moves the card.</li>
+    </ul>
+  </section>
+
+  <section class="step">
+    <h2>Put an agent on a lane <span class="pill">optional</span></h2>
+    <p>AI is off at every level until you turn it on.</p>
+    <h3>Switch it on</h3>
+    <ol>
+      <li><strong>Instance</strong>: as the admin, Settings → AI → "AI on this instance".</li>
+      <li><strong>Account</strong>: Settings → AI. Settings gains the Agents and MCP servers tabs.</li>
+      <li><strong>Project</strong>: its AI switch, and under it <strong>auto-run</strong> if you want agents to start on todos by themselves.</li>
+    </ol>
+    <h3>Make an agent</h3>
+    <p>
+      Settings → Agents → <strong>Start from</strong> one of the four starters:
+      a <strong>Refiner</strong> for drafts, a <strong>Planner</strong> that
+      splits work into todos, a <strong>Worker</strong> that does it and a
+      <strong>Reviewer</strong> that rules PASS or FAIL. Type the endpoint's
+      base URL (any OpenAI-compatible one, a local Ollama included) and pick a
+      model from the list it returns.
+    </p>
+    <h3>Give it a lane</h3>
+    <p>
+      On the board, open the lane's menu → <strong>Agent…</strong>, and set
+      where a passing run and a failing run send the todo. With auto-run off,
+      press <strong>Run now</strong> on a card to work it once.
+    </p>
+    <div class="gs-callout">
+      The app keeps a <strong>setup checklist</strong> on the home page until
+      every step for a first run is taken, and each row links to where it is
+      fixed.
+    </div>
+  </section>
+
+  <section class="step">
+    <h2>Connect your own client <span class="pill">optional</span></h2>
+    <p>
+      With AI on, make an API key in Settings and point any MCP client, Claude
+      Code for one, at <code>/mcp</code> on your instance. Each key has a switch
+      per tool, all on until you turn one off.
+    </p>
+    <pre class="code"><code><span class="cmt"># Claude Code, for example</span>
+claude mcp add --transport http telos http://localhost:3001/mcp \
+  --header "x-api-key: &lt;your API key&gt;"</code></pre>
+  </section>
+
+  <section class="step">
+    <h2>Before you put it on a domain</h2>
+    <p>
+      Registration is open: any address that completes a sign-in gets an
+      account. Put Telos behind a reverse proxy with TLS, and read
+      <a href="{{ '/docs/' | url }}#expose">Before you expose it</a> first.
+    </p>
+  </section>
+</div>
+
+<p class="readme-link">
+  Everything else is in the <a href="{{ '/docs/' | url }}">docs</a> and the
+  <a href="{{ site.repo }}#readme" rel="noopener">README</a>.
+  {% if site.docker %}The image is
+  <a href="{{ site.docker }}" rel="noopener">vantreeseba/telos on Docker Hub</a>.{% endif %}
+</p>
