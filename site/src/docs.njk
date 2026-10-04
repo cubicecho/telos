@@ -1,0 +1,171 @@
+---
+layout: base.njk
+title: Docs
+permalink: /docs/
+description: Configuration, the AI switches, agents, lanes and runs, the MCP door, and what to do before exposing telos.
+---
+<div class="docs-layout">
+  <aside class="toc">
+    <p class="toc-title">On this page</p>
+    <nav>
+      <a href="#configuration">Configuration</a>
+      <a href="#switches">AI switches</a>
+      <a href="#runner">Agents, lanes and runs</a>
+      <a href="#starters">Starters</a>
+      <a href="#mcp-servers">MCP servers and hooks</a>
+      <a href="#mcp">The <code>/mcp</code> door</a>
+      <a href="#changes">Keeping a copy in step</a>
+      <a href="#expose">Before you expose it</a>
+    </nav>
+    <p class="toc-foot"><a href="{{ site.repo }}#readme" rel="noopener">Full README ↗</a></p>
+  </aside>
+
+  <article class="docs-body">
+    <h1>Docs</h1>
+    <p class="lede">
+      How to configure telos, how its AI fits together, and what to check
+      before it is on the internet. New here? Start with
+      <a href="{{ '/get-started/' | url }}">Get started</a>.
+    </p>
+
+    <h2 id="configuration">Configuration</h2>
+    <p>Everything is an environment variable on the <code>telos</code> container.</p>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr><th>Variable</th><th>Default</th><th>Meaning</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>DATABASE_URL</code></td><td>—</td><td><strong>Required.</strong> Postgres connection string. There is no embedded fallback.</td></tr>
+          <tr><td><code>AUTH_SECRET</code></td><td>—</td><td><strong>Required in production.</strong> Signs sessions. <code>openssl rand -hex 32</code>.</td></tr>
+          <tr><td><code>APP_URL</code></td><td><code>http://localhost:3001</code></td><td>Public URL. Magic links, and each todo's and project's link back, are built from it.</td></tr>
+          <tr><td><code>PORT</code></td><td><code>3001</code></td><td>Port the server listens on.</td></tr>
+          <tr><td><code>AUTH_MAGIC_LINK</code></td><td><code>true</code></td><td>Set to <code>false</code> to sign in with an address alone, no link.</td></tr>
+          <tr><td><code>EXPOSE_MAGIC_LINK</code></td><td>dev only</td><td>Return the magic link in the API response so the login page can show it.</td></tr>
+          <tr><td><code>AI_ENABLED</code></td><td>—</td><td>Set to <code>false</code> to remove AI entirely. Otherwise an admin turns it on in Settings.</td></tr>
+          <tr><td><code>RUNNER_CONCURRENCY</code></td><td><code>2</code></td><td>The most runs the runner works at once.</td></tr>
+          <tr><td><code>RUNNER_POLL_SECONDS</code></td><td><code>5</code></td><td>How long the runner waits when nothing is ready.</td></tr>
+          <tr><td><code>RUNNER_ALLOW_STDIO</code></td><td><code>false</code></td><td>Let the runner spawn MCP servers that are commands.</td></tr>
+          <tr><td><code>RUNNER_KEY</code></td><td>made up at boot</td><td>Only for a second runner on another host: set the same value on both.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>
+      Telos ships no mail provider. With magic links on, the link is written to
+      the server log, and that is the delivery channel: pipe the log somewhere
+      you can read it.
+    </p>
+
+    <h2 id="switches">AI switches</h2>
+    <p>Telos is a board for people first, and AI is off unless you turn it on, at every level:</p>
+    <ol>
+      <li><strong>The instance.</strong> Settings → AI, seen only by an admin. Off, <code>/mcp</code> is a 404 and the app shows no AI at all. <code>AI_ENABLED=false</code> removes the switch.</li>
+      <li><strong>The account.</strong> Settings → AI. Off, the account's API keys stop working and the runner leaves its rows alone.</li>
+      <li><strong>The project.</strong> Its AI switch, and under it <strong>auto-run</strong>: whether agents start on todos by themselves. Auto-run is off on a new project; until you turn it on, an agent works a todo only when you press <strong>Run now</strong>.</li>
+      <li><strong>The todo.</strong> "AI ignores this", and the runner leaves it alone.</li>
+    </ol>
+
+    <h2 id="runner">Agents, lanes and runs</h2>
+    <p>The runner is telos's own worker, part of the server, with nothing to set up. Four ideas make it up:</p>
+    <ul>
+      <li>an <strong>agent</strong> is a model and its instructions;</li>
+      <li>a <strong>lane</strong> is a column; give it an agent and each ready todo there becomes a run, which follows the lane's success or failure route;</li>
+      <li>a <strong>run</strong> ends in success or failure, with a report and, if the agent chose, new todos;</li>
+      <li>a <strong>draft</strong> is a request talked over with an agent before it is a todo.</li>
+    </ul>
+    <p>
+      Every reply is read the same way: one that opens with <code>FAIL</code>
+      sends the todo along the failure route, anything else passes. A passing
+      run can split its todo into new ones, which land in the project's lane
+      for new todos, and the todo waits on them. A lane's success route can
+      archive what passes instead of moving it.
+    </p>
+    <p>
+      Each run keeps a log of its tool calls, shown on the todo as it goes, and
+      a list of what it made. A card shows <strong>Sent back</strong> when a
+      reviewer rejected the work, <strong>Run failed</strong> when the run
+      never finished, and how many attempts the lane's agent has used.
+      <strong>Activity</strong> collects what needs you, 30 days of spend, and
+      recent runs across every project.
+    </p>
+
+    <h2 id="starters">Starters</h2>
+    <p>A new agent can start from one of four (Settings → Agents → Start from), each with instructions and a temperature for its job:</p>
+    <ul>
+      <li><strong>Refiner</strong>: talks a draft over and writes its title and brief.</li>
+      <li><strong>Planner</strong>: splits work into todos.</li>
+      <li><strong>Worker</strong>: does it.</li>
+      <li><strong>Reviewer</strong>: rules PASS or FAIL.</li>
+    </ul>
+    <p>
+      Agents talk to any OpenAI-compatible endpoint, a local Ollama included.
+      Type the base URL and its models are listed, with the context length each
+      reports. A reasoning effort is sent as <code>reasoning_effort</code> to a
+      model that deliberates.
+    </p>
+
+    <h2 id="mcp-servers">MCP servers and hooks</h2>
+    <p>
+      MCP servers are kept once, under Settings → MCP servers, and each agent
+      reaches all of them or only the ones you tick. A server's headers and
+      environment are secrets: you see which are set, never their values, and
+      only the runner is sent them.
+    </p>
+    <p>A server can carry hooks, a memory lookup before each turn for example. The todo is the hooks' session:</p>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Hook</th><th>Fires</th></tr></thead>
+        <tbody>
+          <tr><td><code>sessionStart</code></td><td>On the todo's first run.</td></tr>
+          <tr><td><code>beforeTurn</code>, <code>afterTurn</code>, <code>sessionEnd</code></td><td>On every run, each run being one turn of the todo.</td></tr>
+          <tr><td><code>sessionDelete</code></td><td>After the todo is deleted for good, so a memory server can forget it.</td></tr>
+          <tr><td><code>beforeCompact</code></td><td>Never: a run does not compact its transcript.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2 id="mcp">The <code>/mcp</code> door</h2>
+    <p>
+      For your own agents, Claude Code and the like. With an API key from
+      Settings, sent as <code>x-api-key</code>, a client can read the board and
+      what happened on it, and work it: add, edit, move, run and archive todos,
+      set what they wait on, write notes, record artifacts, and apply board
+      templates. Each key has a switch per tool, all on until you turn one off.
+    </p>
+    <p>
+      The AI switches, agents, keys, lanes and their agents, bulk changes and
+      deleting a project stay yours. Nothing checks what a client records, so
+      the board lists it as unverified, signed with the key that said it.
+    </p>
+
+    <h2 id="changes">Keeping a copy in step</h2>
+    <p>
+      <code>changes(since:)</code> on <code>/graphql</code>, and the
+      <code>changes</code> tool on <code>/mcp</code>, hand back what changed in
+      your projects, todos and dependencies since a cursor: the rows as they
+      stand now, tombstones for what went, and the next cursor. A cursor is good
+      for 29 days; after that a client gets <code>CURSOR_EXPIRED</code> and
+      starts again.
+    </p>
+
+    <h2 id="expose">Before you expose it</h2>
+    <p>
+      Registration is <strong>open</strong>: any address that completes a
+      sign-in gets an account. Right for an instance only you can reach, wrong
+      for one on the public internet.
+    </p>
+    <ul>
+      <li><strong>Put it behind something.</strong> A reverse proxy with TLS, and, if the instance is yours alone, an allowlist, VPN, or auth in front of it. Per-IP rate limiting is the proxy's job.</li>
+      <li><strong>Never set <code>AUTH_MAGIC_LINK=false</code></strong> on a reachable instance. An email address becomes the whole credential.</li>
+      <li><strong>Never set <code>EXPOSE_MAGIC_LINK=true</code></strong> on a reachable instance. It hands the sign-in token to whoever asked.</li>
+      <li><strong>Set a real <code>AUTH_SECRET</code></strong> and keep it. The server refuses to boot in production without one.</li>
+      <li><strong>Mind what agents can reach.</strong> An agent's base URL and the MCP servers are fetched from the server's host, so keep it away from anything private and leave <code>RUNNER_ALLOW_STDIO</code> off on a shared instance.</li>
+    </ul>
+
+    <p class="readme-link">
+      This page is a summary. The
+      <a href="{{ site.repo }}#readme" rel="noopener">README</a> has the full detail,
+      and development notes.
+    </p>
+  </article>
+</div>

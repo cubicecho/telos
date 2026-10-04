@@ -1,0 +1,24 @@
+<dialog class="lightbox" aria-label="Screenshot">
+  <button class="lightbox-close" type="button" aria-label="Close">×</button>
+  <img alt="" />
+  <p class="lightbox-caption"></p>
+</dialog>
+<script>
+  (() => {
+    const box = document.querySelector('.lightbox');
+    const img = box.querySelector('img');
+    const caption = box.querySelector('.lightbox-caption');
+    for (const shot of document.querySelectorAll('.shot img')) {
+      const open = () => {
+        img.src = shot.currentSrc || shot.src;
+        img.alt = shot.alt;
+        caption.textContent = shot.closest('figure').querySelector('figcaption')?.textContent ?? '';
+        box.showModal();
+      };
+      shot.tabIndex = 0;
+      shot.addEventListener('click', open);
+      shot.addEventListener('keydown', (e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), open()));
+    }
+    box.addEventListener('click', () => box.close());
+  })();
+</script>

@@ -1,70 +1,159 @@
 ---
 layout: base.njk
+bodyClass: home
 ---
-<section class="hero project-hero">
-  <h1>{{ site.name }}</h1>
-  <p>{{ site.tagline }}</p>
-  <p class="cta">
-    <a class="button" href="#start">Get started</a>
-    <a class="button secondary" href="{{ site.repo }}" rel="noopener">GitHub ↗</a>
+<section class="home-hero">
+  <p class="eyebrow">Self-hosted todo board</p>
+  <h1>{{ site.tagline }}</h1>
+  <p class="lede">
+    Projects hold todos, laid out as a board of lanes. Todos can depend on other
+    todos, and one you are waiting on cannot be ticked off yet. Give a lane an
+    agent and it works each todo that arrives there. One container plus
+    Postgres, and AI is off until you switch it on.
   </p>
+  <p class="cta">
+    <a class="button" href="{{ '/get-started/' | url }}">Get started</a>
+    <a class="button secondary" href="{{ site.repo }}" rel="noopener">View on GitHub ↗</a>
+  </p>
+
+  <div class="board" role="img" aria-label="A board with four lanes: Inbox, Build with a Worker agent, Review with a Reviewer agent, and Done.">
+    <div class="lane">
+      <div class="lane-head">Inbox</div>
+      <div class="todo">Write the release notes<span class="todo-marks"><span class="mark-chip label">docs</span></span></div>
+      <div class="todo blocked">Tag 2.1<span class="todo-marks"><span class="mark-chip">waits on 2</span></span></div>
+    </div>
+    <div class="lane">
+      <div class="lane-head">Build <span class="lane-agent">Worker</span></div>
+      <div class="todo">Add CSV export<span class="todo-marks"><span class="mark-chip running">running</span></span></div>
+      <div class="todo">Fix the date picker<span class="todo-marks"><span class="mark-chip fail">sent back</span></span></div>
+    </div>
+    <div class="lane">
+      <div class="lane-head">Review <span class="lane-agent">Reviewer</span></div>
+      <div class="todo">Paginate the runs list<span class="todo-marks"><span class="mark-chip">attempt 1 of 3</span></span></div>
+    </div>
+    <div class="lane">
+      <div class="lane-head">Done</div>
+      <div class="todo done">Dark mode<span class="todo-marks"><span class="mark-chip pass">pass</span></span></div>
+      <div class="todo done">Labels on projects</div>
+    </div>
+  </div>
 </section>
 
 <section class="section">
   <h2>What it does</h2>
-  <p class="section-intro">
-    Projects hold todos, laid out as a board of lanes. Todos can depend on
-    other todos, and a todo you are waiting on is one you cannot tick off yet —
-    Telos knows that and says so. Give a lane an agent and it works each todo
-    that arrives there. You run it yourself: one container plus Postgres, with
-    the app and the API on the same origin. AI is off unless you turn it on.
-  </p>
-
-  <ul class="card-grid">
-    <li>
-      <article class="card">
-        <h3>Dependencies</h3>
-        <p>A blocked todo sits in its own section with its blockers named and its checkbox disabled, and cycles are rejected when you try to create them.</p>
-      </article>
-    </li>
-    <li>
-      <article class="card">
-        <h3>A board, or a list</h3>
-        <p>The same todos as lanes you name yourself, one of which means done: drag a card there and it is ticked off. Labels attach to projects and todos alike.</p>
-      </article>
-    </li>
-    <li>
-      <article class="card">
-        <h3>Agents, if you want them</h3>
-        <p>An agent is a model and its instructions. Put one on a lane and each todo there becomes a run that passes or fails and moves on. Your own tools can reach the board over MCP.</p>
-      </article>
-    </li>
-  </ul>
-</section>
-
-<section class="section" id="start">
-  <h2>Get started</h2>
-  <div class="prose">
-    <p>
-      Save the <code>docker-compose.yml</code> from the
-      <a href="{{ site.repo }}#quickstart" rel="noopener">README's Quickstart</a>
-      in an empty directory, then generate the two secrets it needs and bring it up:
-    </p>
-    <pre class="code"><code>printf 'AUTH_SECRET=%s\nPOSTGRES_PASSWORD=%s\n' \
-  "$(openssl rand -hex 32)" "$(openssl rand -hex 24)" &gt; .env
-
-docker compose up -d</code></pre>
-    <p>
-      Telos is then on <code>http://localhost:3001</code>. Migrations run at
-      boot. The magic link to sign in goes to the log:
-      <code>docker compose logs -f telos</code>.
-    </p>
+  <div class="feature-grid">
+    <div class="feature">
+      <div class="feature-icon">🔗</div>
+      <h3>Dependencies</h3>
+      <p>A blocked todo sits in its own section with its blockers named and its checkbox disabled. Cycles are rejected when you try to make them.</p>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">🗂️</div>
+      <h3>A board, or a list</h3>
+      <p>The same todos as lanes you name yourself, one of which means done. Drag a card there and it is ticked off. Labels attach to projects and todos alike.</p>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">🤖</div>
+      <h3>Agents on lanes</h3>
+      <p>An agent is a model and its instructions. Put one on a lane and each todo there becomes a run that passes or fails and follows the lane's route.</p>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">🔌</div>
+      <h3>Your own tools, over MCP</h3>
+      <p>Point Claude Code or any MCP client at <code>/mcp</code> with an API key. Each key has a switch per tool, so a read-only key is one with its writing tools off.</p>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">🎚️</div>
+      <h3>AI off until you want it</h3>
+      <p>Switches on the instance, the account and the project, plus auto-run and "AI ignores this" on a todo. Set <code>AI_ENABLED=false</code> to remove it outright.</p>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">📦</div>
+      <h3>One container plus Postgres</h3>
+      <p>The app and the API share one origin, migrations run at boot, and sign-in is a magic link written to the log. Nothing to clone, nothing to build.</p>
+    </div>
   </div>
+</section>
 
-  <p class="readme-link">
-    Full documentation lives in the project README:
-    <a href="{{ site.repo }}#readme" rel="noopener">{{ site.repo }}</a>
-    {% if site.docker %}<br />The image is
-    <a href="{{ site.docker }}" rel="noopener">vantreeseba/telos on Docker Hub</a>.{% endif %}
+<section class="section">
+  <h2>See it in action</h2>
+  <p class="section-intro">A website relaunch with a Planner, a Worker and a Reviewer on its lanes. Click a screenshot to enlarge it.</p>
+  <div class="gallery">
+    <figure class="shot shot-wide">
+      <div class="shot-frame">
+        <picture>
+          <source srcset="{{ '/assets/screenshots/board-dark.webp' | url }}" media="(prefers-color-scheme: dark)" />
+          <img src="{{ '/assets/screenshots/board.webp' | url }}" width="3540" height="2000" loading="lazy" alt="The board: Inbox, Plan, Build, Review and Done lanes. Two todos are being worked by the Planner and the Reviewer, one waits on four others, and one has a failed attempt." />
+        </picture>
+      </div>
+      <figcaption>The board. Agents work the Plan, Build and Review lanes; the launch waits on what is still open.</figcaption>
+    </figure>
+    <figure class="shot">
+      <div class="shot-frame">
+        <img src="{{ '/assets/screenshots/thread.webp' | url }}" width="2880" height="2000" loading="lazy" alt="A todo's thread: a note from you, then the Worker's PASS, the Reviewer's FAIL with its reason, and the Worker's second PASS." />
+      </div>
+      <figcaption>A todo's thread. The Reviewer sent the work back, and said why.</figcaption>
+    </figure>
+    <figure class="shot">
+      <div class="shot-frame">
+        <img src="{{ '/assets/screenshots/runs.webp' | url }}" width="2880" height="2000" loading="lazy" alt="The project's runs: two running now, 13 runs and their tokens in 30 days, and a list of runs with their verdicts." />
+      </div>
+      <figcaption>Every run, its verdict and what it cost.</figcaption>
+    </figure>
+    <figure class="shot">
+      <div class="shot-frame">
+        <img src="{{ '/assets/screenshots/list.webp' | url }}" width="2880" height="2200" loading="lazy" alt="The same project as a list, each todo marked with its lane, and a blocked section at the bottom." />
+      </div>
+      <figcaption>The same todos as a list, with what is blocked set apart.</figcaption>
+    </figure>
+    <figure class="shot">
+      <div class="shot-frame">
+        <img src="{{ '/assets/screenshots/activity.webp' | url }}" width="2880" height="2000" loading="lazy" alt="Activity: what needs you, runs and tokens by project and by agent, and recent runs." />
+      </div>
+      <figcaption>Activity: what needs you, and spend by project and agent.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section class="section">
+  <h2>How it works</h2>
+  <div class="flow">
+    <div class="flow-node">
+      <strong>A todo</strong>
+      <span>Added by you, an MCP client, or a draft talked over with an agent.</span>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node flow-key">
+      <strong>A lane with an agent</strong>
+      <span>When the todo is ready there, the runner starts a run: the agent's model, its instructions, its MCP servers.</span>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node">
+      <strong>A run</strong>
+      <span>Logs every tool call and records what it made. It can split the todo into new ones it then waits on.</span>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node flow-routes">
+      <strong>The lane's route</strong>
+      <span><code class="pass">PASS</code> moves the todo along the success route, or archives it.</span>
+      <span><code class="fail">FAIL</code> sends it along the failure route.</span>
+    </div>
+  </div>
+  <p class="flow-caption">
+    Chain lanes and you have a pipeline: a Planner splits a request into todos,
+    a Worker does each one, and a Reviewer rules PASS or FAIL, sending the work
+    back when it is not done. With auto-run off, nothing starts until you press
+    <strong>Run now</strong>.
   </p>
 </section>
+
+<section class="section cta-final">
+  <h2>Run it yourself</h2>
+  <p>A compose file, two secrets, and <code>docker compose up</code>. The rest is in the docs.</p>
+  <p class="cta">
+    <a class="button" href="{{ '/get-started/' | url }}">Get started</a>
+    <a class="button secondary" href="{{ '/docs/' | url }}">Read the docs</a>
+  </p>
+</section>
+
+{% include "lightbox.njk" %}
