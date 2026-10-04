@@ -69,161 +69,16 @@ html {
   font-size: clamp(1.05rem, 2.2vw, 1.2rem);
 }
 
-/* the list drawn in the hero: plain todos, one blocked, one done */
+/* the screenshot under the hero's buttons */
 
-.todo-list {
+.shot.hero-shot {
   margin-top: 2.75rem;
-  max-width: 34rem;
-  background: var(--bg-alt);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 0.75rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-.list-head {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.85rem;
-  font-weight: 600;
-  padding: 0.1rem 0.2rem 0.2rem;
-}
-.list-head span,
-.list-section {
-  color: var(--muted);
-  font-weight: 600;
-}
-.list-section {
-  font-size: 0.7rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  padding: 0.4rem 0.2rem 0;
-}
-.todo-list .todo {
-  flex-direction: row;
-  align-items: center;
-  gap: 0.6rem;
-  font-size: 0.9rem;
-}
-.todo-list .todo-marks {
-  margin-left: auto;
-  flex-wrap: nowrap;
-}
-.check {
-  width: 1rem;
-  height: 1rem;
-  flex-shrink: 0;
-  border: 1.5px solid var(--muted);
-  border-radius: 4px;
-}
-.todo.done .check {
-  background: var(--accent);
-  border-color: var(--accent);
-}
-.todo.blocked .check {
-  opacity: 0.4;
-}
-.mark-chip.due {
-  border-color: transparent;
-  background: color-mix(in srgb, var(--fail) 14%, transparent);
-  color: var(--fail);
 }
 
-/* the board drawn under the extras: lanes, cards, and the agents on two of them */
+/* the note under the extras */
 
-.board {
-  margin-top: 1.5rem;
-  display: grid;
-  grid-template-columns: repeat(4, minmax(10rem, 1fr));
-  gap: 0.75rem;
-  overflow-x: auto;
-  padding-bottom: 0.25rem;
-}
-.lane {
-  background: var(--bg-alt);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 0.65rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  min-width: 0;
-}
-.lane-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--muted);
-  padding: 0 0.15rem 0.15rem;
-}
-.lane-agent {
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
-  font-weight: 600;
-  padding: 0.1rem 0.45rem;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--accent-2) 18%, transparent);
-  color: var(--accent-2);
-  white-space: nowrap;
-}
-.todo {
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 0.55rem 0.65rem;
-  font-size: 0.82rem;
-  line-height: 1.35;
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-}
-.todo-marks {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.3rem;
-}
-.mark-chip {
-  font-size: 0.68rem;
-  font-weight: 600;
-  padding: 0.05rem 0.4rem;
-  border-radius: 999px;
-  border: 1px solid var(--line);
-  color: var(--muted);
-}
-.mark-chip.label {
-  border-color: transparent;
-  background: color-mix(in srgb, var(--accent) 15%, transparent);
-  color: var(--accent);
-}
-.mark-chip.running {
-  border-color: transparent;
-  background: color-mix(in srgb, var(--accent-2) 18%, transparent);
-  color: var(--accent-2);
-}
-.mark-chip.pass {
-  border-color: transparent;
-  background: color-mix(in srgb, var(--pass) 16%, transparent);
-  color: var(--pass);
-}
-.mark-chip.fail {
-  border-color: transparent;
-  background: color-mix(in srgb, var(--fail) 14%, transparent);
-  color: var(--fail);
-}
-.todo.blocked {
-  border-style: dashed;
-  color: var(--muted);
-}
-.todo.done {
-  color: var(--muted);
-  text-decoration: line-through;
-}
 .board-caption {
-  margin: 0.9rem 0 0;
+  margin: 1.25rem 0 0;
   font-size: 0.85rem;
   color: var(--muted);
 }
@@ -668,9 +523,6 @@ pre.code code {
   }
 }
 @media (max-width: 560px) {
-  .todo-list .todo {
-    flex-wrap: wrap;
-  }
   .step {
     padding-left: 0;
   }
