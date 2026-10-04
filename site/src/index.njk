@@ -3,20 +3,81 @@ layout: base.njk
 bodyClass: home
 ---
 <section class="home-hero">
-  <p class="eyebrow">Self-hosted todo board</p>
+  <p class="eyebrow">Self-hosted todos</p>
   <h1>{{ site.tagline }}</h1>
   <p class="lede">
-    Projects hold todos, laid out as a board of lanes. Todos can depend on other
-    todos, and one you are waiting on cannot be ticked off yet. Give a lane an
-    agent and it works each todo that arrives there. One container plus
-    Postgres, and AI is off until you switch it on.
+    Projects hold todos. A todo can wait on other todos, and one you are
+    waiting on cannot be ticked off yet. Labels and due dates, and that is
+    the app. A board and AI agents are there if you want them, and stay out
+    of your way if you don't.
   </p>
   <p class="cta">
     <a class="button" href="{{ '/get-started/' | url }}">Get started</a>
     <a class="button secondary" href="{{ site.repo }}" rel="noopener">View on GitHub ↗</a>
   </p>
 
-  <div class="board" role="img" aria-label="A board with four lanes: Inbox, Build with a Worker agent, Review with a Reviewer agent, and Done.">
+  <div class="todo-list" role="img" aria-label="A plain todo list: three open todos with a label and a due date, one blocked todo waiting on two others, and one done.">
+    <div class="list-head">Home server <span>3 open</span></div>
+    <div class="todo"><span class="check"></span>Renew the TLS certificate<span class="todo-marks"><span class="mark-chip due">Overdue · Oct 2</span></span></div>
+    <div class="todo"><span class="check"></span>Test restoring last week's backup<span class="todo-marks"><span class="mark-chip label">backups</span></span></div>
+    <div class="todo"><span class="check"></span>Update the media box</div>
+    <div class="list-section">Blocked (1)</div>
+    <div class="todo blocked"><span class="check"></span>Wipe the old NAS<span class="todo-marks"><span class="mark-chip">waits on 2</span></span></div>
+    <div class="todo done"><span class="check"></span>Order the new drives</div>
+  </div>
+</section>
+
+<section class="section">
+  <h2>Just todos</h2>
+  <p class="section-intro">
+    This is the whole app for a lot of people. A project opens as a list, and
+    AI is off until you switch it on, so there is nothing to set up or turn
+    off first.
+  </p>
+  <div class="feature-grid">
+    <div class="feature">
+      <div class="feature-icon">✅</div>
+      <h3>Type it, Enter, done</h3>
+      <p>Add a todo in a sentence. Press <code>n</code> to add, <code>/</code> to filter, and <code>Ctrl K</code> to search every project.</p>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">🔗</div>
+      <h3>What waits on what</h3>
+      <p>A blocked todo sits in its own section with its blockers named and its checkbox disabled. Cycles are rejected when you try to make them.</p>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">🏷️</div>
+      <h3>Labels and due dates</h3>
+      <p>Labels attach to projects and todos alike. A due date flags the todo when it is late, and a project can sort by them.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <h2>Nice extras, when you want them</h2>
+  <p class="section-intro">
+    None of these are needed to use telos. Each is off, or simply unused,
+    until you reach for it.
+  </p>
+  <div class="feature-grid">
+    <div class="feature">
+      <div class="feature-icon">🗂️</div>
+      <h3>A board</h3>
+      <p>The same todos as lanes you name yourself, one of which means done. Drag a card there and it is ticked off; tick the box and the card moves.</p>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">🤖</div>
+      <h3>Agents on lanes</h3>
+      <p>An agent is a model and its instructions. Put one on a lane and each todo there becomes a run that passes or fails and follows the lane's route.</p>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">🔌</div>
+      <h3>Your own tools, over MCP</h3>
+      <p>Point Claude Code or any MCP client at <code>/mcp</code> with an API key. Each key has a switch per tool, so a read-only key is one with its writing tools off.</p>
+    </div>
+  </div>
+
+  <div class="board" role="img" aria-label="The same kind of todos as a board with four lanes: Inbox, Build with a Worker agent, Review with a Reviewer agent, and Done.">
     <div class="lane">
       <div class="lane-head">Inbox</div>
       <div class="todo">Write the release notes<span class="todo-marks"><span class="mark-chip label">docs</span></span></div>
@@ -37,47 +98,16 @@ bodyClass: home
       <div class="todo done">Labels on projects</div>
     </div>
   </div>
-</section>
-
-<section class="section">
-  <h2>What it does</h2>
-  <div class="feature-grid">
-    <div class="feature">
-      <div class="feature-icon">🔗</div>
-      <h3>Dependencies</h3>
-      <p>A blocked todo sits in its own section with its blockers named and its checkbox disabled. Cycles are rejected when you try to make them.</p>
-    </div>
-    <div class="feature">
-      <div class="feature-icon">🗂️</div>
-      <h3>A board, or a list</h3>
-      <p>The same todos as lanes you name yourself, one of which means done. Drag a card there and it is ticked off. Labels attach to projects and todos alike.</p>
-    </div>
-    <div class="feature">
-      <div class="feature-icon">🤖</div>
-      <h3>Agents on lanes</h3>
-      <p>An agent is a model and its instructions. Put one on a lane and each todo there becomes a run that passes or fails and follows the lane's route.</p>
-    </div>
-    <div class="feature">
-      <div class="feature-icon">🔌</div>
-      <h3>Your own tools, over MCP</h3>
-      <p>Point Claude Code or any MCP client at <code>/mcp</code> with an API key. Each key has a switch per tool, so a read-only key is one with its writing tools off.</p>
-    </div>
-    <div class="feature">
-      <div class="feature-icon">🎚️</div>
-      <h3>AI off until you want it</h3>
-      <p>Switches on the instance, the account and the project, plus auto-run and "AI ignores this" on a todo. Set <code>AI_ENABLED=false</code> to remove it outright.</p>
-    </div>
-    <div class="feature">
-      <div class="feature-icon">📦</div>
-      <h3>One container plus Postgres</h3>
-      <p>The app and the API share one origin, migrations run at boot, and sign-in is a magic link written to the log. Nothing to clone, nothing to build.</p>
-    </div>
-  </div>
+  <p class="board-caption">
+    AI is off on the instance, the account and the project until you switch it
+    on, and a todo can say "AI ignores this". Set <code>AI_ENABLED=false</code>
+    to remove it outright.
+  </p>
 </section>
 
 <section class="section">
   <h2>See it in action</h2>
-  <p class="section-intro">A website relaunch with a Planner, a Worker and a Reviewer on its lanes. Click a screenshot to enlarge it.</p>
+  <p class="section-intro">With the extras on: a website relaunch with a Planner, a Worker and a Reviewer on its lanes. Click a screenshot to enlarge it.</p>
   <div class="gallery">
     <figure class="shot shot-wide">
       <div class="shot-frame">
@@ -149,7 +179,7 @@ bodyClass: home
 
 <section class="section cta-final">
   <h2>Run it yourself</h2>
-  <p>A compose file, two secrets, and <code>docker compose up</code>. The rest is in the docs.</p>
+  <p>One container plus Postgres: a compose file, two secrets, and <code>docker compose up</code>. Nothing to clone, nothing to build.</p>
   <p class="cta">
     <a class="button" href="{{ '/get-started/' | url }}">Get started</a>
     <a class="button secondary" href="{{ '/docs/' | url }}">Read the docs</a>

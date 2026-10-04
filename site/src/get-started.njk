@@ -2,15 +2,15 @@
 layout: base.njk
 title: Get started
 permalink: /get-started/
-description: Run telos with Docker Compose, sign in, and optionally put an agent on a lane.
+description: Run telos with Docker Compose, sign in, and start adding todos. The board and agents are optional.
 ---
 <section class="page-hero">
   <p class="eyebrow">Get started</p>
-  <h1>From nothing to a board in a few minutes</h1>
+  <h1>From nothing to your first todo in a few minutes</h1>
   <p class="lede">
     Telos runs as one container plus Postgres. Nothing to clone and nothing to
-    build: save a compose file, make two secrets, start it. Steps 5 and 6 are
-    only for the AI side, and you can skip them.
+    build: save a compose file, make two secrets, start it. After step 4 you
+    have the whole todo app. Steps 5 and 6 are extras you can skip.
   </p>
 </section>
 
@@ -85,16 +85,26 @@ docker compose up -d</code></pre>
   </section>
 
   <section class="step">
-    <h2>Make a project and its lanes</h2>
+    <h2>Make a project and add todos</h2>
     <p>
-      A project's todos show as a list or as a board of lanes you name
-      yourself, one of which means done. Add a todo in a sentence and Enter,
-      then set what it waits on and label it.
+      <strong>New project</strong> in the sidebar, then type a todo in a
+      sentence and press Enter. Tick it off when it is done. From there:
     </p>
     <ul>
-      <li>A todo that waits on an open one shows as <strong>blocked</strong>, with its blockers named.</li>
-      <li>Dragging a card into the done lane ticks it off, and ticking it moves the card.</li>
+      <li>Set what a todo waits on, and it shows as <strong>blocked</strong>, with its blockers named, until they are done.</li>
+      <li>Give todos labels and due dates. A late one is flagged, and the project can sort by due date.</li>
+      <li>Press <code>n</code> to add, <code>/</code> to filter, and <code>Ctrl K</code> to search every project.</li>
     </ul>
+    <div class="gs-callout">
+      <strong>That is the app.</strong> If a list of todos is all you want,
+      you can stop here. The rest of this page is extras.
+    </div>
+    <h3>The board <span class="pill">optional</span></h3>
+    <p>
+      The same todos as lanes you name yourself, one of which means done.
+      Switch to <strong>Board</strong> on the project. Dragging a card into
+      the done lane ticks it off, and ticking it moves the card.
+    </p>
   </section>
 
   <section class="step">
