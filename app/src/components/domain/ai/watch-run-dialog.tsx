@@ -12,7 +12,7 @@ import { RUN_POLL_MS } from './run-row';
 
 /**
  * Watch an agent work a todo, from the board. It follows the todo rather than
- * one run: when a run ends and the next station picks the todo up, the dialog
+ * one run: when a run ends and the next lane's agent picks the todo up, the dialog
  * moves on to the new run and says so.
  */
 export function WatchRunDialog({

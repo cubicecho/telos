@@ -120,14 +120,14 @@ describe('AiSetupChecklist', () => {
     const agent = row('You have an agent: not done');
     expect(within(agent).getByRole('link', { name: 'Open Settings' })).toHaveAttribute('href', '/settings?tab=agents');
     // No project yet, so no board to send anyone to.
-    expect(within(row('A project has a station: not done')).queryByRole('link')).not.toBeInTheDocument();
+    expect(within(row('A lane has an agent: not done')).queryByRole('link')).not.toBeInTheDocument();
     expect(row('The runner is asking for work: not done')).toHaveTextContent('has not asked since the server started');
   });
 
-  it('points the station step at the project on screen while none has one', async () => {
+  it('points the agent-lane step at the project on screen while none has one', async () => {
     checklist([aiState(), aiSetup({ ...NOTHING, agent: true })], 'p9');
-    const station = await screen.findByRole('listitem', { name: 'A project has a station: not done' });
-    expect(within(station).getByRole('link', { name: 'Open the board' })).toHaveAttribute(
+    const step = await screen.findByRole('listitem', { name: 'A lane has an agent: not done' });
+    expect(within(step).getByRole('link', { name: 'Open the board' })).toHaveAttribute(
       'href',
       '/projects/p9?view=board',
     );
@@ -146,13 +146,13 @@ describe('AiSetupChecklist', () => {
     expect(within(request).getByRole('link')).toHaveAttribute('href', '/projects/p1?view=board');
   });
 
-  it('shows on the project it points at, and not on another that has a station', async () => {
+  it('shows on the project it points at, and not on another that has an agent lane', async () => {
     const setup = { ...NOTHING, agent: true, station: true, stationProjectIds: ['p1', 'p2'] };
     checklist([aiState(), aiSetup(setup)], 'p1');
     expect(await screen.findByRole('list', { name: 'AI setup steps' })).toBeInTheDocument();
   });
 
-  it('is absent from a project with a station that the list does not point at', async () => {
+  it('is absent from a project with an agent lane that the list does not point at', async () => {
     const setup = aiSetup({ ...NOTHING, agent: true, station: true, stationProjectIds: ['p1', 'p2'] });
     checklist([aiState(), setup], 'p2');
     await vi.waitFor(() => expect(setup.result).toHaveBeenCalled());
@@ -190,7 +190,7 @@ describe('setupSteps', () => {
   it('links a project step only once the step before it has a project to name', () => {
     const steps = setupSteps({ ...NOTHING, agent: true }, 'p9', now);
     const href = (key: string) => steps.find((step) => step.key === key)?.href;
-    expect(href('station')).toBe('/projects/p9?view=board');
+    expect(href('agent-lane')).toBe('/projects/p9?view=board');
     expect(href('projectAi')).toBeUndefined();
     expect(href('request')).toBeUndefined();
   });

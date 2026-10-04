@@ -62,7 +62,7 @@ async function runOnce(todoId: string, result: Record<string, unknown>): Promise
   return runId;
 }
 
-/** A second project of the board's account, with a station of its own worked by a second agent. */
+/** A second project of the board's account, with a lane of its own worked by a second agent. */
 async function secondProject(): Promise<{
   projectId: string;
   agentId: string;

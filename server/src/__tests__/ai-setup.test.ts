@@ -106,7 +106,7 @@ describe('aiSetup', () => {
     expect(await setup()).toMatchObject({ request: true, started: true });
   });
 
-  it('does not count a todo outside a station, or one AI is told to ignore', async () => {
+  it('does not count a todo outside a lane with an agent, or one AI is told to ignore', async () => {
     const project = await createProject('P');
     await setLane(person, project.lanes[1].id, { agentId: await createAgent() });
     await person.expectOk(SET_PROJECT_AI, { id: project.id, enabled: true });
@@ -137,7 +137,7 @@ describe('aiSetup', () => {
     expect(await setup()).toMatchObject({ station: false, request: true });
   });
 
-  it('does not count a draft’s reply as a station having started', async () => {
+  it('does not count a draft’s reply as a lane’s agent having started', async () => {
     const project = await createProject('P');
     const agentId = await createAgent();
     await person.expectOk(SET_PROJECT_AI, { id: project.id, enabled: true });
@@ -146,7 +146,7 @@ describe('aiSetup', () => {
     const runner = runnerClient(db);
     const { runId } = (await runner.expectOk(CLAIM_DRAFT, { id: draftId })).claimDraft;
     await runner.expectOk(FINISH_DRAFT, { id: draftId, runId, reply: 'Hi.' });
-    // The reply is a run, but no station made it.
+    // The reply is a run, but no lane's agent made it.
     expect(await db.$count(dbSchema.runs)).toBe(1);
     expect(await setup()).toMatchObject({ request: true, started: false });
   });

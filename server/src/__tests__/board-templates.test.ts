@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { type Board, createBoard, setLane } from './board.ts';
 import { createClient, createTestDb, createUser, type TestDb } from './helpers.ts';
 
-// Board templates: a board's lanes and station settings, saved and given to a
+// Board templates: a board's lanes and their agent settings, saved and given to a
 // new project.
 
 let db: TestDb;
@@ -28,7 +28,7 @@ async function newProject(person = board.person): Promise<string> {
 }
 
 describe('board templates', () => {
-  it('gives a new project the saved lanes, stations and routes', async () => {
+  it('gives a new project the saved lanes, agents and routes', async () => {
     await setLane(board.person, board.lanes[1].id, { onFailureLaneId: board.lanes[0].id, wipLimit: 2, maxAttempts: 5 });
     const saved = (await board.person.expectOk(SAVE, { projectId: board.projectId, name: ' Pipeline ' }))
       .saveBoardTemplate;
@@ -45,7 +45,7 @@ describe('board templates', () => {
     expect(lanes[2].isDone).toBe(true);
   });
 
-  it('carries a station that archives on success', async () => {
+  it('carries a lane that archives on success', async () => {
     await setLane(board.person, board.lanes[0].id, { onSuccessLaneId: null, archiveOnSuccess: true });
     const saved = (await board.person.expectOk(SAVE, { projectId: board.projectId, name: 'Archiving' }))
       .saveBoardTemplate;

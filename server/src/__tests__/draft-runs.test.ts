@@ -16,7 +16,7 @@ import {
 import { createClient, createTestDb, type TestClient, type TestDb } from './helpers.ts';
 
 // A draft's replies are runs, and everything that reads runs to decide
-// something about a todo must not count them: what is ready, what a station
+// something about a todo must not count them: what is ready, what an agent
 // gave up on, what a card says, whether an account has started. They do count
 // where runs are simply listed and added up: a project's runs and its spend.
 
@@ -57,11 +57,11 @@ async function queue(): Promise<string[]> {
   return (await runner.expectOk(QUEUE)).runnerQueue.map((row: { todoId: string }) => row.todoId);
 }
 
-describe('a draft’s runs and the stations', () => {
-  it('leaves the queue and a station’s WIP limit alone while a reply is under way', async () => {
+describe('a draft’s runs and the lanes’ agents', () => {
+  it('leaves the queue and a lane’s WIP limit alone while a reply is under way', async () => {
     const todoId = await board.addTodo('Ready');
     await claimedDraft(board, runner);
-    // The station takes one at a time, and a draft's reply is not one of them.
+    // The lane takes one at a time, and a draft's reply is not one of them.
     expect(await queue()).toEqual([todoId]);
   });
 
@@ -73,7 +73,7 @@ describe('a draft’s runs and the stations', () => {
     expect(claim.turn).toBe(0);
   });
 
-  it('never counts as a todo’s failure, so no station gives up over a failed reply', async () => {
+  it('never counts as a todo’s failure, so no agent gives up over a failed reply', async () => {
     await setLane(board.person, board.lanes[0].id, { maxAttempts: 1 });
     const todoId = await board.addTodo('Ready');
     await answeredDraft(board, runner, FAILED);
@@ -85,7 +85,7 @@ describe('a draft’s runs and the stations', () => {
     expect(status.projects[0].lanes[0]).toMatchObject({ attention: 0, running: 0, queued: 1 });
   });
 
-  it('shows nothing running at a station while only a draft is being answered', async () => {
+  it('shows nothing running in a lane while only a draft is being answered', async () => {
     const todoId = await board.addTodo('Ready');
     await claimedDraft(board, runner);
     const status = (await board.person.expectOk(STATUS, { projectId: board.projectId })).aiStatus;

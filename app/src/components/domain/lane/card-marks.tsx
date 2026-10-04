@@ -44,7 +44,7 @@ export function marksByTodo(marks: readonly CardMark[] | undefined): ReadonlyMap
 }
 
 /**
- * How many attempts a station has used, in words.
+ * How many attempts an agent has used, in words.
  *
  * @param mark - The card's mark.
  * @returns The line, or null when no attempt has failed.
@@ -54,7 +54,7 @@ export function attemptsText(mark: CardMark): string | null {
     return null;
   }
   const failed = mark.attempts === 1 ? '1 failed attempt' : `${mark.attempts} failed attempts`;
-  // "Limit", not "of": a station gives up once the failures pass the limit, so the count can exceed it.
+  // "Limit", not "of": an agent gives up once the failures pass the limit, so the count can exceed it.
   return mark.maxAttempts == null ? failed : `${failed}, limit ${mark.maxAttempts}`;
 }
 

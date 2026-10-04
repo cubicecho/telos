@@ -5,7 +5,7 @@ import { pruneRuns } from '../retention.ts';
 import { type Board, CLAIM, createBoard, FINISH, QUEUE, runnerClient } from './board.ts';
 import { createClient, createTestDb, type TestClient, type TestDb } from './helpers.ts';
 
-// Old runs, pruned after the account's retention, but never one the stations
+// Old runs, pruned after the account's retention, but never one the agents
 // still count: pruning changes what is kept, not what runs next.
 
 let db: TestDb;
@@ -24,7 +24,7 @@ beforeEach(async () => {
   await board.person.expectOk(RETAIN, { days: 30 });
 });
 
-/** Claims `todoId` at `on`'s station and finishes the run with `result`. */
+/** Claims `todoId` at `on`'s agent and finishes the run with `result`. */
 async function work(todoId: string, result: Record<string, unknown>, on = board): Promise<string> {
   const { runId } = (await runner.expectOk(CLAIM, { todoId, laneId: on.lanes[0].id })).claimRun;
   await runner.expectOk(FINISH, { id: runId, result });
@@ -48,7 +48,7 @@ describe('pruning runs', () => {
     expect(history.some((event: { runId: string | null }) => event.runId)).toBe(true);
   });
 
-  it('keeps a failure the station still counts, until a person touches the todo', async () => {
+  it('keeps a failure the lane’s agent still counts, until a person touches the todo', async () => {
     const todo = await board.addTodo('Keeps failing');
     await work(todo, { status: 'error', error: 'It broke.' });
 
@@ -60,7 +60,7 @@ describe('pruning runs', () => {
     expect(await pruneRuns(db, later(60))).toBe(1);
   });
 
-  it('never wakes a todo a station finished with', async () => {
+  it('never wakes a todo an agent finished with', async () => {
     await db.update(dbSchema.lanes).set({ onSuccessLaneId: null }).where(eq(dbSchema.lanes.id, board.lanes[0].id));
     const todo = await board.addTodo('Stays put');
     await work(todo, { status: 'ok', output: 'Done here.' });

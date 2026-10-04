@@ -12,7 +12,7 @@ import { describeError } from '@/lib/errors';
 import {
   CardMarksDocument,
   ProjectActivityDocument,
-  ProjectStationsDocument,
+  ProjectLaneAgentsDocument,
   RetryTodoDocument,
   RunTodoDocument,
 } from '@/lib/graphql';
@@ -38,7 +38,7 @@ import { useMoveTodo } from './use-move-todo';
  * offers is also a menu item: each card carries "Move to", each column header
  * carries its own actions.
  *
- * With AI on for the account and the project, a column can also be a station,
+ * With AI on for the account and the project, a column can also have an agent,
  * and its settings are read here in a query of their own: the columns do not
  * exist in the schema otherwise, so `LaneFields` cannot carry them.
  *
@@ -61,7 +61,7 @@ export function Board({
   todos: readonly TodoSummary[];
   /** The runs working todos now, by todo id. The page polls it, for its header too. */
   live?: ReadonlyMap<string, LiveRun> | undefined;
-  /** The todos a station stopped on, by todo id, from the same poll. */
+  /** The todos an agent stopped on, by todo id, from the same poll. */
   stuck?: ReadonlyMap<string, StuckTodo> | undefined;
   /** The todos waiting to be asked for, or asked for and not yet started, from the same poll. */
   waiting?: ReadonlyMap<string, WaitingTodo> | undefined;
@@ -74,16 +74,16 @@ export function Board({
   const [editing, setEditing] = useState<TodoSummary | null>(null);
 
   const ai = useAi();
-  const stationsOn = ai.on && aiEnabled;
-  const stationsQuery = useQuery(ProjectStationsDocument, { variables: { projectId }, skip: !stationsOn });
-  const stations = useMemo(
-    () => new Map((stationsQuery.data?.lanes ?? []).map((row) => [row.id, row])),
-    [stationsQuery.data],
+  const agentsOn = ai.on && aiEnabled;
+  const laneAgentsQuery = useQuery(ProjectLaneAgentsDocument, { variables: { projectId }, skip: !agentsOn });
+  const laneAgents = useMemo(
+    () => new Map((laneAgentsQuery.data?.lanes ?? []).map((row) => [row.id, row])),
+    [laneAgentsQuery.data],
   );
-  const agents = stationsQuery.data?.agents ?? [];
-  const [stationLane, setStationLane] = useState<CachedLane | null>(null);
+  const agents = laneAgentsQuery.data?.agents ?? [];
+  const [agentLane, setAgentLane] = useState<CachedLane | null>(null);
   const [watching, setWatching] = useState<TodoSummary | null>(null);
-  const shownLive = stationsOn ? live : undefined;
+  const shownLive = agentsOn ? live : undefined;
   const [retryTodo] = useMutation(RetryTodoDocument, { refetchQueries: [ProjectActivityDocument] });
   const [runTodo] = useMutation(RunTodoDocument, { refetchQueries: [ProjectActivityDocument] });
   const boardAi: BoardAi | undefined = shownLive
@@ -179,10 +179,10 @@ export function Board({
               onReorder={(delta) => run(() => actions.moveLane(lanes, lane, delta))}
               onToggleDone={() => run(() => actions.toggleDoneLane(lane))}
               onDelete={() => run(() => actions.deleteLane(lane))}
-              station={stationsOn ? (stations.get(lane.id) ?? null) : undefined}
-              agentName={agents.find((agent) => agent.id === stations.get(lane.id)?.agentId)?.name}
+              laneAgent={agentsOn ? (laneAgents.get(lane.id) ?? null) : undefined}
+              agentName={agents.find((agent) => agent.id === laneAgents.get(lane.id)?.agentId)?.name}
               // Offered once the settings are in, so a save cannot overwrite them with defaults.
-              onEditStation={stationsOn && stationsQuery.data ? () => setStationLane(lane) : undefined}
+              onEditAgent={agentsOn && laneAgentsQuery.data ? () => setAgentLane(lane) : undefined}
               ai={boardAi}
               marks={marks}
             />
@@ -216,14 +216,14 @@ export function Board({
         />
       ) : null}
 
-      {stationLane && stationsOn ? (
+      {agentLane && agentsOn ? (
         <LaneAgentDialog
-          key={stationLane.id}
+          key={agentLane.id}
           open
-          onOpenChange={(next) => !next && setStationLane(null)}
-          lane={stationLane}
+          onOpenChange={(next) => !next && setAgentLane(null)}
+          lane={agentLane}
           lanes={lanes}
-          settings={stations.get(stationLane.id) ?? null}
+          settings={laneAgents.get(agentLane.id) ?? null}
           agents={agents}
         />
       ) : null}

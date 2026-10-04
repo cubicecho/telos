@@ -19,13 +19,13 @@ const AI_SETUP_SDL = parse(`
   type AiSetup {
     "You have an agent."
     agent: Boolean!
-    "A project of yours has a station: a lane an agent works."
+    "A project of yours has a lane with an agent."
     station: Boolean!
-    "Your projects that have a station, the one furthest along first: AI on, then running by itself, then oldest."
+    "Your projects that have a lane with an agent, the one furthest along first: AI on, then running by itself, then oldest."
     stationProjectIds: [ID!]!
-    "AI is on for a project that has a station."
+    "AI is on for a project that has a lane with an agent."
     projectAi: Boolean!
-    "There is something to work: an open todo at a station in such a project, or a draft, or a run already made."
+    "There is something to work: an open todo in a lane with an agent in such a project, or a draft, or a run already made."
     request: Boolean!
     "Work may start: such a project runs by itself, or a todo was asked for with runTodo, or a run was already made."
     started: Boolean!
@@ -42,7 +42,7 @@ const AI_SETUP_SDL = parse(`
 /** What the one statement behind `aiSetup` answers. */
 interface SetupRow {
   agent: boolean;
-  station_project_ids: string[];
+  agent_project_ids: string[];
   project_ai: boolean;
   request: boolean;
   started: boolean;
@@ -57,7 +57,7 @@ interface SetupRow {
  */
 async function readSetup(db: AnyDb, userId: string): Promise<SetupRow> {
   const result = await db.execute(sql`
-    WITH station_projects AS (
+    WITH agent_projects AS (
       SELECT p.id, p.ai_enabled, p.auto_run, p.created_at
       FROM projects p
       WHERE p.user_id = ${userId} AND p.archived_at IS NULL
@@ -69,26 +69,26 @@ async function readSetup(db: AnyDb, userId: string): Promise<SetupRow> {
     SELECT
       EXISTS (SELECT 1 FROM agents a WHERE a.user_id = ${userId} AND a.enabled) AS agent,
       COALESCE(
-        (SELECT json_agg(s.id ORDER BY s.ai_enabled DESC, s.auto_run DESC, s.created_at) FROM station_projects s),
+        (SELECT json_agg(s.id ORDER BY s.ai_enabled DESC, s.auto_run DESC, s.created_at) FROM agent_projects s),
         '[]'::json
-      ) AS station_project_ids,
-      EXISTS (SELECT 1 FROM station_projects s WHERE s.ai_enabled) AS project_ai,
+      ) AS agent_project_ids,
+      EXISTS (SELECT 1 FROM agent_projects s WHERE s.ai_enabled) AS project_ai,
       (
         (SELECT yes FROM has_run)
         OR EXISTS (SELECT 1 FROM drafts d WHERE d.user_id = ${userId})
         OR EXISTS (
           SELECT 1 FROM todos t
-          JOIN station_projects s ON s.id = t.project_id AND s.ai_enabled
+          JOIN agent_projects s ON s.id = t.project_id AND s.ai_enabled
           JOIN lanes l ON l.id = t.lane_id AND l.agent_id IS NOT NULL
           WHERE t.completed_at IS NULL AND t.archived_at IS NULL AND NOT t.ai_ignored
         )
       ) AS request,
       (
         (SELECT yes FROM has_run)
-        OR EXISTS (SELECT 1 FROM station_projects s WHERE s.ai_enabled AND s.auto_run)
+        OR EXISTS (SELECT 1 FROM agent_projects s WHERE s.ai_enabled AND s.auto_run)
         OR EXISTS (
           SELECT 1 FROM todos t
-          JOIN station_projects s ON s.id = t.project_id AND s.ai_enabled
+          JOIN agent_projects s ON s.id = t.project_id AND s.ai_enabled
           WHERE t.run_requested_at IS NOT NULL
         )
       ) AS started
@@ -112,8 +112,8 @@ export function applyAiSetupExtension(schema: GraphQLSchema): GraphQLSchema {
     const row = await readSetup(context.db, userId);
     return {
       agent: row.agent,
-      station: row.station_project_ids.length > 0,
-      stationProjectIds: row.station_project_ids,
+      station: row.agent_project_ids.length > 0,
+      stationProjectIds: row.agent_project_ids,
       projectAi: row.project_ai,
       request: row.request,
       started: row.started,

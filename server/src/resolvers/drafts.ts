@@ -26,7 +26,7 @@ import { isUniqueViolation, type RunEventInput, type RunPrompt, type RunUsage, r
 // Each answer is a run (kind `draft`, see draft-runs.ts): claiming a draft
 // starts one, which holds the lease, and finishing it records what the agent
 // was told, what it said or why it failed, and what it cost. So a draft's
-// replies are read, counted and pruned as a station's work is.
+// replies are read, counted and pruned as a lane agent's work is.
 //
 // Every person-side field needs AI on for the account and the project, and the
 // runner only sees drafts where both still are. Applied only when the instance

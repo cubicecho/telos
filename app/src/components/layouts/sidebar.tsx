@@ -90,13 +90,13 @@ export function Sidebar() {
               onPress={() => setSearching(true)}
             />
             {ai.on ? (
-              <Link href="/stations" asChild>
+              <Link href="/agents" asChild>
                 <SidebarNavItem
-                  href="/stations"
-                  label="Stations"
+                  href="/agents"
+                  label="Agents"
                   icon={<Activity />}
                   count={attention > 0 ? attention : undefined}
-                  active={pathname === '/stations'}
+                  active={pathname === '/agents'}
                 />
               </Link>
             ) : null}

@@ -13,7 +13,7 @@ import { draftReplies, type ProjectActivity, SPEND_DAYS } from './project-activi
 import { RunRow } from './run-row';
 import { ArtifactRow, todoLabelOf } from './todo-runs';
 
-// A project's runs, every station and todo together, newest first: the place
+// A project's runs, every lane and todo together, newest first: the place
 // to see what its agents have been doing, and what it cost. An agent's replies
 // in the project's drafts are runs too: listed with the rest, marked as drafts,
 // and counted in the figures, which say how much of each was theirs.

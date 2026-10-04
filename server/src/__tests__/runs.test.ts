@@ -55,7 +55,7 @@ async function actorFor(headers: Record<string, string>): Promise<Actor> {
 }
 
 describe('runnerQueue', () => {
-  it('lists a todo waiting at a station', async () => {
+  it('lists a todo waiting in a lane with an agent', async () => {
     const todoId = await board.addTodo('Write it');
     expect(await queue()).toEqual([{ todoId, laneId: board.lanes[0].id, projectId: board.projectId }]);
   });
@@ -418,7 +418,7 @@ describe('a lane that archives on success', () => {
     expect(todo.completedAt).not.toBeNull();
   });
 
-  it('is one or the other: archive, or a success lane', async () => {
+  it('is one or the other: archive, or a success route', async () => {
     const both = await board.person.expectError(UPDATE_LANE, {
       id: board.lanes[0].id,
       set: { archiveOnSuccess: true },
@@ -427,11 +427,11 @@ describe('a lane that archives on success', () => {
     expect(both.message).toContain('not both');
 
     await setLane(board.person, board.lanes[0].id, ARCHIVES);
-    const arrow = await board.person.expectError(UPDATE_LANE, {
+    const routed = await board.person.expectError(UPDATE_LANE, {
       id: board.lanes[0].id,
       set: { onSuccessLaneId: board.lanes[2].id },
     });
-    expect(arrow.code).toBe('BAD_USER_INPUT');
+    expect(routed.code).toBe('BAD_USER_INPUT');
     // Swapping them in one write is fine.
     await setLane(board.person, board.lanes[0].id, { onSuccessLaneId: board.lanes[2].id, archiveOnSuccess: false });
   });
@@ -451,7 +451,7 @@ describe('stopping a run', () => {
     expect(await thread(todoId)).toEqual([]);
   });
 
-  it('tells AI to ignore the todo, so the station does not take it straight back', async () => {
+  it('tells AI to ignore the todo, so the lane’s agent does not take it straight back', async () => {
     const todoId = await board.addTodo('Write it');
     const { runId } = await claim(todoId);
     await board.person.expectOk(`mutation ($id: ID!) { cancelRun(id: $id) { id } }`, { id: runId });
@@ -560,7 +560,7 @@ describe('who may do what', () => {
     expect(agents.agents).toEqual([{ hasApiKey: true }]);
   });
 
-  it('refuses a station arrow into another project’s board', async () => {
+  it('refuses a success route into another project’s board', async () => {
     const other = await createBoard(db, 'other@example.com');
     const error = await board.person.expectError(
       `mutation ($id: UUID!, $set: UpdateLaneInput!) { updateLane(set: $set, where: { id: { eq: $id } }) { id } }`,

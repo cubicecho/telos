@@ -5,7 +5,7 @@ import { requireAi } from '../ai-gate.ts';
 import type { Context } from '../context.ts';
 import { loadAiTodo, requireText } from './requests.ts';
 
-// Recording an artifact from outside a run. A station's run reports what it
+// Recording an artifact from outside a run. A todo's run reports what it
 // made through `finishRun`, where the runner has checked each location against
 // what the run's tools did. Work done elsewhere, by an MCP client holding an
 // API key, has no such witness: the client says where the thing is and the

@@ -7,7 +7,7 @@ import { type Context, isAiActor } from '../context.ts';
 import { DOOR_TOOL_NAMES } from '../door.ts';
 import { assertCompletionMatchesLane, assertEveryProjectHasLanes, realignLanes, seedMissingLanes } from '../lanes.ts';
 import { stampActor } from '../provenance.ts';
-import { cancelRunsUnder } from '../stations.ts';
+import { cancelRunsUnder } from '../ready.ts';
 import { reachable } from '../tenancy.ts';
 import { requireAuth } from './auth.ts';
 
@@ -188,7 +188,7 @@ function assertIgnoreFlagFromPerson(args: Parameters<typeof writtenRows>[0], con
 }
 
 /**
- * Asking for a run is `runTodo`'s: it checks a station would take the todo,
+ * Asking for a run is `runTodo`'s: it checks the lane's agent would take the todo,
  * and records who asked.
  */
 function assertRunRequestUntouched(args: Parameters<typeof writtenRows>[0]): void {
@@ -295,7 +295,7 @@ async function assertArchiveOnSuccessFits(tx: AnyTable, userId: string): Promise
   if (rows.length === 0) return;
   const [lane] = rows;
   throw new GraphQLError(
-    `"${lane.name}" can archive on success or send todos to a success lane, not both. Clear one of them.`,
+    `"${lane.name}" can archive on success or have a success route to a lane, not both. Clear one of them.`,
     { extensions: { code: 'BAD_USER_INPUT' } },
   );
 }

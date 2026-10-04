@@ -2,7 +2,7 @@ import { MockedProvider } from '@apollo/client/testing';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { UpdateStationDocument } from '@/lib/graphql';
+import { UpdateLaneAgentDocument } from '@/lib/graphql';
 import { LaneAgentDialog, toDraft, toLaneAgentSet } from '../lane-agent-dialog';
 
 const LANES = [
@@ -52,7 +52,7 @@ describe('LaneAgentDialog', () => {
     const update = vi.fn(() => ({ data: { updateLane: [saved] } }));
     render(
       <MockedProvider
-        mocks={[{ request: { query: UpdateStationDocument }, variableMatcher: () => true, result: update }]}
+        mocks={[{ request: { query: UpdateLaneAgentDocument }, variableMatcher: () => true, result: update }]}
       >
         <LaneAgentDialog
           open

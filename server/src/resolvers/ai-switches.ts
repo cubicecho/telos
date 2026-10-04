@@ -4,8 +4,8 @@ import { extendSchema, GraphQLError, type GraphQLObjectType, type GraphQLSchema,
 import { requireAi } from '../ai-gate.ts';
 import type { Context } from '../context.ts';
 import { isAdmin, setInstanceAi } from '../instance.ts';
+import { cancelRunsUnder, dropRunRequests } from '../ready.ts';
 import { MAX_RETENTION_DAYS } from '../retention.ts';
-import { cancelRunsUnder, dropRunRequests } from '../stations.ts';
 import { requireSession } from './auth.ts';
 
 // The instance's, the account's and a project's AI switches. Only a person with a session
@@ -18,7 +18,7 @@ import { requireSession } from './auth.ts';
 // and switching the account off leaves each project's setting where it was, so
 // switching it back on restores the board the user had.
 //
-// A project has a second switch under its first: auto-run, whether its stations
+// A project has a second switch under its first: auto-run, whether its lanes' agents
 // start on todos by themselves. It stops nothing when it goes off.
 //
 // The instance's switch is an admin's: it decides for every account at once.
@@ -37,7 +37,7 @@ const AI_SWITCHES_SDL = parse(`
     setAiEnabled(enabled: Boolean!): User!
     "Opens a project to agents, or closes it. Opening one needs the account's AI on."
     setProjectAiEnabled(projectId: ID!, enabled: Boolean!): Project!
-    "Lets a project's stations start on todos by themselves, or only when asked (runTodo). Off, running work finishes."
+    "Lets a project's lanes' agents start on todos by themselves, or only when asked (runTodo). Off, running work finishes."
     setProjectAutoRun(projectId: ID!, enabled: Boolean!): Project!
     "How many days finished runs are kept before they are pruned. Null keeps them for good."
     setRunRetention(days: Int): User!

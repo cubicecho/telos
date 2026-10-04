@@ -377,7 +377,7 @@ query spend(
   }
 }
 
-# The saved board templates: a name and the lanes, with their station
+# The saved board templates: a name and the lanes, with their agent
 # settings, that `apply_board_template` would give a board.
 query boardTemplates {
   boardTemplates(orderBy: { name: { direction: asc, priority: 1 } }) {
@@ -480,8 +480,8 @@ mutation updateProject(
 }
 
 # Hands a piece of work to a project. It lands as a new todo at the back of
-# the project's first open lane, and the board takes it from there: check on
-# it with `request`. Write the brief for someone with no other context.
+# the lane the project sends new todos to (or else its first open lane), and
+# the board takes it from there: check on it with `request`. Write the brief for someone with no other context.
 mutation submitRequest(
   # From `projects`. The project must be open to AI.
   $projectId: ID!
@@ -523,7 +523,7 @@ mutation createTodo(
   $projectId: UUID!
   # One line: what is wanted.
   $title: String!
-  # A lane of that project, from `projects`. Left out, the first open lane.
+  # A lane of that project, from `projects`. Left out, the lane the project sends new todos to.
   $laneId: UUID
   # What to do and why, with whatever context the work needs.
   $brief: String
@@ -606,8 +606,8 @@ mutation moveTodo(
   }
 }
 
-# Sends a todo round its station again: the failures a station gave up on
-# are forgotten, and a station that finished with it starts over. Refused
+# Sends a todo round its lane's agent again: the failures the agent gave up
+# on are forgotten, and an agent that finished with it starts over. Refused
 # while an agent is working it.
 mutation retryTodo(
   # The todo.
@@ -633,7 +633,7 @@ mutation runTodo(
 }
 
 # Stops a run that is working a todo. The agent is told to stop at its next
-# step, and the todo is set aside from AI so no station picks it straight
+# step, and the todo is set aside from AI so no agent picks it straight
 # back up: it leaves your view too, until its owner lets AI at it again. A
 # draft's reply is stopped with `stop_draft`.
 mutation stopRun(
@@ -814,7 +814,7 @@ mutation stopDraft(
   }
 }
 
-# Makes a todo of a draft, in its project's first open lane, with the title
+# Makes a todo of a draft, in the lane its project sends new todos to, with the title
 # and brief the agent arrived at unless you give others.
 mutation makeTodoFromDraft(
   # The draft.
@@ -840,7 +840,7 @@ mutation discardDraft(
   discardDraft(id: $id)
 }
 
-# Saves a project's lanes and their station settings as a template,
+# Saves a project's lanes and their agents and routes as a template,
 # replacing a template of the same name.
 mutation saveBoardTemplate(
   # The project whose board to save, from `projects`.

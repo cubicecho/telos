@@ -17,9 +17,9 @@ import { LanePicker } from './lane-picker';
 export interface BoardAi {
   /** The run working each todo now, by todo id. */
   live: ReadonlyMap<string, LiveRun>;
-  /** The todos a station gave up on or finished with, by todo id. */
+  /** The todos an agent gave up on or finished with, by todo id. */
   stuck: ReadonlyMap<string, StuckTodo>;
-  /** The todos a station would work if asked, or has been asked to, by todo id. */
+  /** The todos an agent would work if asked, or has been asked to, by todo id. */
   waiting: ReadonlyMap<string, WaitingTodo>;
   onWatch: (todo: TodoSummary) => void;
   onRetry: (todo: TodoSummary) => void;
@@ -53,9 +53,9 @@ export function BoardCardBody({
   mark?: CardMark | undefined;
   /** The run working this todo now, when one is. */
   live?: LiveRun | undefined;
-  /** Why a station stopped on it, when one did and it waits on a person. */
+  /** Why an agent stopped on it, when one did and it waits on a person. */
   stuck?: StuckTodo | undefined;
-  /** Set when its project does not run by itself and a station would work it if asked, or has been. */
+  /** Set when its project does not run by itself and an agent would work it if asked, or has been. */
   waiting?: WaitingTodo | undefined;
   onWatch?: (() => void) | undefined;
   onRetry?: (() => void) | undefined;
@@ -160,7 +160,7 @@ export function BoardCardBody({
       ) : stuck ? (
         <View className="mt-2 flex-row items-start gap-2">
           <Text numberOfLines={2} className="min-w-0 flex-1 text-amber-700 text-xs dark:text-amber-400">
-            {stuck.reason ?? 'A station stopped on it.'}
+            {stuck.reason ?? 'An agent stopped on it.'}
           </Text>
           {onRetry ? (
             <Button

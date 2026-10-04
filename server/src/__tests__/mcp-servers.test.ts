@@ -50,7 +50,7 @@ async function addServer(slug: string, more: Record<string, unknown> = {}): Prom
   return (await board.person.expectOk(CREATE, { values })).createMcpServer.id;
 }
 
-/** What the runner is handed for a new todo on the board's station. The run is ended, so the station is free again. */
+/** What the runner is handed for a new todo in the board's agent lane. The run is ended, so the lane is free again. */
 async function claimed(): Promise<{ servers: Array<Record<string, unknown>>; notices: string[] }> {
   const todoId = await board.addTodo('Write it');
   const { runId, agent } = (await runner.expectOk(CLAIM_SERVERS, { todoId, laneId: board.lanes[0].id })).claimRun;

@@ -12,7 +12,7 @@ import {
 } from './board.ts';
 import { createTestDb, type TestClient, type TestDb } from './helpers.ts';
 
-// The stations as a person reads them, and sending a todo round again.
+// The lanes' agents as a person reads them, and sending a todo round again.
 
 let db: TestDb;
 let board: Board;
@@ -71,7 +71,7 @@ describe('aiStatus', () => {
     expect(project.lanes[1]).toMatchObject({ station: false, parked: 1 });
   });
 
-  it('asks for a person when a station gives up, and retryTodo sends it round again', async () => {
+  it('asks for a person when an agent gives up, and retryTodo sends it round again', async () => {
     await setLane(board.person, board.lanes[0].id, { maxAttempts: 1 });
     const todoId = await board.addTodo('Flaky');
     await fail(todoId);
@@ -90,7 +90,7 @@ describe('aiStatus', () => {
     ]);
   });
 
-  it('asks for a person when a station finished with a todo and has nowhere to send it', async () => {
+  it('asks for a person when an agent finished with a todo and has nowhere to send it', async () => {
     await setLane(board.person, board.lanes[0].id, { onSuccessLaneId: null });
     const todoId = await board.addTodo('Written');
     const claim = (await runner.expectOk(CLAIM, { todoId, laneId: board.lanes[0].id })).claimRun;
@@ -103,7 +103,7 @@ describe('aiStatus', () => {
     expect((await status()).todos[0].state).toBe('queued');
   });
 
-  it('parks what a station would take while auto-run is off, and lets a running todo finish', async () => {
+  it('parks what an agent would take while auto-run is off, and lets a running todo finish', async () => {
     const waiting = await board.addTodo('Waiting');
     const running = await board.addTodo('Running');
     await setLane(board.person, board.lanes[0].id, { wipLimit: 2 });

@@ -9,9 +9,9 @@ import { instanceAiOn } from '../instance.ts';
 import { findDoneLaneId, findNewTodoLaneId } from '../lanes.ts';
 import { runnerAgent } from '../mcp-servers.ts';
 import { stampActor } from '../provenance.ts';
+import { dropRunRequests, expireLapsedRuns, LEASE_SECONDS, readyTodos } from '../ready.ts';
 import { mintRunToken } from '../run-tokens.ts';
 import { markRunnerSeen } from '../runner-seen.ts';
-import { dropRunRequests, expireLapsedRuns, LEASE_SECONDS, readyTodos } from '../stations.ts';
 import { openSession } from '../todo-sessions.ts';
 import { requireAuth } from './auth.ts';
 
@@ -32,14 +32,14 @@ import { requireAuth } from './auth.ts';
 type AnyRow = any;
 
 const RUNS_SDL = parse(`
-  "A todo a station could start on now, and the station."
+  "A todo a lane's agent could start on now, and the lane."
   type ReadyTodo {
     todoId: ID!
     laneId: ID!
     projectId: ID!
   }
 
-  "The agent a station names, secret included. Only ever handed to the runner. Null inherits from \`defaults\`."
+  "The agent a lane names, secret included. Only ever handed to the runner. Null inherits from \`defaults\`."
   type RunnerAgent {
     id: ID!
     name: String!
@@ -181,12 +181,12 @@ const RUNS_SDL = parse(`
   }
 
   extend type Query {
-    "What the stations could start on now. The runner's only."
+    "What lanes' agents could start on now. The runner's only."
     runnerQueue(limit: Int = 20): [ReadyTodo!]!
   }
 
   extend type Mutation {
-    "Starts a run of a ready todo at its station. Null when it is no longer ready. The runner's only."
+    "Starts a run of a ready todo by its lane's agent. Null when it is no longer ready. The runner's only."
     claimRun(todoId: ID!, laneId: ID!): RunClaim
     "Keeps a run's lease. True means stop: somebody asked, or AI was switched off. The runner's only."
     heartbeatRun(id: ID!, events: [RunEventInput!], prompt: RunPromptInput, usage: RunUsageInput): Boolean!
@@ -266,7 +266,7 @@ async function loadRunForUpdate(tx: AnyRow, runId: string) {
   const [run] = await tx.select().from(dbSchema.runs).where(eq(dbSchema.runs.id, runId)).for('update');
   if (!run) throw notFound('Run');
   if (run.kind !== 'todo') {
-    throw new GraphQLError("That run is a draft's reply, which has no station. Report it with finishDraft.", {
+    throw new GraphQLError("That run is a draft's reply, which has no lane. Report it with finishDraft.", {
       extensions: { code: 'BAD_USER_INPUT' },
     });
   }
@@ -778,7 +778,7 @@ export function applyRunsExtension(schema: GraphQLSchema): GraphQLSchema {
     requireSystem(context);
     try {
       return await (context.db as AnyRow).transaction(async (tx: AnyRow) => {
-        // Claims at one station take turns, so two runners cannot both see
+        // Claims in one lane take turns, so two runners cannot both see
         // room under its WIP limit and both take it.
         const [lane] = await tx.select().from(dbSchema.lanes).where(eq(dbSchema.lanes.id, args.laneId)).for('update');
         if (!lane) return null;
@@ -889,7 +889,7 @@ export function applyRunsExtension(schema: GraphQLSchema): GraphQLSchema {
         .where(eq(dbSchema.runs.id, run.id))
         .returning();
       // Stopping a run means "not now", and the queue would otherwise hand the
-      // todo straight back to the same station. So AI is told to leave it alone,
+      // todo straight back to the same agent. So AI is told to leave it alone,
       // as the MCP door's cancelRequest does; switching that off again is the
       // way back in, and the history says why it went on.
       await stampActor(tx, context.actor, { reason: 'Its run was stopped.' });

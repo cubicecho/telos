@@ -2,7 +2,7 @@ import * as dbSchema from '@telos/db/schema';
 import { and, eq, sql } from 'drizzle-orm';
 
 // A draft's replies as runs. Each time an agent answers a draft, that answer is
-// a run of kind `draft`: the same row a station's work leaves, with no todo, no
+// a run of kind `draft`: the same row a lane's agent leaves, with no todo, no
 // lane and no contract. The run holds the lease while the agent answers, so
 // "is somebody answering this draft" and "is somebody working this todo" are
 // asked the same way.

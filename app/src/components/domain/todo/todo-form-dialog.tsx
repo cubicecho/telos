@@ -28,7 +28,7 @@ import type { TodoSummary } from './types';
  * Beside the form, the todo's record: its notes thread and its history, each a
  * tab, loaded only when opened. "AI ignores this" is the one AI field, drawn —
  * and sent — only while AI is on for the account. With AI on for the project
- * as well, a Runs tab shows what the stations' agents made of it.
+ * as well, a Runs tab shows what the lanes' agents made of it.
  *
  * A `DialogLayout`, so the title and the Save stay put and only the body
  * scrolls: a long thread or history would otherwise carry the whole dialog,

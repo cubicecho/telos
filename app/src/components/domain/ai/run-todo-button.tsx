@@ -10,7 +10,7 @@ const REFRESHED: ReadonlySet<string> = new Set(['ProjectActivity', 'TodoRuns']);
 
 /**
  * Asks for a todo to be worked now, where it stands. The server decides
- * whether a station would take it and says why not in words meant for the
+ * whether an agent would take it and says why not in words meant for the
  * person, so those are shown as they come. Drawn only while AI is on for the
  * account and the project; the todo dialog decides that.
  */
@@ -54,7 +54,7 @@ export function RunTodoButton({ todoId, title }: { todoId: string; title: string
       ) : null}
       {asked ? (
         <Text className="text-muted-foreground text-xs" aria-live="polite">
-          Asked. An agent takes it when its station has room.
+          Asked. An agent takes it when its lane has room.
         </Text>
       ) : null}
     </View>

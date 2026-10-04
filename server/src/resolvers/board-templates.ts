@@ -78,7 +78,7 @@ export function checkTemplateLanes(value: unknown): TemplateLane[] {
     }
     const archiveOnSuccess = lane.archiveOnSuccess === true;
     if (archiveOnSuccess && index(lane.onSuccess) != null) {
-      throw badInput(`"${name}" can archive on success or send todos to a success lane, not both.`);
+      throw badInput(`"${name}" can archive on success or have a success route to a lane, not both.`);
     }
     return {
       name,

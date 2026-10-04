@@ -1,14 +1,14 @@
 import { useMutation } from '@apollo/client';
 import { useEffect, useMemo } from 'react';
 import { Text } from 'react-native';
-import type { StationFieldsFragment } from '@/__generated__/graphql';
+import type { LaneAgentFieldsFragment } from '@/__generated__/graphql';
 import { useAppForm } from '@/components/app-form';
 import type { LaneSummary } from '@/components/domain/lane/lane-badge';
 import { Form } from '@/components/ui/form';
 import { FormDialog, FormDialogFooter } from '@/components/ui/form-dialog';
 import { numberRule } from '@/lib/agents';
 import { describeError } from '@/lib/errors';
-import { UpdateStationDocument } from '@/lib/graphql';
+import { UpdateLaneAgentDocument } from '@/lib/graphql';
 
 /** "No agent" and "stay here", as a select can hold them: radix refuses an empty value. */
 const NONE = 'none';
@@ -42,7 +42,7 @@ export interface LaneAgentDraft {
  * @param lane - The lane's agent settings, or null before they load.
  * @returns The form's values.
  */
-export function toDraft(lane: StationFieldsFragment | null): LaneAgentDraft {
+export function toDraft(lane: LaneAgentFieldsFragment | null): LaneAgentDraft {
   return {
     agentId: lane?.agentId ?? NONE,
     onSuccess: lane?.archiveOnSuccess ? ARCHIVE : (lane?.onSuccessLaneId ?? NONE),
@@ -92,10 +92,10 @@ export function LaneAgentDialog({
   onOpenChange: (open: boolean) => void;
   lane: LaneSummary;
   lanes: readonly LaneSummary[];
-  settings: StationFieldsFragment | null;
+  settings: LaneAgentFieldsFragment | null;
   agents: readonly LaneAgentChoice[];
 }) {
-  const [updateLane, { error }] = useMutation(UpdateStationDocument);
+  const [updateLane, { error }] = useMutation(UpdateLaneAgentDocument);
   const initial = useMemo(() => toDraft(settings), [settings]);
   const form = useAppForm({
     defaultValues: initial,

@@ -13,14 +13,14 @@ export const SPEND_DAYS = 30;
 
 export type LiveRun = ProjectActivityQuery['live'][number];
 
-/** Where a todo stands with the stations. */
-export type StationTodo = ProjectActivityQuery['stations']['todos'][number];
+/** Where a todo stands with the lanes' agents. */
+export type WorkTodo = ProjectActivityQuery['work']['todos'][number];
 
-/** A todo a station gave up on or finished with, and why. */
-export type StuckTodo = StationTodo;
+/** A todo an agent gave up on or finished with, and why. */
+export type StuckTodo = WorkTodo;
 
-/** A todo a station would work if asked, or has been asked to and has not started. */
-export type WaitingTodo = StationTodo;
+/** A todo an agent would work if asked, or has been asked to and has not started. */
+export type WaitingTodo = WorkTodo;
 
 export interface ProjectActivity {
   /** The run working each todo now, by todo id. */
@@ -82,19 +82,19 @@ export function useProjectActivity(projectId: string, { skip = false }: { skip?:
     return byTodo;
   }, [rows]);
   const drafting = useMemo(() => (rows ?? []).filter((run) => run.kind === DRAFT_RUN), [rows]);
-  const stations = query.data?.stations.todos;
+  const work = query.data?.work.todos;
   const stuck = useMemo(
-    () => new Map((stations ?? []).filter((todo) => todo.state === 'attention').map((todo) => [todo.todoId, todo])),
-    [stations],
+    () => new Map((work ?? []).filter((todo) => todo.state === 'attention').map((todo) => [todo.todoId, todo])),
+    [work],
   );
   const waiting = useMemo(
     () =>
       new Map(
-        (stations ?? [])
+        (work ?? [])
           .filter((todo) => todo.awaitsRun || (todo.runRequested && todo.state === 'queued'))
           .map((todo) => [todo.todoId, todo]),
       ),
-    [stations],
+    [work],
   );
   return {
     live,

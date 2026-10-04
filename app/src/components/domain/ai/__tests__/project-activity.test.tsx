@@ -17,7 +17,7 @@ function activity(live: unknown[], drafts: { count: number; totalTokens: number 
     variableMatcher: () => true,
     result: {
       data: {
-        stations: { __typename: 'AiStatus', todos: [] },
+        work: { __typename: 'AiStatus', todos: [] },
         live,
         spent: {
           __typename: 'RunAggregate',

@@ -115,7 +115,7 @@ describe('a person with AI off', () => {
 });
 
 describe('an instance with AI off', () => {
-  it('has no runner, agents or stations in its schema', async () => {
+  it('has no runner or agents in its schema', async () => {
     const person = createClient(db, off.userId, { ai: false });
     const schema = await person.expectOk(`query {
       query: __type(name: "Query") { fields { name } }

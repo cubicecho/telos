@@ -95,7 +95,7 @@ export function AccountActivity({
 }
 
 /**
- * "2 of 1 attempts", for a todo at a station, or how many failed where there is none.
+ * "2 of 1 attempts", for a todo in a lane with an agent, or how many failed where there is none.
  *
  * @param todo - The todo.
  * @returns The line, or null when it has used no attempt.

@@ -6,7 +6,7 @@ import { describeError } from '@/lib/errors';
 import { RunRetentionDocument, SetRunRetentionDocument } from '@/lib/graphql';
 
 // How long finished runs are kept. The server prunes hourly, and only runs the
-// stations no longer count, so a shorter setting never makes an agent redo work.
+// agents no longer count, so a shorter setting never makes an agent redo work.
 
 const CHOICES = [
   { value: 'forever', label: 'For good', days: null },
@@ -39,7 +39,7 @@ export function RunRetention() {
     <Section
       surface="card"
       title="Run history"
-      description="How long finished runs and their logs are kept. Notes, history and artifacts stay either way, and a run a station still counts is never pruned."
+      description="How long finished runs and their logs are kept. Notes, history and artifacts stay either way, and a run an agent still counts is never pruned."
       content={
         <View className="gap-2">
           <SegmentedGroup aria-label="Keep finished runs" value={current} onValueChange={choose}>

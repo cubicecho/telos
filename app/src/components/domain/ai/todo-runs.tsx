@@ -11,7 +11,7 @@ import { describeError } from '@/lib/errors';
 import { DeleteArtifactDocument, TodoRunsDocument } from '@/lib/graphql';
 import { RUN_POLL_MS, RunRow } from './run-row';
 
-// A todo's runs — each time a station's agent worked it — and the artifacts
+// A todo's runs — each time a lane's agent worked it — and the artifacts
 // made for it, by those runs or by a client outside one. Drawn only while AI is
 // on for the account and the project; the todo dialog decides that, from the
 // same query this reads.

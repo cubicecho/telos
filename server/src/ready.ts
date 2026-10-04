@@ -2,13 +2,13 @@ import { type SQL, sql } from 'drizzle-orm';
 import { resultRows } from './blocking.ts';
 import { INSTANCE_AI_ON } from './instance.ts';
 
-// The station rules, in one place: which todos an agent may start on, and how
-// to stop what is running. A lane with an agent is a station; the runner asks
+// The readiness rules, in one place: which todos a lane's agent may start on,
+// and how to stop what is running. The runner asks
 // `runnerQueue` what to start, and `claimRun` asks the same question again for
 // one todo inside the claiming transaction, so what is claimable is decided by
 // one piece of SQL rather than two that could drift.
 //
-// A todo is ready at a station when all of these hold:
+// A todo is ready for its lane's agent when all of these hold:
 //
 //   - every AI switch over it is on: its user's, its project's, and it is not
 //     ignored — the same three checks a run token makes on every request
@@ -16,12 +16,11 @@ import { INSTANCE_AI_ON } from './instance.ts';
 //     to be run (runTodo), which holds until a run claims it
 //   - the project is not archived, and the todo is open and not blocked
 //   - nothing is working it now (a running run inside its lease)
-//   - the station has not already finished with it: no `ok` run in this lane
+//   - the lane's agent has not already finished with it: no `ok` run in this lane
 //     since the todo last arrived here
 //   - it has failed no more than `maxAttempts` times since a person last
 //     touched it, which is what stops a Doing↔Review loop spending forever
-//   - an `expand` station has somewhere to put what it produces
-//   - the station has room under its WIP limit
+//   - the lane has room under its WIP limit
 
 // biome-ignore lint/suspicious/noExplicitAny: db type varies by driver (postgres-js, PGlite)
 type AnyDb = any;
@@ -69,7 +68,7 @@ export function failuresSinceTouched(todoId: SQL): SQL {
 }
 
 /**
- * The todos stations could start on now, first station and first todo first.
+ * The todos lanes' agents could start on now, first lane and first todo first.
  *
  * @param db The database or transaction.
  * @param filter Narrows the question to one todo in one lane, which is how a claim asks it.
@@ -194,22 +193,22 @@ export async function dropRunRequests(db: AnyDb, where: { todoId: string } | { p
   await db.execute(sql`UPDATE todos SET run_requested_at = NULL WHERE run_requested_at IS NOT NULL AND ${narrow}`);
 }
 
-/** Where a todo stands with the stations, for a person reading the board. */
-export type StationState = 'attention' | 'running' | 'blocked' | 'queued' | 'parked' | 'done';
+/** Where a todo stands with its lane's agent, for a person reading the board. */
+export type WorkState = 'attention' | 'running' | 'blocked' | 'queued' | 'parked' | 'done';
 
-export interface StationTodo {
+export interface WorkTodo {
   todoId: string;
   title: string;
   projectId: string;
   laneId: string | null;
-  state: StationState;
+  state: WorkState;
   /** Why it is where it is, when that needs saying. */
   reason: string | null;
   /** Failed runs since a person last touched it. */
   failures: number;
   /** The run working it now, if one is. */
   liveRunId: string | null;
-  /** A station would take it, were it asked to: its project does not run by itself. */
+  /** Its lane's agent would take it, were it asked to: its project does not run by itself. */
   awaitsRun: boolean;
   /** A person asked for it to be run, and no run has taken it yet. */
   runRequested: boolean;
@@ -226,13 +225,12 @@ export interface LaneTally {
  * rules `readyTodos` applies, read back as a reason instead of a filter.
  *
  *   - running: a run holds it now
- *   - parked: no station will ever pick it up where it is (no lane, no agent
- *     or one switched off, AI told to ignore it, an expand lane with nowhere
- *     to put what it makes)
- *   - attention: a station gave up on it (more failures than the lane allows)
+ *   - parked: no agent will ever pick it up where it is (no lane, no agent
+ *     or one switched off, AI told to ignore it)
+ *   - attention: its lane's agent gave up on it (more failures than the lane allows)
  *     or finished with it and has nowhere to send it
  *   - blocked: it waits on something unfinished
- *   - queued: a station will start on it when there is room
+ *   - queued: its lane's agent will start on it when there is room
  *
  * A todo that would be queued is parked instead while its project's auto-run
  * is off, until a person asks for it to be run.
@@ -245,11 +243,11 @@ export interface LaneTally {
  * @param projectId Narrows it to one project.
  * @returns The open todos, in board order, and the done counts.
  */
-export async function stationStates(
+export async function workStates(
   db: AnyDb,
   userId: string,
   projectId?: string | null,
-): Promise<{ todos: StationTodo[]; done: LaneTally[] }> {
+): Promise<{ todos: WorkTodo[]; done: LaneTally[] }> {
   const project = projectId ? sql`AND p.id = ${projectId}` : sql``;
   const open = resultRows<{
     todo_id: string;
@@ -319,7 +317,7 @@ export async function stationStates(
     `),
   );
 
-  const todos = open.map((row): StationTodo => {
+  const todos = open.map((row): WorkTodo => {
     const [state, reason] = judge(row);
     return {
       todoId: row.todo_id,
@@ -351,7 +349,7 @@ export async function stationStates(
   return { todos, done };
 }
 
-/** Why a todo a station could take is not queued, in a project that waits to be asked. */
+/** Why a todo a lane's agent could take is not queued, in a project that waits to be asked. */
 const AUTO_RUN_OFF = 'Auto-run is off.';
 
 function judge(row: {
@@ -369,7 +367,7 @@ function judge(row: {
   last_failure: string | null;
   blockers: string | null;
   live_run_id: string | null;
-}): [StationState, string | null] {
+}): [WorkState, string | null] {
   if (row.live_run_id) return ['running', null];
   if (!row.lane_id) return ['parked', 'It is in no lane.'];
   if (row.ai_ignored) return ['parked', 'AI is told to ignore it.'];

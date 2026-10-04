@@ -53,8 +53,8 @@ type Editing = { agent: AgentRow } | { starter: AgentStarter | null };
  * Agents: the models a lane can hand its todos to. Rendered only while AI is
  * on for the instance and the account — the schema has no agents otherwise.
  *
- * An agent does nothing on its own. It is named by a lane (a station), and the
- * runner works it there, so deleting one quietly turns its stations back into
+ * An agent does nothing on its own. It is named by a lane, and the
+ * runner works it there, so deleting one quietly turns its lanes back into
  * ordinary lanes rather than failing. What it leaves blank it inherits from
  * the account's defaults (AgentDefaultsForm).
  */
@@ -155,7 +155,7 @@ export function AgentManager() {
                     className="hover:text-destructive"
                     label={`Delete ${agent.name}`}
                     title={`Delete “${agent.name}”?`}
-                    description="Lanes it works stop being stations, and its runs lose their agent. This cannot be undone."
+                    description="Lanes it works lose their agent, and its runs lose their agent. This cannot be undone."
                     confirmLabel="Delete"
                     onConfirm={() => confirmDelete(agent)}
                   >
@@ -310,10 +310,7 @@ export function AgentFormDialog({
             </form.AppField>
             <form.AppField name="enabled">
               {(field) => (
-                <field.SwitchField
-                  label="On"
-                  description="Off, it takes no runs and no drafts, and its stations wait."
-                />
+                <field.SwitchField label="On" description="Off, it takes no runs and no drafts, and its lanes wait." />
               )}
             </form.AppField>
 

@@ -495,8 +495,8 @@ describe('working the board', () => {
 });
 
 describe('the board’s agents and runs', () => {
-  /** A board with a station, an agent and a key, which runs only what it is asked to. */
-  async function station() {
+  /** A board with an agent lane, an agent and a key, which runs only what it is asked to. */
+  async function agentBoard() {
     const b = await createBoard(db, 'a@example.com');
     const { id: keyId, key } = await mintApiKey(authFor(db), { userId: b.userId, name: 'claude' });
     await b.person.expectOk(SET_AUTO_RUN, { id: b.projectId, enabled: false });
@@ -504,7 +504,7 @@ describe('the board’s agents and runs', () => {
   }
 
   it('lists the agents and their lanes, and nothing secret about them', async () => {
-    const b = await station();
+    const b = await agentBoard();
     const client = await connect(await serve(), b.key);
     const result = await call(client, 'agents');
     expect(result.agentRoster).toEqual([
@@ -523,7 +523,7 @@ describe('the board’s agents and runs', () => {
   });
 
   it('asks for a run, reads it and its log, stops it, and sends the todo round again', async () => {
-    const b = await station();
+    const b = await agentBoard();
     const todo = await b.addTodo('Work me');
     const client = await connect(await serve(), b.key);
     expect((await call(client, 'run_todo', { id: todo })).runTodo.runRequestedAt).not.toBeNull();
@@ -545,14 +545,14 @@ describe('the board’s agents and runs', () => {
   });
 
   it('says what the account has spent', async () => {
-    const b = await station();
+    const b = await agentBoard();
     const client = await connect(await serve(), b.key);
     const { aiSpend } = await call(client, 'spend', { since: new Date(0).toISOString() });
     expect(aiSpend.total).toMatchObject({ runs: 0, totalTokens: 0 });
   });
 
   it('talks a draft over and makes a todo of it, or discards it', async () => {
-    const b = await station();
+    const b = await agentBoard();
     const client = await connect(await serve(), b.key);
     const { startDraft } = await call(client, 'start_draft', {
       projectId: b.projectId,
@@ -586,7 +586,7 @@ describe('the board’s agents and runs', () => {
   });
 
   it('saves a board as a template and gives a new board one', async () => {
-    const b = await station();
+    const b = await agentBoard();
     const client = await connect(await serve(), b.key);
     const { saveBoardTemplate } = await call(client, 'save_board_template', {
       projectId: b.projectId,
@@ -605,8 +605,8 @@ describe('the board’s agents and runs', () => {
     );
   });
 
-  /** A run of a fresh todo on the station's board, and its token. */
-  async function liveRun(b: Awaited<ReturnType<typeof station>>) {
+  /** A run of a fresh todo on the agent lane's board, and its token. */
+  async function liveRun(b: Awaited<ReturnType<typeof agentBoard>>) {
     const todoId = await b.addTodo('Worked');
     await b.person.expectOk('mutation ($id: ID!) { runTodo(id: $id) { id } }', { id: todoId });
     const { runId, token } = (await runnerClient(db).expectOk(CLAIM, { todoId, laneId: b.lanes[0].id })).claimRun;
@@ -617,13 +617,13 @@ describe('the board’s agents and runs', () => {
     updateAgent(set: $set, where: { id: { eq: $id } }) { id toolsOff }
   }`;
 
-  /** Sets which door tools the station's agent has off for its runs; null is the run default. */
-  async function setRunTools(b: Awaited<ReturnType<typeof station>>, off: string[] | null) {
+  /** Sets which door tools the lane's agent has off for its runs; null is the run default. */
+  async function setRunTools(b: Awaited<ReturnType<typeof agentBoard>>, off: string[] | null) {
     await b.person.expectOk(SET_AGENT, { id: b.agentId, set: { toolsOff: off } });
   }
 
   it('gives a run reading, adding work and notes, unless its agent says otherwise', async () => {
-    const b = await station();
+    const b = await agentBoard();
     const { todoId, token } = await liveRun(b);
     const url = await serve();
     const run = await connectRun(url, token);
@@ -660,7 +660,7 @@ describe('the board’s agents and runs', () => {
   });
 
   it('holds a run to its own todo’s tree and what it made, whatever its switches say', async () => {
-    const b = await station();
+    const b = await agentBoard();
     await setRunTools(b, []);
     const { todoId, token } = await liveRun(b);
     const elsewhere = await b.addTodo('Someone else’s');
@@ -701,7 +701,7 @@ describe('the board’s agents and runs', () => {
   });
 
   it('holds a run to its own board', async () => {
-    const b = await station();
+    const b = await agentBoard();
     await setRunTools(b, []);
     const { token } = await liveRun(b);
     const { createProject } = await b.person.expectOk('mutation { createProject(values: { name: "Other" }) { id } }');
@@ -712,7 +712,7 @@ describe('the board’s agents and runs', () => {
   });
 
   it('keeps an agent’s switches to tools the door has', async () => {
-    const b = await station();
+    const b = await agentBoard();
     const unknown = await b.person.expectError(SET_AGENT, {
       id: b.agentId,
       set: { toolsOff: ['move_todo', 'teleport'] },
@@ -727,7 +727,7 @@ describe('the board’s agents and runs', () => {
   });
 
   it('lists which tools a run may have, and which it has by default', async () => {
-    const b = await station();
+    const b = await agentBoard();
     const { mcpTools } = await b.person.expectOk('{ mcpTools { name forRuns runDefault } }');
     const named = (name: string) => mcpTools.find((tool: { name: string }) => tool.name === name);
     expect(named('todos')).toEqual({ name: 'todos', forRuns: true, runDefault: true });

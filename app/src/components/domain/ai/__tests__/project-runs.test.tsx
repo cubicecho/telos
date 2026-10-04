@@ -85,7 +85,7 @@ describe('ProjectRuns', () => {
       </MockedProvider>,
     );
 
-    // One station run and one reply are under way.
+    // One lane run and one reply are under way.
     expect(await screen.findByRole('button', { name: /Running now.*2.*1 draft reply/ })).toBeInTheDocument();
     expect(screen.getByText('in 30 days, 4 draft replies')).toBeInTheDocument();
     expect(screen.getByText('30,000 in, 1,200 out, 900 on drafts, 30 days')).toBeInTheDocument();
