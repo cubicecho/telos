@@ -124,15 +124,15 @@ every level:
    `AI_ENABLED=false`.
 2. **The account**: Settings → AI. Off, the account's API keys stop working and
    nothing the runner does touches its rows. On, Settings gains two tabs:
-   **Agents** (the agent defaults, the agents and the lane presets) and
+   **Agents** (the agent defaults and the agents) and
    **MCP servers**.
 3. **The project**: its AI switch. Off, the project takes no requests and its
-   stations sit idle.
-   Under it is a second switch, **auto-run**: whether the project's stations
+   lanes' agents sit idle.
+   Under it is a second switch, **auto-run**: whether the project's agents
    start on todos by themselves. It is off on a new project, so switching AI on
-   starts nothing. Off, a station works a todo only when you ask: **Run now**,
-   on its card or in its Runs tab, has the station it stands in work it once.
-   It then follows the lane's arrow and waits again. Switching auto-run off
+   starts nothing. Off, an agent works a todo only when you ask: **Run now**,
+   on its card or in its Runs tab, has the agent of the lane it stands in work
+   it once. It then follows the lane's route and waits again. Switching auto-run off
    lets what is running finish.
 4. **The todo**: "AI ignores this". The runner leaves it alone.
 
@@ -146,29 +146,37 @@ write notes, record what they made for a todo (`record_artifact`: where it is
 and what to call it), and save or apply a board template. Each key has a switch
 per tool in Settings, all on until you turn one off; a tool that is off is
 neither offered to the key nor allowed to it, so a read-only key is one with
-its writing tools off. The AI switches, agents, keys, lanes and stations, bulk
+its writing tools off. The AI switches, agents, keys, lanes and their agents, bulk
 changes and deleting a project stay yours. Nothing checks what a client
 records, so the board lists it as unverified, signed with the key that said it. **The runner** is telos's own
-worker. A lane with an agent is a *station*: the runner claims a todo there,
-has the agent work it, verify it, or split it into child todos, and telos moves
-it along the lane's arrows. A new agent can start from one of four templates
-(Settings → Agents → From template): a **Refiner** for drafts, a **Planner** for
-Expand stations, a **Worker** for Work stations and a **Reviewer** for Verdict
-ones. Each comes with a prompt and a temperature for its job; give it a base URL
+worker. Four ideas make it up:
+
+- an **agent** is a model and its instructions;
+- a **lane** is a column; give it an agent (its menu, **Agent…**) and each
+  ready todo there becomes a run, which on success or failure follows the
+  lane's success or failure route;
+- a **run** ends in success or failure, with a report and, if the agent chose,
+  new todos;
+- a **draft** is a request talked over before it is a todo.
+
+What an agent does is in its instructions, and every reply is read the same
+way: one that opens with FAIL sends the todo along the failure route, anything
+else passes (open with PASS to say so). A passing run can split its todo into
+new ones, which land in the lane the project sends new todos to (set in the
+project's form; the first open lane otherwise), and the todo waits on them. A
+new agent can start from one of four starters (Settings → Agents → Start from):
+a **Refiner** for drafts, a **Planner** that splits work into todos, a
+**Worker** that does it and a **Reviewer** that rules PASS or FAIL. Each comes
+with instructions and a temperature for its job; give it a base URL
 and a model, or leave those to your agent defaults. An agent's form, like the
 defaults', starts at its endpoint: type the base URL (and a key, if it wants
 one) and its models are listed, to pick from, with the context length each
 reports; an endpoint that lists nothing still takes a model typed by name.
 A reasoning effort (off, or a level from none to max) is sent as
 `reasoning_effort` to a model that deliberates; an agent can turn off a level its
-defaults ask for. A station can archive what passes instead of
-moving it: the todo is completed and leaves the board, for a pipeline whose
-finished work nobody needs to see in a column. Stations that do the same job
-can follow one **lane preset** (Settings → Agents): its contract, prompt, WIP limit
-and attempts. A lane keeps its own value for any field it overrides and follows
-the preset for the rest, and its own prompt is added after the preset's. A
-preset lists the lanes following it and what each overrides; deleting it copies
-its values into them first. It claims by itself in a project with auto-run on,
+defaults ask for. A lane's success route can archive
+what passes instead of moving it: the todo is completed and leaves the board,
+for a pipeline whose finished work nobody needs to see in a column. The runner claims by itself in a project with auto-run on,
 and only the todos you asked for in one with it off. Each run keeps a log of its tool calls, which the
 todo shows as it goes, and a list of what it made: files it wrote, and anything
 the agent chose to record. What was made for a todo outlives it: delete the
@@ -192,7 +200,7 @@ it.
 
 Before a request is a todo you can **talk it over** with an agent: it asks what
 it needs to and writes the title and brief as you go. Each of its replies is a
-run like a station's, with the agent, the model, what it was told, what it said
+run like a todo's, with the agent, the model, what it was told, what it said
 and what it spent, so a reply that failed can be opened and read. They are
 listed in the draft and among the project's runs, marked as drafts, and counted
 in its spend; a todo made from a draft shows them at the top of its history. A
@@ -205,9 +213,9 @@ whether there is anything to do.
 
 Getting a first run takes a few steps in a few places, so the app keeps a
 **setup checklist** until they are all taken: the two switches, an agent, a
-station, the project's switch, a first request, something that lets work start
+lane with an agent, the project's switch, a first request, something that lets work start
 (auto-run, or Run now), and the runner having asked for work in the last
-minute. It shows on the home page, on a project with no station, and on the
+minute. It shows on the home page, on a project with no lane with an agent, and on the
 project it points at. Each row is read from what is there now and links to
 where it is fixed, and the list goes away when every row is ticked. An account
 with AI off gets one line offering it on the home page, and with
@@ -216,11 +224,11 @@ with AI off gets one line offering it on the home page, and with
 A card on the board says at a glance what you would otherwise open it to find:
 how many notes you or an outside client left on it, **Sent back** when a
 reviewer rejected the work and **Run failed** when the run never finished (the
-reason is one press away on either), and how many attempts the station has
+reason is one press away on either), and how many attempts the lane's agent has
 used of its limit. The marks update as the board does. The note count is there
 with AI off too.
 
-**Activity**, beside Stations in the sidebar, is the same thing across every
+**Activity**, beside Agents in the sidebar, is the same thing across every
 project you own. At the top is what needs you: each todo that is out of
 attempts or whose last run errored, with its project, the reason, and a way to
 send it round again. Under it is what the last 30 days cost in tokens, by

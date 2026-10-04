@@ -3,7 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { GraphQLError } from 'graphql';
 import { describe, expect, it, vi } from 'vitest';
-import { AGENT_TEMPLATES } from '@/lib/agent-templates';
+import { AGENT_STARTERS } from '@/lib/agent-starters';
 import {
   AgentDefaultsDocument,
   AgentModelsDocument,
@@ -200,10 +200,10 @@ describe('AgentManager', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
 
-  it('creates an agent from a template, needing only an endpoint and a model', async () => {
+  it('creates an agent from a starter, needing only an endpoint and a model', async () => {
     minted = 0;
     const user = userEvent.setup();
-    const reviewer = AGENT_TEMPLATES.find((template) => template.id === 'reviewer');
+    const reviewer = AGENT_STARTERS.find((starter) => starter.id === 'reviewer');
     const values = {
       id: 'id-1',
       name: 'Reviewer',
@@ -233,12 +233,12 @@ describe('AgentManager', () => {
     ]);
 
     expect(await screen.findByText('No agents yet.')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'From template' }));
+    await user.click(screen.getByRole('button', { name: 'Start from' }));
     expect((await screen.findAllByRole('menuitem')).map((item) => item.textContent)).toEqual([
-      'RefinerDrafts',
-      'PlannerExpand',
-      'WorkerWork',
-      'ReviewerVerdict',
+      'Refiner',
+      'Planner',
+      'Worker',
+      'Reviewer',
     ]);
     await user.click(screen.getByRole('menuitem', { name: /Reviewer/ }));
 
@@ -256,7 +256,7 @@ describe('AgentManager', () => {
     const user = userEvent.setup();
     manager([agents([]), servers([SERVER]), tools]);
 
-    await user.click(await screen.findByRole('button', { name: 'From template' }));
+    await user.click(await screen.findByRole('button', { name: 'Start from' }));
     await user.click(await screen.findByRole('menuitem', { name: /Refiner/ }));
 
     expect(await screen.findByRole('checkbox', { name: 'Every server' })).not.toBeChecked();

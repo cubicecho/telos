@@ -48,7 +48,7 @@ export function runEvents(run: Pick<RunFieldsFragment, 'events'>): RunEvent[] {
   return Array.isArray(run.events) ? (run.events as RunEvent[]) : [];
 }
 
-/** A run that is an agent's reply in a draft, rather than a station's work on a todo. */
+/** A run that is an agent's reply in a draft, rather than a lane agent's work on a todo. */
 export const DRAFT_RUN = 'draft';
 
 /**

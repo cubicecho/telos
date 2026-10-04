@@ -36,7 +36,7 @@ async function keyNote(key: TestClient, body = 'From outside.'): Promise<string>
   return (await key.expectOk(ADD_NOTE, { todoId, body })).addTodoNote.id;
 }
 
-/** Runs the todo's station once, which leaves a report on the thread. */
+/** Runs the todo's lane agent once, which leaves a report on the thread. */
 async function reportId(): Promise<string> {
   const runner = runnerClient(db);
   const { runId } = (await runner.expectOk(CLAIM, { todoId, laneId: board.lanes[0].id })).claimRun;

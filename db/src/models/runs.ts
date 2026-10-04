@@ -3,7 +3,7 @@ import { check, index, integer, jsonb, pgTable, text, timestamp, uniqueIndex, uu
 
 import { agents } from './agents.ts';
 import { drafts } from './drafts.ts';
-import { type LaneContract, lanes } from './lanes.ts';
+import { lanes } from './lanes.ts';
 import { projects } from './projects.ts';
 import { todos } from './todos.ts';
 import { users } from './users.ts';
@@ -17,8 +17,8 @@ export const RUN_STATUSES = ['running', 'ok', 'error', 'stopped'] as const;
 export type RunStatus = (typeof RUN_STATUSES)[number];
 
 /**
- * What a run was for. `todo` is an agent working a todo at a station. `draft`
- * is an agent answering one turn of a draft, which no station counts.
+ * What a run was for. `todo` is a lane's agent working a todo. `draft`
+ * is an agent answering one turn of a draft, which readiness does not count.
  */
 export const RUN_KINDS = ['todo', 'draft'] as const;
 export type RunKind = (typeof RUN_KINDS)[number];
@@ -49,7 +49,7 @@ export interface RunEvent {
 // for one to stop — so it is read-only through the API.
 //
 // A run belongs to a todo or to a draft, never both (`ck_runs_owner`). What the
-// stations read is a todo's runs, so anything that asks about runs without
+// readiness reads is a todo's runs, so anything that asks about runs without
 // naming a todo has to say `kind = 'todo'`.
 export const runs = pgTable(
   'runs',
@@ -62,17 +62,14 @@ export const runs = pgTable(
       .notNull()
       .references(() => projects.id, { onDelete: 'cascade' }),
     kind: text('kind').$type<RunKind>().notNull().default('todo'),
-    // The todo a station's run worked. Null for a draft's run.
+    // The todo the run worked. Null for a draft's run.
     todoId: uuid('todo_id').references(() => todos.id, { onDelete: 'cascade' }),
     // The draft a reply was for. Its runs go with it when it is discarded, and
     // stay with it when it becomes a todo.
     draftId: uuid('draft_id').references(() => drafts.id, { onDelete: 'cascade' }),
-    // `set null` for both: a run is history, and outlives the station it ran at.
+    // `set null` for both: a run is history, and outlives the lane and agent it ran with.
     laneId: uuid('lane_id').references(() => lanes.id, { onDelete: 'set null' }),
     agentId: uuid('agent_id').references(() => agents.id, { onDelete: 'set null' }),
-    // The lane's contract when the run was claimed, which is what its output is
-    // read against. Null for a draft's run, which has no lane.
-    contract: text('contract').$type<LaneContract>(),
     // The agent's model when the run was claimed: the agent can change after.
     model: text('model'),
     // What the agent was told, exactly, as the runner built it. Reported once,
@@ -112,12 +109,11 @@ export const runs = pgTable(
     check('ck_runs_kind', sql`${t.kind} in ('todo', 'draft')`),
     check(
       'ck_runs_owner',
-      sql`(${t.kind} = 'todo' and ${t.todoId} is not null and ${t.draftId} is null and ${t.contract} is not null)
-        or (${t.kind} = 'draft' and ${t.draftId} is not null and ${t.todoId} is null and ${t.contract} is null)`,
+      sql`(${t.kind} = 'todo' and ${t.todoId} is not null and ${t.draftId} is null)
+        or (${t.kind} = 'draft' and ${t.draftId} is not null and ${t.todoId} is null)`,
     ),
     check('ck_runs_status', sql`${t.status} in ('running', 'ok', 'error', 'stopped')`),
     check('ck_runs_verdict', sql`${t.verdict} in ('none', 'pass', 'fail')`),
-    check('ck_runs_contract', sql`${t.contract} in ('work', 'verdict', 'expand')`),
   ],
 );
 

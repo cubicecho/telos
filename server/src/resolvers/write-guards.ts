@@ -7,7 +7,7 @@ import { type Context, isAiActor } from '../context.ts';
 import { DOOR_TOOL_NAMES } from '../door.ts';
 import { assertCompletionMatchesLane, assertEveryProjectHasLanes, realignLanes, seedMissingLanes } from '../lanes.ts';
 import { stampActor } from '../provenance.ts';
-import { cancelRunsUnder } from '../stations.ts';
+import { cancelRunsUnder } from '../ready.ts';
 import { reachable } from '../tenancy.ts';
 import { requireAuth } from './auth.ts';
 
@@ -39,7 +39,7 @@ interface ForeignKey {
   entity: string;
   parent: AnyTable;
   /** The parent table's key, which names what of it the caller may reach (tenancy.ts). */
-  name: 'projects' | 'todos' | 'labels' | 'lanes' | 'agents' | 'lanePresets';
+  name: 'projects' | 'todos' | 'labels' | 'lanes' | 'agents';
 }
 
 const project: ForeignKey = { key: 'projectId', entity: 'Project', parent: dbSchema.projects, name: 'projects' };
@@ -50,15 +50,11 @@ const parentTodo: ForeignKey = { key: 'parentId', entity: 'Todo', parent: dbSche
 const agent: ForeignKey = { key: 'agentId', entity: 'Agent', parent: dbSchema.agents, name: 'agents' };
 const onSuccessLane: ForeignKey = { key: 'onSuccessLaneId', entity: 'Lane', parent: dbSchema.lanes, name: 'lanes' };
 const onFailureLane: ForeignKey = { key: 'onFailureLaneId', entity: 'Lane', parent: dbSchema.lanes, name: 'lanes' };
-const preset: ForeignKey = {
-  key: 'presetId',
-  entity: 'Lane preset',
-  parent: dbSchema.lanePresets,
-  name: 'lanePresets',
-};
+const newTodoLane: ForeignKey = { key: 'newTodoLaneId', entity: 'Lane', parent: dbSchema.lanes, name: 'lanes' };
 
 const FOREIGN_KEYS: Record<string, ForeignKey[]> = {
-  lanes: [project, agent, onSuccessLane, onFailureLane, preset],
+  projects: [newTodoLane],
+  lanes: [project, agent, onSuccessLane, onFailureLane],
   todos: [project, lane, parentTodo],
   todoLabels: [todo, label],
   projectLabels: [project, label],
@@ -192,7 +188,7 @@ function assertIgnoreFlagFromPerson(args: Parameters<typeof writtenRows>[0], con
 }
 
 /**
- * Asking for a run is `runTodo`'s: it checks a station would take the todo,
+ * Asking for a run is `runTodo`'s: it checks the lane's agent would take the todo,
  * and records who asked.
  */
 function assertRunRequestUntouched(args: Parameters<typeof writtenRows>[0]): void {
@@ -248,10 +244,10 @@ async function assertParentsSound(tx: AnyTable, userId: string): Promise<void> {
 }
 
 /**
- * A station's arrows point within its own board. Checked over the caller's
- * lanes after the write, like the other invariants here.
+ * A lane's success and failure routes point within its own board. Checked over
+ * the caller's lanes after the write, like the other invariants here.
  */
-async function assertArrowsInProject(tx: AnyTable, userId: string): Promise<void> {
+async function assertRoutesInProject(tx: AnyTable, userId: string): Promise<void> {
   const stray = resultRows(
     await tx.execute(sql`
       SELECT 1 FROM lanes l JOIN lanes target ON target.id IN (l.on_success_lane_id, l.on_failure_lane_id)
@@ -266,26 +262,40 @@ async function assertArrowsInProject(tx: AnyTable, userId: string): Promise<void
 }
 
 /**
- * A lane that archives on a pass has no success arrow, and is not an `expand`
- * station: its todo waits on the pieces it became, so there is nothing to put
- * away yet. Checked after the write, over the caller's lanes, so the message
- * says what to change rather than which constraint fired.
+ * A project's new todos land on its own board. Checked after the write, over
+ * the caller's projects, as a lane's routes are.
+ */
+async function assertNewTodoLaneInProject(tx: AnyTable, userId: string): Promise<void> {
+  const stray = resultRows(
+    await tx.execute(sql`
+      SELECT 1 FROM projects p JOIN lanes l ON l.id = p.new_todo_lane_id
+      WHERE p.user_id = ${userId} AND l.project_id <> p.id
+      LIMIT 1
+    `),
+  );
+  if (stray.length === 0) return;
+  throw new GraphQLError("New todos can only land in a lane on the project's own board.", {
+    extensions: { code: 'BAD_USER_INPUT' },
+  });
+}
+
+/**
+ * A lane that archives on a pass has no success route: one or the other.
+ * Checked after the write, over the caller's lanes, so the message says what to
+ * change rather than which constraint fired.
  */
 async function assertArchiveOnSuccessFits(tx: AnyTable, userId: string): Promise<void> {
-  const rows = resultRows<{ name: string; expand: boolean }>(
+  const rows = resultRows<{ name: string }>(
     await tx.execute(sql`
-      SELECT l.name, l.contract = 'expand' AS expand FROM lanes l
-      WHERE l.user_id = ${userId} AND l.archive_on_success
-        AND (l.on_success_lane_id IS NOT NULL OR l.contract = 'expand')
+      SELECT l.name FROM lanes l
+      WHERE l.user_id = ${userId} AND l.archive_on_success AND l.on_success_lane_id IS NOT NULL
       LIMIT 1
     `),
   );
   if (rows.length === 0) return;
   const [lane] = rows;
   throw new GraphQLError(
-    lane.expand
-      ? `"${lane.name}" breaks todos into pieces, so it cannot archive on success: the todo waits on its pieces. Give it a success lane for the pieces instead.`
-      : `"${lane.name}" can archive on success or send todos to a success lane, not both. Clear one of them.`,
+    `"${lane.name}" can archive on success or have a success route to a lane, not both. Clear one of them.`,
     { extensions: { code: 'BAD_USER_INPUT' } },
   );
 }
@@ -300,52 +310,6 @@ function assertDoneFlagUntouched(args: Parameters<typeof writtenRows>[0]): void 
   throw new GraphQLError('Use setDoneLane to choose which lane marks a todo done.', {
     extensions: { code: 'BAD_USER_INPUT' },
   });
-}
-
-const PRESET_FIELDS: readonly unknown[] = dbSchema.PRESET_FIELDS;
-const LANE_CONTRACTS: readonly unknown[] = dbSchema.LANE_CONTRACTS;
-/** The longest name a lane preset may have. */
-const MAX_PRESET_NAME = 100;
-
-/**
- * What a lane keeps of its own is a list of a preset's fields, and nothing
- * else: the `lanes_follow_preset` trigger reads it to decide what to copy.
- */
-function assertPresetOverridesKnown(args: Parameters<typeof writtenRows>[0]): void {
-  for (const row of writtenRows(args)) {
-    if (!('presetOverrides' in row)) continue;
-    const overrides = row.presetOverrides;
-    if (Array.isArray(overrides) && overrides.every((field) => PRESET_FIELDS.includes(field))) continue;
-    throw new GraphQLError(
-      `presetOverrides lists the preset fields a lane keeps its own value for: any of ${dbSchema.PRESET_FIELDS.join(', ')}.`,
-      { extensions: { code: 'BAD_USER_INPUT' } },
-    );
-  }
-}
-
-/**
- * A preset's own values, checked here so the refusal says what to change
- * rather than which constraint fired.
- */
-function assertPresetValuesFit(args: Parameters<typeof writtenRows>[0]): void {
-  const badInput = (message: string) => new GraphQLError(message, { extensions: { code: 'BAD_USER_INPUT' } });
-  for (const row of writtenRows(args)) {
-    if ('name' in row) {
-      const name = typeof row.name === 'string' ? row.name.trim() : '';
-      if (name === '' || name.length > MAX_PRESET_NAME || name !== row.name) {
-        throw badInput(`Name the preset, in ${MAX_PRESET_NAME} characters or fewer, with no space at either end.`);
-      }
-    }
-    if ('contract' in row && !LANE_CONTRACTS.includes(row.contract)) {
-      throw badInput(`A preset's contract is one of ${dbSchema.LANE_CONTRACTS.join(', ')}.`);
-    }
-    if ('wipLimit' in row && (!Number.isInteger(row.wipLimit) || (row.wipLimit as number) < 1)) {
-      throw badInput('A preset needs a WIP limit of 1 or more.');
-    }
-    if ('maxAttempts' in row && (!Number.isInteger(row.maxAttempts) || (row.maxAttempts as number) < 0)) {
-      throw badInput('A preset needs 0 or more attempts.');
-    }
-  }
 }
 
 /** What a slug is made of: it is the prefix of every tool the server offers. */
@@ -415,32 +379,6 @@ async function assertServersSound(tx: AnyTable, userId: string, rows: Row[], ins
   }
 }
 
-/**
- * A preset's name is the only thing a person picks it by, so two of the same
- * name are refused in words. The unique constraint is what holds it; this is
- * what says so.
- */
-async function assertPresetNamesFree(tx: AnyTable, userId: string, args: WriteHookPayload['args']): Promise<void> {
-  const names = [
-    ...new Set(
-      writtenRows(args)
-        .map((row) => row.name)
-        .filter((name): name is string => typeof name === 'string'),
-    ),
-  ];
-  if (names.length === 0) return;
-  const taken: Array<{ id: string; name: string }> = await tx
-    .select({ id: dbSchema.lanePresets.id, name: dbSchema.lanePresets.name })
-    .from(dbSchema.lanePresets)
-    .where(and(eq(dbSchema.lanePresets.userId, userId), inArray(dbSchema.lanePresets.name, names)));
-  // An update that names the preset it is renaming is not a clash with itself.
-  const renamed: unknown = args.where?.id?.eq;
-  const clash = taken.find((row) => row.id !== renamed);
-  if (clash) {
-    throw new GraphQLError(`You already have a preset called "${clash.name}".`, { extensions: { code: 'CONFLICT' } });
-  }
-}
-
 function badServer(message: string): GraphQLError {
   return new GraphQLError(message, { extensions: { code: 'BAD_USER_INPUT' } });
 }
@@ -492,7 +430,6 @@ export const onWrite: NonNullable<BuildSchemaConfig['onWrite']> = {
   lanes: {
     before: async ({ args, context, tx }: WriteHookPayload) => {
       assertDoneFlagUntouched(args);
-      assertPresetOverridesKnown(args);
       // Deleting a lane moves its todos (see `after`), which is history.
       await stampActor(tx, (context as Context).actor);
       await assertForeignKeysOwned(tx, context as Context, writtenRows(args), FOREIGN_KEYS.lanes);
@@ -503,12 +440,8 @@ export const onWrite: NonNullable<BuildSchemaConfig['onWrite']> = {
     // invariant, not the statement, is what must hold.
     after: async ({ args, context, tx }: WriteHookPayload) => {
       const userId = requireAuth(context as Context);
-      if (states(args, 'onSuccessLaneId', 'onFailureLaneId')) await assertArrowsInProject(tx, userId);
-      // Following a preset, or putting a field back to it, can change the
-      // contract without the write naming it.
-      if (states(args, 'archiveOnSuccess', 'onSuccessLaneId', 'contract', 'presetId', 'presetOverrides')) {
-        await assertArchiveOnSuccessFits(tx, userId);
-      }
+      if (states(args, 'onSuccessLaneId', 'onFailureLaneId')) await assertRoutesInProject(tx, userId);
+      if (states(args, 'archiveOnSuccess', 'onSuccessLaneId')) await assertArchiveOnSuccessFits(tx, userId);
       await assertEveryProjectHasLanes(tx, userId);
       await realignLanes(tx, userId);
       await assertCompletionMatchesLane(tx, userId);
@@ -524,31 +457,20 @@ export const onWrite: NonNullable<BuildSchemaConfig['onWrite']> = {
     before: async ({ args, context, operation, tx }: WriteHookPayload) =>
       assertServersSound(tx, requireAuth(context as Context), writtenRows(args), operation === 'insert'),
   },
-  lanePresets: {
-    before: async ({ args, context, operation, tx }: WriteHookPayload) => {
-      if (operation === 'delete') return;
-      assertPresetValuesFit(args);
-      await assertPresetNamesFree(tx, requireAuth(context as Context), args);
-    },
-    // An edit reaches every lane that follows the preset (the
-    // `lane_presets_reach_lanes` trigger), so what a lane's own write is held
-    // to is held here too.
-    after: async ({ context, operation, tx }: WriteHookPayload) => {
-      if (operation === 'delete') return;
-      await assertArchiveOnSuccessFits(tx, requireAuth(context as Context));
-    },
-  },
   projects: {
-    before: async ({ args, context, operation }: WriteHookPayload) => {
+    before: async ({ args, context, operation, tx }: WriteHookPayload) => {
       assertAiSwitchUntouched(args);
       holdAiProjectWrite(args, context as Context, operation);
+      await assertForeignKeysOwned(tx, context as Context, writtenRows(args), FOREIGN_KEYS.projects);
     },
     // A project without lanes has an empty board, so every project gets one at
     // the moment it is created — inside the creating transaction, so a project
     // never exists without it.
-    after: async ({ context, operation, tx }: WriteHookPayload) => {
+    after: async ({ args, context, operation, tx }: WriteHookPayload) => {
+      const userId = requireAuth(context as Context);
+      if (states(args, 'newTodoLaneId')) await assertNewTodoLaneInProject(tx, userId);
       if (operation !== 'insert') return;
-      await seedMissingLanes(tx, requireAuth(context as Context));
+      await seedMissingLanes(tx, userId);
     },
   },
   todos: {

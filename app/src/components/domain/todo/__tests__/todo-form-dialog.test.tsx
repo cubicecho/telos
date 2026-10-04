@@ -277,7 +277,7 @@ describe('TodoFormDialog', () => {
         <TodoFormDialog open onOpenChange={vi.fn()} todo={TODO} initialTab="runs" />
       </MockedProvider>,
     );
-    // In no lane, no station could take it, so there is nothing to ask.
+    // In no lane, no agent could take it, so there is nothing to ask.
     expect(await screen.findByText('No agent has worked this todo yet.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Run “Replace the tap” now' })).not.toBeInTheDocument();
     first.unmount();
@@ -289,7 +289,7 @@ describe('TodoFormDialog', () => {
     );
     await user.click(await screen.findByRole('button', { name: 'Run “Replace the tap” now' }));
     await waitFor(() => expect(asked).toHaveBeenCalled());
-    expect(await screen.findByText('Asked. An agent takes it when its station has room.')).toBeInTheDocument();
+    expect(await screen.findByText('Asked. An agent takes it when its lane has room.')).toBeInTheDocument();
   });
 
   it('opens the thread at a note an agent left, from its artifact', async () => {

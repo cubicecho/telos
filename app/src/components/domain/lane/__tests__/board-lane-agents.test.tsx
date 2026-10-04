@@ -8,7 +8,7 @@ import {
   AiStateDocument,
   CancelRunDocument,
   CardMarksDocument,
-  ProjectStationsDocument,
+  ProjectLaneAgentsDocument,
   RetryTodoDocument,
   RunTodoDocument,
 } from '@/lib/graphql';
@@ -32,20 +32,16 @@ function aiState(instance: boolean, account: boolean) {
   };
 }
 
-function station(id: string, agentId: string | null) {
+function laneAgent(id: string, agentId: string | null) {
   return {
     __typename: 'Lane',
     id,
     agentId,
-    contract: 'verdict',
-    prompt: null,
     onSuccessLaneId: null,
     onFailureLaneId: null,
     archiveOnSuccess: false,
     wipLimit: 1,
     maxAttempts: 3,
-    presetId: null,
-    presetOverrides: [],
   };
 }
 
@@ -81,15 +77,15 @@ const LIVE = new Map([
   ],
 ]);
 
-function stationTodo(state: string, reason: string | null, { awaitsRun = false, runRequested = false } = {}) {
+function workTodo(state: string, reason: string | null, { awaitsRun = false, runRequested = false } = {}) {
   return new Map([
     ['t1', { __typename: 'StationTodo' as const, todoId: 't1', state, reason, failures: 0, awaitsRun, runRequested }],
   ]);
 }
 
-const STUCK = stationTodo('attention', 'It broke.');
-const AWAITS_RUN = stationTodo('parked', 'Auto-run is off.', { awaitsRun: true });
-const RUN_REQUESTED = stationTodo('queued', null, { runRequested: true });
+const STUCK = workTodo('attention', 'It broke.');
+const AWAITS_RUN = workTodo('parked', 'Auto-run is off.', { awaitsRun: true });
+const RUN_REQUESTED = workTodo('queued', null, { runRequested: true });
 
 /** The board asks for its cards' marks whatever AI is set to; these tests have none to show. */
 const NO_MARKS = {
@@ -98,13 +94,12 @@ const NO_MARKS = {
   maxUsageCount: Number.POSITIVE_INFINITY,
 };
 
-const STATIONS = {
-  request: { query: ProjectStationsDocument, variables: { projectId: 'p1' } },
+const LANE_AGENTS = {
+  request: { query: ProjectLaneAgentsDocument, variables: { projectId: 'p1' } },
   result: {
     data: {
-      lanes: [station('l1', null), station('l2', 'a1')],
+      lanes: [laneAgent('l1', null), laneAgent('l2', 'a1')],
       agents: [{ __typename: 'Agent', id: 'a1', name: 'Reviewer' }],
-      lanePresets: [],
     },
   },
 };
@@ -140,22 +135,22 @@ async function laneMenu(lane: string) {
   return screen.findByRole('menuitem', { name: 'Rename' });
 }
 
-describe('Board stations', () => {
-  it('offers no station settings while the instance has AI off', async () => {
-    const stations = vi.fn();
+describe('Board lane agents', () => {
+  it('offers no lane agent settings while the instance has AI off', async () => {
+    const laneAgents = vi.fn();
     board(
       [
         aiState(false, false),
-        { request: { query: ProjectStationsDocument, variables: { projectId: 'p1' } }, result: stations },
+        { request: { query: ProjectLaneAgentsDocument, variables: { projectId: 'p1' } }, result: laneAgents },
       ],
       true,
     );
     await new Promise((resolve) => setTimeout(resolve, 20));
 
     await laneMenu('Review');
-    expect(screen.queryByRole('menuitem', { name: 'Station…' })).not.toBeInTheDocument();
-    expect(screen.queryByText('Station')).not.toBeInTheDocument();
-    expect(stations).not.toHaveBeenCalled();
+    expect(screen.queryByRole('menuitem', { name: 'Agent…' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Agent')).not.toBeInTheDocument();
+    expect(laneAgents).not.toHaveBeenCalled();
   });
 
   it('offers none while the project has AI off, even with the account on', async () => {
@@ -163,20 +158,19 @@ describe('Board stations', () => {
     await new Promise((resolve) => setTimeout(resolve, 20));
 
     await laneMenu('Review');
-    expect(screen.queryByRole('menuitem', { name: 'Station…' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Agent…' })).not.toBeInTheDocument();
   });
 
-  it('marks a station, and offers its settings, with AI on throughout', async () => {
+  it('marks a lane’s agent, and offers its settings, with AI on throughout', async () => {
     board(
       [
         aiState(true, true),
         {
-          request: { query: ProjectStationsDocument, variables: { projectId: 'p1' } },
+          request: { query: ProjectLaneAgentsDocument, variables: { projectId: 'p1' } },
           result: {
             data: {
-              lanes: [station('l1', null), station('l2', 'a1')],
+              lanes: [laneAgent('l1', null), laneAgent('l2', 'a1')],
               agents: [{ __typename: 'Agent', id: 'a1', name: 'Reviewer' }],
-              lanePresets: [],
             },
           },
         },
@@ -184,12 +178,12 @@ describe('Board stations', () => {
       true,
     );
 
-    expect(await screen.findByLabelText('Station, worked by Reviewer')).toBeInTheDocument();
+    expect(await screen.findByLabelText('Worked by Reviewer')).toBeInTheDocument();
     // Only the lane with an agent is one.
-    expect(screen.getAllByText('Station')).toHaveLength(1);
+    expect(screen.getAllByText('Agent')).toHaveLength(1);
 
     await laneMenu('Review');
-    expect(screen.getByRole('menuitem', { name: 'Station…' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Agent…' })).toBeInTheDocument();
   });
 
   it('marks a card an agent is working, and watches it work', async () => {
@@ -197,7 +191,7 @@ describe('Board stations', () => {
     board(
       [
         aiState(true, true),
-        STATIONS,
+        LANE_AGENTS,
         runMock(fullRun('r1', 'running', { events: [{ kind: 'tool_call', name: 'read_file', text: '{}' }] })),
       ],
       true,
@@ -217,13 +211,13 @@ describe('Board stations', () => {
     expect(screen.queryByText(/Working/)).not.toBeInTheDocument();
   });
 
-  it('says why a station stopped on a card, and sends it round again', async () => {
+  it('says why an agent stopped on a card, and sends it round again', async () => {
     const user = userEvent.setup();
     const retried = vi.fn(() => ({ data: { retryTodo: true } }));
     board(
       [
         aiState(true, true),
-        STATIONS,
+        LANE_AGENTS,
         { request: { query: RetryTodoDocument, variables: { id: 't1' } }, result: retried },
       ],
       true,
@@ -238,7 +232,11 @@ describe('Board stations', () => {
     const user = userEvent.setup();
     const asked = vi.fn(() => ({ data: { runTodo: { __typename: 'Todo', id: 't1' } } }));
     board(
-      [aiState(true, true), STATIONS, { request: { query: RunTodoDocument, variables: { id: 't1' } }, result: asked }],
+      [
+        aiState(true, true),
+        LANE_AGENTS,
+        { request: { query: RunTodoDocument, variables: { id: 't1' } }, result: asked },
+      ],
       true,
       { todos: [CARD], live: new Map(), waiting: AWAITS_RUN },
     );
@@ -248,7 +246,7 @@ describe('Board stations', () => {
   });
 
   it('says a card that was asked for waits on an agent, and does not offer to ask twice', async () => {
-    board([aiState(true, true), STATIONS], true, { todos: [CARD], live: new Map(), waiting: RUN_REQUESTED });
+    board([aiState(true, true), LANE_AGENTS], true, { todos: [CARD], live: new Map(), waiting: RUN_REQUESTED });
     expect(await screen.findByText('Waiting for an agent')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Run “Write it” now' })).not.toBeInTheDocument();
   });
@@ -258,7 +256,7 @@ describe('Board stations', () => {
     board(
       [
         aiState(true, true),
-        STATIONS,
+        LANE_AGENTS,
         {
           request: { query: RunTodoDocument, variables: { id: 't1' } },
           result: { errors: [new GraphQLError('An agent is working it now.')] },
@@ -286,7 +284,7 @@ describe('Board stations', () => {
     board(
       [
         aiState(true, true),
-        STATIONS,
+        LANE_AGENTS,
         runMock(fullRun('r1', 'running')),
         { request: { query: CancelRunDocument, variables: { id: 'r1' } }, result: cancelled },
       ],

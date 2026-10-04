@@ -29,7 +29,7 @@ const SET_PROJECT_AI = `mutation ($id: ID!, $enabled: Boolean!) {
   setProjectAiEnabled(projectId: $id, enabled: $enabled) { id }
 }`;
 
-/** Where one todo stands with the stations. */
+/** Where one todo stands with the lanes' agents. */
 async function stateOf(todoId: string): Promise<{ state: string; reason: string | null; failures: number }> {
   const { todos } = (await board.person.expectOk(STATUS, { projectId: board.projectId })).aiStatus;
   return todos.find((todo: { todoId: string }) => todo.todoId === todoId);
@@ -42,7 +42,7 @@ async function rowOf(todoId: string): Promise<any> {
   return row;
 }
 
-/** Claims a todo at the board's station; null when the station will not take it. */
+/** Claims a todo in the board's agent lane; null when its agent will not take it. */
 async function claim(todoId: string, laneId = board.lanes[0].id): Promise<{ runId: string } | null> {
   return (await runner.expectOk(CLAIM, { todoId, laneId })).claimRun;
 }
@@ -53,7 +53,7 @@ async function queued(): Promise<string[]> {
 }
 
 describe('runTodo', () => {
-  it('has a station work the one todo asked for, and leaves the rest waiting', async () => {
+  it('has an agent work the one todo asked for, and leaves the rest waiting', async () => {
     const asked = await board.addTodo('Asked');
     const other = await board.addTodo('Other');
     expect(await queued()).toEqual([]);
@@ -81,10 +81,10 @@ describe('runTodo', () => {
     expect(done.completedAt).not.toBeNull();
   });
 
-  it('is one run: the todo follows the arrow and waits at the next station', async () => {
+  it('is one run: the todo follows its success route and waits in the next agent lane', async () => {
     await setLane(board.person, board.lanes[0].id, { onSuccessLaneId: board.lanes[1].id });
     await setLane(board.person, board.lanes[1].id, { agentId: board.agentId, onSuccessLaneId: board.lanes[2].id });
-    const todoId = await board.addTodo('Two stations');
+    const todoId = await board.addTodo('Two agent lanes');
     await board.person.expectOk(RUN, { id: todoId });
     const run = await claim(todoId);
     await runner.expectOk(FINISH, { id: run?.runId, result: { status: 'ok', output: 'Half done.' } });
@@ -105,7 +105,7 @@ describe('runTodo', () => {
     expect(await stateOf(todoId)).toMatchObject({ state: 'parked', reason: 'Auto-run is off.', failures: 1 });
   });
 
-  it('is a retry: it forgets failures and restarts a station that finished with the todo', async () => {
+  it('is a retry: it forgets failures and restarts an agent that finished with the todo', async () => {
     await setLane(board.person, board.lanes[0].id, { maxAttempts: 1, onSuccessLaneId: null });
     const failed = await board.addTodo('Failed');
     await board.person.expectOk(RUN, { id: failed });

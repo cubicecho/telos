@@ -4,7 +4,7 @@ import { extendSchema, GraphQLError, type GraphQLObjectType, type GraphQLSchema,
 import type { Context } from '../context.ts';
 import { requireAuth } from './auth.ts';
 
-// Board templates: a project's lanes, and their station settings, saved to
+// Board templates: a project's lanes, with their agents and routes, saved to
 // start another project from. Listing, renaming and deleting one is generated
 // CRUD; saving reads the board, and applying writes one, so those are here.
 //
@@ -18,7 +18,7 @@ type TemplateLane = dbSchema.TemplateLane;
 
 const BOARD_TEMPLATES_SDL = parse(`
   extend type Mutation {
-    "Saves a project's lanes and their station settings as a template, replacing one of the same name."
+    "Saves a project's lanes, with their agents and routes, as a template, replacing one of the same name."
     saveBoardTemplate(projectId: ID!, name: String!): BoardTemplate!
     "Gives a project with no todos a template's lanes, in place of the ones it has."
     applyBoardTemplate(projectId: ID!, templateId: ID!): Project!
@@ -28,7 +28,6 @@ const BOARD_TEMPLATES_SDL = parse(`
 /** The most lanes a template may hold. */
 const MAX_LANES = 50;
 const MAX_NAME = 100;
-const CONTRACTS = new Set(['work', 'verdict', 'expand']);
 
 const badInput = (message: string) => new GraphQLError(message, { extensions: { code: 'BAD_USER_INPUT' } });
 const notFound = (what: string) => new GraphQLError(`${what} not found`, { extensions: { code: 'NOT_FOUND' } });
@@ -62,7 +61,7 @@ export function checkTemplateLanes(value: unknown): TemplateLane[] {
   const index = (at: unknown) => {
     if (at == null) return null;
     if (!Number.isInteger(at) || (at as number) < 0 || (at as number) >= value.length) {
-      throw badInput('A station in the template sends its todos to a lane it does not have.');
+      throw badInput('A lane in the template sends its todos to a lane it does not have.');
     }
     return at as number;
   };
@@ -70,8 +69,6 @@ export function checkTemplateLanes(value: unknown): TemplateLane[] {
     const lane = (raw ?? {}) as Record<string, unknown>;
     const name = typeof lane.name === 'string' ? lane.name.trim() : '';
     if (!name || name.length > MAX_NAME) throw badInput('Every lane in a template needs a name.');
-    const contract = lane.contract ?? 'work';
-    if (typeof contract !== 'string' || !CONTRACTS.has(contract)) throw badInput(`"${name}" has an unknown contract.`);
     const wipLimit = lane.wipLimit ?? 1;
     const maxAttempts = lane.maxAttempts ?? 3;
     if (!Number.isInteger(wipLimit) || (wipLimit as number) < 1)
@@ -81,26 +78,17 @@ export function checkTemplateLanes(value: unknown): TemplateLane[] {
     }
     const archiveOnSuccess = lane.archiveOnSuccess === true;
     if (archiveOnSuccess && index(lane.onSuccess) != null) {
-      throw badInput(`"${name}" can archive on success or send todos to a success lane, not both.`);
-    }
-    if (archiveOnSuccess && contract === 'expand') {
-      throw badInput(`"${name}" breaks todos into pieces, so it cannot archive on success.`);
+      throw badInput(`"${name}" can archive on success or have a success route to a lane, not both.`);
     }
     return {
       name,
       isDone: lane.isDone === true,
       agentId: typeof lane.agentId === 'string' ? lane.agentId : null,
-      contract: contract as TemplateLane['contract'],
-      prompt: typeof lane.prompt === 'string' ? lane.prompt : null,
       onSuccess: index(lane.onSuccess),
       onFailure: index(lane.onFailure),
       archiveOnSuccess,
       wipLimit: wipLimit as number,
       maxAttempts: maxAttempts as number,
-      presetId: typeof lane.presetId === 'string' ? lane.presetId : null,
-      presetOverrides: Array.isArray(lane.presetOverrides)
-        ? dbSchema.PRESET_FIELDS.filter((field) => (lane.presetOverrides as unknown[]).includes(field))
-        : [],
     };
   });
   if (lanes.filter((lane) => lane.isDone).length > 1) throw badInput('A template may have only one done lane.');
@@ -131,18 +119,11 @@ export function applyBoardTemplatesExtension(schema: GraphQLSchema): GraphQLSche
       name: lane.name,
       isDone: lane.isDone,
       agentId: lane.agentId,
-      contract: lane.contract,
-      prompt: lane.prompt,
       onSuccess: lane.onSuccessLaneId ? (at.get(lane.onSuccessLaneId) ?? null) : null,
       onFailure: lane.onFailureLaneId ? (at.get(lane.onFailureLaneId) ?? null) : null,
       archiveOnSuccess: lane.archiveOnSuccess,
       wipLimit: lane.wipLimit,
       maxAttempts: lane.maxAttempts,
-      // The preset is named, not copied: `prompt` above is only what the lane
-      // adds to it, and the fields it does not override are the preset's when
-      // the template is applied, whatever they are by then.
-      presetId: lane.presetId,
-      presetOverrides: lane.presetOverrides,
     }));
     const [template] = await db
       .insert(dbSchema.boardTemplates)
@@ -195,21 +176,6 @@ export function applyBoardTemplatesExtension(schema: GraphQLSchema): GraphQLSche
           )
         : new Set<string>();
 
-      // A preset it names that is not the caller's leaves its lane with the
-      // values the template holds for it. One that was deleted never gets this
-      // far: deleting a preset writes its values into the templates naming it.
-      const followed = [...new Set(lanes.map((lane) => lane.presetId).filter((id): id is string => !!id))];
-      const presets = followed.length
-        ? new Set(
-            (
-              await tx
-                .select({ id: dbSchema.lanePresets.id })
-                .from(dbSchema.lanePresets)
-                .where(and(inArray(dbSchema.lanePresets.id, followed), eq(dbSchema.lanePresets.userId, userId)))
-            ).map((row: { id: string }) => row.id),
-          )
-        : new Set<string>();
-
       await tx.delete(dbSchema.lanes).where(eq(dbSchema.lanes.projectId, project.id));
       const inserted = await tx
         .insert(dbSchema.lanes)
@@ -221,33 +187,12 @@ export function applyBoardTemplatesExtension(schema: GraphQLSchema): GraphQLSche
             position,
             isDone: lane.isDone,
             agentId: lane.agentId && agents.has(lane.agentId) ? lane.agentId : null,
-            contract: lane.contract ?? 'work',
-            prompt: lane.prompt ?? null,
             archiveOnSuccess: lane.archiveOnSuccess ?? false,
             wipLimit: lane.wipLimit ?? 1,
             maxAttempts: lane.maxAttempts ?? 3,
-            ...(lane.presetId && presets.has(lane.presetId)
-              ? { presetId: lane.presetId, presetOverrides: lane.presetOverrides ?? [] }
-              : {}),
           })),
         )
         .returning({ id: dbSchema.lanes.id, position: dbSchema.lanes.position });
-      // A preset's contract is not the template's to check ahead of time, so
-      // what the lanes came out as is checked instead.
-      const [stuck] = await tx
-        .select({ name: dbSchema.lanes.name })
-        .from(dbSchema.lanes)
-        .where(
-          and(
-            eq(dbSchema.lanes.projectId, project.id),
-            eq(dbSchema.lanes.archiveOnSuccess, true),
-            eq(dbSchema.lanes.contract, 'expand'),
-          ),
-        )
-        .limit(1);
-      if (stuck) {
-        throw badInput(`"${stuck.name}" breaks todos into pieces, so it cannot archive on success.`);
-      }
       const ids = new Map<number, string>(
         inserted.map((row: { id: string; position: number }) => [row.position, row.id]),
       );

@@ -4,12 +4,12 @@ import { extendSchema, GraphQLError, type GraphQLObjectType, type GraphQLSchema,
 import { requireAi } from '../ai-gate.ts';
 import { resultRows } from '../blocking.ts';
 import type { Actor, Context } from '../context.ts';
+import { type WorkState, workStates } from '../ready.ts';
 import { runnerSeenAt } from '../runner-seen.ts';
-import { type StationState, stationStates } from '../stations.ts';
 
-// The stations, as a person reads them: what needs them, what is running,
+// Lanes' agents, as a person reads them: what needs them, what is running,
 // what waits, per lane; and whether the runner is there at all. Plus the two
-// things anyone can do about a todo at a station, a key or an agent at the MCP
+// things anyone can do about a todo in a lane with an agent, a key or an agent at the MCP
 // door included: send one it gave up on round again, and ask for one to be
 // worked now.
 //
@@ -19,7 +19,7 @@ import { type StationState, stationStates } from '../stations.ts';
 type AnyRow = any;
 
 const AI_STATUS_SDL = parse(`
-  "An open todo and where it stands with the stations."
+  "An open todo and where it stands with its lane's agent."
   type StationTodo {
     todoId: ID!
     title: String!
@@ -33,7 +33,7 @@ const AI_STATUS_SDL = parse(`
     failures: Int!
     "The run working it now."
     liveRunId: ID
-    "A station would take it, were it asked to (runTodo): its project does not run by itself."
+    "Its lane's agent would take it, were it asked to (runTodo): its project does not run by itself."
     awaitsRun: Boolean!
     "It was asked to be run, and no run has taken it yet."
     runRequested: Boolean!
@@ -70,24 +70,24 @@ const AI_STATUS_SDL = parse(`
   }
 
   extend type Query {
-    "Where every todo stands with the stations, across your AI projects or in one."
+    "Where every todo stands with its lane's agent, across your AI projects or in one."
     aiStatus(projectId: ID): AiStatus!
   }
 
   extend type Mutation {
-    "Sends a todo round its station again: its failures are forgotten, and a station that finished with it starts over."
+    "Sends a todo round its lane's agent again: its failures are forgotten, and an agent that finished with it starts over."
     retryTodo(id: ID!, reason: String): Boolean!
     "Asks for a todo to be worked once where it stands, whether or not its project runs by itself. Also a retry. Who asked is on its history."
     runTodo(id: ID!): Todo!
   }
 `);
 
-/** The history kinds a nudge to a station is recorded as. */
+/** The history kinds a nudge to a lane's agent is recorded as. */
 const RETRY_EVENT = 'retry' as const;
 const RUN_EVENT = 'run' as const;
 
 /**
- * Finds a todo a station could be nudged about: the caller's, not archived,
+ * Finds a todo a lane's agent could be nudged about: the caller's, not archived,
  * in a lane, and not being worked now.
  *
  * @param db - The database or transaction.
@@ -104,7 +104,7 @@ async function restingTodo(db: AnyRow, userId: string, id: string): Promise<AnyR
     throw new GraphQLError('Todo not found', { extensions: { code: 'NOT_FOUND' } });
   }
   if (todo.laneId === null) {
-    throw new GraphQLError('It is in no lane, so no station can take it.', {
+    throw new GraphQLError('It is in no lane, so no agent can take it. Move it to a lane with an agent.', {
       extensions: { code: 'BAD_USER_INPUT' },
     });
   }
@@ -126,8 +126,8 @@ async function restingTodo(db: AnyRow, userId: string, id: string): Promise<AnyR
 
 /**
  * Records a nudge in the todo's lane, signed as whoever gave it. The event
- * arriving there is what forgets its failures (stations.ts `TOUCHED`) and
- * restarts a station that finished with it.
+ * arriving there is what forgets its failures (ready.ts `TOUCHED`) and
+ * restarts an agent that finished with it.
  *
  * @param db - The database or transaction.
  * @param actor - Who nudged it.
@@ -157,7 +157,7 @@ async function recordNudge(
 }
 
 /**
- * Why no station would work a todo even when asked, or null when one would.
+ * Why no agent would work a todo even when asked, or null when one would.
  * The same rules `readyTodos` filters on, apart from auto-run and room.
  *
  * @param db - The database or transaction.
@@ -171,13 +171,11 @@ async function whyNotRunnable(db: AnyRow, todo: AnyRow): Promise<string | null> 
     lane_name: string;
     is_done: boolean;
     has_agent: boolean;
-    barren_expand: boolean;
     blockers: string | null;
   }>(
     await db.execute(sql`
       SELECT
         p.ai_enabled, p.archived_at IS NOT NULL AS project_archived, l.name AS lane_name, l.is_done, l.agent_id IS NOT NULL AS has_agent,
-        (l.contract = 'expand' AND l.on_success_lane_id IS NULL) AS barren_expand,
         (
           SELECT string_agg(b.title, ', ' ORDER BY b.title) FROM todo_dependencies d
           JOIN todos b ON b.id = d.depends_on_todo_id
@@ -204,16 +202,13 @@ async function whyNotRunnable(db: AnyRow, todo: AnyRow): Promise<string | null> 
   if (row.has_agent === false) {
     return `${row.lane_name} has no agent.`;
   }
-  if (row.barren_expand) {
-    return `${row.lane_name} splits todos but has nowhere to put the pieces.`;
-  }
   if (row.blockers !== null) {
     return `It is waiting on ${row.blockers}.`;
   }
   return null;
 }
 
-const STATES: StationState[] = ['attention', 'running', 'blocked', 'queued', 'parked', 'done'];
+const STATES: WorkState[] = ['attention', 'running', 'blocked', 'queued', 'parked', 'done'];
 
 export function applyAiStatusExtension(schema: GraphQLSchema): GraphQLSchema {
   const extendedSchema = extendSchema(schema, AI_STATUS_SDL);
@@ -223,7 +218,7 @@ export function applyAiStatusExtension(schema: GraphQLSchema): GraphQLSchema {
   queries.aiStatus.resolve = async (_parent: unknown, args: { projectId?: string | null }, context: Context) => {
     const userId = await requireAi(context);
     const db = context.db as AnyRow;
-    const { todos, done } = await stationStates(db, userId, args.projectId);
+    const { todos, done } = await workStates(db, userId, args.projectId);
 
     const projects: AnyRow[] = await db
       .select({ id: dbSchema.projects.id, name: dbSchema.projects.name })
@@ -251,10 +246,10 @@ export function applyAiStatusExtension(schema: GraphQLSchema): GraphQLSchema {
             )
             .orderBy(asc(dbSchema.lanes.position));
 
-    const tallies = new Map<string, Record<StationState, number>>(
+    const tallies = new Map<string, Record<WorkState, number>>(
       lanes.map((lane) => [
         lane.id,
-        Object.fromEntries(STATES.map((state) => [state, 0])) as Record<StationState, number>,
+        Object.fromEntries(STATES.map((state) => [state, 0])) as Record<WorkState, number>,
       ]),
     );
     for (const todo of todos) {

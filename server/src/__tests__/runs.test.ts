@@ -37,6 +37,10 @@ async function finish(runId: string, result: Record<string, unknown>): Promise<a
   return (await runner.expectOk(FINISH, { id: runId, result })).finishRun;
 }
 
+const SET_NEW_TODO_LANE = `mutation ($id: UUID!, $laneId: UUID) {
+  updateProject(set: { newTodoLaneId: $laneId }, where: { id: { eq: $id } }) { id }
+}`;
+
 async function todoRow(id: string) {
   const [row] = await db.select().from(dbSchema.todos).where(eq(dbSchema.todos.id, id));
   return row;
@@ -51,7 +55,7 @@ async function actorFor(headers: Record<string, string>): Promise<Actor> {
 }
 
 describe('runnerQueue', () => {
-  it('lists a todo waiting at a station', async () => {
+  it('lists a todo waiting in a lane with an agent', async () => {
     const todoId = await board.addTodo('Write it');
     expect(await queue()).toEqual([{ todoId, laneId: board.lanes[0].id, projectId: board.projectId }]);
   });
@@ -129,12 +133,10 @@ describe('claimRun', () => {
     );
     const claimed = await claim(todoId);
     expect(claimed.agent).toMatchObject({ name: 'Worker', apiKey: 'sk-secret', model: 'tiny', mcpServers: '[]' });
-    expect(claimed.brief).toMatchObject({
+    expect(claimed.assignment).toMatchObject({
       projectName: 'P',
       projectContext: 'A test board.',
       laneName: 'To do',
-      contract: 'work',
-      lanePrompt: 'Do the work.',
       title: 'Write it',
       brief: 'The brief.',
       acceptance: 'It exists.',
@@ -176,7 +178,7 @@ describe('claimRun', () => {
 });
 
 describe('finishRun', () => {
-  it('sends passing work down the success arm, completing it in the done lane', async () => {
+  it('sends passing work down the success route, completing it in the done lane', async () => {
     const todoId = await board.addTodo('Write it');
     const { runId } = await claim(todoId);
     const run = await finish(runId, { status: 'ok', output: 'Wrote it.', totalTokens: 42 });
@@ -192,7 +194,7 @@ describe('finishRun', () => {
     expect(events.at(-1)).toMatchObject({ kind: 'complete', actorKind: 'agent', runId });
   });
 
-  it('does not run a todo again at a station that has finished with it', async () => {
+  it('does not run a todo again in a lane whose agent has finished with it', async () => {
     await setLane(board.person, board.lanes[0].id, { onSuccessLaneId: null });
     const todoId = await board.addTodo('Write it');
     const { runId } = await claim(todoId);
@@ -201,8 +203,8 @@ describe('finishRun', () => {
     expect(await queue()).toEqual([]);
   });
 
-  it('reads a verdict station’s FAIL and sends the todo down the failure arm', async () => {
-    await setLane(board.person, board.lanes[0].id, { contract: 'verdict', onFailureLaneId: board.lanes[1].id });
+  it('reads a reply that opens with FAIL as a failing verdict, down the failure route', async () => {
+    await setLane(board.person, board.lanes[0].id, { onFailureLaneId: board.lanes[1].id });
     const todoId = await board.addTodo('Review it');
     const { runId } = await claim(todoId);
     const run = await finish(runId, { status: 'ok', output: 'FAIL: the second paragraph is missing.' });
@@ -238,8 +240,16 @@ describe('finishRun', () => {
     expect((await queue()).map((row) => row.todoId)).toEqual([todoId]);
   });
 
-  it('turns an expansion into child todos down the success arm', async () => {
-    await setLane(board.person, board.lanes[0].id, { contract: 'expand', onSuccessLaneId: board.lanes[1].id });
+  it('reads a reply that opens with PASS as a passing verdict', async () => {
+    const todoId = await board.addTodo('Review it');
+    const run = await finish((await claim(todoId)).runId, { status: 'ok', output: 'PASS: reads well.' });
+    expect(run).toMatchObject({ status: 'ok', verdict: 'pass' });
+    expect((await todoRow(todoId)).laneId).toBe(board.lanes[2].id);
+    expect(await thread(todoId)).toEqual([expect.objectContaining({ kind: 'verdict', body: 'PASS: reads well.' })]);
+  });
+
+  it("puts a run's proposed todos where the project's new todos land, and leaves the parent waiting", async () => {
+    await board.person.expectOk(SET_NEW_TODO_LANE, { id: board.projectId, laneId: board.lanes[1].id });
     const parentId = await board.addTodo('Build the thing');
     const { runId } = await claim(parentId);
     await finish(runId, {
@@ -273,14 +283,34 @@ describe('finishRun', () => {
       .from(dbSchema.todoEvents)
       .where(eq(dbSchema.todoEvents.todoId, children[0].id));
     expect(childEvents[0]).toMatchObject({ kind: 'create', actorKind: 'agent', runId });
+    expect(await todoRow(parentId)).toMatchObject({ laneId: board.lanes[0].id, completedAt: null });
+    expect((await thread(parentId)).map((note: { body: string }) => note.body)).toEqual([
+      '[...]',
+      'Split into 2 todos: Design it; Make it',
+    ]);
   });
 
-  it('fails an expansion that proposed nothing', async () => {
-    await setLane(board.person, board.lanes[0].id, { contract: 'expand', onSuccessLaneId: board.lanes[1].id });
-    const parentId = await board.addTodo('Build the thing');
-    const { runId } = await claim(parentId);
-    const run = await finish(runId, { status: 'ok', output: 'I could not.', todos: [] });
-    expect(run).toMatchObject({ status: 'error', error: 'The agent proposed no todos.' });
+  it('puts proposed todos in the first open lane when the project names none, or names the done lane', async () => {
+    const lanesOfChildren = async (parentId: string) =>
+      (await db.select().from(dbSchema.todos).where(eq(dbSchema.todos.parentId, parentId))).map(
+        (child: { laneId: string }) => child.laneId,
+      );
+    const unset = await board.addTodo('Unset');
+    await finish((await claim(unset)).runId, { status: 'ok', todos: [{ title: 'Piece' }] });
+    expect(await lanesOfChildren(unset)).toEqual([board.lanes[0].id]);
+
+    await board.person.expectOk(SET_NEW_TODO_LANE, { id: board.projectId, laneId: board.lanes[2].id });
+    const done = await board.addTodo('Done lane');
+    await finish((await claim(done)).runId, { status: 'ok', todos: [{ title: 'Piece' }] });
+    expect(await lanesOfChildren(done)).toEqual([board.lanes[0].id]);
+  });
+
+  it('takes no todos from a run that failed', async () => {
+    await setLane(board.person, board.lanes[0].id, { onFailureLaneId: board.lanes[1].id });
+    const todoId = await board.addTodo('Review it');
+    await finish((await claim(todoId)).runId, { status: 'ok', output: 'FAIL: no.', todos: [{ title: 'Fix it' }] });
+    expect(await db.select().from(dbSchema.todos).where(eq(dbSchema.todos.parentId, todoId))).toEqual([]);
+    expect((await todoRow(todoId)).laneId).toBe(board.lanes[1].id);
   });
 
   it('leaves a todo a person moved mid-run where the person put it', async () => {
@@ -303,7 +333,7 @@ describe('finishRun', () => {
   });
 });
 
-describe('a station that archives on success', () => {
+describe('a lane that archives on success', () => {
   const ARCHIVES = { onSuccessLaneId: null, archiveOnSuccess: true };
   const UPDATE_LANE = `mutation ($id: UUID!, $set: UpdateLaneInput!) { updateLane(set: $set, where: { id: { eq: $id } }) { id } }`;
   const DEPEND = `mutation ($a: ID!, $b: ID!) { addTodoDependency(todoId: $a, dependsOnTodoId: $b) { id } }`;
@@ -336,12 +366,8 @@ describe('a station that archives on success', () => {
     expect((await queue()).map((row) => row.todoId)).toEqual([second]);
   });
 
-  it('archives a verdict station’s PASS, and still sends a FAIL down the failure arm', async () => {
-    await setLane(board.person, board.lanes[0].id, {
-      ...ARCHIVES,
-      contract: 'verdict',
-      onFailureLaneId: board.lanes[1].id,
-    });
+  it('archives a PASS, and still sends a FAIL down the failure route', async () => {
+    await setLane(board.person, board.lanes[0].id, { ...ARCHIVES, onFailureLaneId: board.lanes[1].id });
     const passes = await board.addTodo('Good');
     const fails = await board.addTodo('Bad');
     await finish((await claim(passes)).runId, { status: 'ok', output: 'PASS: reads well.' });
@@ -392,7 +418,7 @@ describe('a station that archives on success', () => {
     expect(todo.completedAt).not.toBeNull();
   });
 
-  it('is one or the other: archive, or a success lane', async () => {
+  it('is one or the other: archive, or a success route', async () => {
     const both = await board.person.expectError(UPDATE_LANE, {
       id: board.lanes[0].id,
       set: { archiveOnSuccess: true },
@@ -401,26 +427,13 @@ describe('a station that archives on success', () => {
     expect(both.message).toContain('not both');
 
     await setLane(board.person, board.lanes[0].id, ARCHIVES);
-    const arrow = await board.person.expectError(UPDATE_LANE, {
+    const routed = await board.person.expectError(UPDATE_LANE, {
       id: board.lanes[0].id,
       set: { onSuccessLaneId: board.lanes[2].id },
     });
-    expect(arrow.code).toBe('BAD_USER_INPUT');
+    expect(routed.code).toBe('BAD_USER_INPUT');
     // Swapping them in one write is fine.
     await setLane(board.person, board.lanes[0].id, { onSuccessLaneId: board.lanes[2].id, archiveOnSuccess: false });
-  });
-
-  it('is not for a station that breaks todos into pieces', async () => {
-    const error = await board.person.expectError(UPDATE_LANE, {
-      id: board.lanes[0].id,
-      set: { ...ARCHIVES, contract: 'expand' },
-    });
-    expect(error.code).toBe('BAD_USER_INPUT');
-    expect(error.message).toContain('pieces');
-
-    await setLane(board.person, board.lanes[0].id, ARCHIVES);
-    const later = await board.person.expectError(UPDATE_LANE, { id: board.lanes[0].id, set: { contract: 'expand' } });
-    expect(later.code).toBe('BAD_USER_INPUT');
   });
 });
 
@@ -438,7 +451,7 @@ describe('stopping a run', () => {
     expect(await thread(todoId)).toEqual([]);
   });
 
-  it('tells AI to ignore the todo, so the station does not take it straight back', async () => {
+  it('tells AI to ignore the todo, so the lane’s agent does not take it straight back', async () => {
     const todoId = await board.addTodo('Write it');
     const { runId } = await claim(todoId);
     await board.person.expectOk(`mutation ($id: ID!) { cancelRun(id: $id) { id } }`, { id: runId });
@@ -547,7 +560,7 @@ describe('who may do what', () => {
     expect(agents.agents).toEqual([{ hasApiKey: true }]);
   });
 
-  it('refuses a station arrow into another project’s board', async () => {
+  it('refuses a success route into another project’s board', async () => {
     const other = await createBoard(db, 'other@example.com');
     const error = await board.person.expectError(
       `mutation ($id: UUID!, $set: UpdateLaneInput!) { updateLane(set: $set, where: { id: { eq: $id } }) { id } }`,

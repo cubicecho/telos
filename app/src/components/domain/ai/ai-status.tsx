@@ -17,8 +17,8 @@ import { RunDialog } from './run-dialog';
 import { formatDuration, LiveDot } from './run-log';
 import { RunRow } from './run-row';
 
-// Where the stations stand, across every project with AI on: what waits on a
-// person, what is running, what is waiting its turn and what no station will
+// Where the lanes' agents stand, across every project with AI on: what waits on a
+// person, what is running, what is waiting its turn and what no agent will
 // ever reach; each lane counted; the runs that failed lately; and whether the
 // runner is there at all.
 
@@ -35,19 +35,19 @@ export const RUNNER_QUIET_SECONDS = 60;
 const FAILURE_HOURS = 24;
 
 type State = 'attention' | 'running' | 'blocked' | 'queued' | 'parked' | 'done';
-type StationTodo = AiStatusQuery['aiStatus']['todos'][number];
+type WorkTodo = AiStatusQuery['aiStatus']['todos'][number];
 
 const STATES: Array<{ value: State; label: string; blurb: string; variant: BadgeVariant }> = [
   {
     value: 'attention',
     label: 'Needs you',
-    blurb: 'A station gave up on these, or finished and has nowhere to send them.',
+    blurb: 'An agent gave up on these, or finished and has nowhere to send them.',
     variant: 'destructive',
   },
   { value: 'running', label: 'Running', blurb: 'An agent is working these now.', variant: 'warning' },
   { value: 'blocked', label: 'Blocked', blurb: 'These wait on something unfinished.', variant: 'outline' },
-  { value: 'queued', label: 'Queued', blurb: 'A station will start these when it has room.', variant: 'secondary' },
-  { value: 'parked', label: 'Parked', blurb: 'No station will reach these where they are.', variant: 'outline' },
+  { value: 'queued', label: 'Queued', blurb: 'An agent will start these when it has room.', variant: 'secondary' },
+  { value: 'parked', label: 'Parked', blurb: 'No agent will reach these where they are.', variant: 'outline' },
   { value: 'done', label: 'Done', blurb: 'Finished.', variant: 'success' },
 ];
 
@@ -71,7 +71,7 @@ export function AiStatus({ pollMs = STATUS_POLL_MS }: { pollMs?: number }) {
   const shown = (status?.todos ?? []).filter((todo) => todo.state === focus);
   const focused = STATES.find((state) => state.value === focus) ?? STATES[0];
 
-  function where(todo: StationTodo): string {
+  function where(todo: WorkTodo): string {
     const project = projects.get(todo.projectId);
     const lane = project?.lanes.find((row) => row.laneId === todo.laneId);
     return [project?.name, lane?.name ?? 'no lane'].filter(Boolean).join(' · ');
@@ -210,7 +210,7 @@ export function AiStatus({ pollMs = STATUS_POLL_MS }: { pollMs?: number }) {
                       >
                         <Text className="min-w-32 text-foreground text-sm">{lane.name}</Text>
                         <Text className="text-muted-foreground text-xs">
-                          {lane.station ? 'station' : lane.isDone ? 'done lane' : 'resting place'}
+                          {lane.station ? 'agent' : lane.isDone ? 'done lane' : 'resting place'}
                         </Text>
                         <Text className="flex-1 text-right text-muted-foreground text-xs">
                           {STATES.filter((state) => lane[state.value] > 0).map((state, index) => (

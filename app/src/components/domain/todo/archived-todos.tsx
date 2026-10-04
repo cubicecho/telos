@@ -84,8 +84,7 @@ export function ArchivedTodoList({
   return (
     <View className="gap-3">
       <Text className="text-muted-foreground text-sm">
-        Archived todos are out of the lists, the counts and the stations’ queues. Restore one to put it back where it
-        was.
+        Archived todos are out of the lists, the counts and the agents’ queues. Restore one to put it back where it was.
       </Text>
       <LoadState
         query={query}

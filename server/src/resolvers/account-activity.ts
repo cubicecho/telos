@@ -4,13 +4,13 @@ import { extendSchema, type GraphQLObjectType, type GraphQLSchema, parse } from 
 import { requireAi } from '../ai-gate.ts';
 import { resultRows } from '../blocking.ts';
 import type { Context } from '../context.ts';
-import { failuresSinceTouched, TOUCHED } from '../stations.ts';
+import { failuresSinceTouched, TOUCHED } from '../ready.ts';
 import { requireSession } from './auth.ts';
 
 // What an account's agents did and spent, across every project it owns: the
 // two things the generated lists cannot say. Spend is the runs of a window
 // added up by project and by agent, with where the window really starts when
-// retention has trimmed it. Attention is the todos a station gave up on or
+// retention has trimmed it. Attention is the todos an agent gave up on or
 // whose last run never finished.
 //
 // The runs, artifacts and archived todos themselves come from the generated
@@ -63,7 +63,7 @@ const ACCOUNT_ACTIVITY_SDL = parse(`
     projectName: String!
     laneId: ID
     laneName: String
-    "Its station has used every attempt its lane allows."
+    "Its lane's agent has used every attempt the lane allows."
     outOfAttempts: Boolean!
     "Its last finished run never finished its work."
     errored: Boolean!
@@ -73,7 +73,7 @@ const ACCOUNT_ACTIVITY_SDL = parse(`
     runId: ID
     "Failed runs since a person last touched it, as aiStatus counts them."
     attempts: Int!
-    "How many its lane allows. Null outside a station."
+    "How many its lane allows. Null in a lane with no agent."
     maxAttempts: Int
   }
 
@@ -184,7 +184,7 @@ export function applyAccountActivityExtension(schema: GraphQLSchema): GraphQLSch
       .from(dbSchema.users)
       .where(eq(dbSchema.users.id, userId));
     const retentionDays: number | null = user?.runRetentionDays ?? null;
-    // Pruning keeps the few old runs a station still counts, so this is where
+    // Pruning keeps the few old runs readiness still counts, so this is where
     // the full record starts rather than the oldest run there is.
     const kept = retentionDays === null ? null : new Date(Date.now() - retentionDays * DAY_MS);
 

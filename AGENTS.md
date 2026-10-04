@@ -60,7 +60,7 @@ telos/
 │       ├── tenancy.ts       # Row scope + server-owned columns, as buildSchema config
 │       ├── blocking.ts      # The dependency rules, in one place
 │       ├── lanes.ts         # The lane rules, in one place
-│       ├── stations.ts      # Which todos an agent may start on, and stopping runs
+│       ├── ready.ts         # Which todos an agent may start on, and stopping runs
 │       ├── agent-defaults.ts # An account's agent defaults, and what an agent resolves to over them
 │       ├── instance.ts      # The instance's AI switch, and its admins
 │       ├── run-tokens.ts    # Per-run tokens, and the runner's key check
@@ -77,7 +77,7 @@ telos/
 │       ├── schema.ts        # Barrel re-exporting models/
 │       ├── relations.ts     # defineRelations config (drives the GraphQL schema)
 │       └── index.ts         # DB singleton + re-exports
-├── runner/                  # @telos/runner — works the stations; talks to telos over HTTP only
+├── runner/                  # @telos/runner — works the lanes' agents; talks to telos over HTTP only
 │   └── src/
 │       ├── embed.ts         # startRunner: how the server runs it, in its own process
 │       ├── index.ts         # Standalone entry, for a second runner on another host (needs RUNNER_KEY)
@@ -88,7 +88,7 @@ telos/
 │       ├── execute.ts       # One run: agent-core's runAgentLoop over a per-run MCP pool
 │       ├── tools.ts         # The pool: telos's /mcp with the run token, plus the agent's servers and hooks
 │       ├── artifacts.ts     # What a run made: record_artifact, and writes read off tool calls
-│       ├── prompts.ts       # System prompts per contract, and the brief
+│       ├── prompts.ts       # The standing protocol, the brief, and reading a reply
 │       └── __tests__/       # End to end against a real telos and a scripted model
 ├── scripts/
 │   ├── admin.ts             # `npm run admin -- --user <email>`: make an account an admin
@@ -189,7 +189,7 @@ and answers NOT_FOUND for what AI cannot see. What it writes:
 `holdAiProjectWrite`), todos (create, edit, move, retry, run, stop a run,
 dependencies, archive, restore, delete), notes, artifacts, drafts and board
 templates. Still a person's: the AI switches, auto-run, agents and their keys
-and MCP servers, API keys, lanes and stations, bulk mutations, and archiving
+and MCP servers, API keys, lanes and their agents, the project's new-todo lane, bulk mutations, and archiving
 or deleting a project. A new mutation is closed to AI until it is added there.
 The MCP door (`mcp.ts`) serves only the operations written in `mcp.graphql`,
 and a test pins its mutations to `AI_MUTATIONS`: the tool list is the menu,
@@ -211,28 +211,33 @@ re-pointing the dependencies of its own todo is FORBIDDEN, since that is
 `RUN_REACH` or `RUN_REACH_EXEMPT`, which a test holds. The AI switches sit
 above all of this. `/mcp` is a 404 unless the instance's switch is on.
 
-**Agents work the board only at stations, and only through the runner.** A
-lane with an `agentId` is a station: its `contract` (work, verdict, expand),
-`prompt`, `onSuccessLaneId`/`onFailureLaneId` arrows, `wipLimit` and
-`maxAttempts` say what happens there. `archiveOnSuccess` is the other answer to
-a pass: `finishRun` completes the todo, puts it in the done lane and archives
-it in one write, as the run. It is that or a success arrow, never both, and not
-for an `expand` station; the lane write guard (`assertArchiveOnSuccessFits`)
-holds both and says what to change. A station may follow a **lane preset**
-(`lane_presets`, the account's, managed in Settings → Agents): `lanes.presetId`
-and `lanes.presetOverrides`, the list of the preset's fields (`contract`,
-`wipLimit`, `maxAttempts`) the lane keeps its own value for. The lane's columns
-always hold the values in force, kept so by the `lanes_follow_preset` trigger
-(a write that changes a followed field without naming `presetOverrides` adds
-the field to it), and an edited preset touches its lanes so the trigger reads
-it again; so nothing that reads a lane needs to know about presets. The
-prompt is never an override: `lanes.prompt` is what the lane adds after the
-preset's, and `briefFor` in `resolvers/runs.ts` joins the two for a run.
-Deleting a preset copies it into its lanes and into board templates that name
-it, in the same statement (`copy_lane_preset_before_delete`).
-`saveLaneAsPreset` makes a preset of a lane and has it follow it. A board
-template's lane names a preset by `presetId` rather than copying its prompt.
-Presets are AI surface: hidden from AI actors, closed to them and the runner.
+**Agents work the board only in lanes, and only through the runner.** Four
+ideas, one name each:
+
+- **Agent** — a model and its instructions (`agents`); a blank field inherits
+  the account's agent defaults.
+- **Lane** — a column. Given an `agentId`, each ready todo in it becomes a run.
+  `onSuccessLaneId`/`onFailureLaneId` are its success and failure routes,
+  `wipLimit` how many it works at once, `maxAttempts` how many failures it
+  takes before leaving the todo for a person.
+- **Run** — one agent working one todo (or answering a draft). It ends in
+  success or failure, with a report and optionally new todos.
+- **Draft**, **board template** — as below.
+
+There is no lane prompt and no per-lane contract: what a lane asks for is its
+agent's instructions, and every reply is read the same way (`verdictOf` in
+`resolvers/runs.ts`). A reply that opens with FAIL fails and takes the failure
+route; one that opens with PASS passes; anything else is a report and passes.
+A passing run may propose todos in a fenced `todos` block: they land in the
+project's new-todo lane (`projects.newTodoLaneId`, else its first open lane,
+`findNewTodoLaneId` in `lanes.ts`, also used by requests and finished drafts),
+and the todo waits on them where it is. `archiveOnSuccess` is the other answer
+to a pass: `finishRun` completes the todo, puts it in the done lane and
+archives it in one write, as the run. It is that or a success route, never
+both; the lane write guard (`assertArchiveOnSuccessFits`) holds it and says
+what to change. `assignmentFor` in `resolvers/runs.ts` assembles what a run is
+handed; the runner adds the agent's instructions and one standing protocol
+(`STANDING_SYSTEM` in `runner/src/prompts.ts`).
 The runner (`@telos/runner`, which never
 imports `@telos/db`) runs inside the server's process: `index.ts` starts it
 with `startRunner` whenever AI is included, handing it a key made up at boot
@@ -240,11 +245,11 @@ with `startRunner` whenever AI is included, handing it a key made up at boot
 It still talks to the server only over HTTP, and signs in with `x-runner-key`
 as the `system` actor, which may call only
 `RUNNER_MUTATIONS` (`claimRun`, `heartbeatRun`, `finishRun`) and
-`runnerQueue`. What is ready is one SQL query, `readyTodos` in `stations.ts`,
+`runnerQueue`. What is ready is one SQL query, `readyTodos` in `ready.ts`,
 used by both the queue and the claim, and it checks every AI switch itself.
 A project's AI switch and its auto-run switch are two things. `projects.autoRun`
-(`setProjectAutoRun`, a person's only, off by default) says whether stations
-start by themselves; with it off `readyTodos` takes only a todo a person asked
+(`setProjectAutoRun`, a person's only, off by default) says whether the lanes'
+agents start by themselves; with it off `readyTodos` takes only a todo a person asked
 for with `runTodo`, which sets `todos.runRequestedAt`. A request is for one run
 where the todo stands: the claim clears it, the `todos_run_request` trigger
 clears it when the todo moves, is done, archived or ignored, and
@@ -261,7 +266,7 @@ disappears when every step is taken. A new step goes in both.
 their threads and last runs, one query for the board and only the todos with
 something to mark. It is applied with AI off too, because notes are not an AI
 feature; the run half needs AI on for the instance, the account and the
-project. "Failed" is `RUN_FAILED` and `failuresSinceTouched` in `stations.ts`,
+project. "Failed" is `RUN_FAILED` and `failuresSinceTouched` in `ready.ts`,
 the same the queue and `aiStatus` use: do not write a second definition.
 `claimRun` returns a run token (`x-run-token`) the agent uses to reach `/mcp`
 as the `agent` actor, scoped to the run's owner, and only while the run is
@@ -286,7 +291,7 @@ the model a run records. The default key is write-only, as an agent's is
 agent with a base URL of its own never gets the key entered for another, and
 the runner's own environment key is never used. An agent with `enabled` off
 is not queued (`readyTodos`), its drafts are not claimed, `startDraft` and
-`sayToDraft` refuse it, and `aiStatus` parks its stations' todos saying so.
+`sayToDraft` refuse it, and `aiStatus` parks its lanes' todos saying so.
 
 **The runner never imports the server or the database.** Everything it knows
 comes from `runnerQueue` and `claimRun`, and everything it does goes back
@@ -372,8 +377,8 @@ it is kept and the runner says so in a notice on each run and on a test of the
 server.
 
 **A draft's reply is a run, and no todo's.** `runs.kind` is `todo` or `draft`,
-and `ck_runs_owner` holds each to its shape: a todo's run has `todo_id` and a
-`contract`, a draft's has `draft_id` and neither. `claimDraft` starts the run
+and `ck_runs_owner` holds each to its shape: a todo's run has `todo_id`, a draft's
+has `draft_id`, never both. `claimDraft` starts the run
 and `finishDraft` closes it with the prompt, usage and events `finishRun`
 takes; `finishRun` and `heartbeatRun` refuse a draft's run. The lease and the
 stop are the run's (`server/src/draft-runs.ts`): a draft is being answered
@@ -384,7 +389,7 @@ endpoint's token counts through `askJson`, so it estimates them and says so in
 a notice on the run. Whatever reads runs to decide something about a todo must
 leave these out, by `kind = 'todo'` or because it joins through `todo_id` or
 `lane_id`, which they lack: `readyTodos`, `failuresSinceTouched`,
-`stationStates`, `cardMarks`, `aiStatus`, `claimRun`'s `turn` and `aiSetup`'s
+`workStates`, `cardMarks`, `aiStatus`, `claimRun`'s `turn` and `aiSetup`'s
 `has_run`. Where runs are listed or added up (a project's runs, its spend,
 retention) they count, and the app marks them as drafts. The runs stay with
 the draft: a todo made from one reaches them through `todo.draft`, and
@@ -496,7 +501,7 @@ may change a note is not something a `where` can say. `editTodoNote` and
 `deleteTodoNote` hold the rule: a report or a verdict is what a run said and
 nobody changes it; a plain note is rewritten only by whoever signed it (a
 person, an API key by `actorKeyId`, a run by `runId`); a person may delete any
-plain note on their own board. An edit stamps `editedAt`. `briefFor` reads the
+plain note on their own board. An edit stamps `editedAt`. `assignmentFor` reads the
 thread when a run is claimed, so an edit reaches later runs only, and the app
 says so beside the editor.
 

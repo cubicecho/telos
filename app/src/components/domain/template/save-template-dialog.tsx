@@ -7,7 +7,7 @@ import { describeError } from '@/lib/errors';
 import { BoardTemplatesDocument, SaveBoardTemplateDocument } from '@/lib/graphql';
 
 /**
- * Saves a project's lanes, and what its stations do, as a template to start
+ * Saves a project's lanes, and what their agents do, as a template to start
  * another project from. A template of the same name is replaced, which is how
  * one is updated.
  */
@@ -52,7 +52,7 @@ export function SaveTemplateDialog({
       open={open}
       onOpenChange={onOpenChange}
       title="Save as template"
-      description="Its lanes and what their stations do, not its todos. A template of the same name is replaced."
+      description="Its lanes and what their agents do, not its todos. A template of the same name is replaced."
     >
       <form.AppForm>
         <Form className="gap-4">

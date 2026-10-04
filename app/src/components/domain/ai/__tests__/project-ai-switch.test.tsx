@@ -35,7 +35,7 @@ describe('ProjectAutoRunSwitch', () => {
     expect(screen.queryByRole('switch')).not.toBeInTheDocument();
   });
 
-  it('says the stations wait to be asked, and switches auto-run on', async () => {
+  it('says the agents wait to be asked, and switches auto-run on', async () => {
     const user = userEvent.setup();
     const set = vi.fn(() => ({ data: { setProjectAutoRun: { __typename: 'Project', id: 'p1', autoRun: true } } }));
     autoRun(
@@ -45,8 +45,8 @@ describe('ProjectAutoRunSwitch', () => {
       ],
       false,
     );
-    expect(await screen.findByText('Stations wait to be asked')).toBeInTheDocument();
-    const toggle = screen.getByRole('switch', { name: 'Stations start on todos by themselves' });
+    expect(await screen.findByText('Agents wait to be asked')).toBeInTheDocument();
+    const toggle = screen.getByRole('switch', { name: 'Agents start on todos by themselves' });
     expect(toggle).not.toBeChecked();
     await user.click(toggle);
     await vi.waitFor(() => expect(set).toHaveBeenCalled());
@@ -56,7 +56,7 @@ describe('ProjectAutoRunSwitch', () => {
     const user = userEvent.setup();
     const activity = vi.fn(() => ({
       data: {
-        stations: { __typename: 'AiStatus', todos: [] },
+        work: { __typename: 'AiStatus', todos: [] },
         live: [],
         spent: { __typename: 'RunAggregate', count: 0, sum: null },
         draftSpent: { __typename: 'RunAggregate', count: 0, sum: null },
@@ -103,7 +103,7 @@ describe('ProjectAutoRunSwitch', () => {
       ],
       true,
     );
-    expect(await screen.findByText('Stations start on todos by themselves')).toBeInTheDocument();
+    expect(await screen.findByText('Agents start on todos by themselves')).toBeInTheDocument();
     await user.click(screen.getByRole('switch'));
     expect(await screen.findByText('Project not found')).toBeInTheDocument();
   });

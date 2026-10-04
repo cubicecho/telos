@@ -4,7 +4,7 @@ import { extendSchema, GraphQLError, type GraphQLObjectType, type GraphQLSchema,
 import { aiAllowed } from '../ai-gate.ts';
 import { resultRows } from '../blocking.ts';
 import type { Context } from '../context.ts';
-import { failuresSinceTouched } from '../stations.ts';
+import { failuresSinceTouched } from '../ready.ts';
 import { requireSession } from './auth.ts';
 
 // What a board's cards say at a glance, for the whole board in one query: that
@@ -37,7 +37,7 @@ const CARD_MARKS_SDL = parse(`
     runId: ID
     "Failed runs since a person last touched it, as aiStatus counts them."
     attempts: Int!
-    "How many the lane it stands in allows before leaving it for a person. Null outside a station."
+    "How many the lane it stands in allows before leaving it for a person. Null in a lane with no agent."
     maxAttempts: Int
   }
 

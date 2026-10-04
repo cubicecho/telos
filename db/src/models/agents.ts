@@ -31,7 +31,7 @@ export const agents = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     name: text('name').notNull(),
-    // Off, no station claims a run for it and no draft is answered by it.
+    // Off, no lane claims a run for it and no draft is answered by it.
     enabled: boolean('enabled').notNull().default(true),
     // An OpenAI-compatible base URL: Ollama, llama.cpp, vLLM, a hosted API.
     // Null here and below inherits from the account's defaults

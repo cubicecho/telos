@@ -17,7 +17,7 @@ import { requireText } from './requests.ts';
 // - A person may also take any plain note off their own board.
 //
 // A note the caller cannot see is NOT_FOUND, as everywhere else. The thread is
-// read when a run is claimed (`briefFor`), so an edit reaches the runs that
+// read when a run is claimed (`assignmentFor`), so an edit reaches the runs that
 // start after it and no earlier one.
 
 // biome-ignore lint/suspicious/noExplicitAny: drizzle-orm 1.0 table/column type compat

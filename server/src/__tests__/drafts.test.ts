@@ -35,7 +35,7 @@ const WAITING = `query { runnerDrafts }`;
 const RUNS = `query ($id: UUID!) {
   draft(where: { id: { eq: $id } }) {
     runs(orderBy: { startedAt: { direction: asc, priority: 1 } }) {
-      id kind status todoId draftId laneId contract verdict model systemPrompt userPrompt output error
+      id kind status todoId draftId laneId verdict model systemPrompt userPrompt output error
       promptTokens completionTokens totalTokens startedAt finishedAt cancelRequestedAt
       agent { id } draft { id } todo { id }
     }
@@ -187,7 +187,7 @@ describe('a draft’s replies as runs', () => {
   it('records a reply as a run: who answered, what it was told, what it said and what it spent', async () => {
     const { draftId, runId } = await claimedDraft(board, runner);
     expect(await runsOf(draftId)).toMatchObject([
-      { id: runId, kind: 'draft', status: 'running', draftId, todoId: null, laneId: null, contract: null },
+      { id: runId, kind: 'draft', status: 'running', draftId, todoId: null, laneId: null },
     ]);
 
     await runner.expectOk(FINISH, {
@@ -358,7 +358,7 @@ describe('a draft’s replies as runs', () => {
     ).toBe(false);
   });
 
-  it('is not a station’s run: finishRun and heartbeatRun refuse it and say what to use', async () => {
+  it('is not a lane’s run: finishRun and heartbeatRun refuse it and say what to use', async () => {
     const { runId } = await claimedDraft(board, runner);
     const finish = await runner.expectError(FINISH_RUN, { id: runId, result: { status: 'ok', output: 'Hi' } });
     expect(finish.code).toBe('BAD_USER_INPUT');
@@ -374,9 +374,9 @@ describe('a draft’s replies as runs', () => {
     const insert = (values: Record<string, unknown>) =>
       db.insert(dbSchema.runs).values({ ...base, ...values } as typeof dbSchema.runs.$inferInsert);
 
-    await expect(insert({ kind: 'draft', todoId, contract: 'work' })).rejects.toThrow();
+    await expect(insert({ kind: 'draft', todoId })).rejects.toThrow();
     await expect(insert({ kind: 'todo', draftId })).rejects.toThrow();
-    await expect(insert({ kind: 'todo', todoId, draftId, contract: 'work' })).rejects.toThrow();
+    await expect(insert({ kind: 'todo', todoId, draftId })).rejects.toThrow();
     await expect(insert({ kind: 'draft' })).rejects.toThrow();
     // One live reply per draft.
     await expect(insert({ kind: 'draft', draftId })).rejects.toThrow();

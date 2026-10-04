@@ -6,13 +6,12 @@ import { assertNoCycle, findBlocked } from '../blocking.ts';
 import type { Actor, Context } from '../context.ts';
 import { stopDraftReply } from '../draft-runs.ts';
 import { instanceAiOn } from '../instance.ts';
-import { joinPrompts } from '../lane-presets.ts';
-import { findDoneLaneId, findFirstOpenLaneId } from '../lanes.ts';
+import { findDoneLaneId, findNewTodoLaneId } from '../lanes.ts';
 import { runnerAgent } from '../mcp-servers.ts';
 import { stampActor } from '../provenance.ts';
+import { dropRunRequests, expireLapsedRuns, LEASE_SECONDS, readyTodos } from '../ready.ts';
 import { mintRunToken } from '../run-tokens.ts';
 import { markRunnerSeen } from '../runner-seen.ts';
-import { dropRunRequests, expireLapsedRuns, LEASE_SECONDS, readyTodos } from '../stations.ts';
 import { openSession } from '../todo-sessions.ts';
 import { requireAuth } from './auth.ts';
 
@@ -33,14 +32,14 @@ import { requireAuth } from './auth.ts';
 type AnyRow = any;
 
 const RUNS_SDL = parse(`
-  "A todo a station could start on now, and the station."
+  "A todo a lane's agent could start on now, and the lane."
   type ReadyTodo {
     todoId: ID!
     laneId: ID!
     projectId: ID!
   }
 
-  "The agent a station names, secret included. Only ever handed to the runner. Null inherits from \`defaults\`."
+  "The agent a lane names, secret included. Only ever handed to the runner. Null inherits from \`defaults\`."
   type RunnerAgent {
     id: ID!
     name: String!
@@ -82,14 +81,11 @@ const RUNS_SDL = parse(`
   }
 
   "Everything an agent is told about the todo it is working, and where."
-  type RunBrief {
+  type RunAssignment {
     projectName: String!
     projectDescription: String
     projectContext: String
     laneName: String!
-    "What the station asks for: work, verdict or expand."
-    contract: String!
-    lanePrompt: String
     title: String!
     brief: String
     acceptance: String
@@ -113,10 +109,10 @@ const RUNS_SDL = parse(`
     "Whether no agent has worked the todo before: its hooks' session opens with this run."
     opensSession: Boolean!
     agent: RunnerAgent!
-    brief: RunBrief!
+    assignment: RunAssignment!
   }
 
-  "A todo an expansion proposes."
+  "A todo a run proposes."
   input ProposedTodoInput {
     title: String!
     brief: String
@@ -174,7 +170,7 @@ const RUNS_SDL = parse(`
     promptTokens: Int
     completionTokens: Int
     totalTokens: Int
-    "For an expand station: the todos the agent broke this one into."
+    "The new todos the agent proposed, if any. They land where the project's new todos do, and this one waits on them."
     todos: [ProposedTodoInput!]
     "What happened since the last heartbeat."
     events: [RunEventInput!]
@@ -185,12 +181,12 @@ const RUNS_SDL = parse(`
   }
 
   extend type Query {
-    "What the stations could start on now. The runner's only."
+    "What lanes' agents could start on now. The runner's only."
     runnerQueue(limit: Int = 20): [ReadyTodo!]!
   }
 
   extend type Mutation {
-    "Starts a run of a ready todo at its station. Null when it is no longer ready. The runner's only."
+    "Starts a run of a ready todo by its lane's agent. Null when it is no longer ready. The runner's only."
     claimRun(todoId: ID!, laneId: ID!): RunClaim
     "Keeps a run's lease. True means stop: somebody asked, or AI was switched off. The runner's only."
     heartbeatRun(id: ID!, events: [RunEventInput!], prompt: RunPromptInput, usage: RunUsageInput): Boolean!
@@ -223,8 +219,26 @@ const PROMPT_CHARS = 64_000;
 /** The most artifacts one run may report. */
 const MAX_ARTIFACTS = 100;
 
-/** A verdict station's answer fails the todo when it opens with FAIL. Anything else passes. */
+/** A reply that opens with FAIL is a failing verdict: the todo takes the failure route. */
 const FAILS = /^\s*FAIL\b/i;
+/** A reply that opens with PASS is a passing verdict. Any other reply is a report, and passes too. */
+const PASSES = /^\s*PASS\b/i;
+
+/**
+ * What a reply rules, read off its first word.
+ *
+ * @param output - What the agent replied.
+ * @returns `fail` or `pass` for a verdict, `none` for a report.
+ */
+function verdictOf(output: string | null): 'pass' | 'fail' | 'none' {
+  if (output === null) {
+    return 'none';
+  }
+  if (FAILS.test(output)) {
+    return 'fail';
+  }
+  return PASSES.test(output) ? 'pass' : 'none';
+}
 
 function notFound(what: string): GraphQLError {
   return new GraphQLError(`${what} not found`, { extensions: { code: 'NOT_FOUND' } });
@@ -252,7 +266,7 @@ async function loadRunForUpdate(tx: AnyRow, runId: string) {
   const [run] = await tx.select().from(dbSchema.runs).where(eq(dbSchema.runs.id, runId)).for('update');
   if (!run) throw notFound('Run');
   if (run.kind !== 'todo') {
-    throw new GraphQLError("That run is a draft's reply, which has no station. Report it with finishDraft.", {
+    throw new GraphQLError("That run is a draft's reply, which has no lane. Report it with finishDraft.", {
       extensions: { code: 'BAD_USER_INPUT' },
     });
   }
@@ -268,16 +282,16 @@ async function loadRunForUpdate(tx: AnyRow, runId: string) {
 }
 
 /**
- * What the agent is told: the project, the station, the todo, and what has
- * been said about it.
+ * What the agent is told: the project, the lane, the todo, and what has been
+ * said about it. What to do with it is in the agent's own instructions.
  *
  * @param tx The transaction.
  * @param todo The todo being worked.
- * @param lane The station.
+ * @param lane The lane it is in.
  * @param project The todo's project.
- * @returns The brief.
+ * @returns The assignment.
  */
-async function briefFor(tx: AnyRow, todo: AnyRow, lane: AnyRow, project: AnyRow) {
+async function assignmentFor(tx: AnyRow, todo: AnyRow, lane: AnyRow, project: AnyRow) {
   const thread: AnyRow[] = await tx
     .select()
     .from(dbSchema.todoNotes)
@@ -296,21 +310,11 @@ async function briefFor(tx: AnyRow, todo: AnyRow, lane: AnyRow, project: AnyRow)
   const why =
     arrival?.reason ?? (arrival?.noteId ? (thread.find((note) => note.id === arrival.noteId)?.body ?? null) : null);
 
-  // A lane that follows a preset is told the preset's prompt, then its own.
-  const [preset] = lane.presetId
-    ? await tx
-        .select({ prompt: dbSchema.lanePresets.prompt })
-        .from(dbSchema.lanePresets)
-        .where(eq(dbSchema.lanePresets.id, lane.presetId))
-    : [];
-
   return {
     projectName: project.name,
     projectDescription: project.description,
     projectContext: project.context,
     laneName: lane.name,
-    contract: lane.contract,
-    lanePrompt: joinPrompts(preset?.prompt, lane.prompt),
     title: todo.title,
     brief: todo.notes,
     acceptance: todo.acceptance,
@@ -337,9 +341,9 @@ async function nextPosition(tx: AnyRow, projectId: string): Promise<number> {
 }
 
 /**
- * Writes an expansion's todos into `laneId`, links what they wait on by title,
- * and makes the parent wait on all of them: the request is done when its
- * pieces are. A dependency naming nothing in the batch, or one that would close
+ * Writes a run's proposed todos into `laneId`, links what they wait on by
+ * title, and makes the parent wait on all of them: the request is done when
+ * its pieces are. A dependency naming nothing in the batch, or one that would close
  * a cycle, is dropped — a lost ordering hint, not a lost todo.
  *
  * @param tx The transaction, already stamped with the agent.
@@ -348,7 +352,12 @@ async function nextPosition(tx: AnyRow, projectId: string): Promise<number> {
  * @param proposed What the agent proposed.
  * @returns The new todos.
  */
-async function writeChildren(tx: AnyRow, parent: AnyRow, laneId: string, proposed: ProposedTodo[]): Promise<AnyRow[]> {
+async function writeChildren(
+  tx: AnyRow,
+  parent: AnyRow,
+  laneId: string | null,
+  proposed: ProposedTodo[],
+): Promise<AnyRow[]> {
   const start = await nextPosition(tx, parent.projectId);
   const written: AnyRow[] = await tx
     .insert(dbSchema.todos)
@@ -565,19 +574,20 @@ function spend(run: AnyRow, result: RunResult) {
 }
 
 /**
- * Records what a run came to and carries out what the station says follows.
+ * Records what a run came to and carries out what its lane says follows.
  *
  * A run that was asked to stop, or whose user, project or todo was closed to
  * AI while it worked, is recorded as stopped and nothing else happens: no
  * note, no move, no new todos. For a user who switched AI off, that is the
  * promise — nothing of theirs changes after the switch.
  *
- * Otherwise the outcome is read against the lane's contract. A `verdict`
- * station ruled FAIL, a failed run, or an expansion that proposed nothing
- * sends the todo down the failure arm; anything else passes, down the success
- * arm, or into the archive when that is what the lane does with a pass. A todo
- * a person moved while the agent worked stays where the person put it: the
- * run's opinion is recorded, but the person's move wins.
+ * Otherwise every run is read the same way. A failed run, or a reply that
+ * opens with FAIL, sends the todo down the failure route; anything else
+ * passes, down the success route, or into the archive when that is what the
+ * lane does with a pass. A pass that proposed new todos leaves its todo where
+ * it is, waiting on them. A todo a person moved while the agent worked stays
+ * where the person put it: the run's opinion is recorded, but the person's
+ * move wins.
  *
  * @param context The runner's context.
  * @param runId The run.
@@ -614,21 +624,19 @@ async function finish(context: Context, runId: string, result: RunResult): Promi
     }
 
     const ok = result.status === 'ok';
-    const verdict = run.contract === 'verdict' && ok ? (FAILS.test(output ?? '') ? 'fail' : 'pass') : 'none';
-    const proposed = run.contract === 'expand' && ok ? (result.todos ?? []).filter((todo) => todo.title?.trim()) : [];
-    const barren = run.contract === 'expand' && ok && proposed.length === 0;
-    const passed = ok && verdict !== 'fail' && !barren;
-    const error = barren ? 'The agent proposed no todos.' : ok ? null : result.error?.trim() || 'The run failed.';
+    const verdict = ok ? verdictOf(output) : 'none';
+    const passed = ok && verdict !== 'fail';
+    const proposed = passed ? (result.todos ?? []).filter((todo) => todo.title?.trim()) : [];
+    const error = ok ? null : result.error?.trim() || 'The run failed.';
 
     const actor: Actor = { kind: 'agent', userId: run.userId, runId: run.id };
     await stampActor(tx, actor);
 
     // What the agent said goes on the thread. A verdict is a different kind of
     // note from a report, so a reviewer's PASS never buries the account of the
-    // work the next agent round the loop needs. An expansion's answer is the
-    // todos it became, not something anyone would read back.
+    // work the next agent round the loop needs.
     const [note] =
-      ok && output && run.contract !== 'expand'
+      ok && output
         ? await tx
             .insert(dbSchema.todoNotes)
             .values({
@@ -645,12 +653,8 @@ async function finish(context: Context, runId: string, result: RunResult): Promi
     const stillHere = lane && todo.laneId === lane.id;
     const targetId = stillHere ? (passed ? lane.onSuccessLaneId : lane.onFailureLaneId) : null;
 
-    if (passed && proposed.length > 0 && lane?.onSuccessLaneId) {
-      // Pieces of work are open work, so a success arm into the done lane
-      // puts them in the first open lane instead.
-      const [landing] = await tx.select().from(dbSchema.lanes).where(eq(dbSchema.lanes.id, lane.onSuccessLaneId));
-      const laneId = landing?.isDone ? await findFirstOpenLaneId(tx, todo.projectId) : lane.onSuccessLaneId;
-      await writeChildren(tx, todo, laneId ?? lane.id, proposed);
+    if (proposed.length > 0) {
+      await writeChildren(tx, todo, await findNewTodoLaneId(tx, todo.projectId), proposed);
       await tx.insert(dbSchema.todoNotes).values({
         userId: run.userId,
         todoId: todo.id,
@@ -659,7 +663,7 @@ async function finish(context: Context, runId: string, result: RunResult): Promi
         actorKind: 'agent',
         runId: run.id,
       });
-    } else if (passed && stillHere && lane.archiveOnSuccess && run.contract !== 'expand') {
+    } else if (passed && stillHere && lane.archiveOnSuccess) {
       await archiveOn(tx, actor, todo, { noteId: note?.id ?? null, reason: null });
     } else if (targetId && targetId !== todo.laneId) {
       await moveOn(tx, actor, todo, targetId, {
@@ -692,7 +696,7 @@ async function finish(context: Context, runId: string, result: RunResult): Promi
 }
 
 /**
- * Moves a todo to the lane a station's arrow points at, keeping the lane rules:
+ * Moves a todo to the lane a route points at, keeping the lane rules:
  * into the done lane completes it, out of it reopens it. A todo that became
  * blocked while it was worked is not completed; it stays where it is, since
  * finished work waiting on something unfinished is not finished.
@@ -700,7 +704,7 @@ async function finish(context: Context, runId: string, result: RunResult): Promi
  * @param tx The transaction.
  * @param actor The run's agent.
  * @param todo The todo.
- * @param laneId Where the arrow points.
+ * @param laneId Where the route points.
  * @param provenance The note and reason for its history.
  * @returns Nothing.
  */
@@ -774,7 +778,7 @@ export function applyRunsExtension(schema: GraphQLSchema): GraphQLSchema {
     requireSystem(context);
     try {
       return await (context.db as AnyRow).transaction(async (tx: AnyRow) => {
-        // Claims at one station take turns, so two runners cannot both see
+        // Claims in one lane take turns, so two runners cannot both see
         // room under its WIP limit and both take it.
         const [lane] = await tx.select().from(dbSchema.lanes).where(eq(dbSchema.lanes.id, args.laneId)).for('update');
         if (!lane) return null;
@@ -800,7 +804,6 @@ export function applyRunsExtension(schema: GraphQLSchema): GraphQLSchema {
             todoId: todo.id,
             laneId: lane.id,
             agentId: agent.id,
-            contract: lane.contract,
             model: handed.resolvedModel,
             leaseExpiresAt: leaseFromNow(),
           })
@@ -816,7 +819,7 @@ export function applyRunsExtension(schema: GraphQLSchema): GraphQLSchema {
           turn,
           opensSession,
           agent: handed,
-          brief: await briefFor(tx, todo, lane, project),
+          assignment: await assignmentFor(tx, todo, lane, project),
         };
       });
     } catch (error) {
@@ -886,7 +889,7 @@ export function applyRunsExtension(schema: GraphQLSchema): GraphQLSchema {
         .where(eq(dbSchema.runs.id, run.id))
         .returning();
       // Stopping a run means "not now", and the queue would otherwise hand the
-      // todo straight back to the same station. So AI is told to leave it alone,
+      // todo straight back to the same agent. So AI is told to leave it alone,
       // as the MCP door's cancelRequest does; switching that off again is the
       // way back in, and the history says why it went on.
       await stampActor(tx, context.actor, { reason: 'Its run was stopped.' });

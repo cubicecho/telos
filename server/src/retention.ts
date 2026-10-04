@@ -1,23 +1,23 @@
 import { sql } from 'drizzle-orm';
 import { resultRows } from './blocking.ts';
 import { pruneTombstones } from './changes.ts';
-import { TOUCHED } from './stations.ts';
+import { TOUCHED } from './ready.ts';
 
 // Old runs, pruned: each account says how many days a finished run and its log
 // are kept (users.runRetentionDays; null is for good), and the server deletes
 // what is older, at boot and every hour after.
 //
-// Only runs the stations no longer count go. A station reads a todo's runs to
-// decide whether it is ready (stations.ts): its failures since a person last
+// Only runs readiness no longer counts go. Readiness reads a todo's runs to
+// decide whether it is ready (ready.ts): its failures since a person last
 // touched it, and an `ok` in its lane since it arrived there. Those are kept,
-// however old, so pruning cannot wake a todo a station gave up on or finished
+// however old, so pruning cannot wake a todo an agent gave up on or finished
 // with; both moments only move forward, so a run that stops counting never
 // counts again. A done todo's runs all go: reopening one is a person's touch.
 //
 // What a run did stays: its notes and history keep their `runId`, pointing at
 // a run that is gone, and its artifacts keep their files.
 //
-// A draft's replies are runs too, and no station counts them, so every finished
+// A draft's replies are runs too, and readiness does not count them, so every finished
 // one past its keep goes. What the agent said stays in the draft's conversation.
 
 // biome-ignore lint/suspicious/noExplicitAny: db type varies by driver (postgres-js, PGlite)
@@ -60,7 +60,7 @@ export async function pruneRuns(db: AnyDb, now: Date = new Date()): Promise<numb
             (SELECT max(e.at) FROM todo_events e WHERE e.todo_id = t.id AND ${TOUCHED}),
             '-infinity'::timestamptz
           ))
-          -- A success here since it arrived: the station is done with it.
+          -- A success here since it arrived: the lane's agent is done with it.
           OR (r.status = 'ok' AND r.lane_id = t.lane_id AND r.started_at >= coalesce(
             (SELECT max(e.at) FROM todo_events e WHERE e.todo_id = t.id AND e.to_lane_id = t.lane_id),
             t.created_at

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Text, View } from 'react-native';
-import type { StationFieldsFragment } from '@/__generated__/graphql';
+import type { LaneAgentFieldsFragment } from '@/__generated__/graphql';
 import { Ellipsis } from '@/components/app-icons';
 import type { TodoSummary } from '@/components/domain/todo/types';
 import { Badge } from '@/components/ui/badge';
@@ -34,9 +34,9 @@ export function LaneColumn({
   onReorder,
   onToggleDone,
   onDelete,
-  station,
+  laneAgent,
   agentName,
-  onEditStation,
+  onEditAgent,
   ai,
   marks,
 }: {
@@ -50,12 +50,12 @@ export function LaneColumn({
   onToggleDone: () => void;
   onDelete: () => void;
   /**
-   * The lane's station settings: `undefined` while AI is off for the project,
-   * when a lane cannot be a station and the menu does not offer it.
+   * The lane's agent settings: `undefined` while AI is off for the project,
+   * when a lane cannot have an agent and the menu does not offer it.
    */
-  station?: StationFieldsFragment | null | undefined;
+  laneAgent?: LaneAgentFieldsFragment | null | undefined;
   agentName?: string | undefined;
-  onEditStation?: (() => void) | undefined;
+  onEditAgent?: (() => void) | undefined;
   /** What the project's agents are doing to its cards, while AI is on for it. */
   ai?: BoardAi | undefined;
   /** What the board's cards have to show, by todo id. */
@@ -108,9 +108,9 @@ export function LaneColumn({
             >
               {lane.name}
             </Text>
-            {station?.agentId ? (
-              <Badge variant="secondary" aria-label={`Station, worked by ${agentName ?? 'an agent'}`}>
-                Station
+            {laneAgent?.agentId ? (
+              <Badge variant="secondary" aria-label={`Worked by ${agentName ?? 'an agent'}`}>
+                Agent
               </Badge>
             ) : null}
             <Text className="shrink-0 text-muted-foreground text-xs tabular-nums">{todos.length}</Text>
@@ -135,8 +135,8 @@ export function LaneColumn({
               icon={<Check className={cn('h-3.5 w-3.5', !lane.isDone && 'opacity-0')} />}
               onSelect={onToggleDone}
             />
-            {onEditStation ? (
-              <MenuItem label="Station…" icon={<Settings className="h-3.5 w-3.5" />} onSelect={onEditStation} />
+            {onEditAgent ? (
+              <MenuItem label="Agent…" icon={<Settings className="h-3.5 w-3.5" />} onSelect={onEditAgent} />
             ) : null}
             <MenuItem
               label="Move left"

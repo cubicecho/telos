@@ -101,6 +101,7 @@ export const ProjectDocument = graphql(`
       openTodoCount
       aiEnabled
       autoRun
+      newTodoLaneId
       ...ProjectLabelFields
     }
   }
@@ -294,7 +295,7 @@ export const SetApiKeyToolsDocument = graphql(`
   }
 `);
 
-// Agents, and the lanes they work as stations. `apiKey` is not in the schema:
+// Agents, and the lanes they work. `apiKey` is not in the schema:
 // it is written with `setAgentApiKey`, and all that comes back is `hasApiKey`.
 
 export const AgentFieldsFragment = graphql(`
@@ -532,108 +533,37 @@ export const SetAgentApiKeyDocument = graphql(`
   }
 `);
 
-// The station columns exist only while the instance has AI, so they are not
+// A lane's agent columns exist only while the instance has AI, so they are not
 // in `LaneFields` — every board would ask for fields the server does not have.
 // Read on their own, they land on the same normalized `Lane` rows.
-export const StationFieldsFragment = graphql(`
-  fragment StationFields on Lane {
+export const LaneAgentFieldsFragment = graphql(`
+  fragment LaneAgentFields on Lane {
     id
     agentId
-    contract
-    prompt
     onSuccessLaneId
     onFailureLaneId
     archiveOnSuccess
     wipLimit
     maxAttempts
-    presetId
-    presetOverrides
   }
 `);
 
-// A preset: a station's contract, prompt and limits, kept on the account. A
-// lane that follows one (`presetId`) holds its values, bar the fields named in
-// the lane's `presetOverrides`, and adds its own prompt after the preset's.
-export const LanePresetFieldsFragment = graphql(`
-  fragment LanePresetFields on LanePreset {
-    id
-    name
-    contract
-    prompt
-    wipLimit
-    maxAttempts
-  }
-`);
-
-export const ProjectStationsDocument = graphql(`
-  query ProjectStations($projectId: UUID!) {
+export const ProjectLaneAgentsDocument = graphql(`
+  query ProjectLaneAgents($projectId: UUID!) {
     lanes(where: { projectId: { eq: $projectId } }) {
-      ...StationFields
+      ...LaneAgentFields
     }
     agents(orderBy: { name: { direction: asc, priority: 1 } }) {
       id
       name
     }
-    lanePresets(orderBy: { name: { direction: asc, priority: 1 } }) {
-      ...LanePresetFields
-    }
   }
 `);
 
-// The presets with the lanes that follow each, for the settings page.
-export const LanePresetsDocument = graphql(`
-  query LanePresets {
-    lanePresets(orderBy: { name: { direction: asc, priority: 1 } }) {
-      ...LanePresetFields
-      lanes {
-        id
-        name
-        presetOverrides
-        project {
-          id
-          name
-        }
-      }
-    }
-  }
-`);
-
-export const CreateLanePresetDocument = graphql(`
-  mutation CreateLanePreset($values: CreateLanePresetInput!) {
-    createLanePreset(values: $values) {
-      ...LanePresetFields
-    }
-  }
-`);
-
-export const UpdateLanePresetDocument = graphql(`
-  mutation UpdateLanePreset($id: UUID!, $set: UpdateLanePresetInput!) {
-    updateLanePreset(set: $set, where: { id: { eq: $id } }) {
-      ...LanePresetFields
-    }
-  }
-`);
-
-export const DeleteLanePresetDocument = graphql(`
-  mutation DeleteLanePreset($id: UUID!) {
-    deleteLanePreset(where: { id: { eq: $id } }) {
-      id
-    }
-  }
-`);
-
-export const SaveLaneAsPresetDocument = graphql(`
-  mutation SaveLaneAsPreset($laneId: ID!, $name: String!, $id: ID) {
-    saveLaneAsPreset(laneId: $laneId, name: $name, id: $id) {
-      ...LanePresetFields
-    }
-  }
-`);
-
-export const UpdateStationDocument = graphql(`
-  mutation UpdateStation($id: UUID!, $set: UpdateLaneInput!) {
+export const UpdateLaneAgentDocument = graphql(`
+  mutation UpdateLaneAgent($id: UUID!, $set: UpdateLaneInput!) {
     updateLane(set: $set, where: { id: { eq: $id } }) {
-      ...StationFields
+      ...LaneAgentFields
     }
   }
 `);
@@ -644,7 +574,7 @@ export const UpdateStationDocument = graphql(`
 
 // A run's summary is what a list polls: no log, no prompts, no output, which
 // are the heavy parts. RunFields adds them, for a run someone has opened.
-// A run is a station's work on a todo or an agent's reply in a draft (`kind`),
+// A run is a lane agent's work on a todo or an agent's reply in a draft (`kind`),
 // and has the todo and lane, or the draft, to match.
 export const RunSummaryFieldsFragment = graphql(`
   fragment RunSummaryFields on Run {
@@ -652,7 +582,6 @@ export const RunSummaryFieldsFragment = graphql(`
     kind
     status
     verdict
-    contract
     error
     toolCalls
     promptTokens
@@ -773,7 +702,7 @@ export const ProjectRunsDocument = graphql(`
  */
 export const ProjectActivityDocument = graphql(`
   query ProjectActivity($projectId: UUID!, $project: ID!, $since: DateTime!) {
-    stations: aiStatus(projectId: $project) {
+    work: aiStatus(projectId: $project) {
       todos {
         todoId
         state
@@ -1185,7 +1114,7 @@ export const VerifyMagicLinkDocument = graphql(`
   }
 `);
 
-/** Where every open todo stands with the stations, across the AI projects. */
+/** Where every open todo stands with the lanes' agents, across the AI projects. */
 export const AiStatusDocument = graphql(`
   query AiStatus {
     aiStatus {

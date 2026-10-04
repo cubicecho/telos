@@ -5,7 +5,7 @@ import { requireAi, requireSystem } from '../ai-gate.ts';
 import type { Context } from '../context.ts';
 import { DRAFT_LEASE_SECONDS, draftBeingAnswered, expireLapsedDraftRuns, stopDraftReply } from '../draft-runs.ts';
 import { instanceAiOn } from '../instance.ts';
-import { findFirstOpenLaneId } from '../lanes.ts';
+import { findNewTodoLaneId } from '../lanes.ts';
 import { runnerAgent } from '../mcp-servers.ts';
 import { stampActor } from '../provenance.ts';
 import { markRunnerSeen } from '../runner-seen.ts';
@@ -26,7 +26,7 @@ import { isUniqueViolation, type RunEventInput, type RunPrompt, type RunUsage, r
 // Each answer is a run (kind `draft`, see draft-runs.ts): claiming a draft
 // starts one, which holds the lease, and finishing it records what the agent
 // was told, what it said or why it failed, and what it cost. So a draft's
-// replies are read, counted and pruned as a station's work is.
+// replies are read, counted and pruned as a lane agent's work is.
 //
 // Every person-side field needs AI on for the account and the project, and the
 // runner only sees drafts where both still are. Applied only when the instance
@@ -292,7 +292,7 @@ export function applyDraftsExtension(schema: GraphQLSchema): GraphQLSchema {
       const title = ((args.title ?? draft.title).trim() || brief.split('\n')[0]).slice(0, MAX_TITLE);
 
       await stampActor(tx, context.actor);
-      const laneId = await findFirstOpenLaneId(tx, draft.projectId);
+      const laneId = await findNewTodoLaneId(tx, draft.projectId);
       const [todo] = await tx
         .insert(dbSchema.todos)
         .values({

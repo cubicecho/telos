@@ -47,7 +47,7 @@ const PROJECT_ARTIFACTS = `query ($projectId: UUID!) {
 const PAGE = { location: 'https://example.com/plan', label: 'The plan' };
 
 /**
- * Runs a todo through its station and has the run report `artifacts`.
+ * Runs a todo through its lane's agent and has the run report `artifacts`.
  *
  * @param todoId - The todo to run.
  * @param artifacts - What the run says it made.

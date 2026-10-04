@@ -62,7 +62,7 @@ async function runOnce(todoId: string, result: Record<string, unknown>): Promise
   return runId;
 }
 
-/** A second project of the board's account, with a station of its own worked by a second agent. */
+/** A second project of the board's account, with a lane of its own worked by a second agent. */
 async function secondProject(): Promise<{
   projectId: string;
   agentId: string;
@@ -88,7 +88,7 @@ async function secondProject(): Promise<{
       `mutation { createAgent(values: { name: "Reviewer", baseUrl: "http://llm.test/v1", model: "tiny" }) { id } }`,
     )
   ).createAgent.id;
-  await setLane(person, lanes[0].id, { agentId, onSuccessLaneId: lanes[2].id, prompt: 'Review it.' });
+  await setLane(person, lanes[0].id, { agentId, onSuccessLaneId: lanes[2].id });
   const addTodo = async (title: string) =>
     (
       await person.expectOk(
@@ -250,7 +250,6 @@ describe('accountAttention', () => {
     await setLane(board.person, board.lanes[0].id, { onSuccessLaneId: board.lanes[1].id, maxAttempts: 0 });
     await setLane(board.person, board.lanes[1].id, {
       agentId: board.agentId,
-      contract: 'verdict',
       onSuccessLaneId: board.lanes[2].id,
       onFailureLaneId: board.lanes[0].id,
     });

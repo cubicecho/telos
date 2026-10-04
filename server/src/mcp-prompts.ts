@@ -4,8 +4,8 @@ import { z } from 'zod/v3';
 // The prompts offered beside the MCP door's tools (mcp.ts).
 //
 // A tool's description has room to say what it does, not how the board works:
-// that a lane with an agent is a station, that a request is a todo, that the
-// stations do the work and a client steers it. A prompt does have
+// that a lane's agent works each todo that arrives in it, that a request is a
+// todo, that the agents do the work and a client steers it. A prompt does have
 // that room. It is fetched deliberately, once, so it is the one place a client
 // can be given the model rather than the schema.
 //
@@ -27,9 +27,9 @@ the first call. The tools say what each one does; this says how the board works.
 - **Project**: a board, and a body of work. Its \`context\` is the standing description
   every agent working on it is shown. You only see projects whose owner has switched AI
   on for them.
-- **Lane**: a column, in board order. A lane with an agent is a *station*: the agent
-  works each todo that arrives there, and the lane says where the todo goes when that
-  run succeeds or fails. A lane without an agent is a resting place, for a person to act
+- **Lane**: a column, in board order. A lane may have an agent: the agent works each
+  todo that arrives there, and the lane says where the todo goes when that run succeeds
+  (its success route) or fails (its failure route). A lane without an agent is a resting place, for a person to act
   on. One lane per project may be the done lane: a todo that reaches it is complete.
 - **Todo**: the unit of work. A *request* is simply a todo you submitted: its \`brief\`
   and \`acceptance\` are all the first agent gets, beside the project's context.
@@ -38,15 +38,16 @@ the first call. The tools say what each one does; this says how the board works.
   is handed to the next agent that works the todo.
 - **History**: each move, edit, completion and reopening, with who did it and why.
 
-## What a station does
+## What a run does
 
-A station's contract is one of three things. \`work\` does the todo and reports.
-\`verdict\` judges it against its acceptance and rules PASS or FAIL. \`expand\` splits it
-into child todos, which is the one place work is broken up. After a run the todo
-moves along the lane's success or failure arrow, if it has one. A station gives up on a
-todo after a few failed attempts, until a person touches it or someone retries it.
+An agent's instructions say what it does with a todo. Every run ends the same way: a
+reply that starts with FAIL fails, and anything else passes. The todo then follows the
+lane's success or failure route, if it has one. A run may also propose new todos; they
+land where the project's new todos do, and the todo it was working waits on them. A lane
+gives up on a todo after a few failed attempts, until a person touches it or someone
+retries it.
 
-A todo is *blocked* while another it depends on is unfinished: stations skip it until
+A todo is *blocked* while another it depends on is unfinished: agents skip it until
 then. That is queued, not stuck.
 
 ## What you can do, and what you cannot
@@ -61,7 +62,7 @@ Hand work over (\`submit_request\`, or \`create_todo\` for a lane you choose), t
 over with an agent first (\`start_draft\`, \`say_to_draft\`, \`stop_draft\`,
 \`make_todo_from_draft\`, \`discard_draft\`), and change what a todo says
 (\`update_todo\`). Move a todo (\`move_todo\`; into the done lane completes it), make it
-wait on others (\`set_todo_dependencies\`), send it round its station again
+wait on others (\`set_todo_dependencies\`), send it round its lane's agent again
 (\`retry_todo\`), ask for it to be worked now (\`run_todo\`), stop a run (\`stop_run\`),
 archive or restore it (\`archive_todo\`, \`restore_todo\`) or delete it for good
 (\`delete_todo\`). Say more about it (\`add_todo_note\`, \`edit_todo_note\`,
@@ -71,14 +72,14 @@ lanes as a template, or give an empty board one (\`save_board_template\`,
 \`apply_board_template\`).
 
 What stays a person's: switching AI on or off, for a project or a todo; whether a
-project's stations run by themselves; agents, their keys and their MCP servers;
-changing a lane or its station, beyond giving an empty board a template; archiving or deleting a project; and changing many todos
+project's agents run by themselves; agents, their keys and their MCP servers;
+changing a lane or its agent, beyond giving an empty board a template; archiving or deleting a project; and changing many todos
 at once. The owner may also have switched some of the tools above off for your key,
 in which case they are not listed to you. When something needs one of those, say what
 and why, and leave it to the person.
 
-The stations still do the board's work. Moving a todo past a station, or completing
-it, skips what that station would have checked: do it when you were asked to, not
+The lanes' agents still do the board's work. Moving a todo past a lane with an agent,
+or completing it, skips what that agent would have checked: do it when you were asked to, not
 to hurry the board along.
 
 ## Start here
@@ -103,8 +104,8 @@ export const PROMPTS: readonly Prompt[] = [
     name: 'telos_guide',
     title: 'How a Telos board works',
     description:
-      'Orientation for an agent about to hand work to Telos: what a project, lane, station, ' +
-      'todo, thread and history are, what the stations do, and what an MCP client may and may ' +
+      'Orientation for an agent about to hand work to Telos: what a project, lane, agent, ' +
+      'todo, thread and history are, what the agents do, and what an MCP client may and may ' +
       'not do. Fetch this before the first tool call.',
     render: () => GUIDE,
   },
@@ -131,13 +132,13 @@ export const PROMPTS: readonly Prompt[] = [
    \`board_templates\` has one that fits, \`apply_board_template\` before adding any work.
    If \`create_project\` is not listed to you, stop and tell the person what to set up
    instead, and wait for them.
-3. With a board, read its lanes in order with \`lanes\`. The request lands in the first
-   open lane, so check what that lane is: if it has no agent, nothing will happen until
-   someone moves the todo on. Whether the stations run by themselves is the owner's
+3. With a board, read its lanes in order with \`lanes\`. The request lands in the lane
+   the project sends new todos to, or else its first open lane, so check what that lane
+   is: if it has no agent, nothing will happen until someone moves the todo on. Whether the agents run by themselves is the owner's
    setting; \`run_todo\` asks for one run when they do not.
 4. \`submit_request\`. Put the work in whole, in \`brief\`: what is wanted, where it lives,
    what must not change. Put how anyone could tell it was done in \`acceptance\`, as checks
-   a reviewer could make. A station that expands will break it up; do not pre-divide it.
+   a reviewer could make. An agent may break it up into smaller todos; do not pre-divide it.
 5. \`request\` with the id you got back, to confirm where it landed.
 
 Finish by reporting the project, the request's id and the lane it is in.`,
@@ -169,7 +170,7 @@ Finish by reporting the project, the request's id and the lane it is in.`,
 4. \`submit_request\`, then \`request\` with the id, to confirm the lane it landed in.
 
 Finish by reporting its id and lane. Check on it later with \`request\`: its thread will
-carry the stations' reports and verdicts.`,
+carry the agents' reports and verdicts.`,
   },
   {
     name: 'triage_board',
@@ -183,13 +184,13 @@ carry the stations' reports and verdicts.`,
 
 **Board:** ${args.project}
 
-1. Resolve it with \`projects\`; note its lanes, which are stations and which is done.
+1. Resolve it with \`projects\`; note its lanes, which have agents and which is done.
 2. \`todos\` for it. Say what the board looks like: how many todos in each lane, which are
    blocked, which are complete.
 3. For each open todo that is not blocked, call \`request\` and read its thread and history,
-   newest first; \`runs\` and \`run_events\` say what its agents tried. It is stuck if a
-   station's last verdict was FAIL, if its reports say it could not be done, if it has
-   failed at a station more than once, or if it sits in a lane with no agent. Say why,
+   newest first; \`runs\` and \`run_events\` say what its agents tried. It is stuck if an
+   agent's last verdict was FAIL, if its reports say it could not be done, if it has
+   failed in a lane more than once, or if it sits in a lane with no agent. Say why,
    from what the thread, history and runs say, rather than that it is.
 4. Blocked todos are queued, not stuck, unless what blocks them will never be done
    (\`blockers\` lists them). Say so when that is the case.

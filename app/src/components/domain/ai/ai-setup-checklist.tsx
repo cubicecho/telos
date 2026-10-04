@@ -55,7 +55,7 @@ function runnerQuietFor(seenAt: string | null | undefined, now: number): number 
  */
 export function setupSteps(setup: Setup, projectId: string | undefined, now: number): SetupStep[] {
   // The project the rows about a project send you to: the one furthest along,
-  // or the one on screen while none has a station.
+  // or the one on screen while none has a lane with an agent.
   const target = setup.stationProjectIds[0] ?? projectId;
   const board = target ? `/projects/${target}?view=board` : undefined;
   const quietFor = runnerQuietFor(setup.runnerSeenAt, now);
@@ -72,12 +72,12 @@ export function setupSteps(setup: Setup, projectId: string | undefined, now: num
       linkLabel: 'Open Settings',
     },
     {
-      key: 'station',
-      label: 'A project has a station',
+      key: 'agent-lane',
+      label: 'A lane has an agent',
       done: setup.station,
       hint: target
-        ? 'A station is a lane an agent works. Turn AI on for the project, then on its board open a lane’s menu and choose “Station…”.'
-        : 'A station is a lane an agent works. Create a project first; its board is where a lane is given an agent.',
+        ? 'An agent works the todos in its lane. Turn AI on for the project, then on its board open a lane’s menu and choose “Agent…”.'
+        : 'An agent works the todos in its lane. Create a project first; its board is where a lane is given an agent.',
       href: board,
       linkLabel: 'Open the board',
     },
@@ -93,7 +93,7 @@ export function setupSteps(setup: Setup, projectId: string | undefined, now: num
       key: 'request',
       label: 'There is a first request',
       done: setup.request,
-      hint: 'Add a todo to the station’s lane, or talk a request over from the project’s header.',
+      hint: 'Add a todo to the agent’s lane, or talk a request over from the project’s header.',
       href: setup.projectAi ? board : undefined,
       linkLabel: 'Open the board',
     },
@@ -101,7 +101,7 @@ export function setupSteps(setup: Setup, projectId: string | undefined, now: num
       key: 'started',
       label: 'Work may start',
       done: setup.started,
-      hint: 'Turn on “Stations start on todos by themselves”, or press Run now on a todo’s card.',
+      hint: 'Turn on “Agents start on todos by themselves”, or press Run now on a todo’s card.',
       href: setup.projectAi ? board : undefined,
       linkLabel: 'Open the board',
     },
@@ -127,7 +127,7 @@ export function setupSteps(setup: Setup, projectId: string | undefined, now: num
  * (no `projectId`): a project's page says nothing about AI to someone who
  * left it off.
  *
- * On a project it shows where the project has no station, and on the project
+ * On a project it shows where the project has no lane with an agent, and on the project
  * the list points at, so the later steps have somewhere to be read. A project
  * with AI switched off shows nothing: its switch, beside it, is the one step
  * that matters there, and it was left off on purpose.
@@ -158,8 +158,8 @@ export function AiSetupChecklist({
   const setup = data?.aiSetup;
   if (!setup) return null;
 
-  const stations = setup.stationProjectIds;
-  if (projectId && stations.includes(projectId) && stations[0] !== projectId) return null;
+  const withAgents = setup.stationProjectIds;
+  if (projectId && withAgents.includes(projectId) && withAgents[0] !== projectId) return null;
 
   const steps = setupSteps(setup, projectId, Date.now());
   const left = steps.filter((step) => !step.done).length;

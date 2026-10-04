@@ -60,7 +60,7 @@ export function ProjectAiSwitch({ projectId, enabled }: { projectId: string; ena
 }
 
 /**
- * Whether a project's stations start on todos by themselves, apart from
+ * Whether a project's agents start on todos by themselves, apart from
  * whether AI works on it at all. Off, a todo is worked only when a person asks
  * for it to be run. Drawn only while the project's AI is on: the page decides
  * that, and without it the switch would say nothing true.
@@ -97,10 +97,10 @@ export function ProjectAutoRunSwitch({ projectId, enabled }: { projectId: string
           checked={enabled}
           onCheckedChange={toggle}
           disabled={loading}
-          accessibilityLabel="Stations start on todos by themselves"
+          accessibilityLabel="Agents start on todos by themselves"
         />
         <Text className="text-muted-foreground text-sm">
-          {enabled ? 'Stations start on todos by themselves' : 'Stations wait to be asked'}
+          {enabled ? 'Agents start on todos by themselves' : 'Agents wait to be asked'}
         </Text>
       </View>
       {error ? (

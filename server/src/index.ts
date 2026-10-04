@@ -71,7 +71,7 @@ httpServer.listen(PORT, '0.0.0.0', () => {
   // on in Settings its queue is empty and it only asks, every few seconds.
   if (ai) {
     runner = startRunner({ telosUrl: `http://127.0.0.1:${PORT}`, runnerKey: runnerKey() });
-    console.log('   Runner working the stations (idle until AI is on in Settings)');
+    console.log('   Runner working the lanes’ agents (idle until AI is on in Settings)');
   }
   if (!magicLinkRequired()) {
     console.warn('⚠️  AUTH_MAGIC_LINK is off: any email address signs in without a link. Private networks only.');

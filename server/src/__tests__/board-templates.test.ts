@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { type Board, createBoard, setLane } from './board.ts';
 import { createClient, createTestDb, createUser, type TestDb } from './helpers.ts';
 
-// Board templates: a board's lanes and station settings, saved and given to a
+// Board templates: a board's lanes and their agent settings, saved and given to a
 // new project.
 
 let db: TestDb;
@@ -14,7 +14,7 @@ const SAVE = `mutation ($projectId: ID!, $name: String!) { saveBoardTemplate(pro
 const APPLY = `mutation ($projectId: ID!, $templateId: ID!) { applyBoardTemplate(projectId: $projectId, templateId: $templateId) { id } }`;
 const LANES = `query ($projectId: UUID!) {
   lanes(where: { projectId: { eq: $projectId } }, orderBy: { position: { direction: asc, priority: 1 } }) {
-    id name isDone agentId contract prompt onSuccessLaneId onFailureLaneId archiveOnSuccess wipLimit maxAttempts
+    id name isDone agentId onSuccessLaneId onFailureLaneId archiveOnSuccess wipLimit maxAttempts
   }
 }`;
 
@@ -28,24 +28,24 @@ async function newProject(person = board.person): Promise<string> {
 }
 
 describe('board templates', () => {
-  it('gives a new project the saved lanes, stations and routes', async () => {
+  it('gives a new project the saved lanes, agents and routes', async () => {
     await setLane(board.person, board.lanes[1].id, { onFailureLaneId: board.lanes[0].id, wipLimit: 2, maxAttempts: 5 });
     const saved = (await board.person.expectOk(SAVE, { projectId: board.projectId, name: ' Pipeline ' }))
       .saveBoardTemplate;
     expect(saved.name).toBe('Pipeline');
     expect(saved.lanes).toHaveLength(3);
-    expect(saved.lanes[0]).toMatchObject({ agentId: board.agentId, onSuccess: 2, prompt: 'Do the work.' });
+    expect(saved.lanes[0]).toMatchObject({ agentId: board.agentId, onSuccess: 2 });
 
     const projectId = await newProject();
     await board.person.expectOk(APPLY, { projectId, templateId: saved.id });
     const lanes = (await board.person.expectOk(LANES, { projectId })).lanes;
     expect(lanes.map((lane: { name: string }) => lane.name)).toEqual(board.lanes.map((lane) => lane.name));
-    expect(lanes[0]).toMatchObject({ agentId: board.agentId, onSuccessLaneId: lanes[2].id, prompt: 'Do the work.' });
+    expect(lanes[0]).toMatchObject({ agentId: board.agentId, onSuccessLaneId: lanes[2].id });
     expect(lanes[1]).toMatchObject({ onFailureLaneId: lanes[0].id, wipLimit: 2, maxAttempts: 5 });
     expect(lanes[2].isDone).toBe(true);
   });
 
-  it('carries a station that archives on success', async () => {
+  it('carries a lane that archives on success', async () => {
     await setLane(board.person, board.lanes[0].id, { onSuccessLaneId: null, archiveOnSuccess: true });
     const saved = (await board.person.expectOk(SAVE, { projectId: board.projectId, name: 'Archiving' }))
       .saveBoardTemplate;
@@ -96,10 +96,8 @@ describe('board templates', () => {
       ]),
     ).toBe('BAD_USER_INPUT');
     expect(await bad([{ name: 'A', onSuccess: 3 }])).toBe('BAD_USER_INPUT');
-    expect(await bad([{ name: 'A', contract: 'magic' }])).toBe('BAD_USER_INPUT');
     expect(await bad([{ name: 'A', wipLimit: 0 }])).toBe('BAD_USER_INPUT');
     expect(await bad([{ name: 'A', archiveOnSuccess: true, onSuccess: 0 }])).toBe('BAD_USER_INPUT');
-    expect(await bad([{ name: 'A', archiveOnSuccess: true, contract: 'expand' }])).toBe('BAD_USER_INPUT');
     // The board is as it was.
     expect((await board.person.expectOk(LANES, { projectId })).lanes).toHaveLength(3);
   });

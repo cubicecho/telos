@@ -9,7 +9,6 @@ export function run(id: string, status: string, extra: Record<string, unknown> =
     kind: 'todo',
     status,
     verdict: 'none',
-    contract: 'work',
     error: null,
     toolCalls: 0,
     promptTokens: 0,
@@ -27,11 +26,10 @@ export function run(id: string, status: string, extra: Record<string, unknown> =
   };
 }
 
-/** An agent's reply in a draft, as a run: no todo, lane or contract. */
+/** An agent's reply in a draft, as a run: no todo or lane. */
 export function draftRun(id: string, status: string, extra: Record<string, unknown> = {}) {
   return run(id, status, {
     kind: 'draft',
-    contract: null,
     agent: { __typename: 'Agent', id: 'a2', name: 'Planner' },
     lane: null,
     todo: null,
