@@ -76,6 +76,46 @@ bodyClass: home
 </section>
 
 <section class="section">
+  <h2>See it in action</h2>
+  <p class="section-intro">A website relaunch with a Planner, a Worker and a Reviewer on its lanes. Click a screenshot to enlarge it.</p>
+  <div class="gallery">
+    <figure class="shot shot-wide">
+      <div class="shot-frame">
+        <picture>
+          <source srcset="{{ '/assets/screenshots/board-dark.webp' | url }}" media="(prefers-color-scheme: dark)" />
+          <img src="{{ '/assets/screenshots/board.webp' | url }}" width="3540" height="2000" loading="lazy" alt="The board: Inbox, Plan, Build, Review and Done lanes. Two todos are being worked by the Planner and the Reviewer, one waits on four others, and one has a failed attempt." />
+        </picture>
+      </div>
+      <figcaption>The board. Agents work the Plan, Build and Review lanes; the launch waits on what is still open.</figcaption>
+    </figure>
+    <figure class="shot">
+      <div class="shot-frame">
+        <img src="{{ '/assets/screenshots/thread.webp' | url }}" width="2880" height="2000" loading="lazy" alt="A todo's thread: a note from you, then the Worker's PASS, the Reviewer's FAIL with its reason, and the Worker's second PASS." />
+      </div>
+      <figcaption>A todo's thread. The Reviewer sent the work back, and said why.</figcaption>
+    </figure>
+    <figure class="shot">
+      <div class="shot-frame">
+        <img src="{{ '/assets/screenshots/runs.webp' | url }}" width="2880" height="2000" loading="lazy" alt="The project's runs: two running now, 13 runs and their tokens in 30 days, and a list of runs with their verdicts." />
+      </div>
+      <figcaption>Every run, its verdict and what it cost.</figcaption>
+    </figure>
+    <figure class="shot">
+      <div class="shot-frame">
+        <img src="{{ '/assets/screenshots/list.webp' | url }}" width="2880" height="2200" loading="lazy" alt="The same project as a list, each todo marked with its lane, and a blocked section at the bottom." />
+      </div>
+      <figcaption>The same todos as a list, with what is blocked set apart.</figcaption>
+    </figure>
+    <figure class="shot">
+      <div class="shot-frame">
+        <img src="{{ '/assets/screenshots/activity.webp' | url }}" width="2880" height="2000" loading="lazy" alt="Activity: what needs you, runs and tokens by project and by agent, and recent runs." />
+      </div>
+      <figcaption>Activity: what needs you, and spend by project and agent.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section class="section">
   <h2>How it works</h2>
   <div class="flow">
     <div class="flow-node">
@@ -115,3 +155,5 @@ bodyClass: home
     <a class="button secondary" href="{{ '/docs/' | url }}">Read the docs</a>
   </p>
 </section>
+
+{% include "lightbox.njk" %}

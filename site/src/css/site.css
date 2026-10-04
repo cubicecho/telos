@@ -201,6 +201,96 @@ html {
   font-size: 0.95rem;
 }
 
+/* screenshots, each in a browser frame, enlarged in the lightbox */
+
+.home .section > .section-intro {
+  color: var(--muted);
+}
+.gallery {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.5rem;
+}
+.shot {
+  margin: 0;
+}
+.shot-wide {
+  grid-column: 1 / -1;
+}
+.shot-frame {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg-alt);
+  padding-top: 1.6rem;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 10px 30px -18px rgba(0, 0, 0, 0.35);
+}
+.shot-frame::before {
+  content: '';
+  position: absolute;
+  top: 0.6rem;
+  left: 0.75rem;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--line);
+  box-shadow: 0.85rem 0 0 var(--line), 1.7rem 0 0 var(--line);
+}
+.shot img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-top: 1px solid var(--line);
+  cursor: zoom-in;
+}
+.shot img:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.shot figcaption {
+  margin-top: 0.6rem;
+  font-size: 0.88rem;
+  color: var(--muted);
+}
+
+.lightbox {
+  max-width: min(96vw, 1800px);
+  max-height: 96vh;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  overflow: visible;
+}
+.lightbox::backdrop {
+  background: rgba(0, 0, 0, 0.8);
+}
+.lightbox img {
+  display: block;
+  max-width: 100%;
+  max-height: 88vh;
+  margin: 0 auto;
+  border-radius: var(--radius);
+  cursor: zoom-out;
+}
+.lightbox-caption {
+  margin: 0.6rem 0 0;
+  text-align: center;
+  color: #e5e7eb;
+  font-size: 0.9rem;
+}
+.lightbox-close {
+  position: absolute;
+  top: -2.4rem;
+  right: 0;
+  border: 0;
+  background: transparent;
+  color: #fff;
+  font-size: 2rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
 /* how it works */
 
 .flow {
@@ -501,6 +591,9 @@ pre.code code {
   }
   .flow {
     flex-direction: column;
+  }
+  .gallery {
+    grid-template-columns: 1fr;
   }
   .flow-arrow {
     justify-content: center;
