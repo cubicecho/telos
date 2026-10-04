@@ -1,3 +1,31 @@
+# [2.0.0](https://github.com/cubicecho/telos/compare/v1.23.1...v2.0.0) (2026-10-04)
+
+
+* feat!: read every run the same way, and let the agent own its job ([60462ef](https://github.com/cubicecho/telos/commit/60462efc96a81bb35ad972e0191241e5d133b3f7))
+* refactor!: call what a run is handed its assignment ([c2bc94b](https://github.com/cubicecho/telos/commit/c2bc94bb3ebcc613ff1005a4ec176929d0ac0ea8))
+
+
+### Features
+
+* **app:** start a new agent from starter text that says its job ([8975ca8](https://github.com/cubicecho/telos/commit/8975ca856a72783c507bef734436eea63ddd004e))
+
+
+### BREAKING CHANGES
+
+* RunClaim.brief (RunBrief) is RunClaim.assignment
+(RunAssignment). A runner on another host must upgrade with the server,
+as it must already for this release.
+
+Refs: R3
+* Lane.contract, Lane.prompt, presetId, presetOverrides,
+Run.contract, the lane preset queries and mutations, and the claim's
+contract and lanePrompt are removed; a runner on another host must
+upgrade with the server. The MCP agent roster's `stations` is now
+`lanes`. Existing contracts, lane prompts and presets are dropped, not
+carried over.
+
+Refs: A1, A2, A3, F1, T1, T2
+
 ## [1.23.1](https://github.com/cubicecho/telos/compare/v1.23.0...v1.23.1) (2026-10-03)
 
 
