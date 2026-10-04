@@ -1,9 +1,9 @@
 // Everything the layout needs to say who this is.
 export default {
   name: "telos",
-  tagline: "A self-hostable todo board, and agents to work it if you want them.",
+  tagline: "A self-hostable todo app that is just todos.",
   description:
-    "Telos is a self-hostable todo board: projects, lanes, todos that can depend on other todos, and labels. Give a lane an agent and it works each todo that arrives there. One container plus Postgres.",
+    "Telos is a self-hostable todo app: projects, todos that can depend on other todos, labels and due dates. A board, and agents to work it, are there if you want them. One container plus Postgres.",
   url: "https://cubicecho.github.io/telos/",
   repo: "https://github.com/cubicecho/telos",
   org: "https://cubicecho.com",
