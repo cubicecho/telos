@@ -126,7 +126,7 @@ every level:
    nothing the runner does touches its rows. On, Settings gains two tabs:
    **Agents** (the agent defaults and the agents) and
    **MCP servers**.
-3. **The project**: its AI switch. Off, the project takes no requests and its
+3. **The project**: its AI switch, in **Edit project**. Off, the project takes no requests and its
    lanes' agents sit idle.
    Under it is a second switch, **auto-run**: whether the project's agents
    start on todos by themselves. It is off on a new project, so switching AI on
