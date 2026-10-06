@@ -1,3 +1,10 @@
+## [2.0.1](https://github.com/cubicecho/telos/compare/v2.0.0...v2.0.1) (2026-10-06)
+
+
+### Bug Fixes
+
+* **app:** give the icon-only menu triggers a hover tooltip ([b831be6](https://github.com/cubicecho/telos/commit/b831be6b5a9d8516c7e922867e8579e7d34a96a6))
+
 # [2.0.0](https://github.com/cubicecho/telos/compare/v1.23.1...v2.0.0) (2026-10-04)
 
 
