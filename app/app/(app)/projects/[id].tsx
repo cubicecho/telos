@@ -214,23 +214,9 @@ export default function ProjectScreen() {
             onValueChange={(next) => router.setParams({ view: next })}
             className="flex flex-col gap-6"
           >
-            {/* The composer and the filter serve both views, so they sit above
-            the switcher, which sits directly above what it switches. */}
+            {/* The switcher comes first, so it stays where it is from one view
+            to the next: the composer and the filter under it come and go. */}
             <View className={cn(PROSE_COLUMN, 'gap-6 px-4')}>
-              {/* Adding and filtering todos mean nothing over a list of runs. */}
-              {todoView ? (
-                <>
-                  <TodoComposer ref={composerRef} projectId={project.id} nextPosition={nextPosition} lanes={lanes} />
-                  <TodoFilterBar
-                    ref={filterRef}
-                    filter={filter}
-                    onChange={setFilter}
-                    todos={all}
-                    matched={todos.length}
-                  />
-                </>
-              ) : null}
-
               <TabsList aria-label="Project view" className="self-start">
                 <TabsTrigger value="list">
                   <List />
@@ -257,6 +243,20 @@ export default function ProjectScreen() {
                   Archived
                 </TabsTrigger>
               </TabsList>
+
+              {/* Adding and filtering todos mean nothing over a list of runs. */}
+              {todoView ? (
+                <>
+                  <TodoComposer ref={composerRef} projectId={project.id} nextPosition={nextPosition} lanes={lanes} />
+                  <TodoFilterBar
+                    ref={filterRef}
+                    filter={filter}
+                    onChange={setFilter}
+                    todos={all}
+                    matched={todos.length}
+                  />
+                </>
+              ) : null}
             </View>
 
             {/* No `empty`: an empty project still has a board to show, and the

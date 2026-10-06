@@ -85,7 +85,7 @@ export function setupSteps(setup: Setup, projectId: string | undefined, now: num
       key: 'projectAi',
       label: 'AI is on for that project',
       done: setup.projectAi,
-      hint: 'Turn on “AI works on this project”, under the project’s name.',
+      hint: 'Turn on “AI works on this project” in the project’s settings: “Edit project”, in its header.',
       href: setup.station ? board : undefined,
       linkLabel: 'Open the project',
     },
@@ -101,7 +101,7 @@ export function setupSteps(setup: Setup, projectId: string | undefined, now: num
       key: 'started',
       label: 'Work may start',
       done: setup.started,
-      hint: 'Turn on “Agents start on todos by themselves”, or press Run now on a todo’s card.',
+      hint: 'Turn on “Agents start on todos by themselves” in the project’s settings, or press Run now on a todo’s card.',
       href: setup.projectAi ? board : undefined,
       linkLabel: 'Open the board',
     },
@@ -129,7 +129,7 @@ export function setupSteps(setup: Setup, projectId: string | undefined, now: num
  *
  * On a project it shows where the project has no lane with an agent, and on the project
  * the list points at, so the later steps have somewhere to be read. A project
- * with AI switched off shows nothing: its switch, beside it, is the one step
+ * with AI switched off shows nothing: its switch, in its edit dialog, is the one step
  * that matters there, and it was left off on purpose.
  *
  * @param projectId - The project on screen, or nothing on the home page.

@@ -8,7 +8,6 @@ import { ConfirmButton } from '@/components/confirm-button';
 import { DescriptionList, PropertyRow } from '@/components/description-list';
 import { AiSetupChecklist } from '@/components/domain/ai/ai-setup-checklist';
 import { type ProjectActivity, ProjectActivityLine } from '@/components/domain/ai/project-activity';
-import { ProjectAiSwitch, ProjectAutoRunSwitch } from '@/components/domain/ai/project-ai-switch';
 import { DraftDialog } from '@/components/domain/draft/draft-dialog';
 import { LabelBadge, type LabelSummary } from '@/components/domain/label/label-badge';
 import { LabelPicker } from '@/components/domain/label/label-picker';
@@ -33,7 +32,7 @@ export interface ProjectOverviewData {
   description: string | null;
   todoCount: number;
   openTodoCount: number;
-  /** The project's AI switch. Meaningless, and not shown, unless AI is on for the account. */
+  /** The project's AI switch, flipped in its edit dialog. Meaningless, and not shown, unless AI is on for the account. */
   aiEnabled: boolean;
   /** Whether its lanes' agents start on todos by themselves. Means nothing, and is not shown, while its AI is off. */
   autoRun: boolean;
@@ -172,8 +171,6 @@ export function ProjectPage({
             }
           />
 
-          <ProjectAiSwitch projectId={project.id} enabled={project.aiEnabled} />
-          {project.aiEnabled ? <ProjectAutoRunSwitch projectId={project.id} enabled={project.autoRun} /> : null}
           {activity ? <ProjectActivityLine activity={activity} /> : null}
           <AiSetupChecklist projectId={project.id} projectAi={project.aiEnabled} />
 

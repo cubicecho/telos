@@ -3,8 +3,11 @@ import { useRouter } from 'expo-router';
 import { useEffect } from 'react';
 import { Text, View } from 'react-native';
 import { useAppForm } from '@/components/app-form';
+import { ProjectAiSwitch, ProjectAutoRunSwitch } from '@/components/domain/ai/project-ai-switch';
+import { SectionHeading } from '@/components/section-heading';
 import { Form } from '@/components/ui/form';
 import { FormDialog, FormDialogFooter } from '@/components/ui/form-dialog';
+import { useAi } from '@/lib/ai';
 import { describeError } from '@/lib/errors';
 import {
   ApplyBoardTemplateDocument,
@@ -29,6 +32,10 @@ export interface ProjectDraft {
   description: string | null;
   /** The lane new todos land in, or null for the first open lane. */
   newTodoLaneId: string | null;
+  /** The project's AI switch. Not shown unless AI is on for the account. */
+  aiEnabled: boolean;
+  /** Whether its lanes' agents start on todos by themselves. Not shown while its AI is off. */
+  autoRun: boolean;
 }
 
 interface ProjectFormValues {
@@ -45,7 +52,9 @@ interface ProjectFormValues {
  * @param project - The project being edited, or undefined for a new one.
  * @returns The form's values.
  */
-function toValues(project: ProjectDraft | undefined): ProjectFormValues {
+function toValues(
+  project: Pick<ProjectDraft, 'name' | 'description' | 'newTodoLaneId'> | undefined,
+): ProjectFormValues {
   return {
     name: project?.name ?? '',
     description: project?.description ?? '',
@@ -64,6 +73,7 @@ export function ProjectFormDialog({
   project?: ProjectDraft;
 }) {
   const router = useRouter();
+  const ai = useAi();
   const [createProject, { loading: creating, error: createError }] = useMutation(CreateProjectDocument);
   const [updateProject, { loading: updating, error: updateError }] = useMutation(UpdateProjectDocument, {
     refetchQueries: [ProjectsDocument, ...(project ? [{ query: ProjectDocument, variables: { id: project.id } }] : [])],
@@ -88,11 +98,17 @@ export function ProjectFormDialog({
 
   // Reset from the project each time it opens, not on mount: the dialog
   // outlives a cancel, so a reopened form must show what is stored rather than
-  // what was last typed and abandoned.
+  // what was last typed and abandoned. By field rather than by the project
+  // itself: its AI switches are flipped from inside this dialog, and a reset on
+  // each flip would throw away a name half typed.
+  const projectId = project?.id;
+  const name = project?.name ?? '';
+  const description = project?.description ?? null;
+  const newTodoLaneId = project?.newTodoLaneId ?? null;
   useEffect(() => {
     if (!open) return;
-    form.reset(toValues(project));
-  }, [open, project, form]);
+    form.reset(toValues(projectId === undefined ? undefined : { name, description, newTodoLaneId }));
+  }, [open, projectId, name, description, newTodoLaneId, form]);
 
   async function save({ name, description, template, newTodoLane }: ProjectFormValues) {
     const values = { name: name.trim(), description: description.trim() === '' ? null : description.trim() };
@@ -197,6 +213,18 @@ export function ProjectFormDialog({
               <Text className="text-muted-foreground text-xs">
                 A request, a finished draft, and the todos an agent splits one into.
               </Text>
+            </View>
+          ) : null}
+          {/* Not fields: each switch is its own mutation and takes effect on the
+          press, so Cancel does not undo one. */}
+          {project !== undefined && ai.on ? (
+            <View className="gap-3">
+              <SectionHeading variant="overline" level={3}>
+                AI
+              </SectionHeading>
+              <ProjectAiSwitch projectId={project.id} enabled={project.aiEnabled} />
+              {project.aiEnabled ? <ProjectAutoRunSwitch projectId={project.id} enabled={project.autoRun} /> : null}
+              <Text className="text-muted-foreground text-xs">These apply as soon as they are switched.</Text>
             </View>
           ) : null}
           <FormDialogFooter onCancel={() => onOpenChange(false)} error={error ? describeError(error) : null}>
