@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { Text, View } from 'react-native';
 import type { LaneAgentFieldsFragment } from '@/__generated__/graphql';
+import { ActionButton } from '@/components/action-button';
 import { Ellipsis } from '@/components/app-icons';
 import type { TodoSummary } from '@/components/domain/todo/types';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Check, ChevronLeft, ChevronRight, CircleCheck, Pencil, Settings, Trash2 } from '@/components/ui/icons';
 import { Input } from '@/components/ui/input';
@@ -119,10 +119,10 @@ export function LaneColumn({
 
         <Menu>
           <MenuTrigger asChild>
-            <Button
+            <ActionButton
               variant="ghost"
               size="icon-xs"
-              aria-label={`${lane.name} lane actions`}
+              label={`${lane.name} lane actions`}
               iconSlot={<Ellipsis className="h-4 w-4" />}
             />
           </MenuTrigger>

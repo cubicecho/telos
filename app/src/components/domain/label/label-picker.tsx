@@ -1,7 +1,7 @@
 import { useQuery } from '@apollo/client';
 import { Text } from 'react-native';
+import { ActionButton } from '@/components/action-button';
 import { Tag } from '@/components/app-icons';
-import { Button } from '@/components/ui/button';
 import { ColorDot } from '@/components/ui/color-dot';
 import { LoadState } from '@/components/ui/load-failure';
 import { Menu, MenuCheckboxItem, MenuContent, MenuTrigger } from '@/components/ui/menu';
@@ -36,14 +36,13 @@ export function LabelPicker({
   return (
     <Menu>
       <MenuTrigger asChild>
-        {/* Icon only, to sit in a row of icon actions. The name it lost is in
-            `aria-label`. (The DOM `title` it also had is not a Pressable prop;
-            a pointer hint would be cubeui's Tooltip.) */}
-        <Button
+        {/* Icon only, to sit in a row of icon actions. The name it lost is its
+            `label`, which is also what a resting pointer is shown. */}
+        <ActionButton
           variant="ghost"
           size={size}
           className={cn('text-muted-foreground', className)}
-          aria-label="Labels"
+          label="Labels"
           iconSlot={<Tag className="h-4 w-4" />}
         />
       </MenuTrigger>

@@ -1,6 +1,6 @@
 import { Text } from 'react-native';
+import { ActionButton } from '@/components/action-button';
 import { Link2 } from '@/components/app-icons';
-import { Button } from '@/components/ui/button';
 import { Menu, MenuCheckboxItem, MenuContent, MenuTrigger } from '@/components/ui/menu';
 import { cn } from '@/lib/utils';
 import type { TodoSummary } from './types';
@@ -37,11 +37,11 @@ export function DependencyPicker({
         {/* Icon only. The count the label used to carry survives in the
             accessible name and as a lit icon — a todo that waits on something
             should not look identical to one that waits on nothing. */}
-        <Button
+        <ActionButton
           variant="ghost"
           size={size}
           className={className}
-          aria-label={waiting > 0 ? `Dependencies, waiting on ${waiting}` : 'Dependencies'}
+          label={waiting > 0 ? `Dependencies, waiting on ${waiting}` : 'Dependencies'}
           iconSlot={<Link2 className={cn('h-4 w-4', waiting > 0 ? 'text-foreground' : 'text-muted-foreground')} />}
         />
       </MenuTrigger>
