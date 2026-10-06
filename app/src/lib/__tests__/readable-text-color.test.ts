@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { INK, readableTextColor } from '../readable-text-color';
 
-/** The palette `LabelFormDialog` offers. Every colour a label can have goes through this. */
+/** The palette `LabelFormDialog` offered before it took cubeui's swatches: the colours labels made until then still have. */
 const PALETTE = ['#0f766e', '#0369a1', '#4f46e5', '#7c3aed', '#be185d', '#b91c1c', '#c2410c', '#4d7c0f'];
 
 /** WCAG 2.x contrast, written out again so the test does not trust the module's own maths. */
