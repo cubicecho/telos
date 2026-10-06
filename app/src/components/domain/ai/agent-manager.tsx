@@ -82,14 +82,11 @@ export function AgentManager() {
       surface="card"
       title="Agents"
       description="Models with instructions. Give a lane an agent and it works each todo that arrives there."
-      action={
+      actionSlot={
         <View className="flex-row gap-2">
           <Menu>
             <MenuTrigger asChild>
-              <Button variant="outline" size="sm">
-                Start from
-                <ChevronDown className="h-4 w-4" />
-              </Button>
+              <Button variant="outline" size="sm" content="Start from" trailingSlot={<ChevronDown />} />
             </MenuTrigger>
             <MenuContent align="end" aria-label="Agent starters">
               {AGENT_STARTERS.map((starter) => (
@@ -97,13 +94,15 @@ export function AgentManager() {
               ))}
             </MenuContent>
           </Menu>
-          <Button size="sm" onPress={() => setEditing({ starter: null })}>
-            <Plus className="h-4 w-4" />
-            New agent
-          </Button>
+          <Button
+            size="sm"
+            onPress={() => setEditing({ starter: null })}
+            iconSlot={<Plus className="h-4 w-4" />}
+            content="New agent"
+          />
         </View>
       }
-      content={
+      contentSlot={
         <View className="gap-4">
           {deleteError ? (
             <Text className="text-destructive text-sm" aria-live="polite">
@@ -115,7 +114,7 @@ export function AgentManager() {
             query={agentsQuery}
             what="your agents"
             count={agents.length}
-            empty={<Text className="text-muted-foreground text-sm">No agents yet.</Text>}
+            emptySlot={<Text className="text-muted-foreground text-sm">No agents yet.</Text>}
           />
           {agents.length === 0 ? null : (
             <View role="list" className="gap-1">
@@ -138,17 +137,19 @@ export function AgentManager() {
                   <Badge variant={agent.hasApiKey ? 'secondary' : 'outline'}>
                     {agent.hasApiKey ? 'Key set' : 'No key'}
                   </Badge>
-                  <Button variant="outline" size="sm" onPress={() => setKeying(agent)}>
-                    {agent.hasApiKey ? 'Replace key' : 'Set key'}
-                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onPress={() => setKeying(agent)}
+                    content={agent.hasApiKey ? 'Replace key' : 'Set key'}
+                  />
                   <ActionButton
                     variant="ghost"
                     size="icon-sm"
                     label={`Edit ${agent.name}`}
                     onPress={() => setEditing({ agent })}
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </ActionButton>
+                    iconSlot={<Pencil className="h-4 w-4" />}
+                  />
                   <ConfirmButton
                     variant="ghost"
                     size="icon-sm"
@@ -158,9 +159,8 @@ export function AgentManager() {
                     description="Lanes it works lose their agent, and its runs lose their agent. This cannot be undone."
                     confirmLabel="Delete"
                     onConfirm={() => confirmDelete(agent)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </ConfirmButton>
+                    iconSlot={<Trash2 className="h-4 w-4" />}
+                  />
                 </View>
               ))}
             </View>
@@ -465,11 +465,15 @@ function AgentKeyDialog({
           <FormDialogFooter
             onCancel={() => onOpenChange(false)}
             error={error ? describeError(error) : null}
-            secondary={
+            secondarySlot={
               agent.hasApiKey ? (
-                <Button variant="ghost" className="text-destructive" disabled={loading} onPress={() => save(null)}>
-                  Clear key
-                </Button>
+                <Button
+                  variant="ghost"
+                  className="text-destructive"
+                  disabled={loading}
+                  onPress={() => save(null)}
+                  content="Clear key"
+                />
               ) : null
             }
           >

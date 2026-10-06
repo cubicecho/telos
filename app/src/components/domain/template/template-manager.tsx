@@ -46,7 +46,7 @@ export function TemplateManager() {
       surface="card"
       title="Board templates"
       description="Lanes to start a new project with. Save one from a project's header."
-      content={
+      contentSlot={
         <View className="gap-4">
           {deleteError ? (
             <Text className="text-destructive text-sm" aria-live="polite">
@@ -58,7 +58,7 @@ export function TemplateManager() {
             query={templatesQuery}
             what="your templates"
             count={templates.length}
-            empty={<Text className="text-muted-foreground text-sm">No templates yet.</Text>}
+            emptySlot={<Text className="text-muted-foreground text-sm">No templates yet.</Text>}
           />
           {templates.length === 0 ? null : (
             <View role="list" className="gap-1">
@@ -85,9 +85,8 @@ export function TemplateManager() {
                     description="Projects already made from it keep their lanes."
                     confirmLabel="Delete"
                     onConfirm={() => confirmDelete(template)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </ConfirmButton>
+                    iconSlot={<Trash2 className="h-4 w-4" />}
+                  />
                 </View>
               ))}
             </View>

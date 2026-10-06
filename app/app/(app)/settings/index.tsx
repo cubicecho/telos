@@ -33,7 +33,7 @@ export default function SettingsScreen() {
         surface="card"
         title="Theme"
         description="System follows whatever your operating system is set to. A dark-only palette, such as Monokai, keeps the page dark whatever the theme says."
-        content={<ThemePicker palettes={PALETTE_PREFERENCES} />}
+        contentSlot={<ThemePicker palettes={PALETTE_PREFERENCES} />}
       />
       {/* Its own section: the header's "New label" shares the list's state. */}
       <LabelManager />
@@ -46,7 +46,7 @@ export default function SettingsScreen() {
       width="prose"
       title="Settings"
       description="Theme and palette are kept on this device; everything else belongs to your account."
-      content={
+      contentSlot={
         <View className="py-6">
           {ai.settings ? (
             <Tabs

@@ -147,24 +147,22 @@ export function TodoFormDialog({
         title="Edit todo"
         description="Its lane, labels and dependencies are set from the row itself, where the rules about them live."
         hasUnsavedChanges={() => !form.state.isDefaultValue}
-        footer={
+        footerSlot={
           details && error ? (
             <Text role="alert" className="text-sm text-destructive">
               {describeError(error)}
             </Text>
           ) : null
         }
-        footerActions={(close) =>
+        footerActionsSlot={(close) =>
           details ? (
             <>
-              <Button variant="outline" onPress={close}>
-                Cancel
-              </Button>
+              <Button variant="outline" onPress={close} content="Cancel" />
               <form.SubmitButton isEdit editLabel="Save" />
             </>
           ) : null
         }
-        content={
+        contentSlot={
           <Tabs value={tab} onValueChange={setTab} className="gap-4">
             <TabsList aria-label="Todo" className="self-start">
               <TabsTrigger value="details">Details</TabsTrigger>

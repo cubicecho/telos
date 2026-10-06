@@ -115,7 +115,7 @@ export function ProjectRuns({
           query={query}
           what="the runs"
           count={runs.length}
-          empty={
+          emptySlot={
             <Text className="text-muted-foreground text-sm">
               {filter === 'all' ? 'No agent has worked this project yet.' : 'No runs like that.'}
             </Text>
@@ -130,9 +130,13 @@ export function ProjectRuns({
         )}
         {/* A full page means there may be more; a short one means there is not. */}
         {runs.length >= limit ? (
-          <Button variant="outline" size="sm" className="self-start" onPress={() => setLimit(limit + RUNS_PAGE)}>
-            Show more
-          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="self-start"
+            onPress={() => setLimit(limit + RUNS_PAGE)}
+            content="Show more"
+          />
         ) : null}
       </View>
     </View>
@@ -160,7 +164,7 @@ export function ProjectArtifacts({ projectId }: { projectId: string }) {
         query={query}
         what="the artifacts"
         count={artifacts.length}
-        empty={
+        emptySlot={
           <Text className="text-muted-foreground text-sm">Nothing has been made for this project’s todos yet.</Text>
         }
       />
@@ -179,9 +183,13 @@ export function ProjectArtifacts({ projectId }: { projectId: string }) {
         </View>
       )}
       {artifacts.length >= limit ? (
-        <Button variant="outline" size="sm" className="self-start" onPress={() => setLimit(limit + RUNS_PAGE)}>
-          Show more
-        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          className="self-start"
+          onPress={() => setLimit(limit + RUNS_PAGE)}
+          content="Show more"
+        />
       ) : null}
       {opened ? (
         <TodoFormDialog

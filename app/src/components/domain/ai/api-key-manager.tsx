@@ -67,13 +67,10 @@ export function ApiKeyManager() {
       surface="card"
       title="API keys"
       description="For MCP clients. A key acts as you, and only while AI is on."
-      action={
-        <Button size="sm" onPress={() => setCreating(true)}>
-          <Plus className="h-4 w-4" />
-          New key
-        </Button>
+      actionSlot={
+        <Button size="sm" onPress={() => setCreating(true)} iconSlot={<Plus className="h-4 w-4" />} content="New key" />
       }
-      content={
+      contentSlot={
         <View className="gap-4">
           {deleteError ? (
             <Text className="text-destructive text-sm" aria-live="polite">
@@ -85,7 +82,7 @@ export function ApiKeyManager() {
             query={keysQuery}
             what="your API keys"
             count={keys.length}
-            empty={<Text className="text-muted-foreground text-sm">No keys yet.</Text>}
+            emptySlot={<Text className="text-muted-foreground text-sm">No keys yet.</Text>}
           />
           {keys.length === 0 ? null : (
             <View role="list" className="gap-1">
@@ -107,9 +104,8 @@ export function ApiKeyManager() {
                     size="icon-sm"
                     label={`Tools for ${key.name || 'key'}`}
                     onPress={() => setSwitching(key.id)}
-                  >
-                    <Settings className="h-4 w-4" />
-                  </ActionButton>
+                    iconSlot={<Settings className="h-4 w-4" />}
+                  />
                   <ConfirmButton
                     variant="ghost"
                     size="icon-sm"
@@ -119,9 +115,8 @@ export function ApiKeyManager() {
                     description="Anything signed in with it stops working at once. This cannot be undone."
                     confirmLabel="Revoke"
                     onConfirm={() => confirmDelete(key)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </ConfirmButton>
+                    iconSlot={<Trash2 className="h-4 w-4" />}
+                  />
                 </View>
               ))}
             </View>
@@ -208,20 +203,17 @@ function KeyToolsDialog({ apiKey, onOpenChange }: { apiKey: KeyRow | null; onOpe
       description="What an MCP client signed in with this key may do. A tool that is off is not offered to it, and is refused if it asks."
     >
       <View className="gap-4">
-        <LoadState query={toolsQuery} what="the MCP tools" count={tools.length} empty={null} />
+        <LoadState query={toolsQuery} what="the MCP tools" count={tools.length} emptySlot={null} />
         {tools.length === 0 ? null : (
           <View className="flex-row gap-2">
-            <Button variant="outline" size="sm" disabled={loading} onPress={() => save(new Set())}>
-              All on
-            </Button>
+            <Button variant="outline" size="sm" disabled={loading} onPress={() => save(new Set())} content="All on" />
             <Button
               variant="outline"
               size="sm"
               disabled={loading}
               onPress={() => save(new Set(tools.filter((tool) => tool.writes).map((tool) => tool.name)))}
-            >
-              Read only
-            </Button>
+              content="Read only"
+            />
           </View>
         )}
         {groups.map((group) =>
@@ -251,7 +243,7 @@ function KeyToolsDialog({ apiKey, onOpenChange }: { apiKey: KeyRow | null; onOpe
           </Text>
         ) : null}
         <View className="flex-row justify-end">
-          <Button onPress={() => onOpenChange(false)}>Done</Button>
+          <Button onPress={() => onOpenChange(false)} content="Done" />
         </View>
       </View>
     </FormDialog>
@@ -300,7 +292,7 @@ function CreateApiKeyDialog({ open, onOpenChange }: { open: boolean; onOpenChang
             {minted}
           </Text>
           <View className="flex-row justify-end">
-            <Button onPress={() => onOpenChange(false)}>Done</Button>
+            <Button onPress={() => onOpenChange(false)} content="Done" />
           </View>
         </View>
       </FormDialog>

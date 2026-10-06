@@ -63,7 +63,7 @@ export function WatchRunDialog({
       size="lg"
       title={todoTitle}
       description={run ? `${runWhere(run)} · ${describeRun(run)}` : 'Waiting for the run…'}
-      footer={
+      footerSlot={
         run && running ? (
           run.cancelRequestedAt ? (
             <Text className="text-muted-foreground text-sm">Stopping…</Text>
@@ -72,13 +72,12 @@ export function WatchRunDialog({
               variant="outline"
               disabled={cancelState.loading}
               onPress={() => cancelRun({ variables: { id: run.id } }).catch(() => undefined)}
-            >
-              Stop
-            </Button>
+              content="Stop"
+            />
           )
         ) : undefined
       }
-      content={
+      contentSlot={
         <View className="gap-3">
           {cancelState.error ? (
             <Text className="text-destructive text-sm">{describeError(cancelState.error)}</Text>

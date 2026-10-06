@@ -14,7 +14,7 @@ function PasswordField({ label, ...props }: PasswordFieldProps) {
   return (
     <FieldWrapper
       label={label}
-      control={
+      controlSlot={
         <PasswordInput
           // "Show API key", not "Show password": none of these is a password.
           showLabel={`Show ${label}`}

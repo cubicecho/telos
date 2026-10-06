@@ -108,7 +108,7 @@ export function TodoSearch({ open, onOpenChange }: { open: boolean; onOpenChange
               query={query}
               what="todos"
               count={found.length}
-              empty={<Text className="text-muted-foreground text-sm">Nothing matches “{asked}”.</Text>}
+              emptySlot={<Text className="text-muted-foreground text-sm">Nothing matches “{asked}”.</Text>}
             />
           )}
           {found.length === 0 ? null : (

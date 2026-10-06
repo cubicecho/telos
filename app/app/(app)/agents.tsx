@@ -20,7 +20,7 @@ export default function AgentsScreen() {
     <PageLayout
       title="Agents"
       description="What your agents are doing, what waits on you, and whether the runner is there."
-      content={<View className="py-6">{ai.on ? <AiStatus /> : null}</View>}
+      contentSlot={<View className="py-6">{ai.on ? <AiStatus /> : null}</View>}
     />
   );
 }

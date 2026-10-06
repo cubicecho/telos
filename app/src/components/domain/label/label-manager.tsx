@@ -43,19 +43,18 @@ export function LabelManager() {
       surface="card"
       title="Labels"
       description="Attach them to projects and todos alike."
-      action={
+      actionSlot={
         <Button
           size="sm"
           onPress={() => {
             setEditing(undefined);
             setFormOpen(true);
           }}
-        >
-          <Plus className="h-4 w-4" />
-          New label
-        </Button>
+          iconSlot={<Plus className="h-4 w-4" />}
+          content="New label"
+        />
       }
-      content={
+      contentSlot={
         <View className="gap-4">
           {/* Kept outside the dialog: the dialog closes on the failure, and an
           error that vanishes with the thing that caused it was never read. */}
@@ -69,7 +68,7 @@ export function LabelManager() {
             query={labelsQuery}
             what="your labels"
             count={labels.length}
-            empty={<Text className="text-muted-foreground text-sm">No labels yet.</Text>}
+            emptySlot={<Text className="text-muted-foreground text-sm">No labels yet.</Text>}
           />
           {labels.length === 0 ? null : (
             <View role="list" className="gap-1">
@@ -92,9 +91,8 @@ export function LabelManager() {
                       setEditing(label);
                       setFormOpen(true);
                     }}
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </ActionButton>
+                    iconSlot={<Pencil className="h-4 w-4" />}
+                  />
                   <ConfirmButton
                     variant="ghost"
                     size="icon-sm"
@@ -103,9 +101,8 @@ export function LabelManager() {
                     title={`Delete “${label.name}”?`}
                     description="It is removed from every project and todo it is attached to. Nothing else is deleted."
                     onConfirm={() => confirmDelete(label)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </ConfirmButton>
+                    iconSlot={<Trash2 className="h-4 w-4" />}
+                  />
                 </View>
               ))}
             </View>

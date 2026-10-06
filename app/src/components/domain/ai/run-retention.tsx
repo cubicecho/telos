@@ -40,7 +40,7 @@ export function RunRetention() {
       surface="card"
       title="Run history"
       description="How long finished runs and their logs are kept. Notes, history and artifacts stay either way, and a run an agent still counts is never pruned."
-      content={
+      contentSlot={
         <View className="gap-2">
           <SegmentedGroup aria-label="Keep finished runs" value={current} onValueChange={choose}>
             {choices.map((choice) => (

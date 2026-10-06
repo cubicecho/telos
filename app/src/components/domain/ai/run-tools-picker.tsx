@@ -51,18 +51,18 @@ export function RunToolsPicker({
         Whatever is on, a run changes only its own todo, the todos under it and the ones it made, and its todo's lane is
         decided when the run finishes.
       </Text>
-      <LoadState query={query} what="the MCP tools" count={tools.length} empty={null} />
+      <LoadState query={query} what="the MCP tools" count={tools.length} emptySlot={null} />
       {tools.length === 0 ? null : (
         <View className="flex-row flex-wrap gap-2">
-          <Button variant="outline" size="sm" disabled={toolsOff === null} onPress={() => onChange(null)}>
-            Defaults
-          </Button>
-          <Button variant="outline" size="sm" onPress={() => save((tool) => !tool.writes)}>
-            Read only
-          </Button>
-          <Button variant="outline" size="sm" onPress={() => onChange([])}>
-            All on
-          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={toolsOff === null}
+            onPress={() => onChange(null)}
+            content="Defaults"
+          />
+          <Button variant="outline" size="sm" onPress={() => save((tool) => !tool.writes)} content="Read only" />
+          <Button variant="outline" size="sm" onPress={() => onChange([])} content="All on" />
         </View>
       )}
       {groups.map((group) =>

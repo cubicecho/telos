@@ -550,7 +550,7 @@ the document.
 **An empty state means the server said "none", never that we failed to ask.**
 A list renders `LoadState` from `ui/load-failure.tsx` (cubeui's `QueryState` over
 an Apollo result, worded through `describeError()`): placeholder rows while
-there is no answer, the failure as an alert, then its `empty`, and nothing once
+there is no answer, the failure as an alert, then its `emptySlot`, and nothing once
 there are rows. A screen about one thing — the project, the home redirect —
 renders `LoadFailure` (cubeui's `QueryError`) in the same place. The app used to answer a
 stopped API with "No projects yet." and "That project doesn't exist, or isn't

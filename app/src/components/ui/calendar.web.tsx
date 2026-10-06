@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react';
-import { DayPicker, type PropsBase } from 'react-day-picker';
+import { DayPicker, getDefaultClassNames, type PropsBase } from 'react-day-picker';
 import type { CalendarProps } from '@/components/ui/calendar-base';
 import { cn } from '@/lib/utils';
 import 'react-day-picker/style.css';
@@ -13,19 +13,31 @@ import 'react-day-picker/style.css';
  * declares these on `.rdp-root` unlayered, and an unlayered rule beats everything in
  * `@layer utilities`, so a `[--rdp-accent-color:…]` class would lose in a DOM app. And this file
  * is what renders on both paths, a DOM app on `tokens.web.css` and an Expo web app on
- * `cubeui-tokens.css`, which define the same `--selection`, `--primary` and `--accent`.
+ * `cubeui-tokens.css`, which define the same `--active`, `--neutral` and `--hover`.
  */
 const THEME = {
-  '--rdp-accent-color': 'var(--selection)',
-  '--rdp-accent-background-color': 'var(--accent)',
-  '--rdp-today-color': 'var(--primary)',
-  '--rdp-range_middle-background-color': 'var(--accent)',
-  '--rdp-range_middle-color': 'var(--accent-foreground)',
-  '--rdp-range_start-color': 'var(--selection-foreground)',
-  '--rdp-range_start-date-background-color': 'var(--selection)',
-  '--rdp-range_end-color': 'var(--selection-foreground)',
-  '--rdp-range_end-date-background-color': 'var(--selection)',
+  '--rdp-accent-color': 'var(--active)',
+  '--rdp-accent-background-color': 'var(--hover)',
+  '--rdp-today-color': 'var(--neutral)',
+  '--rdp-range_middle-background-color': 'var(--hover)',
+  '--rdp-range_middle-color': 'var(--foreground)',
+  '--rdp-range_start-color': 'var(--active-foreground)',
+  '--rdp-range_start-date-background-color': 'var(--active)',
+  '--rdp-range_end-color': 'var(--active-foreground)',
+  '--rdp-range_end-date-background-color': 'var(--active)',
 } as CSSProperties;
+
+/**
+ * A day under the pointer or the keyboard. The library's stylesheet draws neither, and its
+ * unlayered `background: none` beats a utility, so these are `!important`. The ends of a range are
+ * left alone: their fill is `active`, and says more than a hover does.
+ */
+const DAY_BUTTON_CLASS = cn(
+  getDefaultClassNames().day_button,
+  'focus-visible:outline-none',
+  '[:not(.rdp-range_start,.rdp-range_end)>&]:hover:bg-hover!',
+  '[:not(.rdp-range_start,.rdp-range_end)>&]:focus-visible:bg-hover!',
+);
 
 /** What `DayPicker` takes beyond the shared contract, passed through as it is. */
 type DayPickerExtras = Omit<
@@ -68,6 +80,7 @@ export function Calendar(props: CalendarProps & DayPickerExtras) {
     ...(startMonth === undefined ? {} : { startMonth }),
     ...(weekStartsOn === undefined ? {} : { weekStartsOn }),
     className: cn('p-3', className),
+    classNames: { day_button: DAY_BUTTON_CLASS, ...extras.classNames },
     // The caller's style last, so a call site can still override any of them.
     style: { ...THEME, ...style },
   };

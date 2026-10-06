@@ -90,7 +90,7 @@ export function ArchivedTodoList({
         query={query}
         what="the archived todos"
         count={todos.length}
-        empty={<Text className="text-muted-foreground text-sm">Nothing archived.</Text>}
+        emptySlot={<Text className="text-muted-foreground text-sm">Nothing archived.</Text>}
       />
       {error ? <Text className="text-destructive text-sm">{error}</Text> : null}
       {todos.length > 0 ? (
@@ -120,10 +120,9 @@ export function ArchivedTodoList({
                 disabled={busy}
                 aria-label={`Restore ${todo.title}`}
                 onPress={() => run(() => restoreTodo({ variables: { id: todo.id } }))}
-              >
-                <ArchiveRestore className="h-4 w-4" />
-                Restore
-              </Button>
+                iconSlot={<ArchiveRestore className="h-4 w-4" />}
+                content="Restore"
+              />
               <ConfirmButton
                 variant="ghost"
                 size="icon-xs"
@@ -133,9 +132,8 @@ export function ArchivedTodoList({
                 title="Delete this todo for good?"
                 description={`“${todo.title}”, its history, notes, runs and dependency links are removed. This cannot be undone.`}
                 onConfirm={() => void run(() => deleteForGood({ variables: { id: todo.id } }))}
-              >
-                <Trash2 className="h-4 w-4" />
-              </ConfirmButton>
+                iconSlot={<Trash2 className="h-4 w-4" />}
+              />
             </View>
           ))}
         </View>

@@ -107,10 +107,12 @@ function SelectContent({ className, children }: SelectContentProps) {
   const { open, setOpen } = useContext(SelectContext);
   return (
     <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
-      <View className="flex-1 items-center justify-center bg-black/60 p-6">
+      <View className="flex-1 items-center justify-center bg-overlay/60 p-6">
         {/* Sibling, not parent: `Pressable` has no `stopPropagation`. */}
         <Pressable className="absolute inset-0" onPress={() => setOpen(false)} role="button" aria-label="Close" />
-        <View className={cn('max-h-96 w-full max-w-sm rounded-md border border-border bg-popover p-1', className)}>
+        <View
+          className={cn('max-h-96 w-full max-w-sm rounded-md border border-foreground/10 bg-secondary p-1', className)}
+        >
           <ScrollView>{children}</ScrollView>
         </View>
       </View>
@@ -130,7 +132,7 @@ function SelectItem({ value, disabled = false, className, children }: SelectItem
         select.onValueChange(value);
         select.setOpen(false);
       }}
-      className={cn(SELECT_ITEM_CLASS, selected && 'bg-accent', disabled && 'opacity-50', className)}
+      className={cn(SELECT_ITEM_CLASS, selected && 'bg-active/40', disabled && 'opacity-50', className)}
     >
       {selected ? (
         <View className="absolute left-2 h-3.5 w-3.5 items-center justify-center">

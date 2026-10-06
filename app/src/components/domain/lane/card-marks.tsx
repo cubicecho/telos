@@ -87,14 +87,11 @@ export function CardMarks({ mark, todoTitle }: { mark: CardMark; todoTitle: stri
               variant="outline"
               size="xs"
               className={
-                mark.lastRun === REJECTED
-                  ? 'border-amber-600/60 text-amber-700 dark:text-amber-400'
-                  : 'border-destructive/60 text-destructive'
+                mark.lastRun === REJECTED ? 'border-warning/60 text-warning' : 'border-destructive/60 text-destructive'
               }
               aria-label={`${lastRun.label}: why “${todoTitle}” came back`}
-            >
-              {lastRun.label}
-            </Button>
+              content={lastRun.label}
+            />
           </PopoverTrigger>
           <PopoverContent align="start" className="w-72">
             <PopoverHeader>

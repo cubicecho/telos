@@ -78,22 +78,20 @@ export function RunRow({
           <>
             {ofDraft && showTodo ? <Badge variant="outline">Draft</Badge> : null}
             {run.verdict === 'none' ? null : (
-              <Badge variant={run.verdict === 'pass' ? 'success' : 'destructive'}>
+              <Badge variant={run.verdict === 'pass' ? 'positive' : 'destructive'}>
                 {run.verdict === 'pass' ? 'Pass' : 'Fail'}
               </Badge>
             )}
             <RunStatusBadge status={run.status} />
           </>
         }
-        action={
+        actionSlot={
           <>
             {/* Cancelling asks; the runner stops at its next heartbeat and the run
                 is marked stopped then. Until it does, the request is what shows.
                 A draft's reply stops at once: the turn goes back to the person. */}
             {running && !run.cancelRequestedAt ? (
-              <Button variant="outline" size="sm" disabled={cancelling} onPress={cancel}>
-                Cancel
-              </Button>
+              <Button variant="outline" size="sm" disabled={cancelling} onPress={cancel} content="Cancel" />
             ) : null}
             {running && run.cancelRequestedAt ? <Text className="text-muted-foreground text-xs">Stopping…</Text> : null}
             {running ? null : (
@@ -106,13 +104,12 @@ export function RunRow({
                 title="Delete this run?"
                 description={ofDraft ? DELETE_DRAFT_RUN : DELETE_TODO_RUN}
                 onConfirm={remove}
-              >
-                Delete
-              </ConfirmButton>
+                content="Delete"
+              />
             )}
           </>
         }
-        content={<OpenRun id={run.id} running={running} pollMs={pollMs} />}
+        contentSlot={<OpenRun id={run.id} running={running} pollMs={pollMs} />}
       />
       {/* Outside the row: a failed cancel or delete is said whether or not it is open. */}
       {error ? (

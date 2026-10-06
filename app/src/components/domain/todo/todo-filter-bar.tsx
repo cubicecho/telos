@@ -63,10 +63,8 @@ export const TodoFilterBar = forwardRef<
               size="sm"
               className={cn('gap-2', selected && 'border-ring')}
               aria-label="Filter by label"
-            >
-              {selected ? <ColorDot color={selected.color} size="sm" /> : <Tag className="h-4 w-4" />}
-              {selected ? selected.name : 'Label'}
-            </Button>
+              content={`${selected ? <ColorDot color={selected.color} size="sm" /> : <Tag className="h-4 w-4" />}${selected ? selected.name : 'Label'}`}
+            />
           </MenuTrigger>
           <MenuContent align="start" className="w-56">
             {labels.length === 0 ? (
@@ -80,7 +78,7 @@ export const TodoFilterBar = forwardRef<
                 {labels.map((label) => (
                   <MenuItem
                     key={label.id}
-                    icon={<ColorDot color={label.color} size="sm" />}
+                    iconSlot={<ColorDot color={label.color} size="sm" />}
                     label={label.name}
                     onSelect={() => pickLabel(label.id)}
                     trailing={tick(filter.labelId === label.id)}
@@ -101,10 +99,14 @@ export const TodoFilterBar = forwardRef<
         </SegmentedGroup>
 
         {active ? (
-          <Button variant="ghost" size="sm" className="gap-2" onPress={() => onChange(NO_FILTER)}>
-            <X className="h-4 w-4" />
-            Clear
-          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-2"
+            onPress={() => onChange(NO_FILTER)}
+            iconSlot={<X className="h-4 w-4" />}
+            content="Clear"
+          />
         ) : null}
       </View>
 

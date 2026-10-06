@@ -17,7 +17,7 @@ const Empty = React.forwardRef<React.ElementRef<typeof View>, ViewProps>(({ clas
     ref={ref}
     testID="empty"
     className={cn(
-      'w-full min-w-0 items-center justify-center gap-3 rounded-lg border-dashed border-border py-10',
+      'w-full min-w-0 items-center justify-center gap-3 rounded-lg border-dashed border-foreground/10 py-10',
       className,
     )}
     {...props}
@@ -35,7 +35,7 @@ export type EmptyMediaVariant = 'default' | 'icon';
 /** `icon` is the muted bubble `EmptyState` draws; `default` is a bare box for an avatar or image. */
 const EMPTY_MEDIA = {
   default: '',
-  icon: "rounded-full bg-muted p-3 text-muted-foreground [&_svg:not([class*='size-'])]:size-6",
+  icon: "rounded-full bg-foreground/10 p-3 text-foreground/60 [&_svg:not([class*='size-'])]:size-6",
 } satisfies Record<EmptyMediaVariant, string>;
 
 type EmptyMediaProps = ViewProps & {
@@ -53,7 +53,7 @@ const EmptyMedia = React.forwardRef<React.ElementRef<typeof View>, EmptyMediaPro
     if (variant === 'icon') {
       return (
         <View ref={ref} testID="empty-icon" className={box} {...props}>
-          <IconClassContext.Provider value="h-6 w-6 text-muted-foreground">{children}</IconClassContext.Provider>
+          <IconClassContext.Provider value="h-6 w-6 text-foreground/60">{children}</IconClassContext.Provider>
         </View>
       );
     }
@@ -76,7 +76,7 @@ const EmptyDescription = React.forwardRef<React.ElementRef<typeof Text>, TextPro
     ref={ref}
     testID="empty-description"
     className={cn(
-      'text-center text-sm text-muted-foreground [&>a]:underline [&>a]:underline-offset-4 [&>a:hover]:text-primary',
+      'text-center text-sm text-foreground/60 [&>a]:underline [&>a]:underline-offset-4 [&>a:hover]:text-info',
       className,
     )}
     {...props}

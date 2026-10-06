@@ -39,7 +39,7 @@ export default function VerifyScreen() {
             icon={CircleAlert}
             title="That link didn't work"
             description={`${error ? describeError(error) : 'The link is missing its token.'} Sign-in links expire after 15 minutes.`}
-            action={
+            actionSlot={
               <Link href="/login" className="text-primary text-sm underline">
                 Request a new one
               </Link>

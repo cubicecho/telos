@@ -45,7 +45,7 @@ export function RunDialog({
       size="lg"
       title={run ? runWhere(run) : 'Run'}
       description={run ? describeRun(run) : undefined}
-      content={
+      contentSlot={
         run ? (
           <View className="gap-3">
             <RunStatusBadge status={run.status} />

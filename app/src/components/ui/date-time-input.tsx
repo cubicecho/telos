@@ -150,18 +150,19 @@ export function DateTimeInput(props: DateTimeInputProps) {
                 }
               : {})}
             className="flex-1 justify-start text-left font-normal"
-          >
-            <CalendarIcon className="mr-2 h-4 w-4" />
-            {/* Its own `Text` in both states, for the id a reference points at; and because
-                native has no colour inheritance, the placeholder's muted class has to be on
-                the words themselves. */}
-            <Text
-              nativeID={valueId}
-              className={value ? buttonTextVariants({ variant: 'outline' }) : 'text-sm text-muted-foreground'}
-            >
-              {valueText}
-            </Text>
-          </Button>
+            iconSlot={<CalendarIcon className="mr-2 h-4 w-4" />}
+            content={
+              // Its own `Text` in both states, for the id a reference points at; and because
+              // native has no colour inheritance, the placeholder's muted class has to be on
+              // the words themselves.
+              <Text
+                nativeID={valueId}
+                className={value ? buttonTextVariants({ variant: 'outline' }) : 'text-sm text-foreground/60'}
+              >
+                {valueText}
+              </Text>
+            }
+          />
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0" align="start">
           <Calendar selected={value ?? undefined} onSelect={handleDateSelect} defaultMonth={value ?? undefined} />
@@ -169,11 +170,14 @@ export function DateTimeInput(props: DateTimeInputProps) {
               and a button inside a button is invalid HTML that no keyboard reaches.
               `DatePicker` puts its Clear in the same place. */}
           {props.clearable && value ? (
-            <View className="flex-row justify-end border-t border-border p-1">
-              <Button variant="ghost" size="sm" onPress={handleClear}>
-                <X className="h-4 w-4" />
-                Clear
-              </Button>
+            <View className="flex-row justify-end border-t border-foreground/10 p-1">
+              <Button
+                variant="outline"
+                size="sm"
+                onPress={handleClear}
+                iconSlot={<X className="h-4 w-4" />}
+                content="Clear"
+              />
             </View>
           ) : null}
         </PopoverContent>

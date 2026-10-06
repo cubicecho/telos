@@ -22,7 +22,7 @@ export default function ActivityScreen() {
     <PageLayout
       title="Activity"
       description="What your agents did across every project: what needs you, what it cost, and what they left behind."
-      content={
+      contentSlot={
         <View className="py-6">
           {ai.on ? (
             <AccountActivity

@@ -42,9 +42,8 @@ export function DependencyPicker({
           size={size}
           className={className}
           aria-label={waiting > 0 ? `Dependencies, waiting on ${waiting}` : 'Dependencies'}
-        >
-          <Link2 className={cn('h-4 w-4', waiting > 0 ? 'text-foreground' : 'text-muted-foreground')} />
-        </Button>
+          iconSlot={<Link2 className={cn('h-4 w-4', waiting > 0 ? 'text-foreground' : 'text-muted-foreground')} />}
+        />
       </MenuTrigger>
       <MenuContent align={align} aria-label="Dependencies" className="max-h-64 w-64 overflow-y-auto">
         {options.length === 0 ? (

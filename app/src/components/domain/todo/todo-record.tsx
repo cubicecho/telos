@@ -55,9 +55,13 @@ function ViewRun({ runId, projectAi }: { runId: string | null | undefined; proje
   if (!ai.on || !projectAi || !runId) return null;
   return (
     <>
-      <Button variant="link" size="xs" className="h-auto self-start px-0" onPress={() => setOpen(true)}>
-        View run
-      </Button>
+      <Button
+        variant="link"
+        size="xs"
+        className="h-auto self-start px-0"
+        onPress={() => setOpen(true)}
+        content="View run"
+      />
       {open ? <RunDialog runId={runId} open onOpenChange={setOpen} /> : null}
     </>
   );
@@ -151,9 +155,13 @@ function ThreadNote({
           </Badge>
         )}
         {canEdit(note) && draft === null ? (
-          <ActionButton variant="ghost" size="icon-sm" label="Edit note" onPress={() => setDraft(note.body)}>
-            <Pencil className="h-4 w-4" />
-          </ActionButton>
+          <ActionButton
+            variant="ghost"
+            size="icon-sm"
+            label="Edit note"
+            onPress={() => setDraft(note.body)}
+            iconSlot={<Pencil className="h-4 w-4" />}
+          />
         ) : null}
         {canDelete(note) ? (
           <ActionButton
@@ -162,9 +170,8 @@ function ThreadNote({
             className="hover:text-destructive"
             label="Delete note"
             onPress={() => onDelete(note.id)}
-          >
-            <Trash2 className="h-4 w-4" />
-          </ActionButton>
+            iconSlot={<Trash2 className="h-4 w-4" />}
+          />
         ) : null}
       </View>
       {draft === null ? (
@@ -179,12 +186,8 @@ function ThreadNote({
             </Text>
           ) : null}
           <View className="flex-row justify-end gap-2">
-            <Button variant="ghost" size="sm" disabled={saving} onPress={() => setDraft(null)}>
-              Cancel
-            </Button>
-            <Button size="sm" disabled={saving || draft.trim() === ''} onPress={save}>
-              Save note
-            </Button>
+            <Button variant="ghost" size="sm" disabled={saving} onPress={() => setDraft(null)} content="Cancel" />
+            <Button size="sm" disabled={saving || draft.trim() === ''} onPress={save} content="Save note" />
           </View>
         </View>
       )}
@@ -250,7 +253,7 @@ export function TodoThread({ todoId, focusNoteId }: { todoId: string; focusNoteI
         query={record}
         what="the notes"
         count={notes.length}
-        empty={<Text className="text-muted-foreground text-sm">No notes yet.</Text>}
+        emptySlot={<Text className="text-muted-foreground text-sm">No notes yet.</Text>}
       />
       {notes.length === 0 ? null : (
         <View role="list" className="gap-2">
@@ -275,9 +278,13 @@ export function TodoThread({ todoId, focusNoteId }: { todoId: string; focusNoteI
 
       <View className="gap-2">
         <Textarea value={body} onChangeText={setBody} placeholder="Add a note…" rows={3} />
-        <Button size="sm" className="self-end" disabled={adding || body.trim() === ''} onPress={add}>
-          Add note
-        </Button>
+        <Button
+          size="sm"
+          className="self-end"
+          disabled={adding || body.trim() === ''}
+          onPress={add}
+          content="Add note"
+        />
       </View>
     </View>
   );
@@ -341,7 +348,7 @@ export function TodoHistory({ todoId, runs = [] }: { todoId: string; runs?: read
         query={record}
         what="the history"
         count={entries.length}
-        empty={<Text className="text-muted-foreground text-sm">Nothing recorded yet.</Text>}
+        emptySlot={<Text className="text-muted-foreground text-sm">Nothing recorded yet.</Text>}
       />
       {entries.length === 0 ? null : (
         <View role="list" className="gap-2">

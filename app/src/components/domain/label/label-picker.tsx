@@ -39,9 +39,13 @@ export function LabelPicker({
         {/* Icon only, to sit in a row of icon actions. The name it lost is in
             `aria-label`. (The DOM `title` it also had is not a Pressable prop;
             a pointer hint would be cubeui's Tooltip.) */}
-        <Button variant="ghost" size={size} className={cn('text-muted-foreground', className)} aria-label="Labels">
-          <Tag className="h-4 w-4" />
-        </Button>
+        <Button
+          variant="ghost"
+          size={size}
+          className={cn('text-muted-foreground', className)}
+          aria-label="Labels"
+          iconSlot={<Tag className="h-4 w-4" />}
+        />
       </MenuTrigger>
       <MenuContent align={align} aria-label="Labels" className="w-56">
         {/* The failure, not "No labels yet.", when the list did not load: the
@@ -53,7 +57,7 @@ export function LabelPicker({
           count={labels.length}
           compact
           rows={2}
-          empty={<Text className="px-2 py-3 text-center text-muted-foreground text-sm">No labels yet.</Text>}
+          emptySlot={<Text className="px-2 py-3 text-center text-muted-foreground text-sm">No labels yet.</Text>}
         />
         {labels.map((label) => {
           const isAttached = attachedIds.has(label.id);
@@ -62,7 +66,7 @@ export function LabelPicker({
               key={label.id}
               checked={isAttached}
               onCheckedChange={(attach) => onToggle(label, attach)}
-              icon={<ColorDot color={label.color} size="sm" />}
+              iconSlot={<ColorDot color={label.color} size="sm" />}
               label={label.name}
             />
           );
