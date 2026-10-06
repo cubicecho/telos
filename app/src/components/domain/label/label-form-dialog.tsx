@@ -1,7 +1,7 @@
 import { useApolloClient, useMutation } from '@apollo/client';
 import { useEffect } from 'react';
 import { useAppForm } from '@/components/app-form';
-import { isHexColor } from '@/components/ui/color-picker';
+import { COLOR_SWATCHES, isHexColor } from '@/components/ui/color-picker';
 import { Form } from '@/components/ui/form';
 import { FormDialog, FormDialogFooter } from '@/components/ui/form-dialog';
 import { describeError } from '@/lib/errors';
@@ -9,9 +9,8 @@ import { CreateLabelDocument, LabelsDocument, UpdateLabelDocument } from '@/lib/
 import { newId } from '@/lib/ids';
 import type { LabelSummary } from './label-badge';
 
-/** A small fixed palette — picking a colour should be one click, not a colour wheel. */
-const PALETTE = ['#0f766e', '#0369a1', '#4f46e5', '#7c3aed', '#be185d', '#b91c1c', '#c2410c', '#4d7c0f'];
-const FIRST = PALETTE[0] as string;
+/** A new label's colour: the first of cubeui's swatches, which are the ones the picker offers. */
+const FIRST: string = COLOR_SWATCHES[0];
 
 export function LabelFormDialog({
   open,
@@ -108,7 +107,7 @@ export function LabelFormDialog({
               onChange: ({ value }) => (isHexColor(value) ? undefined : 'Pick a colour, or finish the hex.'),
             }}
           >
-            {(field) => <field.ColorField label="Colour" colors={PALETTE} />}
+            {(field) => <field.ColorField label="Colour" />}
           </form.AppField>
           <FormDialogFooter onCancel={() => onOpenChange(false)} error={error ? describeError(error) : null}>
             <form.SubmitButton isEdit={label !== undefined} editLabel="Save" />

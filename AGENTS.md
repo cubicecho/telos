@@ -527,8 +527,7 @@ the control reset raw DOM needs is in the tokens.
 the OS. Before that, `app/public/index.html` runs a pasted copy of cubeui's
 `THEME_PRE_PAINT_SCRIPT` so there is no white flash. A test
 (`src/lib/__tests__/pre-paint.test.ts`) fails when a re-add changes the
-original, and the copy is then re-pasted. The line before it moves a preference
-saved under telos's old key, `telos_theme`, to cubeui's `cubeui-theme`. (cubeui's
+original, and the copy is then re-pasted. (cubeui's
 palette as TypeScript is `src/lib/cubeui-theme.ts`, installed by the `tokens`
 item.) That HTML file is also Expo's own template with a script added:
 `app/+html.tsx` is the documented place for this and does nothing under

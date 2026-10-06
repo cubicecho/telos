@@ -19,6 +19,4 @@ body {
 
 * {
   border-color: var(--border);
-  scrollbar-color: color-mix(in srgb, var(--muted-foreground) 30%, transparent) transparent;
-  scrollbar-width: thin;
 }

@@ -18,11 +18,9 @@
 
       The script is cubeui's THEME_PRE_PAINT_SCRIPT (ui/theme-preference-base.ts),
       pasted because none of the bundle has loaded yet; re-paste it when that
-      item changes. The line before it moves a preference saved under telos's
-      old key, `telos_theme`, to cubeui's.
+      item changes.
     -->
     <script>
-      (function(){try{var o=localStorage.getItem("telos_theme");if(o!==null){if(localStorage.getItem("cubeui-theme")===null)localStorage.setItem("cubeui-theme",o);localStorage.removeItem("telos_theme")}}catch(e){}})();
       (function(){try{var s=localStorage,p=s.getItem("cubeui-theme"),q=s.getItem("cubeui-palette"),k=["monokai"].indexOf(q)>=0,d=k||p==="dark"||(p!=="light"&&matchMedia("(prefers-color-scheme: dark)").matches),e=document.documentElement,c=e.classList;c.toggle("dark",d);c.toggle("light",!k&&p==="light");if(["monokai"].indexOf(q)>=0)e.setAttribute("data-palette",q)}catch(e){}})();
     </script>
     <!-- The `react-native-web` recommended style reset: https://necolas.github.io/react-native-web/docs/setup/#root-element -->
