@@ -70,9 +70,9 @@ export default function LoginScreen() {
         {sent ? (
           <CardLayout
             className="mt-6"
-            icon={<CircleCheck className="size-4 text-primary" />}
+            iconSlot={<CircleCheck className="size-4 text-primary" />}
             title="Sign-in link sent"
-            content={
+            contentSlot={
               magicLink ? (
                 <View className="gap-2">
                   <Text className="text-muted-foreground text-sm">

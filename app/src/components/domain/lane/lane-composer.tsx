@@ -22,10 +22,13 @@ export function LaneComposer({ onCreate }: { onCreate: (name: string) => Promise
 
   if (!adding) {
     return (
-      <Button variant="ghost" onPress={() => setAdding(true)} className="h-9 w-72 shrink-0 justify-start">
-        <Plus className="mr-1 h-4 w-4" />
-        Add lane
-      </Button>
+      <Button
+        variant="ghost"
+        onPress={() => setAdding(true)}
+        className="h-9 w-72 shrink-0 justify-start"
+        iconSlot={<Plus className="mr-1 h-4 w-4" />}
+        content="Add lane"
+      />
     );
   }
 

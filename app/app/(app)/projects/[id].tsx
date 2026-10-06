@@ -142,7 +142,7 @@ export default function ProjectScreen() {
   // The title waits at its own height; nothing below it has anything to show
   // until the project lands.
   if (projectLoading && !projectData) {
-    return <PageLayout width="full" headerClassName={PROSE_COLUMN} loading title={undefined} content={null} />;
+    return <PageLayout width="full" headerClassName={PROSE_COLUMN} loading title={undefined} contentSlot={null} />;
   }
 
   // Ahead of the not-found message, which is a claim about the caller's own
@@ -165,10 +165,8 @@ export default function ProjectScreen() {
           icon={CircleAlert}
           title="Project not found"
           description="That project doesn't exist, or isn't yours."
-          action={
-            <Button variant="outline" size="sm" onPress={() => router.replace('/')}>
-              Go to your projects
-            </Button>
+          actionSlot={
+            <Button variant="outline" size="sm" onPress={() => router.replace('/')} content="Go to your projects" />
           }
         />
       </View>
@@ -347,9 +345,8 @@ export default function ProjectScreen() {
                           className="-ml-3 self-start text-muted-foreground"
                           aria-expanded={showCompleted}
                           onPress={() => setShowCompleted((shown) => !shown)}
-                        >
-                          {`${showCompleted ? 'Hide' : 'Show'} completed (${completed.length})`}
-                        </Button>
+                          content={`${showCompleted ? 'Hide' : 'Show'} completed (${completed.length})`}
+                        />
                         {showCompleted
                           ? completed.map((todo) => (
                               <TodoRow key={todo.id} todo={todo} projectId={project.id} siblings={all} lanes={lanes} />

@@ -47,9 +47,8 @@ export function LanePicker({
           size={size}
           className={cn('text-muted-foreground', className)}
           aria-label={current ? `Lane, currently ${current.name}` : 'Lane'}
-        >
-          <Columns3 className="h-4 w-4" />
-        </Button>
+          iconSlot={<Columns3 className="h-4 w-4" />}
+        />
       </MenuTrigger>
       <MenuContent align={align} className="w-52">
         {lanes.map((lane) => (

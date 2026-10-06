@@ -12,8 +12,8 @@ export const itemVariants = cva('flex-row flex-wrap items-center rounded-md bord
   variants: {
     variant: {
       default: 'bg-transparent',
-      outline: 'border-border',
-      muted: 'bg-muted/50',
+      outline: 'border-foreground/10',
+      muted: 'bg-foreground/10',
     },
     size: {
       default: 'gap-4 p-4',
@@ -24,6 +24,13 @@ export const itemVariants = cva('flex-row flex-wrap items-center rounded-md bord
 });
 
 /**
+ * The chosen row: the one whose record is open beside the list. A tint in `active` and not the
+ * hover grey, which on a row that stays put reads as a hover that stuck. The colour is not the
+ * whole of it: say which row it is with `aria-current` on the link, or `aria-selected` in a listbox.
+ */
+export const ITEM_SELECTED_CLASS = 'bg-active/40';
+
+/**
  * The start of the row: an icon in a small tile, an image, or whatever is passed. On the web an
  * `<svg>` or `<img>` inside is sized for you; on a device pass it sized (`size-4`, `size-full`).
  */
@@ -31,7 +38,7 @@ export const itemMediaVariants = cva('shrink-0 flex-row items-center justify-cen
   variants: {
     variant: {
       default: 'bg-transparent',
-      icon: 'size-8 rounded-sm border border-border bg-muted',
+      icon: 'size-8 rounded-sm border border-foreground/10 bg-foreground/10',
       image: 'size-10 overflow-hidden rounded-sm',
     },
   },
@@ -48,7 +55,7 @@ export const ITEM_TITLE_CLASS = 'flex-row items-center gap-2';
 export const ITEM_TITLE_TEXT = 'text-sm leading-snug font-medium';
 
 /** The muted line under the title, two lines at most. */
-export const ITEM_DESCRIPTION_CLASS = 'line-clamp-2 text-sm leading-normal font-normal text-muted-foreground';
+export const ITEM_DESCRIPTION_CLASS = 'line-clamp-2 text-sm leading-normal font-normal text-foreground/60';
 
 /** The far end: buttons, a menu. */
 export const ITEM_ACTIONS_CLASS = 'flex-row items-center gap-2';
@@ -60,4 +67,4 @@ export const ITEM_HEADER_CLASS = 'flex-row items-center justify-between gap-2';
 export const ITEM_FOOTER_CLASS = 'flex-row items-center justify-between gap-2';
 
 /** The rule between rows in an `ItemGroup`. */
-export const ITEM_SEPARATOR_CLASS = 'my-0 shrink-0 bg-border';
+export const ITEM_SEPARATOR_CLASS = 'my-0 shrink-0 bg-foreground/10';

@@ -1,6 +1,6 @@
 import { useMutation } from '@apollo/client';
 import { useRouter } from 'expo-router';
-import { type ReactNode, useState } from 'react';
+import { useState } from 'react';
 import { Text, View } from 'react-native';
 import { ActionButton } from '@/components/action-button';
 import { MessageSquare } from '@/components/app-icons';
@@ -24,6 +24,7 @@ import {
   DetachProjectLabelDocument,
   ProjectsDocument,
 } from '@/lib/graphql';
+import type { SlotNode } from '@/lib/utils';
 import { ProjectFormDialog } from './project-form-dialog';
 
 export interface ProjectOverviewData {
@@ -54,7 +55,7 @@ export function ProjectPage({
   activity,
 }: {
   project: ProjectOverviewData;
-  content: ReactNode;
+  content: SlotNode;
   /** What its agents are doing, while AI is on for the account and the project. */
   activity?: ProjectActivity | undefined;
 }) {
@@ -113,7 +114,7 @@ export function ProjectPage({
       headerClassName={PROSE_COLUMN}
       title={project.name}
       description={project.description || undefined}
-      action={
+      actionSlot={
         <>
           <LabelPicker attached={project.labels} onToggle={toggleLabel} align="end" />
           {canDraft ? (
@@ -125,9 +126,8 @@ export function ProjectPage({
                 setDrafting(true);
               }}
               label="Talk a request over"
-            >
-              <MessageSquare className="h-4 w-4" />
-            </ActionButton>
+              iconSlot={<MessageSquare className="h-4 w-4" />}
+            />
           ) : null}
           <ActionButton
             variant="ghost"
@@ -137,12 +137,15 @@ export function ProjectPage({
               setSavingTemplate(true);
             }}
             label="Save lanes as a template"
-          >
-            <Copy className="h-4 w-4" />
-          </ActionButton>
-          <ActionButton variant="ghost" size="icon" onPress={() => setEditing(true)} label="Edit project">
-            <Pencil className="h-4 w-4" />
-          </ActionButton>
+            iconSlot={<Copy className="h-4 w-4" />}
+          />
+          <ActionButton
+            variant="ghost"
+            size="icon"
+            onPress={() => setEditing(true)}
+            label="Edit project"
+            iconSlot={<Pencil className="h-4 w-4" />}
+          />
           <ConfirmButton
             variant="ghost"
             size="icon"
@@ -151,17 +154,16 @@ export function ProjectPage({
             title={`Delete “${project.name}”?`}
             description={`Its ${project.todoCount} todo${project.todoCount === 1 ? '' : 's'} go with it. This cannot be undone.`}
             onConfirm={confirmDelete}
-          >
-            <Trash2 className="h-4 w-4" />
-          </ConfirmButton>
+            iconSlot={<Trash2 className="h-4 w-4" />}
+          />
         </>
       }
-      headerContent={
+      headerContentSlot={
         <View className="gap-3">
           <DescriptionList
             layout="stacked"
             className="flex-row gap-6"
-            content={
+            contentSlot={
               <>
                 <Stat label="Open" value={project.openTodoCount} />
                 <Stat label="Done" value={done} />
@@ -214,7 +216,7 @@ export function ProjectPage({
           ) : null}
         </View>
       }
-      content={content}
+      contentSlot={content}
     />
   );
 }

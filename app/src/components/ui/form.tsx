@@ -22,7 +22,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import type { TextareaProps } from '@/components/ui/textarea-base';
-import { cn } from '@/lib/utils';
+import { cn, type SlotNode } from '@/lib/utils';
 
 export const { fieldContext, formContext, useFieldContext, useFormContext } = createFormHookContexts();
 
@@ -241,7 +241,7 @@ function splitProps<T>(props: BoundFieldProps & T): [BoundFieldProps, T] {
 }
 
 type FieldWrapperProps = BoundFieldProps & {
-  control: ReactNode;
+  controlSlot: SlotNode;
 };
 
 /**
@@ -250,7 +250,7 @@ type FieldWrapperProps = BoundFieldProps & {
  */
 function FieldWrapper({
   label,
-  control,
+  controlSlot,
   description,
   required = false,
   orientation = 'vertical',
@@ -265,13 +265,13 @@ function FieldWrapper({
       {label}
       {required ? (
         // Decoration: the name stays "Email", not "Email star". `aria-required` says it instead.
-        <Text aria-hidden className="text-destructive">
+        <Text aria-hidden className="text-negative">
           {' *'}
         </Text>
       ) : null}
     </FieldLabel>
   );
-  const wired = <FieldControl aria-required={required || undefined}>{control}</FieldControl>;
+  const wired = <FieldControl aria-required={required || undefined}>{controlSlot}</FieldControl>;
   const rest = (
     <>
       {description ? <FieldDescription className={descriptionClassName}>{description}</FieldDescription> : null}
@@ -299,11 +299,11 @@ function FieldWrapper({
   );
 }
 
-type InputFieldProps = {
-  label: string;
-} & Omit<InputProps, 'value' | 'onChangeText' | 'onBlur'>;
+type InputFieldProps = BoundFieldProps & Omit<InputProps, 'value' | 'onChangeText' | 'onBlur' | keyof BoundFieldProps>;
 
-function InputField({ label, ...props }: InputFieldProps) {
+/** A text box and the field around it. `className` is the field's, as on every bound field. */
+function InputField(props: InputFieldProps) {
+  const [fieldProps, input] = splitProps(props);
   // The stored value is whatever the schema says — string, number or null — and
   // this component is generic over all of them, so there is nothing narrower to
   // write here. Both edges are handled explicitly: `String(… ?? "")` going in,
@@ -313,14 +313,14 @@ function InputField({ label, ...props }: InputFieldProps) {
 
   return (
     <FieldWrapper
-      label={label}
-      control={
+      {...fieldProps}
+      controlSlot={
         <Input
-          {...props}
+          {...input}
           value={String(field.state.value ?? '')}
           onBlur={field.handleBlur}
           onChangeText={(text) => {
-            if (props.type === 'number') {
+            if (input.type === 'number') {
               // `valueAsNumber` is DOM-only; parse the text so native agrees.
               field.handleChange(text === '' ? null : Number(text));
             } else {
@@ -333,19 +333,20 @@ function InputField({ label, ...props }: InputFieldProps) {
   );
 }
 
-type TextAreaFieldProps = {
-  label: string;
-} & Omit<TextareaProps, 'value' | 'onChangeText' | 'onBlur'>;
+type TextAreaFieldProps = BoundFieldProps &
+  Omit<TextareaProps, 'value' | 'onChangeText' | 'onBlur' | keyof BoundFieldProps>;
 
-function TextAreaField({ label, ...props }: TextAreaFieldProps) {
+/** A multi-line text box and the field around it. */
+function TextAreaField(props: TextAreaFieldProps) {
+  const [fieldProps, textarea] = splitProps(props);
   const field = useFieldContext<string>();
 
   return (
     <FieldWrapper
-      label={label}
-      control={
+      {...fieldProps}
+      controlSlot={
         <Textarea
-          {...props}
+          {...textarea}
           value={field.state.value ?? ''}
           onBlur={field.handleBlur}
           onChangeText={(text) => field.handleChange(text)}
@@ -360,19 +361,19 @@ type SelectOption = {
   value: string;
 };
 
-type SelectFieldProps = {
-  label: string;
+type SelectFieldProps = BoundFieldProps & {
   options: readonly SelectOption[];
   placeholder?: string;
 };
 
-function SelectField({ label, options, placeholder }: SelectFieldProps) {
+function SelectField(props: SelectFieldProps) {
+  const [fieldProps, { options, placeholder }] = splitProps(props);
   const field = useFieldContext<string>();
 
   return (
     <FieldWrapper
-      label={label}
-      control={
+      {...fieldProps}
+      controlSlot={
         <Select value={field.state.value} onValueChange={(v) => field.handleChange(v)}>
           <SelectTrigger onBlur={field.handleBlur}>
             <SelectValue placeholder={placeholder} />
@@ -407,7 +408,7 @@ function CheckboxField(props: CheckboxFieldProps) {
     <FieldWrapper
       orientation="horizontal"
       {...fieldProps}
-      control={
+      controlSlot={
         <Checkbox
           {...checkbox}
           accessibilityLabel={props.label}
@@ -445,7 +446,7 @@ function SwitchField(props: SwitchFieldProps) {
     <FieldWrapper
       orientation="horizontal"
       {...fieldProps}
-      control={
+      controlSlot={
         <Switch
           {...control}
           accessibilityLabel={props.label}
@@ -467,14 +468,14 @@ type SubmitButtonProps = {
   editLabel?: string;
   savingLabel?: string;
   /** Leading glyph, e.g. `<Plus className="mr-1 h-4 w-4" />`. */
-  icon?: React.ReactNode;
+  iconSlot?: SlotNode;
   /**
    * A third reason not to submit, OR-ed with `!canSubmit` and `isSubmitting` — a mutation in
    * flight elsewhere, a form that is valid but unchanged. It only ever tightens the guard:
    * `disabled={false}` never enables an invalid form.
    */
   disabled?: boolean | undefined;
-} & Omit<React.ComponentProps<typeof Button>, 'disabled' | 'children'>;
+} & Omit<React.ComponentProps<typeof Button>, 'disabled' | 'content' | 'loading' | 'loadingLabel'>;
 
 /**
  * The submit control: reads `canSubmit` / `isSubmitting` from form context, so
@@ -486,7 +487,7 @@ function SubmitButton({
   createLabel = 'Create',
   editLabel = 'Save changes',
   savingLabel = 'Saving…',
-  icon,
+  iconSlot,
   disabled,
   ...props
 }: SubmitButtonProps) {
@@ -506,11 +507,12 @@ function SubmitButton({
         form.handleSubmit();
       }}
       {...props}
-      disabled={disabled === true || !canSubmit || isSubmitting}
-    >
-      {icon}
-      {isSubmitting ? savingLabel : isEdit ? editLabel : createLabel}
-    </Button>
+      disabled={disabled === true || !canSubmit}
+      loading={isSubmitting}
+      loadingLabel={savingLabel}
+      iconSlot={iconSlot}
+      content={isEdit ? editLabel : createLabel}
+    />
   );
 }
 

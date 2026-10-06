@@ -255,9 +255,13 @@ export function TodoRow({
             the old `has-[[data-state=open]]` guard read a radix attribute that
             react-native-web does not forward onto a `Pressable`. */}
         <View className={cn('h-5 shrink-0 flex-row items-center focus-within:opacity-100', HOVER_REVEAL)}>
-          <ActionButton variant="ghost" size="icon-xs" onPress={() => setEditing(true)} label={`Edit ${todo.title}`}>
-            <Pencil className="h-4 w-4" />
-          </ActionButton>
+          <ActionButton
+            variant="ghost"
+            size="icon-xs"
+            onPress={() => setEditing(true)}
+            label={`Edit ${todo.title}`}
+            iconSlot={<Pencil className="h-4 w-4" />}
+          />
           <LanePicker
             lanes={lanes}
             current={todo.lane}
@@ -269,9 +273,13 @@ export function TodoRow({
           <LabelPicker attached={todo.labels} onToggle={toggleLabel} align="end" size="icon-xs" />
           <DependencyPicker todo={todo} candidates={siblings} onToggle={toggleDependency} align="end" size="icon-xs" />
           {/* No confirmation: archiving is undone from the Archived view. */}
-          <ActionButton variant="ghost" size="icon-xs" onPress={() => void archive()} label={`Archive ${todo.title}`}>
-            <Archive className="h-4 w-4" />
-          </ActionButton>
+          <ActionButton
+            variant="ghost"
+            size="icon-xs"
+            onPress={() => void archive()}
+            label={`Archive ${todo.title}`}
+            iconSlot={<Archive className="h-4 w-4" />}
+          />
         </View>
       </View>
 

@@ -170,7 +170,7 @@ export function AiSetupChecklist({
       surface="card"
       title="Getting AI running"
       description={`${left} of ${steps.length} steps left before an agent works a todo.`}
-      content={
+      contentSlot={
         <View role="list" aria-label="AI setup steps" className="gap-2">
           {steps.map((step) => (
             <View
@@ -180,7 +180,7 @@ export function AiSetupChecklist({
               className="flex-row gap-2"
             >
               {step.done ? (
-                <CircleCheck aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-green-600" />
+                <CircleCheck aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-positive" />
               ) : (
                 <View aria-hidden className="mt-0.5 size-4 shrink-0 rounded-full border border-muted-foreground" />
               )}

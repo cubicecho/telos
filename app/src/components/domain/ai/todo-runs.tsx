@@ -51,7 +51,7 @@ export function TodoRuns({
           query={query}
           what="the runs"
           count={runs.length}
-          empty={<Text className="text-muted-foreground text-sm">No agent has worked this todo yet.</Text>}
+          emptySlot={<Text className="text-muted-foreground text-sm">No agent has worked this todo yet.</Text>}
         />
         {runs.length === 0 ? null : (
           <View role="list" aria-label="Runs" className="gap-2">
@@ -201,9 +201,8 @@ export function ArtifactRow({
           disabled={removing}
           label={`Remove ${label} from the board`}
           onPress={remove}
-        >
-          <Trash2 className="h-4 w-4" />
-        </ActionButton>
+          iconSlot={<Trash2 className="h-4 w-4" />}
+        />
       </View>
       {error ? (
         <Text className="text-destructive text-sm" aria-live="polite">

@@ -7,6 +7,7 @@ import {
   ITEM_DESCRIPTION_CLASS,
   ITEM_FOOTER_CLASS,
   ITEM_HEADER_CLASS,
+  ITEM_SELECTED_CLASS,
   ITEM_SEPARATOR_CLASS,
   ITEM_TITLE_CLASS,
   ITEM_TITLE_TEXT,
@@ -72,10 +73,22 @@ type ItemProps = ViewProps & {
    * opens the record, an expo-router `Link`. Radix's `Slot`, as on `Button`.
    */
   asChild?: boolean | undefined;
+  /**
+   * The chosen row: the one open beside the list. Tinted in `active`. Set `aria-current` or
+   * `aria-selected` on the row or the link inside as well.
+   */
+  selected?: boolean | undefined;
 };
 
-function Item({ className, variant = 'default', size = 'default', asChild = false, ...props }: ItemProps) {
-  const classes = cn(itemVariants({ variant, size }), className);
+function Item({
+  className,
+  variant = 'default',
+  size = 'default',
+  asChild = false,
+  selected = false,
+  ...props
+}: ItemProps) {
+  const classes = cn(itemVariants({ variant, size }), selected && ITEM_SELECTED_CLASS, className);
   if (asChild) {
     // `Slot.Root` is typed for the DOM, but it renders nothing of its own — it clones the caller's
     // one child with these props merged in — so the cast is the honest way to say neither side's

@@ -44,7 +44,7 @@ export default function HomeScreen() {
         icon={Plus}
         title="Nothing here yet"
         description="A project holds a list of todos. Start with one."
-        action={<Button onPress={() => setCreating(true)}>Create a project</Button>}
+        actionSlot={<Button onPress={() => setCreating(true)} content="Create a project" />}
       />
       {/* What getting an agent to work takes, or one line offering it. */}
       <View className="w-full max-w-xl items-center self-center">

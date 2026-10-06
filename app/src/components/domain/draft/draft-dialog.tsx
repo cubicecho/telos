@@ -64,7 +64,7 @@ export function DraftDialog({
       size="lg"
       title="Talk a request over"
       description="Say what you want. The agent asks what it needs to and writes it up as a todo's brief."
-      content={
+      contentSlot={
         draftId ? (
           <DraftTalk
             draftId={draftId}
@@ -132,9 +132,13 @@ function DraftStart({
           <Text className="font-medium text-foreground text-sm">Carry on with</Text>
           <View className="flex-row flex-wrap gap-2">
             {openDrafts.map((draft) => (
-              <Button key={draft.id} variant="outline" size="sm" onPress={() => onStarted(draft.id)}>
-                {draft.title || 'Untitled draft'}
-              </Button>
+              <Button
+                key={draft.id}
+                variant="outline"
+                size="sm"
+                onPress={() => onStarted(draft.id)}
+                content={draft.title || 'Untitled draft'}
+              />
             ))}
           </View>
         </View>
@@ -170,9 +174,7 @@ function DraftStart({
 
       <View className="flex-row items-center justify-end gap-2">
         {error ? <Text className="flex-1 text-destructive text-sm">{describeError(error)}</Text> : null}
-        <Button disabled={!message.trim() || loading} onPress={send}>
-          Start
-        </Button>
+        <Button disabled={!message.trim() || loading} onPress={send} content="Start" />
       </View>
     </View>
   );
@@ -285,13 +287,14 @@ function DraftTalk({
         />
         <View className="flex-row justify-end gap-2">
           {waiting ? (
-            <Button variant="outline" disabled={busy} onPress={() => act(() => stop({ variables: { id: draftId } }))}>
-              Stop
-            </Button>
+            <Button
+              variant="outline"
+              disabled={busy}
+              onPress={() => act(() => stop({ variables: { id: draftId } }))}
+              content="Stop"
+            />
           ) : null}
-          <Button disabled={waiting || busy || !message.trim()} onPress={send}>
-            Send
-          </Button>
+          <Button disabled={waiting || busy || !message.trim()} onPress={send} content="Send" />
         </View>
       </View>
 
@@ -328,16 +331,10 @@ function DraftTalk({
 
       <View className="flex-row flex-wrap items-center justify-between gap-2">
         <View className="flex-row gap-2">
-          <Button variant="ghost" disabled={busy} onPress={onBack}>
-            Back
-          </Button>
-          <Button variant="destructive-outline" disabled={busy} onPress={throwAway}>
-            Discard
-          </Button>
+          <Button variant="ghost" disabled={busy} onPress={onBack} content="Back" />
+          <Button variant="destructive-outline" disabled={busy} onPress={throwAway} content="Discard" />
         </View>
-        <Button disabled={busy || !brief.trim()} onPress={makeTodo}>
-          Make a todo
-        </Button>
+        <Button disabled={busy || !brief.trim()} onPress={makeTodo} content="Make a todo" />
       </View>
     </View>
   );

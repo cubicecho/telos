@@ -108,10 +108,12 @@ export const TodoComposer = forwardRef<
             list and the field is already empty, so the only thing waiting on the
             server would be the next todo. An empty field is what stops a
             double-submit. */}
-        <Button onPress={onSubmit} disabled={title.trim() === ''}>
-          <Plus className="mr-1 h-4 w-4" />
-          Add
-        </Button>
+        <Button
+          onPress={onSubmit}
+          disabled={title.trim() === ''}
+          iconSlot={<Plus className="mr-1 h-4 w-4" />}
+          content="Add"
+        />
       </View>
       {error ? (
         <Text className="text-destructive text-sm" aria-live="polite">

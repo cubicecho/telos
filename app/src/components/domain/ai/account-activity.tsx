@@ -131,13 +131,13 @@ function NeedsAttention({ pollMs }: { pollMs: number }) {
     <Section
       title="Needs attention"
       description="Todos that are out of attempts, or whose last run never finished its work."
-      content={
+      contentSlot={
         <View className="gap-2">
           <LoadState
             query={query}
             what="what needs attention"
             count={todos.length}
-            empty={<Text className="text-muted-foreground text-sm">Nothing is waiting on you.</Text>}
+            emptySlot={<Text className="text-muted-foreground text-sm">Nothing is waiting on you.</Text>}
           />
           {error ? (
             <Text className="text-destructive text-sm" aria-live="polite">
@@ -162,30 +162,31 @@ function NeedsAttention({ pollMs }: { pollMs: number }) {
                       aria-label={`Send “${todo.title}” round again`}
                       disabled={retryState.loading}
                       onPress={() => run(() => retryTodo({ variables: { id: todo.todoId } }))}
-                    >
-                      Retry
-                    </Button>
+                      content="Retry"
+                    />
                     {todo.runId ? (
                       <Button
                         variant="outline"
                         size="sm"
                         aria-label={`Open the last run of “${todo.title}”`}
                         onPress={() => setWatching(todo.runId ?? null)}
-                      >
-                        Run
-                      </Button>
+                        content="Run"
+                      />
                     ) : null}
                     <Link href={`/projects/${todo.projectId}?view=board`} asChild>
-                      <Button variant="ghost" size="sm" aria-label={`Open the board “${todo.title}” is on`}>
-                        Board
-                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        aria-label={`Open the board “${todo.title}” is on`}
+                        content="Board"
+                      />
                     </Link>
                   </View>
                   <Text className="text-muted-foreground text-xs">
                     {[todo.projectName, todo.laneName ?? 'no lane', attemptsLine(todo)].filter(Boolean).join(' · ')}
                   </Text>
                   {todo.reason ? (
-                    <Text selectable numberOfLines={3} className="text-amber-700 text-sm dark:text-amber-400">
+                    <Text selectable numberOfLines={3} className="text-sm text-warning">
                       {todo.reason}
                     </Text>
                   ) : null}
@@ -226,7 +227,7 @@ function AccountSpend({ pollMs }: { pollMs: number }) {
     <Section
       title="Spend"
       description={`What your agents’ runs used in the last ${SPEND_DAYS} days, across every project.`}
-      content={
+      contentSlot={
         <View className="gap-4">
           <View className="flex-row flex-wrap gap-3">
             <StatTile
@@ -343,7 +344,7 @@ function AccountRuns({ pollMs }: { pollMs: number }) {
           query={query}
           what="the runs"
           count={runs.length}
-          empty={
+          emptySlot={
             <Text className="text-muted-foreground text-sm">
               {filter === 'all' ? 'No agent has worked any of your projects yet.' : 'No runs like that.'}
             </Text>
@@ -358,9 +359,13 @@ function AccountRuns({ pollMs }: { pollMs: number }) {
         )}
         {/* A full page means there may be more; a short one means there is not. */}
         {runs.length >= limit ? (
-          <Button variant="outline" size="sm" className="self-start" onPress={() => setLimit(limit + RUNS_PAGE)}>
-            Show more
-          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="self-start"
+            onPress={() => setLimit(limit + RUNS_PAGE)}
+            content="Show more"
+          />
         ) : null}
       </View>
     </View>
@@ -384,7 +389,7 @@ function AccountArtifacts() {
         query={query}
         what="the artifacts"
         count={artifacts.length}
-        empty={<Text className="text-muted-foreground text-sm">No run has left anything behind yet.</Text>}
+        emptySlot={<Text className="text-muted-foreground text-sm">No run has left anything behind yet.</Text>}
       />
       {artifacts.length === 0 ? null : (
         <View role="list" aria-label="Artifacts" className="gap-1">
@@ -403,9 +408,13 @@ function AccountArtifacts() {
         </View>
       )}
       {artifacts.length >= limit ? (
-        <Button variant="outline" size="sm" className="self-start" onPress={() => setLimit(limit + RUNS_PAGE)}>
-          Show more
-        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          className="self-start"
+          onPress={() => setLimit(limit + RUNS_PAGE)}
+          content="Show more"
+        />
       ) : null}
       {opened ? (
         <TodoFormDialog
@@ -438,9 +447,13 @@ function AccountArchive() {
       onDelete={[AccountArchivedTodosDocument]}
       footer={
         todos.length >= limit ? (
-          <Button variant="outline" size="sm" className="self-start" onPress={() => setLimit(limit + RUNS_PAGE)}>
-            Show more
-          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="self-start"
+            onPress={() => setLimit(limit + RUNS_PAGE)}
+            content="Show more"
+          />
         ) : null
       }
     />

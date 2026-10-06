@@ -24,7 +24,7 @@ export interface RunEvent {
 
 export const RUN_STATUS: Record<string, { label: string; variant: BadgeVariant }> = {
   running: { label: 'Running', variant: 'warning' },
-  ok: { label: 'Finished', variant: 'success' },
+  ok: { label: 'Finished', variant: 'positive' },
   error: { label: 'Failed', variant: 'destructive' },
   stopped: { label: 'Stopped', variant: 'outline' },
 };
@@ -39,7 +39,7 @@ export function LiveDot({ className }: { className?: string }) {
   return (
     <View
       aria-hidden
-      className={cn('size-2 shrink-0 rounded-full bg-green-600', Platform.OS === 'web' && 'animate-pulse', className)}
+      className={cn('size-2 shrink-0 rounded-full bg-positive', Platform.OS === 'web' && 'animate-pulse', className)}
     />
   );
 }
@@ -128,7 +128,7 @@ export function RunLog({ run, className }: { run: RunFieldsFragment; className?:
         <Disclosure
           title="What it was told"
           description={run.model ? `Model ${run.model}` : undefined}
-          content={
+          contentSlot={
             <View className="gap-2">
               {run.systemPrompt ? <PromptBlock label="System" text={run.systemPrompt} /> : null}
               {run.userPrompt ? <PromptBlock label="Task" text={run.userPrompt} /> : null}
@@ -248,7 +248,7 @@ function LogEntry({ event }: { event: RunEvent }) {
       return <MonoLine title={timeOf(event)} line={`Hook ${text || event.name || ''}`} failed={event.ok === false} />;
     case 'notice':
       return (
-        <Text selectable className="text-amber-700 text-xs dark:text-amber-400">
+        <Text selectable className="text-xs text-warning">
           {[event.name, text].filter(Boolean).join(': ')}
         </Text>
       );

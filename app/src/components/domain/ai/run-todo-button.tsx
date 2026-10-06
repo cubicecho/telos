@@ -44,9 +44,8 @@ export function RunTodoButton({ todoId, title }: { todoId: string; title: string
         disabled={loading}
         aria-label={`Run “${title}” now`}
         onPress={ask}
-      >
-        Run now
-      </Button>
+        content="Run now"
+      />
       {error ? (
         <Text className="text-destructive text-xs" aria-live="polite">
           {error}

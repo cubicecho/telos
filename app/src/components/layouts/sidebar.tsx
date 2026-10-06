@@ -34,7 +34,7 @@ export function Sidebar() {
     <>
       <SidebarFrame
         label="Telos"
-        header={
+        headerSlot={
           <>
             <Link href="/" className="px-1 font-semibold text-foreground text-lg tracking-tight no-underline">
               Telos
@@ -43,13 +43,16 @@ export function Sidebar() {
                 than leaving a bare `+` for the reader to interpret, and it wears
                 `primary`. Nothing else in the sidebar is filled, so the colour is
                 the whole hierarchy: spend it on the action and the rows stay quiet. */}
-            <Button size="sm" className="w-full gap-2 rounded-lg" onPress={() => setCreating(true)}>
-              <Plus className="h-4 w-4" />
-              New project
-            </Button>
+            <Button
+              size="sm"
+              className="w-full gap-2 rounded-lg"
+              onPress={() => setCreating(true)}
+              iconSlot={<Plus className="h-4 w-4" />}
+              content="New project"
+            />
           </>
         }
-        content={
+        contentSlot={
           <View role="navigation" aria-label="Projects">
             <SidebarSection
               title="Projects"
@@ -63,10 +66,10 @@ export function Sidebar() {
                   what="your projects"
                   count={projects.length}
                   compact
-                  empty={<Text className="px-2 py-2 text-muted-foreground text-sm">No projects yet.</Text>}
+                  emptySlot={<Text className="px-2 py-2 text-muted-foreground text-sm">No projects yet.</Text>}
                 />
               }
-              content={projects.map((project) => (
+              contentSlot={projects.map((project) => (
                 <Link key={project.id} href={`/projects/${project.id}`} asChild>
                   <SidebarNavItem
                     href={`/projects/${project.id}`}
@@ -79,11 +82,11 @@ export function Sidebar() {
             />
           </View>
         }
-        footer={
+        footerSlot={
           <>
             <SidebarNavItem
               label="Search"
-              icon={<Search />}
+              iconSlot={<Search />}
               // The shortcut is a web keyboard's; on device there is none to show.
               count={Platform.OS === 'web' ? 'Ctrl K' : undefined}
               aria-label="Search todos"
@@ -94,7 +97,7 @@ export function Sidebar() {
                 <SidebarNavItem
                   href="/agents"
                   label="Agents"
-                  icon={<Activity />}
+                  iconSlot={<Activity />}
                   count={attention > 0 ? attention : undefined}
                   active={pathname === '/agents'}
                 />
@@ -105,16 +108,21 @@ export function Sidebar() {
                 <SidebarNavItem
                   href="/activity"
                   label="Activity"
-                  icon={<History />}
+                  iconSlot={<History />}
                   active={pathname === '/activity'}
                 />
               </Link>
             ) : null}
             <Link href="/settings" asChild>
-              <SidebarNavItem href="/settings" label="Settings" icon={<Settings />} active={pathname === '/settings'} />
+              <SidebarNavItem
+                href="/settings"
+                label="Settings"
+                iconSlot={<Settings />}
+                active={pathname === '/settings'}
+              />
             </Link>
             {/* A button, not a link: it does something rather than going somewhere. */}
-            <SidebarNavItem label="Sign out" icon={<LogOut />} onPress={signOut} />
+            <SidebarNavItem label="Sign out" iconSlot={<LogOut />} onPress={signOut} />
           </>
         }
       />

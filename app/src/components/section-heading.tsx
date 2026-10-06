@@ -22,7 +22,7 @@ type SectionHeadingProps = {
 // A small muted heading above a section of content.
 export function SectionHeading({ variant = 'default', level, className, children }: SectionHeadingProps) {
   const classes = cn(
-    'font-semibold text-muted-foreground',
+    'font-semibold text-foreground/60',
     variant === 'overline' ? 'text-xs uppercase tracking-wide' : 'text-sm',
     className,
   );

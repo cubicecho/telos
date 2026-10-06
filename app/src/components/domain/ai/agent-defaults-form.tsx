@@ -97,19 +97,22 @@ export function AgentDefaultsForm() {
       surface="card"
       title="Agent defaults"
       description="What every agent inherits for a field it leaves blank. Zero is a value: only a blank inherits."
-      action={
+      actionSlot={
         defaults ? (
           <View className="flex-row items-center gap-2">
             <Badge variant={defaults.hasApiKey ? 'secondary' : 'outline'}>
               {defaults.hasApiKey ? 'Key set' : 'No key'}
             </Badge>
-            <Button variant="outline" size="sm" onPress={() => setKeying(true)}>
-              {defaults.hasApiKey ? 'Replace default key' : 'Set default key'}
-            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onPress={() => setKeying(true)}
+              content={defaults.hasApiKey ? 'Replace default key' : 'Set default key'}
+            />
           </View>
         ) : null
       }
-      content={
+      contentSlot={
         <View className="gap-4">
           <LoadState query={query} what="your agent defaults" count={defaults ? 1 : 0} />
           {defaults ? (
@@ -265,11 +268,15 @@ function DefaultKeyDialog({
           <FormDialogFooter
             onCancel={() => onOpenChange(false)}
             error={error ? describeError(error) : null}
-            secondary={
+            secondarySlot={
               hasApiKey ? (
-                <Button variant="ghost" className="text-destructive" disabled={loading} onPress={() => save(null)}>
-                  Clear key
-                </Button>
+                <Button
+                  variant="ghost"
+                  className="text-destructive"
+                  disabled={loading}
+                  onPress={() => save(null)}
+                  content="Clear key"
+                />
               ) : null
             }
           >

@@ -56,7 +56,7 @@ export function McpServerPicker({
             query={query}
             what="your MCP servers"
             count={servers.length + missing.length}
-            empty={<Text className="text-muted-foreground text-xs">No servers yet, so it reaches none.</Text>}
+            emptySlot={<Text className="text-muted-foreground text-xs">No servers yet, so it reaches none.</Text>}
           />
           {servers.map((server) => (
             <Field key={server.id} orientation="horizontal">
@@ -77,9 +77,13 @@ export function McpServerPicker({
           {missing.map((slug) => (
             <View key={slug} className="flex-row items-center gap-2">
               <Text className="flex-1 text-destructive text-xs">“{slug}” no longer exists, so it is left out.</Text>
-              <ActionButton variant="ghost" size="icon-sm" label={`Remove ${slug}`} onPress={() => toggle(slug, false)}>
-                <X className="h-4 w-4" />
-              </ActionButton>
+              <ActionButton
+                variant="ghost"
+                size="icon-sm"
+                label={`Remove ${slug}`}
+                onPress={() => toggle(slug, false)}
+                iconSlot={<X className="h-4 w-4" />}
+              />
             </View>
           ))}
         </View>

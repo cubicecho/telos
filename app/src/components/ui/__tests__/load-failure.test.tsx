@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { Text } from 'react-native';
 import { describe, expect, it, vi } from 'vitest';
 import { LoadFailure, LoadState } from '../load-failure';
 
@@ -44,7 +45,14 @@ describe('LoadState', () => {
   const refetch = () => Promise.resolve();
 
   it('stands in with placeholders while there is no answer yet', () => {
-    render(<LoadState query={{ loading: true, refetch }} what="your labels" count={0} empty="No labels yet." />);
+    render(
+      <LoadState
+        query={{ loading: true, refetch }}
+        what="your labels"
+        count={0}
+        emptySlot={<Text>No labels yet.</Text>}
+      />,
+    );
     expect(screen.getByRole('status', { name: 'Loading' })).toBeInTheDocument();
     expect(screen.queryByText('No labels yet.')).not.toBeInTheDocument();
   });
@@ -55,7 +63,7 @@ describe('LoadState', () => {
         query={{ loading: false, error: new Error('Failed to fetch'), refetch }}
         what="your labels"
         count={0}
-        empty="No labels yet."
+        emptySlot={<Text>No labels yet.</Text>}
       />,
     );
     expect(screen.getByRole('alert')).toHaveTextContent('Couldn’t reach the server.');
@@ -80,7 +88,7 @@ describe('LoadState', () => {
         query={{ loading: false, data: { labels: [] }, refetch }}
         what="your labels"
         count={0}
-        empty="No labels yet."
+        emptySlot={<Text>No labels yet.</Text>}
       />,
     );
     expect(screen.getByText('No labels yet.')).toBeInTheDocument();

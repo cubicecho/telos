@@ -79,9 +79,13 @@ export function EndpointStatus({
   const { asked, loading, error, models } = endpoint;
   return (
     <View className="flex-row flex-wrap items-center gap-2">
-      <Button variant="outline" size="sm" disabled={!canLoad || loading} onPress={onLoad}>
-        {loading ? 'Asking…' : asked ? 'Reload models' : 'Load models'}
-      </Button>
+      <Button
+        variant="outline"
+        size="sm"
+        disabled={!canLoad || loading}
+        onPress={onLoad}
+        content={loading ? 'Asking…' : asked ? 'Reload models' : 'Load models'}
+      />
       {error ? (
         <>
           <Badge variant="destructive">Failed</Badge>
@@ -91,7 +95,7 @@ export function EndpointStatus({
         </>
       ) : models ? (
         <>
-          <Badge variant="success">Connected</Badge>
+          <Badge variant="positive">Connected</Badge>
           <Text className="flex-1 text-muted-foreground text-xs" aria-live="polite">
             {models.length === 1 ? '1 model' : `${models.length} models`} at {asked?.baseUrl}
           </Text>
@@ -170,11 +174,15 @@ export function ModelField({
 
   return (
     <View className="gap-1">
-      <FieldWrapper label={label} control={control} />
+      <FieldWrapper label={label} controlSlot={control} />
       {models !== null && models.length > 0 ? (
-        <Button variant="link" size="sm" className="self-start px-0" onPress={() => setTyping(!typing)}>
-          {typing ? 'Pick from the list' : 'Type a name instead'}
-        </Button>
+        <Button
+          variant="link"
+          size="sm"
+          className="self-start px-0"
+          onPress={() => setTyping(!typing)}
+          content={typing ? 'Pick from the list' : 'Type a name instead'}
+        />
       ) : null}
     </View>
   );

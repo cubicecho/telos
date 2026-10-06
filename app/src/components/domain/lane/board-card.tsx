@@ -71,8 +71,8 @@ export function BoardCardBody({
       className={cn(
         'group rounded-lg border border-border bg-card px-3 py-2.5 shadow-sm',
         todo.isBlocked && !done && 'opacity-70',
-        live && 'border-green-600/60',
-        !live && stuck && 'border-amber-600/60',
+        live && 'border-positive/60',
+        !live && stuck && 'border-warning/60',
         className,
       )}
     >
@@ -152,14 +152,13 @@ export function BoardCardBody({
               className="-my-1 -mr-2"
               aria-label={`Watch the agent work “${todo.title}”`}
               onPress={onWatch}
-            >
-              Watch
-            </Button>
+              content="Watch"
+            />
           ) : null}
         </View>
       ) : stuck ? (
         <View className="mt-2 flex-row items-start gap-2">
-          <Text numberOfLines={2} className="min-w-0 flex-1 text-amber-700 text-xs dark:text-amber-400">
+          <Text numberOfLines={2} className="min-w-0 flex-1 text-xs text-warning">
             {stuck.reason ?? 'An agent stopped on it.'}
           </Text>
           {onRetry ? (
@@ -169,9 +168,8 @@ export function BoardCardBody({
               className="-my-1 -mr-2"
               aria-label={`Send “${todo.title}” round again`}
               onPress={onRetry}
-            >
-              Retry
-            </Button>
+              content="Retry"
+            />
           ) : null}
         </View>
       ) : waiting ? (
@@ -186,9 +184,8 @@ export function BoardCardBody({
               className="-my-1 -mr-2"
               aria-label={`Run “${todo.title}” now`}
               onPress={onRun}
-            >
-              Run now
-            </Button>
+              content="Run now"
+            />
           ) : null}
         </View>
       ) : null}

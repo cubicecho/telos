@@ -31,7 +31,7 @@ function Separator({ className, orientation = 'horizontal', decorative = true, .
             'aria-orientation': orientation === 'vertical' ? 'vertical' : undefined,
           } as const))}
       {...(Platform.OS === 'web' ? ({ 'data-orientation': orientation } as const) : {})}
-      className={cn('shrink-0 bg-border', ORIENTATIONS[orientation], className)}
+      className={cn('shrink-0 bg-foreground/10', ORIENTATIONS[orientation], className)}
       {...props}
     />
   );

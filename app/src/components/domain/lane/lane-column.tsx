@@ -119,34 +119,37 @@ export function LaneColumn({
 
         <Menu>
           <MenuTrigger asChild>
-            <Button variant="ghost" size="icon-xs" aria-label={`${lane.name} lane actions`}>
-              <Ellipsis className="h-4 w-4" />
-            </Button>
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              aria-label={`${lane.name} lane actions`}
+              iconSlot={<Ellipsis className="h-4 w-4" />}
+            />
           </MenuTrigger>
           <MenuContent align="end" className="w-56">
             <MenuItem
               label="Rename"
-              icon={<Pencil className="h-3.5 w-3.5" />}
+              iconSlot={<Pencil className="h-3.5 w-3.5" />}
               focusesElsewhere
               onSelect={() => setRenaming(true)}
             />
             <MenuItem
               label="Marks work done"
-              icon={<Check className={cn('h-3.5 w-3.5', !lane.isDone && 'opacity-0')} />}
+              iconSlot={<Check className={cn('h-3.5 w-3.5', !lane.isDone && 'opacity-0')} />}
               onSelect={onToggleDone}
             />
             {onEditAgent ? (
-              <MenuItem label="Agent…" icon={<Settings className="h-3.5 w-3.5" />} onSelect={onEditAgent} />
+              <MenuItem label="Agent…" iconSlot={<Settings className="h-3.5 w-3.5" />} onSelect={onEditAgent} />
             ) : null}
             <MenuItem
               label="Move left"
-              icon={<ChevronLeft className="h-3.5 w-3.5" />}
+              iconSlot={<ChevronLeft className="h-3.5 w-3.5" />}
               disabled={index <= 0}
               onSelect={() => onReorder(-1)}
             />
             <MenuItem
               label="Move right"
-              icon={<ChevronRight className="h-3.5 w-3.5" />}
+              iconSlot={<ChevronRight className="h-3.5 w-3.5" />}
               disabled={index < 0 || index >= lanes.length - 1}
               onSelect={() => onReorder(1)}
             />
@@ -154,7 +157,7 @@ export function LaneColumn({
                 without a board is a project whose Board tab is empty. */}
             <MenuItem
               label="Delete lane"
-              icon={<Trash2 className="h-3.5 w-3.5" />}
+              iconSlot={<Trash2 className="h-3.5 w-3.5" />}
               destructive
               disabled={lanes.length <= 1}
               onSelect={() => setConfirmingDelete(true)}

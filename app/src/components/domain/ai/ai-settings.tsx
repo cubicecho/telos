@@ -67,13 +67,13 @@ export function AiSettings() {
         surface="card"
         title="AI"
         description="Off unless you turn it on. Each project has its own switch as well."
-        content={
+        contentSlot={
           <View className="gap-3">
             {adminSwitch ? (
               <SettingRow
                 title="AI on this instance"
                 description="For everyone on this server; only admins see this. Turned off, no account can use AI, the MCP endpoint closes, and anything agents are working on is stopped."
-                action={
+                actionSlot={
                   <Switch
                     checked={ai.instance}
                     onCheckedChange={toggleInstance}
@@ -87,7 +87,7 @@ export function AiSettings() {
               <SettingRow
                 title="Use AI on this account"
                 description="Lets AI clients reach your projects with an API key. Turned off, every key stops working and nothing AI is shown; your todos, notes and history are untouched."
-                action={
+                actionSlot={
                   <Switch
                     checked={ai.account}
                     onCheckedChange={toggle}

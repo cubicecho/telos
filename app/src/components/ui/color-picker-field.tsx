@@ -44,7 +44,7 @@ function ColorFieldControl(control: Omit<ColorFieldProps, keyof FieldProps>) {
 
 export function ColorField(props: ColorFieldProps) {
   const [fieldProps, control] = splitProps(props);
-  return <FieldWrapper {...fieldProps} control={<ColorFieldControl {...control} />} />;
+  return <FieldWrapper {...fieldProps} controlSlot={<ColorFieldControl {...control} />} />;
 }
 
 export type { ColorFieldProps };

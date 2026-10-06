@@ -22,7 +22,7 @@ export default function TodoLinkScreen() {
   });
 
   if (loading && !data) {
-    return <PageLayout loading title={undefined} content={null} />;
+    return <PageLayout loading title={undefined} contentSlot={null} />;
   }
 
   // As on the project screen: with the API unreachable, saying the todo is
@@ -43,10 +43,8 @@ export default function TodoLinkScreen() {
           icon={CircleAlert}
           title="Todo not found"
           description="That todo doesn't exist, or isn't yours."
-          action={
-            <Button variant="outline" size="sm" onPress={() => router.replace('/')}>
-              Go to your projects
-            </Button>
+          actionSlot={
+            <Button variant="outline" size="sm" onPress={() => router.replace('/')} content="Go to your projects" />
           }
         />
       </View>

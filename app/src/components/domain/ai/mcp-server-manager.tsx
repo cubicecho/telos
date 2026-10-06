@@ -84,13 +84,15 @@ export function McpServerManager() {
       surface="card"
       title="MCP servers"
       description="Tool servers your agents can reach. Kept once here; each agent says which it uses."
-      action={
-        <Button size="sm" onPress={() => setEditing('new')}>
-          <Plus className="h-4 w-4" />
-          New server
-        </Button>
+      actionSlot={
+        <Button
+          size="sm"
+          onPress={() => setEditing('new')}
+          iconSlot={<Plus className="h-4 w-4" />}
+          content="New server"
+        />
       }
-      content={
+      contentSlot={
         <View className="gap-4">
           {error ? (
             <Text className="text-destructive text-sm" aria-live="polite">
@@ -102,7 +104,7 @@ export function McpServerManager() {
             query={serversQuery}
             what="your MCP servers"
             count={servers.length}
-            empty={<Text className="text-muted-foreground text-sm">No servers yet.</Text>}
+            emptySlot={<Text className="text-muted-foreground text-sm">No servers yet.</Text>}
           />
           {servers.length === 0 ? null : (
             <View role="list" className="gap-1">
@@ -135,9 +137,8 @@ export function McpServerManager() {
                       size="icon-sm"
                       label={`Edit ${server.name}`}
                       onPress={() => setEditing(server)}
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </ActionButton>
+                      iconSlot={<Pencil className="h-4 w-4" />}
+                    />
                     <ConfirmButton
                       variant="ghost"
                       size="icon-sm"
@@ -147,15 +148,12 @@ export function McpServerManager() {
                       description="Its secrets go with it. An agent that names it carries on without it, and says so on its runs. This cannot be undone."
                       confirmLabel="Delete"
                       onConfirm={() => confirmDelete(server)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </ConfirmButton>
+                      iconSlot={<Trash2 className="h-4 w-4" />}
+                    />
                   </View>
                   <Text className="text-muted-foreground text-xs">{describeUse(server, agents)}</Text>
                   <View className="flex-row flex-wrap items-center gap-2">
-                    <Button variant="outline" size="sm" onPress={() => setKeying(server.id)}>
-                      Secrets
-                    </Button>
+                    <Button variant="outline" size="sm" onPress={() => setKeying(server.id)} content="Secrets" />
                     <Badge variant={secretCount(server) > 0 ? 'secondary' : 'outline'}>{describeSecrets(server)}</Badge>
                   </View>
                   <McpServerTest server={server} />
@@ -268,9 +266,8 @@ function McpServerTest({ server }: { server: ServerRow }) {
         disabled={asking.loading || !done}
         aria-label={`Test ${server.name}`}
         onPress={() => void test()}
-      >
-        Test
-      </Button>
+        content="Test"
+      />
       <Text
         role={result.failed ? 'alert' : 'status'}
         className={
@@ -552,9 +549,8 @@ function McpServerSecretsDialog({
                       setSecret({ variables: { id: server.id, kind: secret.kind, name: secret.name, value: null } }),
                     )
                   }
-                >
-                  <X className="h-4 w-4" />
-                </ActionButton>
+                  iconSlot={<X className="h-4 w-4" />}
+                />
               </View>
             ))}
           </View>

@@ -120,7 +120,7 @@ export function Calendar(props: CalendarProps) {
 
           <View className="flex-row">
             {weekdays.map((day) => (
-              <Text key={day} className="flex-1 text-center text-xs text-muted-foreground">
+              <Text key={day} className="flex-1 text-center text-xs text-foreground/60">
                 {day}
               </Text>
             ))}
@@ -153,8 +153,8 @@ export function Calendar(props: CalendarProps) {
                     'h-9 items-center justify-center',
                     // A range's interior is a continuous band, so only its ends are
                     // rounded — the same shape react-day-picker draws.
-                    place.middle ? 'bg-accent' : 'rounded-md',
-                    place.edge && 'bg-selection',
+                    place.middle ? 'bg-hover' : 'rounded-md',
+                    place.edge && 'bg-active',
                     off && 'opacity-30',
                   )}
                   // Seven per row, and `flex-wrap` needs a width it can measure.
@@ -166,12 +166,12 @@ export function Calendar(props: CalendarProps) {
                     className={cn(
                       'text-sm',
                       place.edge
-                        ? 'text-selection-foreground'
+                        ? 'text-active-foreground'
                         : place.middle
-                          ? 'text-accent-foreground'
+                          ? 'text-foreground'
                           : isSameMonth(day, shown)
                             ? 'text-foreground'
-                            : 'text-muted-foreground',
+                            : 'text-foreground/60',
                     )}
                   >
                     {format(day, 'd')}

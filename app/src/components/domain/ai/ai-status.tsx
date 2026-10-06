@@ -48,7 +48,7 @@ const STATES: Array<{ value: State; label: string; blurb: string; variant: Badge
   { value: 'blocked', label: 'Blocked', blurb: 'These wait on something unfinished.', variant: 'outline' },
   { value: 'queued', label: 'Queued', blurb: 'An agent will start these when it has room.', variant: 'secondary' },
   { value: 'parked', label: 'Parked', blurb: 'No agent will reach these where they are.', variant: 'outline' },
-  { value: 'done', label: 'Done', blurb: 'Finished.', variant: 'success' },
+  { value: 'done', label: 'Done', blurb: 'Finished.', variant: 'positive' },
 ];
 
 export function AiStatus({ pollMs = STATUS_POLL_MS }: { pollMs?: number }) {
@@ -92,7 +92,7 @@ export function AiStatus({ pollMs = STATUS_POLL_MS }: { pollMs?: number }) {
             onPress={state.value === 'done' ? undefined : () => setFocus(state.value)}
             selected={focus === state.value}
             valueClassName={state.value === 'attention' && counts.attention > 0 ? 'text-destructive' : undefined}
-            icon={
+            iconSlot={
               (state.value === 'attention' || state.value === 'running') && counts[state.value] > 0 ? (
                 <LiveDot />
               ) : undefined
@@ -104,13 +104,13 @@ export function AiStatus({ pollMs = STATUS_POLL_MS }: { pollMs?: number }) {
       <Section
         title={focused.label}
         description={focused.blurb}
-        content={
+        contentSlot={
           <View className="gap-2">
             <LoadState
               query={query}
               what="where things stand"
               count={shown.length}
-              empty={
+              emptySlot={
                 <Text className="text-muted-foreground text-sm">
                   {focus === 'attention'
                     ? `Nothing is waiting on you. ${counts.running} running, ${counts.queued} queued.`
@@ -139,9 +139,8 @@ export function AiStatus({ pollMs = STATUS_POLL_MS }: { pollMs?: number }) {
                           aria-label={`Send “${todo.title}” round again`}
                           disabled={retryState.loading}
                           onPress={() => retryTodo({ variables: { id: todo.todoId } }).catch(() => undefined)}
-                        >
-                          Retry
-                        </Button>
+                          content="Retry"
+                        />
                       ) : null}
                       {todo.liveRunId ? (
                         <Button
@@ -149,14 +148,16 @@ export function AiStatus({ pollMs = STATUS_POLL_MS }: { pollMs?: number }) {
                           size="sm"
                           aria-label={`Watch the agent work “${todo.title}”`}
                           onPress={() => setWatching(todo.liveRunId ?? null)}
-                        >
-                          Watch
-                        </Button>
+                          content="Watch"
+                        />
                       ) : null}
                       <Link href={`/projects/${todo.projectId}?view=board`} asChild>
-                        <Button variant="ghost" size="sm" aria-label={`Open the board “${todo.title}” is on`}>
-                          Board
-                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          aria-label={`Open the board “${todo.title}” is on`}
+                          content="Board"
+                        />
                       </Link>
                     </View>
                     <Text className="text-muted-foreground text-xs">
@@ -169,10 +170,7 @@ export function AiStatus({ pollMs = STATUS_POLL_MS }: { pollMs?: number }) {
                       <Text
                         selectable
                         numberOfLines={3}
-                        className={cn(
-                          'text-sm',
-                          todo.state === 'attention' ? 'text-amber-700 dark:text-amber-400' : 'text-muted-foreground',
-                        )}
+                        className={cn('text-sm', todo.state === 'attention' ? 'text-warning' : 'text-muted-foreground')}
                       >
                         {todo.reason}
                       </Text>
@@ -188,7 +186,7 @@ export function AiStatus({ pollMs = STATUS_POLL_MS }: { pollMs?: number }) {
       <Section
         title="Lanes"
         description="Every lane in your AI projects, and where its todos stand."
-        content={
+        contentSlot={
           status && status.projects.length === 0 ? (
             <Text className="text-muted-foreground text-sm">No project has AI on.</Text>
           ) : (
@@ -248,7 +246,7 @@ function RunnerLine({ seenAt, loaded }: { seenAt: string | null | undefined; loa
   const quiet = seconds === null || seconds > RUNNER_QUIET_SECONDS;
   return (
     <View className="flex-row items-center gap-2">
-      {quiet ? <View aria-hidden className="size-2 rounded-full bg-amber-500" /> : <LiveDot />}
+      {quiet ? <View aria-hidden className="size-2 rounded-full bg-warning" /> : <LiveDot />}
       <Text className="text-muted-foreground text-sm">
         {seconds === null
           ? 'The runner has not asked for work since the server started. Nothing will be picked up until it does.'
@@ -275,13 +273,13 @@ function RecentFailures({ pollMs }: { pollMs: number }) {
     <Section
       title="Failed lately"
       description={`Runs that failed in the last ${FAILURE_HOURS} hours, newest first.`}
-      content={
+      contentSlot={
         <View className="gap-2">
           <LoadState
             query={query}
             what="the failed runs"
             count={runs.length}
-            empty={<Text className="text-muted-foreground text-sm">No run failed.</Text>}
+            emptySlot={<Text className="text-muted-foreground text-sm">No run failed.</Text>}
           />
           {runs.length > 0 ? (
             <View role="list" aria-label="Failed runs" className="gap-2">
