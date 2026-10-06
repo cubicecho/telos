@@ -1,6 +1,6 @@
 import { Text } from 'react-native';
+import { ActionButton } from '@/components/action-button';
 import { Columns3 } from '@/components/app-icons';
-import { Button } from '@/components/ui/button';
 import { Check } from '@/components/ui/icons';
 import { Menu, MenuContent, MenuItem, MenuTrigger } from '@/components/ui/menu';
 import { cn } from '@/lib/utils';
@@ -42,11 +42,11 @@ export function LanePicker({
   return (
     <Menu>
       <MenuTrigger asChild>
-        <Button
+        <ActionButton
           variant="ghost"
           size={size}
           className={cn('text-muted-foreground', className)}
-          aria-label={current ? `Lane, currently ${current.name}` : 'Lane'}
+          label={current ? `Lane, currently ${current.name}` : 'Lane'}
           iconSlot={<Columns3 className="h-4 w-4" />}
         />
       </MenuTrigger>

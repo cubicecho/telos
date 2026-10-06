@@ -28,4 +28,17 @@ describe('LabelPicker', () => {
     await user.click(screen.getByRole('menuitemcheckbox', { name: 'urgent' }));
     expect(onToggle).toHaveBeenLastCalledWith(URGENT, false);
   });
+
+  // The trigger is an icon and nothing else, so its name has to be on show somewhere.
+  it('says what it is to a resting pointer', async () => {
+    const user = userEvent.setup();
+    render(
+      <MockedProvider mocks={[{ request: { query: LabelsDocument }, result: { data: { labels: [] } } }]}>
+        <LabelPicker attached={[]} onToggle={vi.fn()} />
+      </MockedProvider>,
+    );
+
+    await user.hover(screen.getByRole('button', { name: 'Labels' }));
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Labels');
+  });
 });
