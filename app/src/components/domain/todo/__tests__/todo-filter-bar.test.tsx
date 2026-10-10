@@ -110,8 +110,15 @@ describe('TodoFilterBar', () => {
     expect(await screen.findByText(/no labels on this project/i)).toBeInTheDocument();
   });
 
+  // Exact text: the icon once went into the label's string and the trigger
+  // read "[object Object]urgent", which a substring match let through.
   it('names the chosen label on the trigger', () => {
     bar({ labelId: URGENT.id }, 1);
-    expect(screen.getByRole('button', { name: 'Filter by label' })).toHaveTextContent('urgent');
+    expect(screen.getByRole('button', { name: 'Filter by label' })).toHaveTextContent(/^urgent$/);
+  });
+
+  it('reads "Label" on the trigger while none is chosen', () => {
+    bar();
+    expect(screen.getByRole('button', { name: 'Filter by label' })).toHaveTextContent(/^Label$/);
   });
 });
