@@ -1,3 +1,10 @@
+## [2.0.2](https://github.com/cubicecho/telos/compare/v2.0.1...v2.0.2) (2026-10-10)
+
+
+### Bug Fixes
+
+* **app:** stop the label filter's trigger reading [object Object] ([74d92c4](https://github.com/cubicecho/telos/commit/74d92c437ec33c8716cbea7670fa4fbd5a302901))
+
 ## [2.0.1](https://github.com/cubicecho/telos/compare/v2.0.0...v2.0.1) (2026-10-06)
 
 
