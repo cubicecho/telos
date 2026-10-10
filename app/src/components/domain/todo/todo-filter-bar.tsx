@@ -63,7 +63,8 @@ export const TodoFilterBar = forwardRef<
               size="sm"
               className={cn('gap-2', selected && 'border-ring')}
               aria-label="Filter by label"
-              content={`${selected ? <ColorDot color={selected.color} size="sm" /> : <Tag className="h-4 w-4" />}${selected ? selected.name : 'Label'}`}
+              iconSlot={selected ? <ColorDot color={selected.color} size="sm" /> : <Tag className="h-4 w-4" />}
+              content={selected ? selected.name : 'Label'}
             />
           </MenuTrigger>
           <MenuContent align="start" className="w-56">
