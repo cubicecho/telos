@@ -7,13 +7,13 @@ import { MessageSquare } from '@/components/app-icons';
 import { ConfirmButton } from '@/components/confirm-button';
 import { DescriptionList, PropertyRow } from '@/components/description-list';
 import { AiSetupChecklist } from '@/components/domain/ai/ai-setup-checklist';
-import { type ProjectActivity, ProjectActivityLine } from '@/components/domain/ai/project-activity';
+import type { ProjectActivity } from '@/components/domain/ai/project-activity';
 import { DraftDialog } from '@/components/domain/draft/draft-dialog';
 import { LabelBadge, type LabelSummary } from '@/components/domain/label/label-badge';
 import { LabelPicker } from '@/components/domain/label/label-picker';
 import { SaveTemplateDialog } from '@/components/domain/template/save-template-dialog';
-import { PROSE_COLUMN } from '@/components/header-content-footer';
-import { PageLayout } from '@/components/page-layout';
+import { HeaderContentFooter } from '@/components/header-content-footer';
+import { PageHeader } from '@/components/page-header';
 import { Copy, Pencil, Trash2 } from '@/components/ui/icons';
 import { useAi } from '@/lib/ai';
 import { describeError } from '@/lib/errors';
@@ -24,6 +24,7 @@ import {
   ProjectsDocument,
 } from '@/lib/graphql';
 import type { SlotNode } from '@/lib/utils';
+import { ProjectBar } from './project-bar';
 import { ProjectFormDialog } from './project-form-dialog';
 
 export interface ProjectOverviewData {
@@ -32,7 +33,7 @@ export interface ProjectOverviewData {
   description: string | null;
   todoCount: number;
   openTodoCount: number;
-  /** The project's AI switch, flipped in its edit dialog. Meaningless, and not shown, unless AI is on for the account. */
+  /** The project's AI switch, flipped in the bar under its header. Meaningless, and not shown, unless AI is on for the account. */
   aiEnabled: boolean;
   /** Whether its lanes' agents start on todos by themselves. Means nothing, and is not shown, while its AI is off. */
   autoRun: boolean;
@@ -42,11 +43,14 @@ export interface ProjectOverviewData {
 }
 
 /**
- * A project's page: its name, description and actions in the header, its
- * counts and labels in the row under it, and whichever view is showing as the
- * body. The body is full width, for the board; the header keeps to the
- * reading column. The dialogs and mutations behind the header's buttons live here with
- * them.
+ * A project's page: its name, description, counts and actions in the header,
+ * the AI bar under it, and whichever view is showing as the body. All of it
+ * runs the full width of the pane. The dialogs and mutations behind the
+ * header's buttons live here with them.
+ *
+ * It is `PageLayout` written out — the chassis with a `PageHeader` in its
+ * header — because the bar is a second row of that header and runs edge to
+ * edge, which `PageLayout`'s one header slot has no place for.
  */
 export function ProjectPage({
   project,
@@ -107,114 +111,129 @@ export function ProjectPage({
     router.replace('/');
   }
 
+  const pinned = actionError || notice || project.labels.length > 0;
+
   return (
-    <PageLayout
-      width="full"
-      headerClassName={PROSE_COLUMN}
-      title={project.name}
-      description={project.description || undefined}
-      actionSlot={
-        <>
-          <LabelPicker attached={project.labels} onToggle={toggleLabel} align="end" />
-          {canDraft ? (
-            <ActionButton
-              variant="ghost"
-              size="icon"
-              onPress={() => {
-                setNotice(null);
-                setDrafting(true);
-              }}
-              label="Talk a request over"
-              iconSlot={<MessageSquare className="h-4 w-4" />}
+    <>
+      <HeaderContentFooter
+        width="full"
+        className="h-full"
+        headerSlot={
+          <>
+            <PageHeader
+              title={project.name}
+              description={project.description || undefined}
+              actionSlot={
+                <>
+                  {/* Beside the title rather than under it, so the views get the height. */}
+                  <DescriptionList
+                    layout="stacked"
+                    className="mr-2 flex-row gap-6"
+                    contentSlot={
+                      <>
+                        <Stat label="Open" value={project.openTodoCount} />
+                        <Stat label="Done" value={done} />
+                        <Stat label="Total" value={project.todoCount} />
+                      </>
+                    }
+                  />
+                  <LabelPicker attached={project.labels} onToggle={toggleLabel} align="end" />
+                  {canDraft ? (
+                    <ActionButton
+                      variant="ghost"
+                      size="icon"
+                      onPress={() => {
+                        setNotice(null);
+                        setDrafting(true);
+                      }}
+                      label="Talk a request over"
+                      iconSlot={<MessageSquare className="h-4 w-4" />}
+                    />
+                  ) : null}
+                  <ActionButton
+                    variant="ghost"
+                    size="icon"
+                    onPress={() => {
+                      setNotice(null);
+                      setSavingTemplate(true);
+                    }}
+                    label="Save lanes as a template"
+                    iconSlot={<Copy className="h-4 w-4" />}
+                  />
+                  <ActionButton
+                    variant="ghost"
+                    size="icon"
+                    onPress={() => setEditing(true)}
+                    label="Edit project"
+                    iconSlot={<Pencil className="h-4 w-4" />}
+                  />
+                  <ConfirmButton
+                    variant="ghost"
+                    size="icon"
+                    className="hover:text-destructive"
+                    label="Delete project"
+                    title={`Delete “${project.name}”?`}
+                    description={`Its ${project.todoCount} todo${project.todoCount === 1 ? '' : 's'} go with it. This cannot be undone.`}
+                    onConfirm={confirmDelete}
+                    iconSlot={<Trash2 className="h-4 w-4" />}
+                  />
+                </>
+              }
             />
-          ) : null}
-          <ActionButton
-            variant="ghost"
-            size="icon"
-            onPress={() => {
-              setNotice(null);
-              setSavingTemplate(true);
-            }}
-            label="Save lanes as a template"
-            iconSlot={<Copy className="h-4 w-4" />}
-          />
-          <ActionButton
-            variant="ghost"
-            size="icon"
-            onPress={() => setEditing(true)}
-            label="Edit project"
-            iconSlot={<Pencil className="h-4 w-4" />}
-          />
-          <ConfirmButton
-            variant="ghost"
-            size="icon"
-            className="hover:text-destructive"
-            label="Delete project"
-            title={`Delete “${project.name}”?`}
-            description={`Its ${project.todoCount} todo${project.todoCount === 1 ? '' : 's'} go with it. This cannot be undone.`}
-            onConfirm={confirmDelete}
-            iconSlot={<Trash2 className="h-4 w-4" />}
-          />
-        </>
-      }
-      headerContentSlot={
-        <View className="gap-3">
-          <DescriptionList
-            layout="stacked"
-            className="flex-row gap-6"
-            contentSlot={
-              <>
-                <Stat label="Open" value={project.openTodoCount} />
-                <Stat label="Done" value={done} />
-                <Stat label="Total" value={project.todoCount} />
-              </>
-            }
-          />
+            <ProjectBar project={project} activity={activity} />
 
-          {activity ? <ProjectActivityLine activity={activity} /> : null}
-          <AiSetupChecklist projectId={project.id} projectAi={project.aiEnabled} />
+            {/* Pinned with the header: what a header button did or failed to do
+            is read from wherever the body has scrolled to. No row is drawn
+            when there is nothing to say. */}
+            {pinned ? (
+              <View className="gap-2 px-4 pt-3">
+                {actionError ? (
+                  <Text className="text-destructive text-sm" aria-live="polite">
+                    {actionError}
+                  </Text>
+                ) : null}
+                {notice ? (
+                  <Text className="text-muted-foreground text-sm" aria-live="polite">
+                    {notice}
+                  </Text>
+                ) : null}
+                {project.labels.length > 0 ? (
+                  <View className="flex-row flex-wrap gap-1">
+                    {project.labels.map((label) => (
+                      <LabelBadge key={label.id} label={label} onRemove={() => toggleLabel(label, false)} />
+                    ))}
+                  </View>
+                ) : null}
+              </View>
+            ) : null}
+          </>
+        }
+        contentSlot={
+          <>
+            {/* In the body, so a list of steps does not take the board's height for good. */}
+            <AiSetupChecklist className="mx-4 mt-4" projectId={project.id} projectAi={project.aiEnabled} />
+            {content}
+          </>
+        }
+      />
 
-          {actionError ? (
-            <Text className="text-destructive text-sm" aria-live="polite">
-              {actionError}
-            </Text>
-          ) : null}
-          {notice ? (
-            <Text className="text-muted-foreground text-sm" aria-live="polite">
-              {notice}
-            </Text>
-          ) : null}
-
-          {/* Only the badges, so no row is drawn for a project that has none. */}
-          {project.labels.length > 0 ? (
-            <View className="flex-row flex-wrap gap-1">
-              {project.labels.map((label) => (
-                <LabelBadge key={label.id} label={label} onRemove={() => toggleLabel(label, false)} />
-              ))}
-            </View>
-          ) : null}
-
-          <ProjectFormDialog open={editing} onOpenChange={setEditing} project={project} />
-          <SaveTemplateDialog
-            open={savingTemplate}
-            onOpenChange={setSavingTemplate}
-            projectId={project.id}
-            projectName={project.name}
-            onSaved={(name) => setNotice(`Saved its lanes as the template “${name}”.`)}
-          />
-
-          {canDraft ? (
-            <DraftDialog
-              open={drafting}
-              onOpenChange={setDrafting}
-              projectId={project.id}
-              onMade={(title) => setNotice(`Made the todo “${title}”.`)}
-            />
-          ) : null}
-        </View>
-      }
-      contentSlot={content}
-    />
+      <ProjectFormDialog open={editing} onOpenChange={setEditing} project={project} />
+      <SaveTemplateDialog
+        open={savingTemplate}
+        onOpenChange={setSavingTemplate}
+        projectId={project.id}
+        projectName={project.name}
+        onSaved={(name) => setNotice(`Saved its lanes as the template “${name}”.`)}
+      />
+      {canDraft ? (
+        <DraftDialog
+          open={drafting}
+          onOpenChange={setDrafting}
+          projectId={project.id}
+          onMade={(title) => setNotice(`Made the todo “${title}”.`)}
+        />
+      ) : null}
+    </>
   );
 }
 

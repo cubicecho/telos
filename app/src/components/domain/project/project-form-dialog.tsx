@@ -3,11 +3,8 @@ import { useRouter } from 'expo-router';
 import { useEffect } from 'react';
 import { Text, View } from 'react-native';
 import { useAppForm } from '@/components/app-form';
-import { ProjectAiSwitch, ProjectAutoRunSwitch } from '@/components/domain/ai/project-ai-switch';
-import { SectionHeading } from '@/components/section-heading';
 import { Form } from '@/components/ui/form';
 import { FormDialog, FormDialogFooter } from '@/components/ui/form-dialog';
-import { useAi } from '@/lib/ai';
 import { describeError } from '@/lib/errors';
 import {
   ApplyBoardTemplateDocument,
@@ -73,7 +70,6 @@ export function ProjectFormDialog({
   project?: ProjectDraft;
 }) {
   const router = useRouter();
-  const ai = useAi();
   const [createProject, { loading: creating, error: createError }] = useMutation(CreateProjectDocument);
   const [updateProject, { loading: updating, error: updateError }] = useMutation(UpdateProjectDocument, {
     refetchQueries: [ProjectsDocument, ...(project ? [{ query: ProjectDocument, variables: { id: project.id } }] : [])],
@@ -99,8 +95,8 @@ export function ProjectFormDialog({
   // Reset from the project each time it opens, not on mount: the dialog
   // outlives a cancel, so a reopened form must show what is stored rather than
   // what was last typed and abandoned. By field rather than by the project
-  // itself: its AI switches are flipped from inside this dialog, and a reset on
-  // each flip would throw away a name half typed.
+  // itself: a poll or a switch in the bar behind this dialog hands it a new
+  // project object, and a reset on each would throw away a name half typed.
   const projectId = project?.id;
   const name = project?.name ?? '';
   const description = project?.description ?? null;
@@ -213,18 +209,6 @@ export function ProjectFormDialog({
               <Text className="text-muted-foreground text-xs">
                 A request, a finished draft, and the todos an agent splits one into.
               </Text>
-            </View>
-          ) : null}
-          {/* Not fields: each switch is its own mutation and takes effect on the
-          press, so Cancel does not undo one. */}
-          {project !== undefined && ai.on ? (
-            <View className="gap-3">
-              <SectionHeading variant="overline" level={3}>
-                AI
-              </SectionHeading>
-              <ProjectAiSwitch projectId={project.id} enabled={project.aiEnabled} />
-              {project.aiEnabled ? <ProjectAutoRunSwitch projectId={project.id} enabled={project.autoRun} /> : null}
-              <Text className="text-muted-foreground text-xs">These apply as soon as they are switched.</Text>
             </View>
           ) : null}
           <FormDialogFooter onCancel={() => onOpenChange(false)} error={error ? describeError(error) : null}>

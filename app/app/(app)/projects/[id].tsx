@@ -13,7 +13,6 @@ import { TodoFilterBar } from '@/components/domain/todo/todo-filter-bar';
 import { TodoFormDialog } from '@/components/domain/todo/todo-form-dialog';
 import { TodoRow } from '@/components/domain/todo/todo-row';
 import type { TodoSummary } from '@/components/domain/todo/types';
-import { PROSE_COLUMN } from '@/components/header-content-footer';
 import { EmptyState } from '@/components/page';
 import { PageLayout } from '@/components/page-layout';
 import { SectionHeading } from '@/components/section-heading';
@@ -27,7 +26,6 @@ import { useBoardUpdates } from '@/lib/board-updates';
 import { filterTodos, isFiltering, NO_FILTER, type TodoFilter } from '@/lib/filter-todos';
 import { ProjectDocument, ProjectLanesDocument, ProjectTodosDocument } from '@/lib/graphql';
 import { useHotkey } from '@/lib/hotkeys';
-import { cn } from '@/lib/utils';
 
 type ProjectView = 'list' | 'board' | 'runs' | 'artifacts' | 'archived';
 
@@ -142,7 +140,7 @@ export default function ProjectScreen() {
   // The title waits at its own height; nothing below it has anything to show
   // until the project lands.
   if (projectLoading && !projectData) {
-    return <PageLayout width="full" headerClassName={PROSE_COLUMN} loading title={undefined} contentSlot={null} />;
+    return <PageLayout width="full" loading title={undefined} contentSlot={null} />;
   }
 
   // Ahead of the not-found message, which is a claim about the caller's own
@@ -199,16 +197,14 @@ export default function ProjectScreen() {
   const linked = linkedId ? all.find((todo) => todo.id === linkedId) : undefined;
 
   return (
-    // The page is full width so the board can be as wide as its columns need,
-    // but everything read as text — the header, the composer, the filter and
-    // the list — keeps to the reading column. Switching views then moves none
-    // of it; only the panel under the switcher changes. A `full` body brings no
+    // Every view runs the full width of the pane, so switching between them
+    // moves nothing but the panel under the switcher. A `full` body brings no
     // inset of its own, so each part adds `px-4` to line up with the header.
     <ProjectPage
       project={project}
       activity={aiHere ? activity : undefined}
       content={
-        <View className="gap-6 pt-2 pb-6">
+        <View className="gap-6 pt-4 pb-6">
           <Tabs
             value={current}
             onValueChange={(next) => router.setParams({ view: next })}
@@ -216,7 +212,7 @@ export default function ProjectScreen() {
           >
             {/* The switcher comes first, so it stays where it is from one view
             to the next: the composer and the filter under it come and go. */}
-            <View className={cn(PROSE_COLUMN, 'gap-6 px-4')}>
+            <View className="gap-6 px-4">
               <TabsList aria-label="Project view" className="self-start">
                 <TabsTrigger value="list">
                   <List />
@@ -244,18 +240,20 @@ export default function ProjectScreen() {
                 </TabsTrigger>
               </TabsList>
 
-              {/* Adding and filtering todos mean nothing over a list of runs. */}
+              {/* Todos are added from the list alone: the other views are for
+              reading what is there. */}
+              {current === 'list' ? (
+                <TodoComposer ref={composerRef} projectId={project.id} nextPosition={nextPosition} lanes={lanes} />
+              ) : null}
+              {/* Filtering todos means nothing over a list of runs. */}
               {todoView ? (
-                <>
-                  <TodoComposer ref={composerRef} projectId={project.id} nextPosition={nextPosition} lanes={lanes} />
-                  <TodoFilterBar
-                    ref={filterRef}
-                    filter={filter}
-                    onChange={setFilter}
-                    todos={all}
-                    matched={todos.length}
-                  />
-                </>
+                <TodoFilterBar
+                  ref={filterRef}
+                  filter={filter}
+                  onChange={setFilter}
+                  todos={all}
+                  matched={todos.length}
+                />
               ) : null}
             </View>
 
@@ -263,7 +261,7 @@ export default function ProjectScreen() {
             list's own empty line depends on the filter. The rungs only stand in
             while there is no answer at all. */}
             {todosQuery.data === undefined ? (
-              <View className={cn(PROSE_COLUMN, 'px-4')}>
+              <View className="px-4">
                 <LoadState query={todosQuery} what="the todos" count={all.length} />
               </View>
             ) : (
@@ -290,26 +288,26 @@ export default function ProjectScreen() {
                 {aiHere ? (
                   <>
                     <TabsContent value="runs" className="mt-0">
-                      <View className={cn(PROSE_COLUMN, 'px-4')}>
+                      <View className="px-4">
                         {current === 'runs' ? <ProjectRuns projectId={project.id} activity={activity} /> : null}
                       </View>
                     </TabsContent>
                     <TabsContent value="artifacts" className="mt-0">
-                      <View className={cn(PROSE_COLUMN, 'px-4')}>
+                      <View className="px-4">
                         {current === 'artifacts' ? <ProjectArtifacts projectId={project.id} /> : null}
                       </View>
                     </TabsContent>
                   </>
                 ) : null}
                 <TabsContent value="archived" className="mt-0">
-                  <View className={cn(PROSE_COLUMN, 'px-4')}>
+                  <View className="px-4">
                     {current === 'archived' ? <ArchivedTodos projectId={project.id} /> : null}
                   </View>
                 </TabsContent>
                 <TabsContent value="list" className="mt-0">
                   {/* The column is a view of its own: on web a display class on the
                   panel itself would beat the `hidden` radix gives it when inactive. */}
-                  <View className={cn(PROSE_COLUMN, 'gap-6 px-4')}>
+                  <View className="gap-6 px-4">
                     <View className="gap-2">
                       {open.length === 0 ? (
                         <Text className="text-muted-foreground text-sm">
