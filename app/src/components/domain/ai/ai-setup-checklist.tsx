@@ -129,18 +129,21 @@ export function setupSteps(setup: Setup, projectId: string | undefined, now: num
  *
  * On a project it shows where the project has no lane with an agent, and on the project
  * the list points at, so the later steps have somewhere to be read. A project
- * with AI switched off shows nothing: its switch, in its edit dialog, is the one step
+ * with AI switched off shows nothing: its switch, in the bar under its header, is the one step
  * that matters there, and it was left off on purpose.
  *
  * @param projectId - The project on screen, or nothing on the home page.
  * @param projectAi - Whether that project has AI on; false hides the list.
+ * @param className - On the card, for the caller's margin.
  */
 export function AiSetupChecklist({
   projectId,
   projectAi = true,
+  className,
 }: {
   projectId?: string | undefined;
   projectAi?: boolean;
+  className?: string | undefined;
 }) {
   const ai = useAi();
   const shown = ai.on && projectAi;
@@ -168,6 +171,7 @@ export function AiSetupChecklist({
   return (
     <Section
       surface="card"
+      className={className}
       title="Getting AI running"
       description={`${left} of ${steps.length} steps left before an agent works a todo.`}
       contentSlot={

@@ -639,7 +639,10 @@ a value it failed to read.
   actions in its header, `width="prose"` for reading pages and `"full"` for the
   board. The `(app)` shell's main does not scroll; the `PageLayout` body does,
   so the header stays put. A project's header is `ProjectPage` in
-  `domain/project/project-page.tsx`. A screen whose whole content is "nothing
+  `domain/project/project-page.tsx`, which is `PageLayout` written out so that
+  `ProjectBar` (the AI switches, and what the agents are doing) can sit under
+  the title as a second row, edge to edge; every project view runs the full
+  width, and only the list has the composer. A screen whose whole content is "nothing
   here" or "that failed" is `EmptyState` (from `page.tsx`), not a hand-built
   column. Icon buttons are `size="icon"` in headers, `"icon-sm"` in list rows
   and `"icon-xs"` inside a todo row or a board card.
