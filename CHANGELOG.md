@@ -1,3 +1,10 @@
+# [2.1.0](https://github.com/cubicecho/telos/compare/v2.0.2...v2.1.0) (2026-10-12)
+
+
+### Features
+
+* **app:** lay the project page out like kanban-server's board ([f0b3f88](https://github.com/cubicecho/telos/commit/f0b3f88e030db28de9c1ba2824945f066e5ea73a))
+
 ## [2.0.2](https://github.com/cubicecho/telos/compare/v2.0.1...v2.0.2) (2026-10-10)
 
 
