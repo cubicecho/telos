@@ -83,27 +83,27 @@ export function ArchivedTodoList({
 
   return (
     <View className="gap-3">
-      <Text className="text-muted-foreground text-sm">
+      <Text className="text-foreground/60 text-sm">
         Archived todos are out of the lists, the counts and the agents’ queues. Restore one to put it back where it was.
       </Text>
       <LoadState
         query={query}
         what="the archived todos"
         count={todos.length}
-        emptySlot={<Text className="text-muted-foreground text-sm">Nothing archived.</Text>}
+        emptySlot={<Text className="text-foreground/60 text-sm">Nothing archived.</Text>}
       />
-      {error ? <Text className="text-destructive text-sm">{error}</Text> : null}
+      {error ? <Text className="text-negative text-sm">{error}</Text> : null}
       {todos.length > 0 ? (
         <View role="list" aria-label="Archived todos" className="gap-2">
           {todos.map((todo) => (
             <View
               key={todo.id}
               role="listitem"
-              className="flex-row items-center gap-2 rounded-lg border border-border bg-card px-3 py-2"
+              className="flex-row items-center gap-2 rounded-lg border border-foreground/10 bg-secondary px-3 py-2"
             >
               <View className="min-w-0 flex-1 gap-0.5">
                 <Text className="text-foreground text-sm">{todo.title}</Text>
-                <Text className="text-muted-foreground text-xs">
+                <Text className="text-foreground/60 text-xs">
                   {[
                     todo.project?.name,
                     todo.archivedAt ? `Archived ${formatTimestamp(todo.archivedAt)}` : null,
@@ -126,7 +126,7 @@ export function ArchivedTodoList({
               <ConfirmButton
                 variant="ghost"
                 size="icon-xs"
-                className="hover:text-destructive"
+                className="hover:text-negative"
                 disabled={busy}
                 label={`Delete ${todo.title} for good`}
                 title="Delete this todo for good?"

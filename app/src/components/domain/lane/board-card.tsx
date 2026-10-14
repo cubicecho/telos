@@ -64,15 +64,14 @@ export function BoardCardBody({
 }) {
   const done = todo.completedAt != null;
   const locked = laneLock(todo);
-  const titleClass = cn('text-foreground text-sm leading-5', done && 'text-muted-foreground line-through');
+  const titleClass = cn('text-foreground text-sm leading-5', done && 'text-foreground/60 line-through');
 
   return (
     <View
       className={cn(
-        'group rounded-lg border border-border bg-card px-3 py-2.5 shadow-sm',
-        todo.isBlocked && !done && 'opacity-70',
-        live && 'border-positive/60',
-        !live && stuck && 'border-warning/60',
+        'group rounded-lg border border-foreground/10 bg-secondary px-3 py-2.5 shadow-sm',
+        live && 'border-info/40',
+        !live && stuck && 'border-warning/40',
         className,
       )}
     >
@@ -86,7 +85,7 @@ export function BoardCardBody({
           <Pressable
             role="button"
             onPress={onEdit}
-            className="min-w-0 flex-1 rounded-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
+            className="min-w-0 flex-1 rounded-sm focus-visible:ring-2 focus-visible:ring-active focus-visible:ring-offset-1"
           >
             <Text className={cn(titleClass, 'hover:underline')}>{todo.title}</Text>
           </Pressable>
@@ -113,7 +112,7 @@ export function BoardCardBody({
         <View className="mt-1.5 min-w-0 flex-row items-center gap-2">
           <DueBadge dueAt={todo.dueAt} done={done} />
           {todo.notes ? (
-            <Text numberOfLines={1} className="min-w-0 shrink text-muted-foreground text-xs">
+            <Text numberOfLines={1} className="min-w-0 shrink text-foreground/60 text-xs">
               {todo.notes}
             </Text>
           ) : null}
@@ -121,7 +120,7 @@ export function BoardCardBody({
       ) : null}
 
       {todo.isBlocked && !done ? (
-        <Text className="mt-1 text-muted-foreground text-xs">
+        <Text className="mt-1 text-foreground/60 text-xs">
           Blocked by {todo.blockedBy.map((blocker) => blocker.title).join(', ')}
         </Text>
       ) : null}
@@ -141,7 +140,7 @@ export function BoardCardBody({
       {live ? (
         <View className="mt-2 flex-row items-center gap-2">
           <LiveDot />
-          <Text numberOfLines={1} className="min-w-0 flex-1 text-muted-foreground text-xs">
+          <Text numberOfLines={1} className="min-w-0 flex-1 text-foreground/60 text-xs">
             {live.cancelRequestedAt ? 'Stopping' : 'Working'}
             {live.agent ? ` · ${live.agent.name}` : ''}
           </Text>
@@ -174,7 +173,7 @@ export function BoardCardBody({
         </View>
       ) : waiting ? (
         <View className="mt-2 flex-row items-center gap-2">
-          <Text numberOfLines={1} className="min-w-0 flex-1 text-muted-foreground text-xs">
+          <Text numberOfLines={1} className="min-w-0 flex-1 text-foreground/60 text-xs">
             {waiting.runRequested ? 'Waiting for an agent' : 'Waiting to be run'}
           </Text>
           {onRun && waiting.runRequested === false ? (

@@ -142,10 +142,13 @@ function ThreadNote({
       role="listitem"
       ref={focused ? scrollToNote : undefined}
       aria-current={focused ? true : undefined}
-      className={cn('gap-1 rounded-lg border px-3 py-2', focused ? 'border-primary bg-accent' : 'border-border')}
+      className={cn(
+        'gap-1 rounded-lg border px-3 py-2',
+        focused ? 'border-active bg-active/10' : 'border-foreground/10',
+      )}
     >
       <View className="flex-row items-center gap-2">
-        <Text className="flex-1 text-muted-foreground text-xs">
+        <Text className="flex-1 text-foreground/60 text-xs">
           {actorName(note.actorKind)} · {formatTimestamp(note.createdAt)}
           {note.editedAt ? ` · edited ${formatTimestamp(note.editedAt)}` : ''}
         </Text>
@@ -167,7 +170,7 @@ function ThreadNote({
           <ActionButton
             variant="ghost"
             size="icon-sm"
-            className="hover:text-destructive"
+            className="hover:text-negative"
             label="Delete note"
             onPress={() => onDelete(note.id)}
             iconSlot={<Trash2 className="h-4 w-4" />}
@@ -181,7 +184,7 @@ function ThreadNote({
           <Textarea value={draft} onChangeText={setDraft} aria-label="Note" rows={3} />
           {/* The thread is read when a run is claimed, so one under way has the old wording. */}
           {ai.on && projectAi ? (
-            <Text className="text-muted-foreground text-xs">
+            <Text className="text-foreground/60 text-xs">
               An edit reaches only the runs that start after it. A run already under way keeps what it read.
             </Text>
           ) : null}
@@ -253,7 +256,7 @@ export function TodoThread({ todoId, focusNoteId }: { todoId: string; focusNoteI
         query={record}
         what="the notes"
         count={notes.length}
-        emptySlot={<Text className="text-muted-foreground text-sm">No notes yet.</Text>}
+        emptySlot={<Text className="text-foreground/60 text-sm">No notes yet.</Text>}
       />
       {notes.length === 0 ? null : (
         <View role="list" className="gap-2">
@@ -271,7 +274,7 @@ export function TodoThread({ todoId, focusNoteId }: { todoId: string; focusNoteI
       )}
 
       {error ? (
-        <Text className="text-destructive text-sm" aria-live="polite">
+        <Text className="text-negative text-sm" aria-live="polite">
           {error}
         </Text>
       ) : null}
@@ -279,6 +282,7 @@ export function TodoThread({ todoId, focusNoteId }: { todoId: string; focusNoteI
       <View className="gap-2">
         <Textarea value={body} onChangeText={setBody} placeholder="Add a note…" rows={3} />
         <Button
+          variant="positive"
           size="sm"
           className="self-end"
           disabled={adding || body.trim() === ''}
@@ -348,13 +352,13 @@ export function TodoHistory({ todoId, runs = [] }: { todoId: string; runs?: read
         query={record}
         what="the history"
         count={entries.length}
-        emptySlot={<Text className="text-muted-foreground text-sm">Nothing recorded yet.</Text>}
+        emptySlot={<Text className="text-foreground/60 text-sm">Nothing recorded yet.</Text>}
       />
       {entries.length === 0 ? null : (
         <View role="list" className="gap-2">
           {entries.map(({ event, run }) =>
             run ? (
-              <View key={run.id} role="listitem" className="gap-0.5 border-primary/40 border-l-2 pl-3">
+              <View key={run.id} role="listitem" className="gap-0.5 border-foreground/40 border-l-2 pl-3">
                 <View className="flex-row items-center gap-2">
                   <Text className="text-foreground text-sm">
                     {run.agent?.name ?? 'A deleted agent'}{' '}
@@ -364,15 +368,15 @@ export function TodoHistory({ todoId, runs = [] }: { todoId: string; runs?: read
                   </Text>
                   <RunStatusBadge status={run.status} />
                 </View>
-                {run.error ? <Text className="text-destructive text-sm">{run.error}</Text> : null}
-                <Text className="text-muted-foreground text-xs">{describeRun(run)}</Text>
+                {run.error ? <Text className="text-negative text-sm">{run.error}</Text> : null}
+                <Text className="text-foreground/60 text-xs">{describeRun(run)}</Text>
                 <ViewRun runId={run.id} projectAi={projectAi} />
               </View>
             ) : (
-              <View key={event.id} role="listitem" className="gap-0.5 border-border border-l-2 pl-3">
+              <View key={event.id} role="listitem" className="gap-0.5 border-foreground/10 border-l-2 pl-3">
                 <Text className="text-foreground text-sm">{describe(event)}</Text>
-                {event.reason ? <Text className="text-muted-foreground text-sm">“{event.reason}”</Text> : null}
-                <Text className="text-muted-foreground text-xs">
+                {event.reason ? <Text className="text-foreground/60 text-sm">“{event.reason}”</Text> : null}
+                <Text className="text-foreground/60 text-xs">
                   {actorName(event.actorKind)} · {formatTimestamp(event.at)}
                 </Text>
                 <ViewRun runId={event.runId} projectAi={projectAi} />

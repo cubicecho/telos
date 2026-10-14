@@ -1,16 +1,17 @@
 import { useMutation, useQuery } from '@apollo/client';
 import { useEffect, useMemo, useState } from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { McpSecretKind, type McpServerFieldsFragment } from '@/__generated__/graphql';
 import { ActionButton } from '@/components/action-button';
 import { useAppForm } from '@/components/app-form';
 import { ConfirmButton } from '@/components/confirm-button';
+import { DialogLayout } from '@/components/dialog-layout';
+import { EmptyState } from '@/components/page';
 import { Section } from '@/components/section';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
-import { FormDialog, FormDialogFooter } from '@/components/ui/form-dialog';
-import { Pencil, Plus, Trash2, X } from '@/components/ui/icons';
+import { Pencil, Plug, Plus, Trash2, X } from '@/components/ui/icons';
 import { LoadState } from '@/components/ui/load-failure';
 import { Switch } from '@/components/ui/switch';
 import { readServerSlugs } from '@/lib/agents';
@@ -36,6 +37,7 @@ import {
   slugRule,
   toServerDraft,
 } from '@/lib/mcp-servers';
+import { CARD_TITLE } from '@/lib/styles';
 
 type ServerRow = McpServerFieldsFragment;
 
@@ -82,10 +84,12 @@ export function McpServerManager() {
   return (
     <Section
       surface="card"
+      titleClassName={CARD_TITLE}
       title="MCP servers"
       description="Tool servers your agents can reach. Kept once here; each agent says which it uses."
       actionSlot={
         <Button
+          variant="positive"
           size="sm"
           onPress={() => setEditing('new')}
           iconSlot={<Plus className="h-4 w-4" />}
@@ -95,7 +99,7 @@ export function McpServerManager() {
       contentSlot={
         <View className="gap-4">
           {error ? (
-            <Text className="text-destructive text-sm" aria-live="polite">
+            <Text className="text-negative text-sm" aria-live="polite">
               {error}
             </Text>
           ) : null}
@@ -104,19 +108,25 @@ export function McpServerManager() {
             query={serversQuery}
             what="your MCP servers"
             count={servers.length}
-            emptySlot={<Text className="text-muted-foreground text-sm">No servers yet.</Text>}
+            emptySlot={
+              <EmptyState icon={Plug} title="No servers yet." description="A server lends your agents its tools." />
+            }
           />
           {servers.length === 0 ? null : (
             <View role="list" className="gap-1">
               {servers.map((server) => (
-                <View key={server.id} role="listitem" className="gap-2 rounded-lg border border-border bg-card p-3">
+                <View
+                  key={server.id}
+                  role="listitem"
+                  className="gap-2 rounded-lg border border-foreground/10 bg-secondary p-3"
+                >
                   <View className="flex-row items-center gap-3">
                     <View className="flex-1 gap-0.5">
                       <Text numberOfLines={1} className="text-foreground text-sm">
                         {server.name}
-                        <Text className="font-mono text-muted-foreground"> {server.slug}</Text>
+                        <Text className="font-mono text-foreground/60"> {server.slug}</Text>
                       </Text>
-                      <Text numberOfLines={1} className="text-muted-foreground text-xs">
+                      <Text numberOfLines={1} className="text-foreground/60 text-xs">
                         {server.url ?? server.command}
                       </Text>
                     </View>
@@ -142,7 +152,7 @@ export function McpServerManager() {
                     <ConfirmButton
                       variant="ghost"
                       size="icon-sm"
-                      className="hover:text-destructive"
+                      className="hover:text-negative"
                       label={`Delete ${server.name}`}
                       title={`Delete “${server.name}”?`}
                       description="Its secrets go with it. An agent that names it carries on without it, and says so on its runs. This cannot be undone."
@@ -151,7 +161,7 @@ export function McpServerManager() {
                       iconSlot={<Trash2 className="h-4 w-4" />}
                     />
                   </View>
-                  <Text className="text-muted-foreground text-xs">{describeUse(server, agents)}</Text>
+                  <Text className="text-foreground/60 text-xs">{describeUse(server, agents)}</Text>
                   <View className="flex-row flex-wrap items-center gap-2">
                     <Button variant="outline" size="sm" onPress={() => setKeying(server.id)} content="Secrets" />
                     <Badge variant={secretCount(server) > 0 ? 'secondary' : 'outline'}>{describeSecrets(server)}</Badge>
@@ -270,9 +280,7 @@ function McpServerTest({ server }: { server: ServerRow }) {
       />
       <Text
         role={result.failed ? 'alert' : 'status'}
-        className={
-          result.failed ? 'flex-1 pt-1.5 text-destructive text-xs' : 'flex-1 pt-1.5 text-muted-foreground text-xs'
-        }
+        className={result.failed ? 'flex-1 pt-1.5 text-negative text-xs' : 'flex-1 pt-1.5 text-foreground/60 text-xs'}
       >
         {result.text}
       </Text>
@@ -353,18 +361,32 @@ export function McpServerFormDialog({
     onOpenChange(false);
   }
 
+  const failure = targetError ?? (error ? describeError(error) : null);
+
   return (
-    <FormDialog
-      open={open}
-      onOpenChange={onOpenChange}
-      title={isEdit ? `Edit ${server.name}` : 'New MCP server'}
-      description="A URL for an HTTP server, or a command for one the runner starts itself."
-      className="sm:max-w-[560px]"
-    >
-      <form.AppForm>
-        <Form className="gap-4">
-          {/* Padding is room for a field's focus ring, which a scroll area would clip. */}
-          <ScrollView className="-m-1 max-h-[60vh]" contentContainerClassName="gap-4 p-1">
+    <form.AppForm>
+      <DialogLayout
+        open={open}
+        onOpenChange={onOpenChange}
+        title={isEdit ? `Edit ${server.name}` : 'New MCP server'}
+        description="A URL for an HTTP server, or a command for one the runner starts itself."
+        size="lg"
+        hasUnsavedChanges={() => !form.state.isDefaultValue}
+        footerSlot={
+          failure ? (
+            <Text role="alert" className="text-negative text-sm">
+              {failure}
+            </Text>
+          ) : null
+        }
+        footerActionsSlot={(close) => (
+          <>
+            <Button variant="outline" onPress={close} content="Cancel" />
+            <form.SubmitButton isEdit={isEdit} createLabel="Create server" editLabel="Save" />
+          </>
+        )}
+        contentSlot={
+          <Form className="gap-4">
             <form.AppField name="name">
               {(field) => <field.InputField label="Name" autoFocus placeholder="Team memory" />}
             </form.AppField>
@@ -446,22 +468,16 @@ export function McpServerFormDialog({
                 </View>
               )}
             </form.AppField>
-          </ScrollView>
-          <FormDialogFooter
-            onCancel={() => onOpenChange(false)}
-            error={targetError ?? (error ? describeError(error) : null)}
-          >
-            <form.SubmitButton isEdit={isEdit} createLabel="Create server" editLabel="Save" />
-          </FormDialogFooter>
-        </Form>
-      </form.AppForm>
-    </FormDialog>
+          </Form>
+        }
+      />
+    </form.AppForm>
   );
 }
 
 /** A line under a field saying what it is for. */
 function Hint({ children }: { children: string }) {
-  return <Text className="text-muted-foreground text-xs">{children}</Text>;
+  return <Text className="text-foreground/60 text-xs">{children}</Text>;
 }
 
 const SECRET_KINDS = [
@@ -516,68 +532,82 @@ function McpServerSecretsDialog({
   ];
 
   return (
-    <FormDialog
-      open={open}
-      onOpenChange={onOpenChange}
-      title={`Secrets for ${server.name}`}
-      description="Headers sent to its URL, and the environment its command starts with. A value cannot be shown again; setting a name that is there replaces it."
-    >
-      <View className="gap-4">
-        {stored.length === 0 ? (
-          <Text className="text-muted-foreground text-sm">None set.</Text>
-        ) : (
-          <View role="list" className="gap-1">
-            {stored.map((secret) => (
-              <View
-                key={`${secret.kind}:${secret.name}`}
-                role="listitem"
-                className="flex-row items-center gap-2 rounded-lg border border-border px-3 py-1.5"
-              >
-                <View className="flex-1 gap-0.5">
-                  <Text numberOfLines={1} className="font-mono text-foreground text-sm">
-                    {secret.name}
-                  </Text>
-                  <Text className="text-muted-foreground text-xs">{secret.what}</Text>
-                </View>
-                <ActionButton
-                  variant="ghost"
-                  size="icon-sm"
-                  disabled={loading}
-                  label={`Remove ${secret.name}`}
-                  onPress={() =>
-                    run(() =>
-                      setSecret({ variables: { id: server.id, kind: secret.kind, name: secret.name, value: null } }),
-                    )
-                  }
-                  iconSlot={<X className="h-4 w-4" />}
-                />
-              </View>
-            ))}
-          </View>
+    <form.AppForm>
+      <DialogLayout
+        open={open}
+        onOpenChange={onOpenChange}
+        title={`Secrets for ${server.name}`}
+        description="Headers sent to its URL, and the environment its command starts with. A value cannot be shown again; setting a name that is there replaces it."
+        hasUnsavedChanges={() => !form.state.isDefaultValue}
+        footerSlot={
+          error ? (
+            <Text role="alert" className="text-negative text-sm">
+              {error}
+            </Text>
+          ) : null
+        }
+        footerActionsSlot={(close) => (
+          <>
+            <Button variant="outline" onPress={close} content="Done" />
+            <form.SubmitButton createLabel="Set secret" disabled={loading} />
+          </>
         )}
-        <form.AppForm>
-          <Form className="gap-4">
-            <form.AppField name="kind">
-              {(field) => <field.SelectField label="Kind" options={SECRET_KINDS} />}
-            </form.AppField>
-            <form.AppField
-              name="name"
-              validators={{ onChange: ({ value }) => (value.trim() === '' ? 'A secret needs a name.' : undefined) }}
-            >
-              {(field) => <field.InputField label="Name" placeholder="Authorization" />}
-            </form.AppField>
-            <form.AppField
-              name="value"
-              validators={{ onChange: ({ value }) => (value === '' ? 'Paste a value.' : undefined) }}
-            >
-              {(field) => <field.PasswordField label="Value" />}
-            </form.AppField>
-            <FormDialogFooter onCancel={() => onOpenChange(false)} cancelLabel="Done" error={error}>
-              <form.SubmitButton createLabel="Set secret" disabled={loading} />
-            </FormDialogFooter>
-          </Form>
-        </form.AppForm>
-      </View>
-    </FormDialog>
+        contentSlot={
+          <View className="gap-4">
+            {stored.length === 0 ? (
+              <Text className="text-foreground/60 text-sm">None set.</Text>
+            ) : (
+              <View role="list" className="gap-1">
+                {stored.map((secret) => (
+                  <View
+                    key={`${secret.kind}:${secret.name}`}
+                    role="listitem"
+                    className="flex-row items-center gap-2 rounded-lg border border-foreground/10 px-3 py-1.5"
+                  >
+                    <View className="flex-1 gap-0.5">
+                      <Text numberOfLines={1} className="font-mono text-foreground text-sm">
+                        {secret.name}
+                      </Text>
+                      <Text className="text-foreground/60 text-xs">{secret.what}</Text>
+                    </View>
+                    <ActionButton
+                      variant="ghost"
+                      size="icon-sm"
+                      disabled={loading}
+                      label={`Remove ${secret.name}`}
+                      onPress={() =>
+                        run(() =>
+                          setSecret({
+                            variables: { id: server.id, kind: secret.kind, name: secret.name, value: null },
+                          }),
+                        )
+                      }
+                      iconSlot={<X className="h-4 w-4" />}
+                    />
+                  </View>
+                ))}
+              </View>
+            )}
+            <Form className="gap-4">
+              <form.AppField name="kind">
+                {(field) => <field.SelectField label="Kind" options={SECRET_KINDS} />}
+              </form.AppField>
+              <form.AppField
+                name="name"
+                validators={{ onChange: ({ value }) => (value.trim() === '' ? 'A secret needs a name.' : undefined) }}
+              >
+                {(field) => <field.InputField label="Name" placeholder="Authorization" />}
+              </form.AppField>
+              <form.AppField
+                name="value"
+                validators={{ onChange: ({ value }) => (value === '' ? 'Paste a value.' : undefined) }}
+              >
+                {(field) => <field.PasswordField label="Value" />}
+              </form.AppField>
+            </Form>
+          </View>
+        }
+      />
+    </form.AppForm>
   );
 }

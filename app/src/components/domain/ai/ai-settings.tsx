@@ -7,6 +7,7 @@ import { Switch } from '@/components/ui/switch';
 import { useAi } from '@/lib/ai';
 import { describeError } from '@/lib/errors';
 import { AiStateDocument, SetAiEnabledDocument, SetInstanceAiEnabledDocument } from '@/lib/graphql';
+import { CARD_TITLE } from '@/lib/styles';
 import { AgentDefaultsForm } from './agent-defaults-form';
 import { AgentManager } from './agent-manager';
 import { ApiKeyManager } from './api-key-manager';
@@ -65,6 +66,7 @@ export function AiSettings() {
     <>
       <Section
         surface="card"
+        titleClassName={CARD_TITLE}
         title="AI"
         description="Off unless you turn it on. Each project has its own switch as well."
         contentSlot={
@@ -98,7 +100,7 @@ export function AiSettings() {
               />
             ) : null}
             {error ? (
-              <Text className="text-destructive text-sm" aria-live="polite">
+              <Text className="text-negative text-sm" aria-live="polite">
                 {error}
               </Text>
             ) : null}

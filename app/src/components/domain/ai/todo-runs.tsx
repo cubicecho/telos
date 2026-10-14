@@ -51,7 +51,7 @@ export function TodoRuns({
           query={query}
           what="the runs"
           count={runs.length}
-          emptySlot={<Text className="text-muted-foreground text-sm">No agent has worked this todo yet.</Text>}
+          emptySlot={<Text className="text-foreground/60 text-sm">No agent has worked this todo yet.</Text>}
         />
         {runs.length === 0 ? null : (
           <View role="list" aria-label="Runs" className="gap-2">
@@ -158,14 +158,14 @@ export function ArtifactRow({
         aria-label={`${label}, ${where}`}
         disabled={!onOpenNote}
         onPress={() => onOpenNote?.(noteId)}
-        className="min-w-0 flex-1 flex-row items-center gap-2 rounded-sm hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="min-w-0 flex-1 flex-row items-center gap-2 rounded-sm hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-active"
       >
-        <MessageSquare className="h-4 w-4 text-muted-foreground" />
+        <MessageSquare className="h-4 w-4 text-foreground/60" />
         <View className="min-w-0 flex-1 gap-0.5">
           <Text numberOfLines={1} className="text-foreground text-sm">
             {label}
           </Text>
-          <Text numberOfLines={1} className="text-muted-foreground text-xs">
+          <Text numberOfLines={1} className="text-foreground/60 text-xs">
             {where}
           </Text>
         </View>
@@ -179,10 +179,10 @@ export function ArtifactRow({
           <Text numberOfLines={1} className="text-foreground text-sm">
             {label}
           </Text>
-          <Text numberOfLines={1} className="text-muted-foreground text-xs">
+          <Text numberOfLines={1} className="text-foreground/60 text-xs">
             {[todoTitle, artifact.title ? artifact.location : null, artifact.mediaType].filter(Boolean).join(' · ')}
           </Text>
-          {unchecked ? <Text className="text-muted-foreground text-xs italic">{UNCHECKED}</Text> : null}
+          {unchecked ? <Text className="text-foreground/60 text-xs italic">{UNCHECKED}</Text> : null}
         </View>
         <Badge variant="outline">{artifact.action}</Badge>
         {unchecked ? <Badge variant="outline">unverified</Badge> : <Badge variant="secondary">{artifact.source}</Badge>}
@@ -191,13 +191,13 @@ export function ArtifactRow({
   }
 
   return (
-    <View role="listitem" className="gap-1 rounded-lg border border-border px-3 py-2">
+    <View role="listitem" className="gap-1 rounded-lg border border-foreground/10 px-3 py-2">
       <View className="flex-row items-center gap-2">
         {body}
         <ActionButton
           variant="ghost"
           size="icon-sm"
-          className="hover:text-destructive"
+          className="hover:text-negative"
           disabled={removing}
           label={`Remove ${label} from the board`}
           onPress={remove}
@@ -205,7 +205,7 @@ export function ArtifactRow({
         />
       </View>
       {error ? (
-        <Text className="text-destructive text-sm" aria-live="polite">
+        <Text className="text-negative text-sm" aria-live="polite">
           {error}
         </Text>
       ) : null}

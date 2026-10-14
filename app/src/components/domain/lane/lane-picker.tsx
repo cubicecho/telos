@@ -45,7 +45,7 @@ export function LanePicker({
         <ActionButton
           variant="ghost"
           size={size}
-          className={cn('text-muted-foreground', className)}
+          className={cn('text-foreground/60', className)}
           label={current ? `Lane, currently ${current.name}` : 'Lane'}
           iconSlot={<Columns3 className="h-4 w-4" />}
         />
@@ -59,13 +59,13 @@ export function LanePicker({
             onSelect={() => onSelect(lane)}
             trailing={
               <>
-                {lane.isDone ? <Text className="text-muted-foreground text-xs">done</Text> : null}
+                {lane.isDone ? <Text className="text-foreground/60 text-xs">done</Text> : null}
                 {lane.id === current?.id ? <Check className="h-3.5 w-3.5" /> : null}
               </>
             }
           />
         ))}
-        {lockedReason ? <Text className="px-2 py-1.5 text-muted-foreground text-xs">{lockedReason}</Text> : null}
+        {lockedReason ? <Text className="px-2 py-1.5 text-foreground/60 text-xs">{lockedReason}</Text> : null}
       </MenuContent>
     </Menu>
   );

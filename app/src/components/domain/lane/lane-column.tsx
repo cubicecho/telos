@@ -15,6 +15,7 @@ import { type BoardAi, BoardCard } from './board-card';
 import type { CardMark } from './card-marks';
 import { DropLane } from './drag-surfaces';
 import type { LaneSummary } from './lane-badge';
+import { LaneTodoComposer } from './lane-todo-composer';
 
 /**
  * One column of the board: a droppable region and everything the column itself
@@ -34,6 +35,7 @@ export function LaneColumn({
   onReorder,
   onToggleDone,
   onDelete,
+  onCreateTodo,
   laneAgent,
   agentName,
   onEditAgent,
@@ -49,6 +51,8 @@ export function LaneColumn({
   onReorder: (delta: number) => void;
   onToggleDone: () => void;
   onDelete: () => void;
+  /** Adds a todo with this title to the bottom of the lane. */
+  onCreateTodo: (title: string) => void;
   /**
    * The lane's agent settings: `undefined` while AI is off for the project,
    * when a lane cannot have an agent and the menu does not offer it.
@@ -98,7 +102,7 @@ export function LaneColumn({
         ) : (
           <>
             {lane.isDone ? (
-              <CircleCheck className="h-4 w-4 shrink-0 text-muted-foreground" aria-label="Marks work done" />
+              <CircleCheck className="h-4 w-4 shrink-0 text-foreground/60" aria-label="Marks work done" />
             ) : null}
             <Text
               role="heading"
@@ -113,7 +117,7 @@ export function LaneColumn({
                 Agent
               </Badge>
             ) : null}
-            <Text className="shrink-0 text-muted-foreground text-xs tabular-nums">{todos.length}</Text>
+            <Text className="shrink-0 text-foreground/60 text-xs tabular-nums">{todos.length}</Text>
           </>
         )}
 
@@ -169,8 +173,12 @@ export function LaneColumn({
       <DropLane
         laneId={lane.id}
         itemIds={todos.map((todo) => todo.id)}
-        className="min-h-32 flex-1 gap-2 rounded-lg bg-muted/40 p-2 transition-colors"
-        overClassName="bg-muted"
+        // An empty lane is an outline to drop into rather than a filled panel.
+        className={cn(
+          'min-h-32 flex-1 gap-2 rounded-lg p-2 transition-colors',
+          todos.length === 0 ? 'border border-foreground/10 border-dashed' : 'bg-foreground/10',
+        )}
+        overClassName="bg-hover"
       >
         {todos.map((todo) => (
           <BoardCard
@@ -188,7 +196,12 @@ export function LaneColumn({
             onRun={ai ? () => ai.onRun(todo) : undefined}
           />
         ))}
-        {todos.length === 0 ? <Text className="px-1 py-2 text-muted-foreground text-xs">Drop a todo here.</Text> : null}
+        {todos.length === 0 ? (
+          <>
+            <Text className="flex-1 px-1 py-2 text-foreground/60 text-xs">Drop a todo here.</Text>
+            <LaneTodoComposer laneName={lane.name} onCreate={onCreateTodo} />
+          </>
+        ) : null}
       </DropLane>
 
       <ConfirmDialog

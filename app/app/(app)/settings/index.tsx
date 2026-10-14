@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ThemePicker } from '@/components/ui/theme-picker';
 import { PALETTE_PREFERENCES } from '@/components/ui/theme-preference-base';
 import { useAi } from '@/lib/ai';
+import { CARD_TITLE } from '@/lib/styles';
 
 type SettingsTab = 'general' | 'ai' | 'agents' | 'mcp';
 
@@ -31,6 +32,7 @@ export default function SettingsScreen() {
     <View className="gap-6">
       <Section
         surface="card"
+        titleClassName={CARD_TITLE}
         title="Theme"
         description="System follows whatever your operating system is set to. A dark-only palette, such as Monokai, keeps the page dark whatever the theme says."
         contentSlot={<ThemePicker palettes={PALETTE_PREFERENCES} />}

@@ -44,7 +44,7 @@ export function RunToolsPicker({
   return (
     <View className="gap-2">
       <Text className="font-medium text-foreground text-sm">Telos tools for its runs</Text>
-      <Text className="text-muted-foreground text-xs">
+      <Text className="text-foreground/60 text-xs">
         {toolsOff === null
           ? 'The defaults: it reads the board, adds todos and leaves notes.'
           : 'Chosen for this agent.'}{' '}

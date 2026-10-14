@@ -116,7 +116,7 @@ export function ProjectRuns({
           what="the runs"
           count={runs.length}
           emptySlot={
-            <Text className="text-muted-foreground text-sm">
+            <Text className="text-foreground/60 text-sm">
               {filter === 'all' ? 'No agent has worked this project yet.' : 'No runs like that.'}
             </Text>
           }
@@ -165,7 +165,7 @@ export function ProjectArtifacts({ projectId }: { projectId: string }) {
         what="the artifacts"
         count={artifacts.length}
         emptySlot={
-          <Text className="text-muted-foreground text-sm">Nothing has been made for this project’s todos yet.</Text>
+          <Text className="text-foreground/60 text-sm">Nothing has been made for this project’s todos yet.</Text>
         }
       />
       {artifacts.length === 0 ? null : (

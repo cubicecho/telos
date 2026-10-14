@@ -2,15 +2,16 @@ import { useMutation, useQuery } from '@apollo/client';
 import { useEffect, useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
 import { useAppForm } from '@/components/app-form';
+import { DialogLayout } from '@/components/dialog-layout';
 import { Section } from '@/components/section';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
-import { FormDialog, FormDialogFooter } from '@/components/ui/form-dialog';
 import { LoadState } from '@/components/ui/load-failure';
 import { fromLayerDraft, type LayerDraft, layerHints, toLayerDraft } from '@/lib/agents';
 import { describeError } from '@/lib/errors';
 import { AgentDefaultsDocument, SetAgentDefaultsApiKeyDocument, SetAgentDefaultsDocument } from '@/lib/graphql';
+import { CARD_TITLE } from '@/lib/styles';
 import {
   DISCOVERY_HELP,
   discoveryOptions,
@@ -95,6 +96,7 @@ export function AgentDefaultsForm() {
   return (
     <Section
       surface="card"
+      titleClassName={CARD_TITLE}
       title="Agent defaults"
       description="What every agent inherits for a field it leaves blank. Zero is a value: only a blank inherits."
       actionSlot={
@@ -122,7 +124,7 @@ export function AgentDefaultsForm() {
                 <form.AppField name="baseUrl" listeners={{ onBlur: () => askModels() }}>
                   {(field) => <field.InputField label="Base URL" type="url" placeholder="http://localhost:11434/v1" />}
                 </form.AppField>
-                <Text className="-mt-2 text-muted-foreground text-xs">{BASE_URL_HELP}</Text>
+                <Text className="-mt-2 text-foreground/60 text-xs">{BASE_URL_HELP}</Text>
                 <form.AppField name="apiKey" listeners={{ onBlur: () => askModels() }}>
                   {(field) => (
                     <field.PasswordField
@@ -170,7 +172,7 @@ export function AgentDefaultsForm() {
                     />
                   )}
                 </form.AppField>
-                <Text className="-mt-2 text-muted-foreground text-xs">{EFFORT_HELP}</Text>
+                <Text className="-mt-2 text-foreground/60 text-xs">{EFFORT_HELP}</Text>
 
                 <FormGroupTitle title="Tools" />
                 {numbers('tools')}
@@ -179,7 +181,7 @@ export function AgentDefaultsForm() {
                     <field.SelectField label="Tool discovery" options={discoveryOptions(hints.toolDiscovery)} />
                   )}
                 </form.AppField>
-                <Text className="-mt-2 text-muted-foreground text-xs">{DISCOVERY_HELP}</Text>
+                <Text className="-mt-2 text-foreground/60 text-xs">{DISCOVERY_HELP}</Text>
                 <form.AppField name="toolSelectModel">
                   {() => (
                     <ModelField
@@ -196,11 +198,11 @@ export function AgentDefaultsForm() {
 
                 <View className="flex-row items-center justify-end gap-3">
                   {failure ? (
-                    <Text className="flex-1 text-destructive text-sm" aria-live="polite">
+                    <Text className="flex-1 text-negative text-sm" aria-live="polite">
                       {describeError(failure)}
                     </Text>
                   ) : saved ? (
-                    <Text className="flex-1 text-muted-foreground text-sm" aria-live="polite">
+                    <Text className="flex-1 text-foreground/60 text-sm" aria-live="polite">
                       Saved.
                     </Text>
                   ) : null}
@@ -247,43 +249,53 @@ function DefaultKeyDialog({
   }
 
   return (
-    <FormDialog
-      open={open}
-      onOpenChange={onOpenChange}
-      title="Default API key"
-      description={
-        hasApiKey
-          ? 'A key is set. A new one replaces it; it cannot be shown. It is sent only to the default base URL.'
-          : 'No key is set. It is sent only to the default base URL, for agents without a key of their own.'
-      }
-    >
-      <form.AppForm>
-        <Form className="gap-4">
-          <form.AppField
-            name="apiKey"
-            validators={{ onChange: ({ value }) => (value.trim() === '' ? 'Paste a key, or cancel.' : undefined) }}
-          >
-            {(field) => <field.PasswordField label="API key" autoFocus />}
-          </form.AppField>
-          <FormDialogFooter
-            onCancel={() => onOpenChange(false)}
-            error={error ? describeError(error) : null}
-            secondarySlot={
-              hasApiKey ? (
-                <Button
-                  variant="ghost"
-                  className="text-destructive"
-                  disabled={loading}
-                  onPress={() => save(null)}
-                  content="Clear key"
-                />
-              ) : null
-            }
-          >
+    <form.AppForm>
+      <DialogLayout
+        open={open}
+        onOpenChange={onOpenChange}
+        title="Default API key"
+        description={
+          hasApiKey
+            ? 'A key is set. A new one replaces it; it cannot be shown. It is sent only to the default base URL.'
+            : 'No key is set. It is sent only to the default base URL, for agents without a key of their own.'
+        }
+        size="sm"
+        hasUnsavedChanges={() => !form.state.isDefaultValue}
+        footerSlot={
+          <>
+            {hasApiKey ? (
+              <Button
+                variant="ghost"
+                className="text-negative"
+                disabled={loading}
+                onPress={() => save(null)}
+                content="Clear key"
+              />
+            ) : null}
+            {error ? (
+              <Text role="alert" className="text-negative text-sm">
+                {describeError(error)}
+              </Text>
+            ) : null}
+          </>
+        }
+        footerActionsSlot={(close) => (
+          <>
+            <Button variant="outline" onPress={close} content="Cancel" />
             <form.SubmitButton createLabel={hasApiKey ? 'Replace key' : 'Set key'} disabled={loading} />
-          </FormDialogFooter>
-        </Form>
-      </form.AppForm>
-    </FormDialog>
+          </>
+        )}
+        contentSlot={
+          <Form className="gap-4">
+            <form.AppField
+              name="apiKey"
+              validators={{ onChange: ({ value }) => (value.trim() === '' ? 'Paste a key, or cancel.' : undefined) }}
+            >
+              {(field) => <field.PasswordField label="API key" autoFocus />}
+            </form.AppField>
+          </Form>
+        }
+      />
+    </form.AppForm>
   );
 }

@@ -4,12 +4,13 @@ import { Text, View } from 'react-native';
 import { ActionButton } from '@/components/action-button';
 import { useAppForm } from '@/components/app-form';
 import { ConfirmButton } from '@/components/confirm-button';
+import { DialogLayout } from '@/components/dialog-layout';
+import { EmptyState } from '@/components/page';
 import { Section } from '@/components/section';
 import { Button } from '@/components/ui/button';
 import { Field, FieldContent, FieldDescription, FieldLegend, FieldSet, FieldTitle } from '@/components/ui/field';
 import { Form } from '@/components/ui/form';
-import { FormDialog, FormDialogFooter } from '@/components/ui/form-dialog';
-import { Plus, Settings, Trash2 } from '@/components/ui/icons';
+import { KeyRound, Plus, Settings, Trash2 } from '@/components/ui/icons';
 import { LoadState } from '@/components/ui/load-failure';
 import { Switch } from '@/components/ui/switch';
 import { formatShortDate } from '@/lib/dates';
@@ -21,6 +22,7 @@ import {
   McpToolsDocument,
   SetApiKeyToolsDocument,
 } from '@/lib/graphql';
+import { CARD_TITLE } from '@/lib/styles';
 
 const EXPIRY_OPTIONS = [
   { label: 'Never', value: 'never' },
@@ -65,15 +67,22 @@ export function ApiKeyManager() {
   return (
     <Section
       surface="card"
+      titleClassName={CARD_TITLE}
       title="API keys"
       description="For MCP clients. A key acts as you, and only while AI is on."
       actionSlot={
-        <Button size="sm" onPress={() => setCreating(true)} iconSlot={<Plus className="h-4 w-4" />} content="New key" />
+        <Button
+          variant="positive"
+          size="sm"
+          onPress={() => setCreating(true)}
+          iconSlot={<Plus className="h-4 w-4" />}
+          content="New key"
+        />
       }
       contentSlot={
         <View className="gap-4">
           {deleteError ? (
-            <Text className="text-destructive text-sm" aria-live="polite">
+            <Text className="text-negative text-sm" aria-live="polite">
               {deleteError}
             </Text>
           ) : null}
@@ -82,7 +91,13 @@ export function ApiKeyManager() {
             query={keysQuery}
             what="your API keys"
             count={keys.length}
-            emptySlot={<Text className="text-muted-foreground text-sm">No keys yet.</Text>}
+            emptySlot={
+              <EmptyState
+                icon={KeyRound}
+                title="No keys yet."
+                description="A key lets an MCP client work in Telos as you."
+              />
+            }
           />
           {keys.length === 0 ? null : (
             <View role="list" className="gap-1">
@@ -90,14 +105,14 @@ export function ApiKeyManager() {
                 <View
                   key={key.id}
                   role="listitem"
-                  className="flex-row items-center gap-3 rounded-lg border border-border bg-card px-3 py-2"
+                  className="flex-row items-center gap-3 rounded-lg border border-foreground/10 bg-secondary px-3 py-2"
                 >
                   <View className="flex-1 gap-0.5">
                     <Text numberOfLines={1} className="text-foreground text-sm">
                       {key.name || 'Unnamed key'}
-                      {key.start ? <Text className="font-mono text-muted-foreground"> {key.start}…</Text> : null}
+                      {key.start ? <Text className="font-mono text-foreground/60"> {key.start}…</Text> : null}
                     </Text>
-                    <Text className="text-muted-foreground text-xs">{describeKey(key)}</Text>
+                    <Text className="text-foreground/60 text-xs">{describeKey(key)}</Text>
                   </View>
                   <ActionButton
                     variant="ghost"
@@ -109,7 +124,7 @@ export function ApiKeyManager() {
                   <ConfirmButton
                     variant="ghost"
                     size="icon-sm"
-                    className="hover:text-destructive"
+                    className="hover:text-negative"
                     label={`Revoke ${key.name || 'key'}`}
                     title={`Revoke “${key.name || 'this key'}”?`}
                     description="Anything signed in with it stops working at once. This cannot be undone."
@@ -196,57 +211,58 @@ function KeyToolsDialog({ apiKey, onOpenChange }: { apiKey: KeyRow | null; onOpe
   ];
 
   return (
-    <FormDialog
+    <DialogLayout
       open={apiKey !== null}
       onOpenChange={onOpenChange}
       title={`Tools for “${apiKey?.name || 'this key'}”`}
       description="What an MCP client signed in with this key may do. A tool that is off is not offered to it, and is refused if it asks."
-    >
-      <View className="gap-4">
-        <LoadState query={toolsQuery} what="the MCP tools" count={tools.length} emptySlot={null} />
-        {tools.length === 0 ? null : (
-          <View className="flex-row gap-2">
-            <Button variant="outline" size="sm" disabled={loading} onPress={() => save(new Set())} content="All on" />
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={loading}
-              onPress={() => save(new Set(tools.filter((tool) => tool.writes).map((tool) => tool.name)))}
-              content="Read only"
-            />
-          </View>
-        )}
-        {groups.map((group) =>
-          group.tools.length === 0 ? null : (
-            <FieldSet key={group.legend} className="gap-3">
-              <FieldLegend variant="label">{group.legend}</FieldLegend>
-              {group.tools.map((tool) => (
-                <Field key={tool.name} orientation="horizontal">
-                  <Switch
-                    checked={!off.has(tool.name)}
-                    onCheckedChange={(on) => flip(tool.name, on)}
-                    disabled={loading}
-                    accessibilityLabel={tool.name}
-                  />
-                  <FieldContent>
-                    <FieldTitle className="font-mono">{tool.name}</FieldTitle>
-                    <FieldDescription>{tool.description.split('\n')[0]}</FieldDescription>
-                  </FieldContent>
-                </Field>
-              ))}
-            </FieldSet>
-          ),
-        )}
-        {error ? (
-          <Text className="text-destructive text-sm" aria-live="polite">
+      footerSlot={
+        error ? (
+          <Text className="text-negative text-sm" aria-live="polite">
             {error}
           </Text>
-        ) : null}
-        <View className="flex-row justify-end">
-          <Button onPress={() => onOpenChange(false)} content="Done" />
+        ) : null
+      }
+      footerActionsSlot={<Button onPress={() => onOpenChange(false)} content="Done" />}
+      contentSlot={
+        <View className="gap-4">
+          <LoadState query={toolsQuery} what="the MCP tools" count={tools.length} emptySlot={null} />
+          {tools.length === 0 ? null : (
+            <View className="flex-row gap-2">
+              <Button variant="outline" size="sm" disabled={loading} onPress={() => save(new Set())} content="All on" />
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={loading}
+                onPress={() => save(new Set(tools.filter((tool) => tool.writes).map((tool) => tool.name)))}
+                content="Read only"
+              />
+            </View>
+          )}
+          {groups.map((group) =>
+            group.tools.length === 0 ? null : (
+              <FieldSet key={group.legend} className="gap-3">
+                <FieldLegend variant="label">{group.legend}</FieldLegend>
+                {group.tools.map((tool) => (
+                  <Field key={tool.name} orientation="horizontal">
+                    <Switch
+                      checked={!off.has(tool.name)}
+                      onCheckedChange={(on) => flip(tool.name, on)}
+                      disabled={loading}
+                      accessibilityLabel={tool.name}
+                    />
+                    <FieldContent>
+                      <FieldTitle className="font-mono">{tool.name}</FieldTitle>
+                      <FieldDescription>{tool.description.split('\n')[0]}</FieldDescription>
+                    </FieldContent>
+                  </Field>
+                ))}
+              </FieldSet>
+            ),
+          )}
         </View>
-      </View>
-    </FormDialog>
+      }
+    />
   );
 }
 
@@ -281,47 +297,58 @@ function CreateApiKeyDialog({ open, onOpenChange }: { open: boolean; onOpenChang
 
   if (minted) {
     return (
-      <FormDialog
+      <DialogLayout
         open={open}
         onOpenChange={onOpenChange}
         title="Your new key"
         description="Copy it now. Only a hash is kept, so it cannot be shown again."
-      >
-        <View className="gap-4">
-          <Text selectable className="rounded-md bg-muted px-3 py-2 font-mono text-foreground text-sm">
+        size="sm"
+        footerActionsSlot={<Button onPress={() => onOpenChange(false)} content="Done" />}
+        contentSlot={
+          <Text selectable className="rounded-md bg-foreground/10 px-3 py-2 font-mono text-foreground text-sm">
             {minted}
           </Text>
-          <View className="flex-row justify-end">
-            <Button onPress={() => onOpenChange(false)} content="Done" />
-          </View>
-        </View>
-      </FormDialog>
+        }
+      />
     );
   }
 
   return (
-    <FormDialog
-      open={open}
-      onOpenChange={onOpenChange}
-      title="New API key"
-      description="Name it after where it will live, so you know which to revoke."
-    >
-      <form.AppForm>
-        <Form className="gap-4">
-          <form.AppField
-            name="name"
-            validators={{ onChange: ({ value }) => (value.trim() === '' ? 'A key needs a name.' : undefined) }}
-          >
-            {(field) => <field.InputField label="Name" autoFocus placeholder="Claude Code on my laptop" />}
-          </form.AppField>
-          <form.AppField name="expiry">
-            {(field) => <field.SelectField label="Expires" options={EXPIRY_OPTIONS} />}
-          </form.AppField>
-          <FormDialogFooter onCancel={() => onOpenChange(false)} error={error ? describeError(error) : null}>
+    <form.AppForm>
+      <DialogLayout
+        open={open}
+        onOpenChange={onOpenChange}
+        title="New API key"
+        description="Name it after where it will live, so you know which to revoke."
+        size="sm"
+        hasUnsavedChanges={() => !form.state.isDefaultValue}
+        footerSlot={
+          error ? (
+            <Text role="alert" className="text-negative text-sm">
+              {describeError(error)}
+            </Text>
+          ) : null
+        }
+        footerActionsSlot={(close) => (
+          <>
+            <Button variant="outline" onPress={close} content="Cancel" />
             <form.SubmitButton createLabel="Create key" />
-          </FormDialogFooter>
-        </Form>
-      </form.AppForm>
-    </FormDialog>
+          </>
+        )}
+        contentSlot={
+          <Form className="gap-4">
+            <form.AppField
+              name="name"
+              validators={{ onChange: ({ value }) => (value.trim() === '' ? 'A key needs a name.' : undefined) }}
+            >
+              {(field) => <field.InputField label="Name" autoFocus placeholder="Claude Code on my laptop" />}
+            </form.AppField>
+            <form.AppField name="expiry">
+              {(field) => <field.SelectField label="Expires" options={EXPIRY_OPTIONS} />}
+            </form.AppField>
+          </Form>
+        }
+      />
+    </form.AppForm>
   );
 }

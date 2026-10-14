@@ -66,7 +66,7 @@ export function WatchRunDialog({
       footerSlot={
         run && running ? (
           run.cancelRequestedAt ? (
-            <Text className="text-muted-foreground text-sm">Stopping…</Text>
+            <Text className="text-foreground/60 text-sm">Stopping…</Text>
           ) : (
             <Button
               variant="outline"
@@ -79,11 +79,9 @@ export function WatchRunDialog({
       }
       contentSlot={
         <View className="gap-3">
-          {cancelState.error ? (
-            <Text className="text-destructive text-sm">{describeError(cancelState.error)}</Text>
-          ) : null}
+          {cancelState.error ? <Text className="text-negative text-sm">{describeError(cancelState.error)}</Text> : null}
           {moved ? (
-            <Text aria-live="polite" className="text-muted-foreground text-sm">
+            <Text aria-live="polite" className="text-foreground/60 text-sm">
               {moved}
             </Text>
           ) : null}
@@ -92,7 +90,7 @@ export function WatchRunDialog({
               <View className="flex-row items-center gap-2">
                 <RunStatusBadge status={run.status} />
                 {running ? null : (
-                  <Text className="text-muted-foreground text-sm">
+                  <Text className="text-foreground/60 text-sm">
                     {`${RUN_STATUS[run.status]?.label ?? run.status}. Nothing has picked the todo up since.`}
                   </Text>
                 )}
@@ -100,11 +98,11 @@ export function WatchRunDialog({
               <RunLog run={run} />
             </>
           ) : query.error ? (
-            <Text className="text-destructive text-sm">{describeError(query.error)}</Text>
+            <Text className="text-negative text-sm">{describeError(query.error)}</Text>
           ) : runId ? (
             <Spinner label="Loading the run" />
           ) : (
-            <Text className="text-muted-foreground text-sm">No agent is working this todo.</Text>
+            <Text className="text-foreground/60 text-sm">No agent is working this todo.</Text>
           )}
         </View>
       }

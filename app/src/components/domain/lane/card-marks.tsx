@@ -73,8 +73,8 @@ export function CardMarks({ mark, todoTitle }: { mark: CardMark; todoTitle: stri
     <View className="mt-2 flex-row flex-wrap items-center gap-x-2 gap-y-1">
       {mark.notes > 0 ? (
         <View role="img" aria-label={notes} className="flex-row items-center gap-1">
-          <MessageSquare className="h-3.5 w-3.5 text-muted-foreground" />
-          <Text aria-hidden className="text-muted-foreground text-xs tabular-nums">
+          <MessageSquare className="h-3.5 w-3.5 text-foreground/60" />
+          <Text aria-hidden className="text-foreground/60 text-xs tabular-nums">
             {mark.notes}
           </Text>
         </View>
@@ -87,7 +87,7 @@ export function CardMarks({ mark, todoTitle }: { mark: CardMark; todoTitle: stri
               variant="outline"
               size="xs"
               className={
-                mark.lastRun === REJECTED ? 'border-warning/60 text-warning' : 'border-destructive/60 text-destructive'
+                mark.lastRun === REJECTED ? 'border-warning/40 text-warning' : 'border-negative/40 text-negative'
               }
               aria-label={`${lastRun.label}: why “${todoTitle}” came back`}
               content={lastRun.label}
@@ -102,7 +102,7 @@ export function CardMarks({ mark, todoTitle }: { mark: CardMark; todoTitle: stri
         </Popover>
       ) : null}
 
-      {attempts ? <Text className="text-muted-foreground text-xs">{attempts}</Text> : null}
+      {attempts ? <Text className="text-foreground/60 text-xs">{attempts}</Text> : null}
     </View>
   );
 }

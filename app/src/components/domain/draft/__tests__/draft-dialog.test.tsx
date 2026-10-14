@@ -151,7 +151,7 @@ describe('DraftDialog', () => {
     expect(within(reply).getByText('Failed')).toBeInTheDocument();
     expect(within(reply).queryByText('Draft')).not.toBeInTheDocument();
 
-    await user.click(within(reply).getByRole('button', { name: /^Draft reply · Planner.*Failed/ }));
+    await user.click(within(reply).getByRole('button', { name: /Failed.*Draft reply · Planner/ }));
     expect(await within(reply).findByText('The model timed out.')).toBeInTheDocument();
   });
 

@@ -31,7 +31,7 @@ export function ProjectBar({
     <View
       role="region"
       aria-label="AI on this project"
-      className="flex-row flex-wrap items-center justify-between gap-x-6 gap-y-1 border-foreground/10 border-b bg-muted/40 px-4 py-1.5"
+      className="flex-row flex-wrap items-center justify-between gap-x-6 gap-y-1 border-foreground/10 border-b bg-secondary px-4 py-1.5"
     >
       <View className="flex-row flex-wrap items-center gap-x-6 gap-y-1">
         <ProjectAiSwitch projectId={project.id} enabled={project.aiEnabled} />

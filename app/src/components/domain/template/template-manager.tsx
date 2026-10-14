@@ -2,11 +2,13 @@ import { useMutation, useQuery } from '@apollo/client';
 import { useState } from 'react';
 import { Text, View } from 'react-native';
 import { ConfirmButton } from '@/components/confirm-button';
+import { EmptyState } from '@/components/page';
 import { Section } from '@/components/section';
-import { Trash2 } from '@/components/ui/icons';
+import { Library, Trash2 } from '@/components/ui/icons';
 import { LoadState } from '@/components/ui/load-failure';
 import { describeError } from '@/lib/errors';
 import { BoardTemplatesDocument, DeleteBoardTemplateDocument } from '@/lib/graphql';
+import { CARD_TITLE } from '@/lib/styles';
 import { cn, HOVER_REVEAL } from '@/lib/utils';
 
 interface TemplateSummary {
@@ -44,12 +46,13 @@ export function TemplateManager() {
   return (
     <Section
       surface="card"
+      titleClassName={CARD_TITLE}
       title="Board templates"
       description="Lanes to start a new project with. Save one from a project's header."
       contentSlot={
         <View className="gap-4">
           {deleteError ? (
-            <Text className="text-destructive text-sm" aria-live="polite">
+            <Text className="text-negative text-sm" aria-live="polite">
               {deleteError}
             </Text>
           ) : null}
@@ -58,7 +61,13 @@ export function TemplateManager() {
             query={templatesQuery}
             what="your templates"
             count={templates.length}
-            emptySlot={<Text className="text-muted-foreground text-sm">No templates yet.</Text>}
+            emptySlot={
+              <EmptyState
+                icon={Library}
+                title="No templates yet."
+                description="Save one from a project's header, and its lanes can start the next project."
+              />
+            }
           />
           {templates.length === 0 ? null : (
             <View role="list" className="gap-1">
@@ -66,20 +75,20 @@ export function TemplateManager() {
                 <View
                   key={template.id}
                   role="listitem"
-                  className="group flex-row items-center gap-3 rounded-lg border border-border bg-card px-3 py-2"
+                  className="group flex-row items-center gap-3 rounded-lg border border-foreground/10 bg-secondary px-3 py-2"
                 >
                   <View className="min-w-0 flex-1">
                     <Text numberOfLines={1} className="text-foreground text-sm">
                       {template.name}
                     </Text>
-                    <Text numberOfLines={1} className="text-muted-foreground text-xs">
+                    <Text numberOfLines={1} className="text-foreground/60 text-xs">
                       {laneNames(template.lanes)}
                     </Text>
                   </View>
                   <ConfirmButton
                     variant="ghost"
                     size="icon-sm"
-                    className={cn('hover:text-destructive focus-visible:opacity-100', HOVER_REVEAL)}
+                    className={cn('hover:text-negative focus-visible:opacity-100', HOVER_REVEAL)}
                     label={`Delete ${template.name}`}
                     title={`Delete “${template.name}”?`}
                     description="Projects already made from it keep their lanes."

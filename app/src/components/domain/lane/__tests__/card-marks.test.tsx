@@ -60,7 +60,7 @@ function mark(todoId: string, over: Partial<CardMark> = {}): CardMark {
 function board(todos: TodoSummary[], result: any) {
   render(
     <MockedProvider mocks={[AI_OFF, { request: { query: CardMarksDocument, variables: { projectId: 'p1' } }, result }]}>
-      <Board projectId="p1" lanes={LANES} todos={todos} />
+      <Board projectId="p1" lanes={LANES} todos={todos} nextPosition={todos.length} />
     </MockedProvider>,
   );
 }

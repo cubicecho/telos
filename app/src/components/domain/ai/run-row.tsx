@@ -74,7 +74,9 @@ export function RunRow({
         onOpenChange={setOpen}
         title={title}
         description={project ? `${project} · ${describeRun(run)}` : describeRun(run)}
-        meta={
+        // Before the title, where a column of them lines up down the list, rather
+        // than trailing titles of every length.
+        badgesSlot={
           <>
             {ofDraft && showTodo ? <Badge variant="outline">Draft</Badge> : null}
             {run.verdict === 'none' ? null : (
@@ -93,7 +95,7 @@ export function RunRow({
             {running && !run.cancelRequestedAt ? (
               <Button variant="outline" size="sm" disabled={cancelling} onPress={cancel} content="Cancel" />
             ) : null}
-            {running && run.cancelRequestedAt ? <Text className="text-muted-foreground text-xs">Stopping…</Text> : null}
+            {running && run.cancelRequestedAt ? <Text className="text-foreground/60 text-xs">Stopping…</Text> : null}
             {running ? null : (
               <ConfirmButton
                 variant="ghost"
@@ -113,7 +115,7 @@ export function RunRow({
       />
       {/* Outside the row: a failed cancel or delete is said whether or not it is open. */}
       {error ? (
-        <Text className="text-destructive text-sm" aria-live="polite">
+        <Text className="text-negative text-sm" aria-live="polite">
           {error}
         </Text>
       ) : null}
@@ -131,7 +133,7 @@ function OpenRun({ id, running, pollMs }: { id: string; running: boolean; pollMs
   const run = query.data?.run;
   if (!run) {
     return query.error ? (
-      <Text className="text-destructive text-sm">{describeError(query.error)}</Text>
+      <Text className="text-negative text-sm">{describeError(query.error)}</Text>
     ) : (
       <Spinner label="Loading the run" />
     );

@@ -3,9 +3,10 @@ import { useEffect, useMemo } from 'react';
 import { Text } from 'react-native';
 import type { LaneAgentFieldsFragment } from '@/__generated__/graphql';
 import { useAppForm } from '@/components/app-form';
+import { DialogLayout } from '@/components/dialog-layout';
 import type { LaneSummary } from '@/components/domain/lane/lane-badge';
+import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
-import { FormDialog, FormDialogFooter } from '@/components/ui/form-dialog';
 import { numberRule } from '@/lib/agents';
 import { describeError } from '@/lib/errors';
 import { UpdateLaneAgentDocument } from '@/lib/graphql';
@@ -130,46 +131,58 @@ export function LaneAgentDialog({
   ];
 
   return (
-    <FormDialog
-      open={open}
-      onOpenChange={onOpenChange}
-      title={`${lane.name}’s agent`}
-      description="An agent works each todo that arrives here, then sends it on."
-      className="sm:max-w-[520px]"
-    >
-      <form.AppForm>
-        <Form className="gap-4">
-          <form.AppField name="agentId">
-            {(field) => <field.SelectField label="Agent" options={agentOptions} />}
-          </form.AppField>
-          {agents.length === 0 ? (
-            <Text className="text-muted-foreground text-xs">Add an agent in Settings → Agents first.</Text>
-          ) : null}
-          <form.Subscribe selector={(state) => state.values.agentId}>
-            {(agentId) =>
-              agentId === NONE ? null : (
-                <>
-                  <form.AppField name="onSuccess">
-                    {(field) => <field.SelectField label="On success" options={successOptions} />}
-                  </form.AppField>
-                  <form.AppField name="onFailureLaneId">
-                    {(field) => <field.SelectField label="On failure, move to" options={failureOptions} />}
-                  </form.AppField>
-                  <form.AppField name="wipLimit" validators={{ onChange: numberRule({ min: 1, required: true }) }}>
-                    {(field) => <field.InputField label="Work at once (WIP limit)" inputMode="numeric" />}
-                  </form.AppField>
-                  <form.AppField name="maxAttempts" validators={{ onChange: numberRule({ min: 0, required: true }) }}>
-                    {(field) => <field.InputField label="Attempts before leaving it for you" inputMode="numeric" />}
-                  </form.AppField>
-                </>
-              )
-            }
-          </form.Subscribe>
-          <FormDialogFooter onCancel={() => onOpenChange(false)} error={error ? describeError(error) : null}>
+    <form.AppForm>
+      <DialogLayout
+        open={open}
+        onOpenChange={onOpenChange}
+        title={`${lane.name}’s agent`}
+        description="An agent works each todo that arrives here, then sends it on."
+        size="md"
+        hasUnsavedChanges={() => !form.state.isDefaultValue}
+        footerSlot={
+          error ? (
+            <Text role="alert" className="text-negative text-sm">
+              {describeError(error)}
+            </Text>
+          ) : null
+        }
+        footerActionsSlot={(close) => (
+          <>
+            <Button variant="outline" onPress={close} content="Cancel" />
             <form.SubmitButton isEdit editLabel="Save" />
-          </FormDialogFooter>
-        </Form>
-      </form.AppForm>
-    </FormDialog>
+          </>
+        )}
+        contentSlot={
+          <Form className="gap-4">
+            <form.AppField name="agentId">
+              {(field) => <field.SelectField label="Agent" options={agentOptions} />}
+            </form.AppField>
+            {agents.length === 0 ? (
+              <Text className="text-foreground/60 text-xs">Add an agent in Settings → Agents first.</Text>
+            ) : null}
+            <form.Subscribe selector={(state) => state.values.agentId}>
+              {(agentId) =>
+                agentId === NONE ? null : (
+                  <>
+                    <form.AppField name="onSuccess">
+                      {(field) => <field.SelectField label="On success" options={successOptions} />}
+                    </form.AppField>
+                    <form.AppField name="onFailureLaneId">
+                      {(field) => <field.SelectField label="On failure, move to" options={failureOptions} />}
+                    </form.AppField>
+                    <form.AppField name="wipLimit" validators={{ onChange: numberRule({ min: 1, required: true }) }}>
+                      {(field) => <field.InputField label="Work at once (WIP limit)" inputMode="numeric" />}
+                    </form.AppField>
+                    <form.AppField name="maxAttempts" validators={{ onChange: numberRule({ min: 0, required: true }) }}>
+                      {(field) => <field.InputField label="Attempts before leaving it for you" inputMode="numeric" />}
+                    </form.AppField>
+                  </>
+                )
+              }
+            </form.Subscribe>
+          </Form>
+        }
+      />
+    </form.AppForm>
   );
 }

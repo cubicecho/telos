@@ -1,8 +1,10 @@
 import { useMutation } from '@apollo/client';
 import { useEffect } from 'react';
+import { Text } from 'react-native';
 import { useAppForm } from '@/components/app-form';
+import { DialogLayout } from '@/components/dialog-layout';
+import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
-import { FormDialog, FormDialogFooter } from '@/components/ui/form-dialog';
 import { describeError } from '@/lib/errors';
 import { BoardTemplatesDocument, SaveBoardTemplateDocument } from '@/lib/graphql';
 
@@ -48,25 +50,38 @@ export function SaveTemplateDialog({
   }, [open, projectName, form]);
 
   return (
-    <FormDialog
-      open={open}
-      onOpenChange={onOpenChange}
-      title="Save as template"
-      description="Its lanes and what their agents do, not its todos. A template of the same name is replaced."
-    >
-      <form.AppForm>
-        <Form className="gap-4">
-          <form.AppField
-            name="name"
-            validators={{ onChange: ({ value }) => (value.trim() === '' ? 'Name the template.' : undefined) }}
-          >
-            {(field) => <field.InputField label="Template name" autoFocus maxLength={100} />}
-          </form.AppField>
-          <FormDialogFooter onCancel={() => onOpenChange(false)} error={error ? describeError(error) : null}>
+    <form.AppForm>
+      <DialogLayout
+        open={open}
+        onOpenChange={onOpenChange}
+        title="Save as template"
+        description="Its lanes and what their agents do, not its todos. A template of the same name is replaced."
+        size="sm"
+        hasUnsavedChanges={() => !form.state.isDefaultValue}
+        footerSlot={
+          error ? (
+            <Text role="alert" className="text-negative text-sm">
+              {describeError(error)}
+            </Text>
+          ) : null
+        }
+        footerActionsSlot={(close) => (
+          <>
+            <Button variant="outline" onPress={close} content="Cancel" />
             <form.SubmitButton createLabel="Save template" />
-          </FormDialogFooter>
-        </Form>
-      </form.AppForm>
-    </FormDialog>
+          </>
+        )}
+        contentSlot={
+          <Form className="gap-4">
+            <form.AppField
+              name="name"
+              validators={{ onChange: ({ value }) => (value.trim() === '' ? 'Name the template.' : undefined) }}
+            >
+              {(field) => <field.InputField label="Template name" autoFocus maxLength={100} />}
+            </form.AppField>
+          </Form>
+        }
+      />
+    </form.AppForm>
   );
 }

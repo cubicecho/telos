@@ -6,6 +6,7 @@ import { Section } from '@/components/section';
 import { CircleCheck } from '@/components/ui/icons';
 import { useAi } from '@/lib/ai';
 import { AiSetupDocument } from '@/lib/graphql';
+import { CARD_TITLE } from '@/lib/styles';
 import { RUNNER_QUIET_SECONDS } from './ai-status';
 import { formatDuration } from './run-log';
 
@@ -171,6 +172,7 @@ export function AiSetupChecklist({
   return (
     <Section
       surface="card"
+      titleClassName={CARD_TITLE}
       className={className}
       title="Getting AI running"
       description={`${left} of ${steps.length} steps left before an agent works a todo.`}
@@ -186,14 +188,14 @@ export function AiSetupChecklist({
               {step.done ? (
                 <CircleCheck aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-positive" />
               ) : (
-                <View aria-hidden className="mt-0.5 size-4 shrink-0 rounded-full border border-muted-foreground" />
+                <View aria-hidden className="mt-0.5 size-4 shrink-0 rounded-full border border-foreground/40" />
               )}
               <View className="flex-1 gap-0.5">
-                <Text className={step.done ? 'text-muted-foreground text-sm' : 'font-medium text-foreground text-sm'}>
+                <Text className={step.done ? 'text-foreground/60 text-sm' : 'font-medium text-foreground text-sm'}>
                   {step.label}
                 </Text>
                 {step.done ? null : (
-                  <Text className="text-muted-foreground text-xs">
+                  <Text className="text-foreground/60 text-xs">
                     {step.hint}
                     {step.href ? (
                       <>
@@ -218,13 +220,13 @@ export function AiSetupChecklist({
 function Offer({ instance, admin }: { instance: boolean; admin: boolean }) {
   if (!instance && !admin) {
     return (
-      <Text className="text-muted-foreground text-sm">
+      <Text className="text-foreground/60 text-sm">
         Agents can work todos for you, but AI is off on this instance. Ask an admin to turn it on.
       </Text>
     );
   }
   return (
-    <Text className="text-muted-foreground text-sm">
+    <Text className="text-foreground/60 text-sm">
       {instance
         ? 'Agents can work todos for you. AI is off for your account.'
         : 'Agents can work todos for you. AI is off on this instance.'}{' '}
