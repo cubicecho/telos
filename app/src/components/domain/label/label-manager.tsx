@@ -1,10 +1,10 @@
 import { useMutation, useQuery } from '@apollo/client';
 import { useState } from 'react';
 import { Text, View } from 'react-native';
-import { ActionButton } from '@/components/action-button';
 import { ConfirmButton } from '@/components/confirm-button';
 import type { LabelSummary } from '@/components/domain/label/label-badge';
 import { LabelFormDialog } from '@/components/domain/label/label-form-dialog';
+import { List } from '@/components/list';
 import { EmptyState } from '@/components/page';
 import { Section } from '@/components/section';
 import { Button } from '@/components/ui/button';
@@ -80,43 +80,41 @@ export function LabelManager() {
               />
             }
           />
-          {labels.length === 0 ? null : (
-            <View role="list" className="gap-1">
-              {labels.map((label) => (
-                <View
-                  key={label.id}
-                  role="listitem"
-                  className="group flex-row items-center gap-3 rounded-lg border border-foreground/10 bg-secondary px-3 py-2"
-                >
-                  <ColorDot color={label.color} />
-                  <Text numberOfLines={1} className="flex-1 text-foreground text-sm">
-                    {label.name}
-                  </Text>
-                  <ActionButton
-                    variant="ghost"
-                    size="icon-sm"
-                    className={cn('focus-visible:opacity-100', HOVER_REVEAL)}
-                    label={`Rename ${label.name}`}
-                    onPress={() => {
-                      setEditing(label);
-                      setFormOpen(true);
-                    }}
-                    iconSlot={<Pencil className="h-4 w-4" />}
-                  />
-                  <ConfirmButton
-                    variant="ghost"
-                    size="icon-sm"
-                    className={cn('hover:text-negative focus-visible:opacity-100', HOVER_REVEAL)}
-                    label={`Delete ${label.name}`}
-                    title={`Delete “${label.name}”?`}
-                    description="It is removed from every project and todo it is attached to. Nothing else is deleted."
-                    onConfirm={() => confirmDelete(label)}
-                    iconSlot={<Trash2 className="h-4 w-4" />}
-                  />
-                </View>
-              ))}
-            </View>
-          )}
+          <List
+            divided={false}
+            contentSlot={labels.map((label) => (
+              <View
+                key={label.id}
+                className="group flex-row items-center gap-3 rounded-lg border border-foreground/10 bg-secondary px-3 py-2"
+              >
+                <ColorDot color={label.color} />
+                <Text numberOfLines={1} className="flex-1 text-foreground text-sm">
+                  {label.name}
+                </Text>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  className={cn('focus-visible:opacity-100', HOVER_REVEAL)}
+                  aria-label={`Rename ${label.name}`}
+                  onPress={() => {
+                    setEditing(label);
+                    setFormOpen(true);
+                  }}
+                  iconSlot={<Pencil className="h-4 w-4" />}
+                />
+                <ConfirmButton
+                  variant="ghost"
+                  size="icon-sm"
+                  className={cn('hover:text-negative focus-visible:opacity-100', HOVER_REVEAL)}
+                  aria-label={`Delete ${label.name}`}
+                  title={`Delete “${label.name}”?`}
+                  description="It is removed from every project and todo it is attached to. Nothing else is deleted."
+                  onConfirm={() => confirmDelete(label)}
+                  iconSlot={<Trash2 className="h-4 w-4" />}
+                />
+              </View>
+            ))}
+          />
 
           <LabelFormDialog open={formOpen} onOpenChange={setFormOpen} label={editing} />
         </View>

@@ -70,6 +70,42 @@ export type InputKeyPressHandler = {
   bivarianceHack(event: InputKeyPressEvent): void;
 }['bivarianceHack'];
 
+/**
+ * What a field holds, said to the browser's autofill, a password manager and the keyboard's
+ * suggestion strip. These are the names HTML's `autocomplete` and React Native's `autoComplete`
+ * share, so one value means the same thing on both halves. The web half takes every DOM token on
+ * top of them.
+ */
+export type InputAutoComplete =
+  | 'off'
+  | 'name'
+  | 'given-name'
+  | 'additional-name'
+  | 'family-name'
+  | 'honorific-prefix'
+  | 'honorific-suffix'
+  | 'nickname'
+  | 'username'
+  | 'email'
+  | 'current-password'
+  | 'new-password'
+  | 'one-time-code'
+  | 'organization'
+  | 'organization-title'
+  | 'street-address'
+  | 'address-line1'
+  | 'address-line2'
+  | 'postal-code'
+  | 'country'
+  | 'tel'
+  | 'url'
+  | 'cc-name'
+  | 'cc-number'
+  | 'cc-exp'
+  | 'cc-exp-month'
+  | 'cc-exp-year'
+  | 'cc-csc';
+
 export type InputProps = {
   value?: string | undefined;
   /** Uncontrolled: where the text starts, when nothing above is holding `value`. */
@@ -109,6 +145,12 @@ export type InputProps = {
    * otherwise there.
    */
   autoCorrect?: boolean | undefined;
+  /**
+   * What the field holds, so a saved address, a password manager's entry or a texted code is
+   * offered for it: `email` on a sign-in, `one-time-code`, `street-address`. `type="email"` alone
+   * does not say it. `off` asks for no suggestions.
+   */
+  autoComplete?: InputAutoComplete | undefined;
   maxLength?: number | undefined;
   /** Web only; the native keyboard has no equivalent constraint. */
   min?: number | undefined;
@@ -184,7 +226,9 @@ export const INPUT_SLOT_ICON_CLASS = 'size-4 shrink-0 text-foreground/60';
 
 /** The text's padding past a slot, so it never runs under the icon. */
 export const INPUT_LEADING_PAD_CLASS = 'pl-9';
+/** The text's padding before a trailing slot, so it never runs under the icon. */
 export const INPUT_TRAILING_PAD_CLASS = 'pr-9';
 
+/** The input's box: border, background, height and type. */
 export const INPUT_CLASS =
-  'border-foreground/15 bg-background text-foreground placeholder:text-foreground/60 focus:border-active flex h-10 w-full rounded-md border px-3 py-2 text-sm focus:outline-none';
+  'border-foreground/50 bg-background text-foreground placeholder:text-foreground/60 focus:border-active flex h-10 w-full rounded-md border px-3 py-2 text-sm focus:outline-none';

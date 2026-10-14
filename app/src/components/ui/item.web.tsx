@@ -29,6 +29,7 @@ function ItemGroup({ className, ...props }: React.ComponentProps<'div'>) {
   return <div data-slot="item-group" className={cn('group/item-group flex flex-col', className)} {...props} />;
 }
 
+/** A rule between two items. */
 function ItemSeparator({
   className,
   orientation = 'horizontal',
@@ -54,6 +55,7 @@ function ItemSeparator({
 const ITEM_WEB =
   'group/item flex text-sm transition-colors duration-100 outline-none [a]:transition-colors [a]:hover:bg-hover [a]:focus-visible:bg-hover';
 
+/** One row: media, content and actions side by side. */
 function Item({
   className,
   variant = 'default',
@@ -96,6 +98,7 @@ const ITEM_MEDIA_WEB = {
   image: '[&_img]:size-full [&_img]:object-cover',
 } as const;
 
+/** The icon or image at the start of an item. */
 function ItemMedia({
   className,
   variant = 'default',
@@ -116,6 +119,7 @@ function ItemMedia({
   );
 }
 
+/** The middle of an item, holding its title and description. */
 function ItemContent({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
@@ -126,12 +130,14 @@ function ItemContent({ className, ...props }: React.ComponentProps<'div'>) {
   );
 }
 
+/** The item's title. */
 function ItemTitle({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div data-slot="item-title" className={cn('flex w-fit', ITEM_TITLE_CLASS, ITEM_TITLE_TEXT, className)} {...props} />
   );
 }
 
+/** The muted line under the item's title. */
 function ItemDescription({ className, ...props }: React.ComponentProps<'p'>) {
   return (
     <p
@@ -146,14 +152,17 @@ function ItemDescription({ className, ...props }: React.ComponentProps<'p'>) {
   );
 }
 
+/** The buttons at the far end of an item. */
 function ItemActions({ className, ...props }: React.ComponentProps<'div'>) {
   return <div data-slot="item-actions" className={cn('flex', ITEM_ACTIONS_CLASS, className)} {...props} />;
 }
 
+/** A full-width line above the item's row. */
 function ItemHeader({ className, ...props }: React.ComponentProps<'div'>) {
   return <div data-slot="item-header" className={cn('flex basis-full', ITEM_HEADER_CLASS, className)} {...props} />;
 }
 
+/** A full-width line below the item's row. */
 function ItemFooter({ className, ...props }: React.ComponentProps<'div'>) {
   return <div data-slot="item-footer" className={cn('flex basis-full', ITEM_FOOTER_CLASS, className)} {...props} />;
 }

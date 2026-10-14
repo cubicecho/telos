@@ -68,6 +68,7 @@ export type DateTimeInputProps = DateTimeInputSharedProps &
       }
   );
 
+/** A date picked from a calendar with a time beside it, or a date alone with `mode="date"`. */
 export function DateTimeInput(props: DateTimeInputProps) {
   const {
     mode = 'datetime',
@@ -93,7 +94,9 @@ export function DateTimeInput(props: DateTimeInputProps) {
   }
 
   function handleDateSelect(picked: Date | undefined) {
-    if (!picked) return;
+    if (!picked) {
+      return;
+    }
     const next = new Date(picked);
     if (withTime && value) {
       // The calendar only knows a day, so the time is carried over rather than
@@ -110,21 +113,31 @@ export function DateTimeInput(props: DateTimeInputProps) {
 
   function handleTimeChange(text: string) {
     // A time with no date is not a value this control can hold, so it waits.
-    if (!value) return;
+    if (!value) {
+      return;
+    }
     const parts = text.split(':').map(Number);
     const hh = parts[0];
     const mm = parts[1];
-    if (hh === undefined || mm === undefined) return;
-    if (Number.isNaN(hh) || Number.isNaN(mm)) return;
+    if (hh === undefined || mm === undefined) {
+      return;
+    }
+    if (Number.isNaN(hh) || Number.isNaN(mm)) {
+      return;
+    }
     const next = new Date(value);
     next.setHours(hh, mm, 0, 0);
     commit(next);
   }
 
   function handleClear() {
-    if (props.clearable) props.onChange(null);
+    if (props.clearable) {
+      props.onChange(null);
+    }
     setOpen(false);
   }
+
+  const ownTimeLabel = ariaLabel ? `${ariaLabel}, time` : 'Time';
 
   return (
     <View className={cn('flex-row items-center gap-2', className)}>
@@ -190,12 +203,12 @@ export function DateTimeInput(props: DateTimeInputProps) {
           // box itself, whose own `aria-label` is what that second reference reads — so there is
           // no hidden text node to render. With no name given, it is "Time", as it always was.
           id={ariaLabelledBy ? timeId : undefined}
-          aria-label={ariaLabelledBy ? 'time' : ariaLabel ? `${ariaLabel}, time` : 'Time'}
+          aria-label={ariaLabelledBy ? 'time' : ownTimeLabel}
           aria-labelledby={ariaLabelledBy ? `${ariaLabelledBy} ${timeId}` : undefined}
           value={value ? format(value, 'HH:mm') : ''}
           onChangeText={handleTimeChange}
           disabled={!value}
-          className="w-[120px]"
+          className="w-28"
         />
       ) : null}
     </View>

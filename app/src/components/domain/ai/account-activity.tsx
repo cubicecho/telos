@@ -7,6 +7,7 @@ import { Archive } from '@/components/app-icons';
 import { ArchivedTodoList } from '@/components/domain/todo/archived-todos';
 import { TodoFormDialog } from '@/components/domain/todo/todo-form-dialog';
 import type { TodoSummary } from '@/components/domain/todo/types';
+import { List } from '@/components/list';
 import { EmptyState } from '@/components/page';
 import { Section } from '@/components/section';
 import { StatTile } from '@/components/stat-tile';
@@ -145,56 +146,52 @@ function NeedsAttention({ pollMs }: { pollMs: number }) {
               {error}
             </Text>
           ) : null}
-          {todos.length > 0 ? (
-            <View role="list" aria-label="Needs attention" className="gap-2">
-              {todos.map((todo) => (
-                <View
-                  key={todo.todoId}
-                  role="listitem"
-                  className="gap-1 rounded-lg border border-foreground/10 bg-secondary px-3 py-2.5"
-                >
-                  <View className="flex-row flex-wrap items-center gap-2">
-                    {todo.outOfAttempts ? <Badge variant="destructive">Out of attempts</Badge> : null}
-                    {todo.errored ? <Badge variant="warning">Errored</Badge> : null}
-                    <Text className="min-w-0 flex-1 font-medium text-foreground text-sm">{todo.title}</Text>
+          <List
+            label="Needs attention"
+            divided={false}
+            contentSlot={todos.map((todo) => (
+              <View key={todo.todoId} className="gap-1 rounded-lg border border-foreground/10 bg-secondary px-3 py-2.5">
+                <View className="flex-row flex-wrap items-center gap-2">
+                  {todo.outOfAttempts ? <Badge variant="destructive">Out of attempts</Badge> : null}
+                  {todo.errored ? <Badge variant="warning">Errored</Badge> : null}
+                  <Text className="min-w-0 flex-1 font-medium text-foreground text-sm">{todo.title}</Text>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    aria-label={`Send “${todo.title}” round again`}
+                    disabled={retryState.loading}
+                    onPress={() => run(() => retryTodo({ variables: { id: todo.todoId } }))}
+                    content="Retry"
+                  />
+                  {todo.runId ? (
                     <Button
                       variant="outline"
                       size="sm"
-                      aria-label={`Send “${todo.title}” round again`}
-                      disabled={retryState.loading}
-                      onPress={() => run(() => retryTodo({ variables: { id: todo.todoId } }))}
-                      content="Retry"
+                      aria-label={`Open the last run of “${todo.title}”`}
+                      onPress={() => setWatching(todo.runId ?? null)}
+                      content="Run"
                     />
-                    {todo.runId ? (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        aria-label={`Open the last run of “${todo.title}”`}
-                        onPress={() => setWatching(todo.runId ?? null)}
-                        content="Run"
-                      />
-                    ) : null}
-                    <Link href={`/projects/${todo.projectId}?view=board`} asChild>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        aria-label={`Open the board “${todo.title}” is on`}
-                        content="Board"
-                      />
-                    </Link>
-                  </View>
-                  <Text className="text-foreground/60 text-xs">
-                    {[todo.projectName, todo.laneName ?? 'no lane', attemptsLine(todo)].filter(Boolean).join(' · ')}
-                  </Text>
-                  {todo.reason ? (
-                    <Text selectable numberOfLines={3} className="text-sm text-warning">
-                      {todo.reason}
-                    </Text>
                   ) : null}
+                  <Link href={`/projects/${todo.projectId}?view=board`} asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      aria-label={`Open the board “${todo.title}” is on`}
+                      content="Board"
+                    />
+                  </Link>
                 </View>
-              ))}
-            </View>
-          ) : null}
+                <Text className="text-foreground/60 text-xs">
+                  {[todo.projectName, todo.laneName ?? 'no lane', attemptsLine(todo)].filter(Boolean).join(' · ')}
+                </Text>
+                {todo.reason ? (
+                  <Text selectable numberOfLines={3} className="text-sm text-warning">
+                    {todo.reason}
+                  </Text>
+                ) : null}
+              </View>
+            ))}
+          />
           {watching ? <RunDialog runId={watching} open onOpenChange={(next) => !next && setWatching(null)} /> : null}
         </View>
       }
@@ -286,13 +283,10 @@ function SpendList({
   return (
     <View className="min-w-64 flex-1 gap-1">
       <Text className="font-medium text-foreground text-sm">{label}</Text>
-      <View role="list" aria-label={label}>
-        {lines.map((line) => (
-          <View
-            key={line.id ?? line.name}
-            role="listitem"
-            className="flex-row flex-wrap items-baseline gap-x-3 gap-y-0.5 border-foreground/10 border-b py-1.5"
-          >
+      <List
+        label={label}
+        contentSlot={lines.map((line) => (
+          <View key={line.id ?? line.name} className="flex-row flex-wrap items-baseline gap-x-3 gap-y-0.5 py-0.5">
             {linked && line.id ? (
               <Link href={`/projects/${line.id}?view=runs`} className="min-w-0 flex-1 text-foreground text-sm">
                 {line.name}
@@ -306,7 +300,7 @@ function SpendList({
             </Text>
           </View>
         ))}
-      </View>
+      />
     </View>
   );
 }
@@ -351,13 +345,11 @@ function AccountRuns({ pollMs }: { pollMs: number }) {
             </Text>
           }
         />
-        {runs.length === 0 ? null : (
-          <View role="list" aria-label="Runs" className="gap-2">
-            {runs.map((run) => (
-              <RunRow key={run.id} run={run} showTodo project={run.project?.name} />
-            ))}
-          </View>
-        )}
+        <List
+          label="Runs"
+          divided={false}
+          contentSlot={runs.map((run) => <RunRow key={run.id} run={run} showTodo project={run.project?.name} />)}
+        />
         {/* A full page means there may be more; a short one means there is not. */}
         {runs.length >= limit ? (
           <Button
@@ -392,22 +384,22 @@ function AccountArtifacts() {
         count={artifacts.length}
         emptySlot={<Text className="text-foreground/60 text-sm">No run has left anything behind yet.</Text>}
       />
-      {artifacts.length === 0 ? null : (
-        <View role="list" aria-label="Artifacts" className="gap-1">
-          {artifacts.map((artifact) => {
-            // An artifact can outlive its todo: it is then only its project's.
-            const { todo } = artifact;
-            return (
-              <ArtifactRow
-                key={artifact.id}
-                artifact={artifact}
-                todoTitle={[artifact.project?.name, todoLabelOf(artifact)].filter(Boolean).join(' · ')}
-                onOpenNote={todo ? (noteId) => setOpened({ todo, noteId }) : undefined}
-              />
-            );
-          })}
-        </View>
-      )}
+      <List
+        label="Artifacts"
+        divided={false}
+        contentSlot={artifacts.map((artifact) => {
+          // An artifact can outlive its todo: it is then only its project's.
+          const { todo } = artifact;
+          return (
+            <ArtifactRow
+              key={artifact.id}
+              artifact={artifact}
+              todoTitle={[artifact.project?.name, todoLabelOf(artifact)].filter(Boolean).join(' · ')}
+              onOpenNote={todo ? (noteId) => setOpened({ todo, noteId }) : undefined}
+            />
+          );
+        })}
+      />
       {artifacts.length >= limit ? (
         <Button
           variant="outline"

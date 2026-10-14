@@ -10,6 +10,7 @@ type DateTimeFieldProps = FieldProps & {
   placeholder?: string | undefined;
 };
 
+/** A `DateTimeInput` bound to a form field holding a `Date | null`. */
 export function DateTimeField(props: DateTimeFieldProps) {
   const [fieldProps, { mode, clearable = false, placeholder }] = splitProps(props);
   const field = useFieldContext<Date | null>();

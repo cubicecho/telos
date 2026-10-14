@@ -3,6 +3,12 @@ import type { ReactElement } from 'react';
 import { Platform } from 'react-native';
 import { twMerge } from 'tailwind-merge';
 
+/**
+ * Joins class names and lets the later of two conflicting Tailwind classes win.
+ *
+ * @param inputs - Class names, and the arrays and objects of them `clsx` takes.
+ * @returns The one class string.
+ */
 export function cn(...inputs: ClassValue[]): string {
   return twMerge(clsx(inputs));
 }
@@ -15,6 +21,19 @@ export function cn(...inputs: ClassValue[]): string {
  * so no component has to reach for `Platform` to express it.
  */
 export const HOVER_REVEAL = Platform.OS === 'web' ? 'opacity-0 transition-opacity group-hover:opacity-100' : '';
+
+/**
+ * A field whose value was refused, on device: the web halves draw the same thing from the
+ * `aria-invalid` attribute (`aria-invalid:border-negative`), which React Native has no variant
+ * for. Focus still wins while the value is being fixed. Here rather than in one field's base so
+ * Input, Textarea and Select share it without installing each other.
+ */
+export const FIELD_INVALID_CLASS = 'border-negative focus:border-active';
+
+/** Whether an `aria-invalid` value says the field is invalid. */
+export function isInvalid(value: boolean | 'true' | 'false' | undefined): boolean {
+  return value === true || value === 'true';
+}
 
 /**
  * What a prop whose name ends in `Slot` takes: an element, several, or nothing.

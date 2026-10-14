@@ -2,9 +2,10 @@ import { useMutation, useQuery } from '@apollo/client';
 import { type ReactNode, useEffect, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import type { ArtifactFieldsFragment } from '@/__generated__/graphql';
-import { ActionButton } from '@/components/action-button';
 import { MessageSquare } from '@/components/app-icons';
+import { List } from '@/components/list';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Trash2 } from '@/components/ui/icons';
 import { LoadState } from '@/components/ui/load-failure';
 import { describeError } from '@/lib/errors';
@@ -53,13 +54,11 @@ export function TodoRuns({
           count={runs.length}
           emptySlot={<Text className="text-foreground/60 text-sm">No agent has worked this todo yet.</Text>}
         />
-        {runs.length === 0 ? null : (
-          <View role="list" aria-label="Runs" className="gap-2">
-            {runs.map((run) => (
-              <RunRow key={run.id} run={run} pollMs={pollMs} />
-            ))}
-          </View>
-        )}
+        <List
+          label="Runs"
+          divided={false}
+          contentSlot={runs.map((run) => <RunRow key={run.id} run={run} pollMs={pollMs} />)}
+        />
       </View>
 
       {artifacts.length === 0 ? null : (
@@ -67,11 +66,13 @@ export function TodoRuns({
           <Text role="heading" aria-level={3} className="font-medium text-foreground text-sm">
             Artifacts
           </Text>
-          <View role="list" aria-label="Artifacts" className="gap-1">
-            {artifacts.map((artifact) => (
+          <List
+            label="Artifacts"
+            divided={false}
+            contentSlot={artifacts.map((artifact) => (
               <ArtifactRow key={artifact.id} artifact={artifact} onOpenNote={onOpenNote} />
             ))}
-          </View>
+          />
         </View>
       )}
     </View>
@@ -191,15 +192,15 @@ export function ArtifactRow({
   }
 
   return (
-    <View role="listitem" className="gap-1 rounded-lg border border-foreground/10 px-3 py-2">
+    <View className="gap-1 rounded-lg border border-foreground/10 px-3 py-2">
       <View className="flex-row items-center gap-2">
         {body}
-        <ActionButton
+        <Button
           variant="ghost"
           size="icon-sm"
           className="hover:text-negative"
           disabled={removing}
-          label={`Remove ${label} from the board`}
+          aria-label={`Remove ${label} from the board`}
           onPress={remove}
           iconSlot={<Trash2 className="h-4 w-4" />}
         />

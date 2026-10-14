@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
 import { DialogLayout } from '@/components/dialog-layout';
 import { RunRow } from '@/components/domain/ai/run-row';
+import { List } from '@/components/list';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -313,11 +314,11 @@ function DraftTalk({
       {draft.runs.length > 0 ? (
         <View className="gap-2 border-foreground/10 border-t pt-4">
           <Text className="font-medium text-foreground text-sm">Replies</Text>
-          <View role="list" aria-label="Replies" className="gap-2">
-            {draft.runs.map((run) => (
-              <RunRow key={run.id} run={run} pollMs={pollMs} />
-            ))}
-          </View>
+          <List
+            label="Replies"
+            divided={false}
+            contentSlot={draft.runs.map((run) => <RunRow key={run.id} run={run} pollMs={pollMs} />)}
+          />
         </View>
       ) : null}
 

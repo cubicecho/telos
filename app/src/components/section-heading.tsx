@@ -19,7 +19,7 @@ type SectionHeadingProps = {
   children: ReactNode;
 };
 
-// A small muted heading above a section of content.
+/** A small muted heading above a section of content. */
 export function SectionHeading({ variant = 'default', level, className, children }: SectionHeadingProps) {
   const classes = cn(
     'font-semibold text-foreground/60',
@@ -29,9 +29,11 @@ export function SectionHeading({ variant = 'default', level, className, children
 
   // Two elements written out rather than one with a conditional role: a `role="heading"` with no
   // rank is not a heading the web can express, and the compiler refuses it for exactly that.
-  if (level === undefined) return <Text className={classes}>{children}</Text>;
+  if (level === undefined) {
+    return <Text className={classes}>{children}</Text>;
+  }
   return (
-    // biome-ignore lint/a11y/useSemanticElements: React Native has no heading element; role="heading" is the cross-platform form
+    // web: biome-ignore lint/a11y/useSemanticElements: React Native has no heading element; role="heading" is the cross-platform form
     <Text role="heading" aria-level={level} className={classes}>
       {children}
     </Text>

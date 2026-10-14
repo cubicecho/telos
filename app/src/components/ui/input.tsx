@@ -9,6 +9,7 @@ import {
   INPUT_TRAILING_CLASS,
   INPUT_TRAILING_PAD_CLASS,
   INPUT_WRAPPER_CLASS,
+  type InputAutoComplete,
   type InputHandle,
   type InputKeyPressEvent,
   type InputKeyPressHandler,
@@ -16,8 +17,9 @@ import {
   type InputType,
   NATIVE_INPUT_MODE,
 } from '@/components/ui/input-base';
-import { cn } from '@/lib/utils';
+import { cn, FIELD_INVALID_CLASS, isInvalid } from '@/lib/utils';
 
+/** A one-line text box, with optional slots at its start and end. */
 function Input({
   className,
   type = 'text',
@@ -32,6 +34,7 @@ function Input({
   placeholder,
   autoCapitalize,
   autoCorrect,
+  autoComplete,
   maxLength,
   disabled,
   readOnly,
@@ -59,15 +62,22 @@ function Input({
       onChangeText={onChangeText}
       onBlur={onBlur}
       onSubmitEditing={onSubmitEditing}
-      onKeyPress={(event: InputKeyPressEvent) => {
+      onKeyPress={(event) => {
         onKeyPress?.(event);
-        if (event.nativeEvent.key === 'Escape') onEscape?.();
+        // A caller's own handler that took the key keeps it, as on the web.
+        if (event.isDefaultPrevented()) {
+          return;
+        }
+        if (event.nativeEvent.key === 'Escape') {
+          onEscape?.();
+        }
       }}
       placeholder={placeholder}
       autoCapitalize={autoCapitalize}
       autoCorrect={autoCorrect}
+      autoComplete={autoComplete}
       maxLength={maxLength}
-      editable={!disabled && !readOnly}
+      editable={disabled !== true && readOnly !== true}
       autoFocus={autoFocus}
       id={id}
       aria-label={ariaLabel}
@@ -89,13 +99,16 @@ function Input({
         INPUT_CLASS,
         leadingSlot != null && INPUT_LEADING_PAD_CLASS,
         trailingSlot != null && INPUT_TRAILING_PAD_CLASS,
+        isInvalid(ariaInvalid) && FIELD_INVALID_CLASS,
         disabled && 'opacity-50',
         className,
       )}
     />
   );
 
-  if (leadingSlot == null && trailingSlot == null) return field;
+  if (leadingSlot == null && trailingSlot == null) {
+    return field;
+  }
 
   return (
     <View className={cn(INPUT_WRAPPER_CLASS, wrapperClassName)}>
@@ -108,5 +121,5 @@ function Input({
   );
 }
 
-export type { InputHandle, InputKeyPressEvent, InputKeyPressHandler, InputProps, InputType };
+export type { InputAutoComplete, InputHandle, InputKeyPressEvent, InputKeyPressHandler, InputProps, InputType };
 export { Input };

@@ -2,10 +2,10 @@ import { useMutation, useQuery } from '@apollo/client';
 import { useEffect, useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
 import { McpSecretKind, type McpServerFieldsFragment } from '@/__generated__/graphql';
-import { ActionButton } from '@/components/action-button';
 import { useAppForm } from '@/components/app-form';
 import { ConfirmButton } from '@/components/confirm-button';
 import { DialogLayout } from '@/components/dialog-layout';
+import { List } from '@/components/list';
 import { EmptyState } from '@/components/page';
 import { Section } from '@/components/section';
 import { Badge } from '@/components/ui/badge';
@@ -112,65 +112,60 @@ export function McpServerManager() {
               <EmptyState icon={Plug} title="No servers yet." description="A server lends your agents its tools." />
             }
           />
-          {servers.length === 0 ? null : (
-            <View role="list" className="gap-1">
-              {servers.map((server) => (
-                <View
-                  key={server.id}
-                  role="listitem"
-                  className="gap-2 rounded-lg border border-foreground/10 bg-secondary p-3"
-                >
-                  <View className="flex-row items-center gap-3">
-                    <View className="flex-1 gap-0.5">
-                      <Text numberOfLines={1} className="text-foreground text-sm">
-                        {server.name}
-                        <Text className="font-mono text-foreground/60"> {server.slug}</Text>
-                      </Text>
-                      <Text numberOfLines={1} className="text-foreground/60 text-xs">
-                        {server.url ?? server.command}
-                      </Text>
-                    </View>
-                    <Switch
-                      checked={server.enabled}
-                      onCheckedChange={(enabled) =>
-                        run(() =>
-                          updateServer({
-                            variables: { id: server.id, set: { enabled } },
-                            optimisticResponse: { updateMcpServer: { ...server, enabled } },
-                          }),
-                        )
-                      }
-                      accessibilityLabel={`${server.name} on`}
-                    />
-                    <ActionButton
-                      variant="ghost"
-                      size="icon-sm"
-                      label={`Edit ${server.name}`}
-                      onPress={() => setEditing(server)}
-                      iconSlot={<Pencil className="h-4 w-4" />}
-                    />
-                    <ConfirmButton
-                      variant="ghost"
-                      size="icon-sm"
-                      className="hover:text-negative"
-                      label={`Delete ${server.name}`}
-                      title={`Delete “${server.name}”?`}
-                      description="Its secrets go with it. An agent that names it carries on without it, and says so on its runs. This cannot be undone."
-                      confirmLabel="Delete"
-                      onConfirm={() => confirmDelete(server)}
-                      iconSlot={<Trash2 className="h-4 w-4" />}
-                    />
+          <List
+            divided={false}
+            contentSlot={servers.map((server) => (
+              <View key={server.id} className="gap-2 rounded-lg border border-foreground/10 bg-secondary p-3">
+                <View className="flex-row items-center gap-3">
+                  <View className="flex-1 gap-0.5">
+                    <Text numberOfLines={1} className="text-foreground text-sm">
+                      {server.name}
+                      <Text className="font-mono text-foreground/60"> {server.slug}</Text>
+                    </Text>
+                    <Text numberOfLines={1} className="text-foreground/60 text-xs">
+                      {server.url ?? server.command}
+                    </Text>
                   </View>
-                  <Text className="text-foreground/60 text-xs">{describeUse(server, agents)}</Text>
-                  <View className="flex-row flex-wrap items-center gap-2">
-                    <Button variant="outline" size="sm" onPress={() => setKeying(server.id)} content="Secrets" />
-                    <Badge variant={secretCount(server) > 0 ? 'secondary' : 'outline'}>{describeSecrets(server)}</Badge>
-                  </View>
-                  <McpServerTest server={server} />
+                  <Switch
+                    checked={server.enabled}
+                    onCheckedChange={(enabled) =>
+                      run(() =>
+                        updateServer({
+                          variables: { id: server.id, set: { enabled } },
+                          optimisticResponse: { updateMcpServer: { ...server, enabled } },
+                        }),
+                      )
+                    }
+                    accessibilityLabel={`${server.name} on`}
+                  />
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={`Edit ${server.name}`}
+                    onPress={() => setEditing(server)}
+                    iconSlot={<Pencil className="h-4 w-4" />}
+                  />
+                  <ConfirmButton
+                    variant="ghost"
+                    size="icon-sm"
+                    className="hover:text-negative"
+                    aria-label={`Delete ${server.name}`}
+                    title={`Delete “${server.name}”?`}
+                    description="Its secrets go with it. An agent that names it carries on without it, and says so on its runs. This cannot be undone."
+                    confirmLabel="Delete"
+                    onConfirm={() => confirmDelete(server)}
+                    iconSlot={<Trash2 className="h-4 w-4" />}
+                  />
                 </View>
-              ))}
-            </View>
-          )}
+                <Text className="text-foreground/60 text-xs">{describeUse(server, agents)}</Text>
+                <View className="flex-row flex-wrap items-center gap-2">
+                  <Button variant="outline" size="sm" onPress={() => setKeying(server.id)} content="Secrets" />
+                  <Badge variant={secretCount(server) > 0 ? 'secondary' : 'outline'}>{describeSecrets(server)}</Badge>
+                </View>
+                <McpServerTest server={server} />
+              </View>
+            ))}
+          />
 
           {/* Keyed so switching from one server to another starts a fresh form. */}
           {editing ? (
@@ -557,11 +552,11 @@ function McpServerSecretsDialog({
             {stored.length === 0 ? (
               <Text className="text-foreground/60 text-sm">None set.</Text>
             ) : (
-              <View role="list" className="gap-1">
-                {stored.map((secret) => (
+              <List
+                divided={false}
+                contentSlot={stored.map((secret) => (
                   <View
                     key={`${secret.kind}:${secret.name}`}
-                    role="listitem"
                     className="flex-row items-center gap-2 rounded-lg border border-foreground/10 px-3 py-1.5"
                   >
                     <View className="flex-1 gap-0.5">
@@ -570,11 +565,11 @@ function McpServerSecretsDialog({
                       </Text>
                       <Text className="text-foreground/60 text-xs">{secret.what}</Text>
                     </View>
-                    <ActionButton
+                    <Button
                       variant="ghost"
                       size="icon-sm"
                       disabled={loading}
-                      label={`Remove ${secret.name}`}
+                      aria-label={`Remove ${secret.name}`}
                       onPress={() =>
                         run(() =>
                           setSecret({
@@ -586,7 +581,7 @@ function McpServerSecretsDialog({
                     />
                   </View>
                 ))}
-              </View>
+              />
             )}
             <Form className="gap-4">
               <form.AppField name="kind">

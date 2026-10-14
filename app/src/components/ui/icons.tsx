@@ -11,6 +11,7 @@ import ChevronUpSource from 'lucide-react-native/icons/chevron-up';
 import ChevronsUpDownSource from 'lucide-react-native/icons/chevrons-up-down';
 import CircleAlertSource from 'lucide-react-native/icons/circle-alert';
 import CircleCheckSource from 'lucide-react-native/icons/circle-check';
+import CircleQuestionMarkSource from 'lucide-react-native/icons/circle-question-mark';
 import ClockSource from 'lucide-react-native/icons/clock';
 import CopySource from 'lucide-react-native/icons/copy';
 import DownloadSource from 'lucide-react-native/icons/download';
@@ -40,7 +41,9 @@ import SettingsSource from 'lucide-react-native/icons/settings';
 import SquareSource from 'lucide-react-native/icons/square';
 import SunSource from 'lucide-react-native/icons/sun';
 import TagSource from 'lucide-react-native/icons/tag';
-import Trash2Source from 'lucide-react-native/icons/trash-2';
+// lucide 1.41 renamed `trash-2` to `trash` and ships no file for the old name. `Trash2` stays the
+// export, so no caller changes.
+import Trash2Source from 'lucide-react-native/icons/trash';
 import TriangleAlertSource from 'lucide-react-native/icons/triangle-alert';
 import Undo2Source from 'lucide-react-native/icons/undo-2';
 import UploadSource from 'lucide-react-native/icons/upload';
@@ -99,6 +102,7 @@ export const ChevronUp = icon(ChevronUpSource);
 export const ChevronsUpDown = icon(ChevronsUpDownSource);
 export const CircleAlert = icon(CircleAlertSource);
 export const CircleCheck = icon(CircleCheckSource);
+export const CircleQuestionMark = icon(CircleQuestionMarkSource);
 export const Clock = icon(ClockSource);
 export const Copy = icon(CopySource);
 export const Download = icon(DownloadSource);

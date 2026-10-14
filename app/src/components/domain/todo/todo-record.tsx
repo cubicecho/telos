@@ -2,9 +2,9 @@ import { useMutation, useQuery } from '@apollo/client';
 import { useState } from 'react';
 import { Platform, Text, View } from 'react-native';
 import type { RunSummaryFieldsFragment, TodoNoteFieldsFragment } from '@/__generated__/graphql';
-import { ActionButton } from '@/components/action-button';
 import { RunDialog } from '@/components/domain/ai/run-dialog';
 import { DRAFT_RUN, describeRun, RunStatusBadge } from '@/components/domain/ai/run-log';
+import { List } from '@/components/list';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Pencil, Trash2 } from '@/components/ui/icons';
@@ -158,20 +158,20 @@ function ThreadNote({
           </Badge>
         )}
         {canEdit(note) && draft === null ? (
-          <ActionButton
+          <Button
             variant="ghost"
             size="icon-sm"
-            label="Edit note"
+            aria-label="Edit note"
             onPress={() => setDraft(note.body)}
             iconSlot={<Pencil className="h-4 w-4" />}
           />
         ) : null}
         {canDelete(note) ? (
-          <ActionButton
+          <Button
             variant="ghost"
             size="icon-sm"
             className="hover:text-negative"
-            label="Delete note"
+            aria-label="Delete note"
             onPress={() => onDelete(note.id)}
             iconSlot={<Trash2 className="h-4 w-4" />}
           />
@@ -354,37 +354,36 @@ export function TodoHistory({ todoId, runs = [] }: { todoId: string; runs?: read
         count={entries.length}
         emptySlot={<Text className="text-foreground/60 text-sm">Nothing recorded yet.</Text>}
       />
-      {entries.length === 0 ? null : (
-        <View role="list" className="gap-2">
-          {entries.map(({ event, run }) =>
-            run ? (
-              <View key={run.id} role="listitem" className="gap-0.5 border-foreground/40 border-l-2 pl-3">
-                <View className="flex-row items-center gap-2">
-                  <Text className="text-foreground text-sm">
-                    {run.agent?.name ?? 'A deleted agent'}{' '}
-                    {run.kind === DRAFT_RUN
-                      ? 'replied in the draft it was made from'
-                      : `worked it in ${run.lane?.name ?? 'a deleted lane'}`}
-                  </Text>
-                  <RunStatusBadge status={run.status} />
-                </View>
-                {run.error ? <Text className="text-negative text-sm">{run.error}</Text> : null}
-                <Text className="text-foreground/60 text-xs">{describeRun(run)}</Text>
-                <ViewRun runId={run.id} projectAi={projectAi} />
-              </View>
-            ) : (
-              <View key={event.id} role="listitem" className="gap-0.5 border-foreground/10 border-l-2 pl-3">
-                <Text className="text-foreground text-sm">{describe(event)}</Text>
-                {event.reason ? <Text className="text-foreground/60 text-sm">“{event.reason}”</Text> : null}
-                <Text className="text-foreground/60 text-xs">
-                  {actorName(event.actorKind)} · {formatTimestamp(event.at)}
+      <List
+        divided={false}
+        contentSlot={entries.map(({ event, run }) =>
+          run ? (
+            <View key={run.id} className="gap-0.5 border-foreground/40 border-l-2 pl-3">
+              <View className="flex-row items-center gap-2">
+                <Text className="text-foreground text-sm">
+                  {run.agent?.name ?? 'A deleted agent'}{' '}
+                  {run.kind === DRAFT_RUN
+                    ? 'replied in the draft it was made from'
+                    : `worked it in ${run.lane?.name ?? 'a deleted lane'}`}
                 </Text>
-                <ViewRun runId={event.runId} projectAi={projectAi} />
+                <RunStatusBadge status={run.status} />
               </View>
-            ),
-          )}
-        </View>
-      )}
+              {run.error ? <Text className="text-negative text-sm">{run.error}</Text> : null}
+              <Text className="text-foreground/60 text-xs">{describeRun(run)}</Text>
+              <ViewRun runId={run.id} projectAi={projectAi} />
+            </View>
+          ) : (
+            <View key={event.id} className="gap-0.5 border-foreground/10 border-l-2 pl-3">
+              <Text className="text-foreground text-sm">{describe(event)}</Text>
+              {event.reason ? <Text className="text-foreground/60 text-sm">“{event.reason}”</Text> : null}
+              <Text className="text-foreground/60 text-xs">
+                {actorName(event.actorKind)} · {formatTimestamp(event.at)}
+              </Text>
+              <ViewRun runId={event.runId} projectAi={projectAi} />
+            </View>
+          ),
+        )}
+      />
     </View>
   );
 }

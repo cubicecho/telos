@@ -3,6 +3,7 @@ import { type ComponentProps, type ReactNode, useState } from 'react';
 import { Text, View } from 'react-native';
 import { ArchiveRestore } from '@/components/app-icons';
 import { ConfirmButton } from '@/components/confirm-button';
+import { List } from '@/components/list';
 import { Button } from '@/components/ui/button';
 import { Trash2 } from '@/components/ui/icons';
 import { LoadState } from '@/components/ui/load-failure';
@@ -93,51 +94,50 @@ export function ArchivedTodoList({
         emptySlot={<Text className="text-foreground/60 text-sm">Nothing archived.</Text>}
       />
       {error ? <Text className="text-negative text-sm">{error}</Text> : null}
-      {todos.length > 0 ? (
-        <View role="list" aria-label="Archived todos" className="gap-2">
-          {todos.map((todo) => (
-            <View
-              key={todo.id}
-              role="listitem"
-              className="flex-row items-center gap-2 rounded-lg border border-foreground/10 bg-secondary px-3 py-2"
-            >
-              <View className="min-w-0 flex-1 gap-0.5">
-                <Text className="text-foreground text-sm">{todo.title}</Text>
-                <Text className="text-foreground/60 text-xs">
-                  {[
-                    todo.project?.name,
-                    todo.archivedAt ? `Archived ${formatTimestamp(todo.archivedAt)}` : null,
-                    todo.lane?.name,
-                    todo.completedAt ? 'done' : null,
-                  ]
-                    .filter(Boolean)
-                    .join(' · ')}
-                </Text>
-              </View>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={busy}
-                aria-label={`Restore ${todo.title}`}
-                onPress={() => run(() => restoreTodo({ variables: { id: todo.id } }))}
-                iconSlot={<ArchiveRestore className="h-4 w-4" />}
-                content="Restore"
-              />
-              <ConfirmButton
-                variant="ghost"
-                size="icon-xs"
-                className="hover:text-negative"
-                disabled={busy}
-                label={`Delete ${todo.title} for good`}
-                title="Delete this todo for good?"
-                description={`“${todo.title}”, its history, notes, runs and dependency links are removed. This cannot be undone.`}
-                onConfirm={() => void run(() => deleteForGood({ variables: { id: todo.id } }))}
-                iconSlot={<Trash2 className="h-4 w-4" />}
-              />
+      <List
+        label="Archived todos"
+        divided={false}
+        contentSlot={todos.map((todo) => (
+          <View
+            key={todo.id}
+            className="flex-row items-center gap-2 rounded-lg border border-foreground/10 bg-secondary px-3 py-2"
+          >
+            <View className="min-w-0 flex-1 gap-0.5">
+              <Text className="text-foreground text-sm">{todo.title}</Text>
+              <Text className="text-foreground/60 text-xs">
+                {[
+                  todo.project?.name,
+                  todo.archivedAt ? `Archived ${formatTimestamp(todo.archivedAt)}` : null,
+                  todo.lane?.name,
+                  todo.completedAt ? 'done' : null,
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </Text>
             </View>
-          ))}
-        </View>
-      ) : null}
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={busy}
+              aria-label={`Restore ${todo.title}`}
+              onPress={() => run(() => restoreTodo({ variables: { id: todo.id } }))}
+              iconSlot={<ArchiveRestore className="h-4 w-4" />}
+              content="Restore"
+            />
+            <ConfirmButton
+              variant="ghost"
+              size="icon-xs"
+              className="hover:text-negative"
+              disabled={busy}
+              aria-label={`Delete ${todo.title} for good`}
+              title="Delete this todo for good?"
+              description={`“${todo.title}”, its history, notes, runs and dependency links are removed. This cannot be undone.`}
+              onConfirm={() => void run(() => deleteForGood({ variables: { id: todo.id } }))}
+              iconSlot={<Trash2 className="h-4 w-4" />}
+            />
+          </View>
+        ))}
+      />
       {footer}
     </View>
   );

@@ -4,6 +4,7 @@ import { Text, View } from 'react-native';
 import type { RunFilters } from '@/__generated__/graphql';
 import { TodoFormDialog } from '@/components/domain/todo/todo-form-dialog';
 import type { TodoSummary } from '@/components/domain/todo/types';
+import { List } from '@/components/list';
 import { StatTile } from '@/components/stat-tile';
 import { Button } from '@/components/ui/button';
 import { LoadState } from '@/components/ui/load-failure';
@@ -121,13 +122,11 @@ export function ProjectRuns({
             </Text>
           }
         />
-        {runs.length === 0 ? null : (
-          <View role="list" aria-label="Runs" className="gap-2">
-            {runs.map((run) => (
-              <RunRow key={run.id} run={run} showTodo />
-            ))}
-          </View>
-        )}
+        <List
+          label="Runs"
+          divided={false}
+          contentSlot={runs.map((run) => <RunRow key={run.id} run={run} showTodo />)}
+        />
         {/* A full page means there may be more; a short one means there is not. */}
         {runs.length >= limit ? (
           <Button
@@ -168,20 +167,20 @@ export function ProjectArtifacts({ projectId }: { projectId: string }) {
           <Text className="text-foreground/60 text-sm">Nothing has been made for this project’s todos yet.</Text>
         }
       />
-      {artifacts.length === 0 ? null : (
-        <View role="list" aria-label="Artifacts" className="gap-1">
-          {artifacts.map((artifact) => (
-            <ArtifactRow
-              key={artifact.id}
-              artifact={artifact}
-              todoTitle={todoLabelOf(artifact)}
-              onOpenNote={(noteId) => {
-                if (artifact.todo) setOpened({ todo: artifact.todo, noteId });
-              }}
-            />
-          ))}
-        </View>
-      )}
+      <List
+        label="Artifacts"
+        divided={false}
+        contentSlot={artifacts.map((artifact) => (
+          <ArtifactRow
+            key={artifact.id}
+            artifact={artifact}
+            todoTitle={todoLabelOf(artifact)}
+            onOpenNote={(noteId) => {
+              if (artifact.todo) setOpened({ todo: artifact.todo, noteId });
+            }}
+          />
+        ))}
+      />
       {artifacts.length >= limit ? (
         <Button
           variant="outline"

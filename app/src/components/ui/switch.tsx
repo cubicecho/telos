@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { Platform, Pressable, View } from 'react-native';
 import { SWITCH_THUMB_CLASS, SWITCH_TRACK_CLASS, type SwitchProps } from '@/components/ui/switch-base';
 import { cn } from '@/lib/utils';
 
+/** A control that is on or off. */
 function Switch({
   checked: checkedProp,
   defaultChecked = false,
@@ -11,6 +12,7 @@ function Switch({
   onBlur,
   accessibilityLabel,
   'aria-labelledby': ariaLabelledBy,
+  'aria-describedby': ariaDescribedBy,
   className,
 }: SwitchProps) {
   // Controlled when `checked` is passed and self-driving otherwise, the way radix's is.
@@ -22,6 +24,9 @@ function Switch({
       aria-checked={checked}
       aria-label={accessibilityLabel}
       aria-labelledby={ariaLabelledBy}
+      // What react-native has no prop for, in the spelling react-native-web reads — the same
+      // arrangement as `Input`'s.
+      {...(Platform.OS === 'web' && ariaDescribedBy !== undefined ? { 'aria-describedby': ariaDescribedBy } : {})}
       disabled={disabled}
       onPress={() => {
         setCheckedState(!checked);
@@ -30,7 +35,7 @@ function Switch({
       onBlur={onBlur}
       className={cn(
         SWITCH_TRACK_CLASS,
-        checked ? 'bg-active' : 'bg-foreground/15',
+        checked ? 'bg-active' : 'bg-foreground/50',
         // `disabled:` never applies to a Pressable — apply the state directly.
         disabled && 'opacity-50',
         className,

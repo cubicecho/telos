@@ -16,6 +16,7 @@ import { cn } from '@/lib/utils';
 /** The shared contract, widened to what the radix part underneath accepts. */
 type Wide<Base, Radix> = Base & Omit<Radix, keyof Base>;
 
+/** The root of a set of tabs: it holds which one is active. */
 function Tabs({
   value,
   onValueChange,
@@ -44,13 +45,19 @@ function Tabs({
  */
 function reveal(list: HTMLElement) {
   const tab = list.querySelector('[role="tab"][data-state="active"]');
-  if (!tab) return;
+  if (!tab) {
+    return;
+  }
   const box = list.getBoundingClientRect();
   const span = tab.getBoundingClientRect();
-  if (span.left < box.left) list.scrollLeft -= box.left - span.left + TABS_LIST_INSET;
-  else if (span.right > box.right) list.scrollLeft += span.right - box.right + TABS_LIST_INSET;
+  if (span.left < box.left) {
+    list.scrollLeft -= box.left - span.left + TABS_LIST_INSET;
+  } else if (span.right > box.right) {
+    list.scrollLeft += span.right - box.right + TABS_LIST_INSET;
+  }
 }
 
+/** The row of tab buttons. */
 function TabsList({ className, ref, ...props }: Wide<TabsListProps, React.ComponentProps<typeof TabsPrimitive.List>>) {
   const list = useRef<HTMLDivElement | null>(null);
 
@@ -58,7 +65,9 @@ function TabsList({ className, ref, ...props }: Wide<TabsListProps, React.Compon
   // is watched: it covers a click, an arrow key, the caller's `value` and a `defaultValue` alike.
   useEffect(() => {
     const node = list.current;
-    if (!node) return;
+    if (!node) {
+      return;
+    }
     reveal(node);
     const observer = new MutationObserver(() => reveal(node));
     observer.observe(node, { attributes: true, attributeFilter: ['data-state'], subtree: true });
@@ -70,8 +79,12 @@ function TabsList({ className, ref, ...props }: Wide<TabsListProps, React.Compon
       data-slot="tabs-list"
       ref={(node) => {
         list.current = node;
-        if (typeof ref === 'function') return ref(node);
-        if (ref) ref.current = node;
+        if (typeof ref === 'function') {
+          return ref(node);
+        }
+        if (ref) {
+          ref.current = node;
+        }
       }}
       // `justify-center-safe`: plain centring puts the first tabs of a row that overflows past
       // the start, where no scrolling reaches them. The scrollbar is hidden because the row is
@@ -86,6 +99,7 @@ function TabsList({ className, ref, ...props }: Wide<TabsListProps, React.Compon
   );
 }
 
+/** One tab's button, which shows the pane with the same `value`. */
 function TabsTrigger({
   className,
   disabled,
@@ -114,6 +128,7 @@ function TabsTrigger({
   );
 }
 
+/** One tab's pane, rendered while its tab is active. */
 function TabsContent({
   className,
   ...props

@@ -1,7 +1,6 @@
 import { type ApolloCache, useMutation } from '@apollo/client';
 import { useState } from 'react';
 import { Pressable, Text, View, type ViewProps } from 'react-native';
-import { ActionButton } from '@/components/action-button';
 import { Archive } from '@/components/app-icons';
 import { AiIgnoredBadge } from '@/components/domain/ai/ai-ignored-badge';
 import { LabelBadge, type LabelSummary } from '@/components/domain/label/label-badge';
@@ -9,6 +8,7 @@ import { LabelPicker } from '@/components/domain/label/label-picker';
 import { LaneBadge } from '@/components/domain/lane/lane-badge';
 import { LanePicker } from '@/components/domain/lane/lane-picker';
 import { useMoveTodo } from '@/components/domain/lane/use-move-todo';
+import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Pencil } from '@/components/ui/icons';
 import { bumpProjectCounts, type CachedLane, laneForCompletion, updateProjectTodos } from '@/lib/cache';
@@ -252,11 +252,11 @@ export function TodoRow({
             the old `has-[[data-state=open]]` guard read a radix attribute that
             react-native-web does not forward onto a `Pressable`. */}
         <View className={cn('h-5 shrink-0 flex-row items-center focus-within:opacity-100', HOVER_REVEAL)}>
-          <ActionButton
+          <Button
             variant="ghost"
             size="icon-xs"
             onPress={() => setEditing(true)}
-            label={`Edit ${todo.title}`}
+            aria-label={`Edit ${todo.title}`}
             iconSlot={<Pencil className="h-4 w-4" />}
           />
           <LanePicker
@@ -270,11 +270,11 @@ export function TodoRow({
           <LabelPicker attached={todo.labels} onToggle={toggleLabel} align="end" size="icon-xs" />
           <DependencyPicker todo={todo} candidates={siblings} onToggle={toggleDependency} align="end" size="icon-xs" />
           {/* No confirmation: archiving is undone from the Archived view. */}
-          <ActionButton
+          <Button
             variant="ghost"
             size="icon-xs"
             onPress={() => void archive()}
-            label={`Archive ${todo.title}`}
+            aria-label={`Archive ${todo.title}`}
             iconSlot={<Archive className="h-4 w-4" />}
           />
         </View>
