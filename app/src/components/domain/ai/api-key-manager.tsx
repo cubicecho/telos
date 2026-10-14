@@ -1,10 +1,10 @@
 import { useMutation, useQuery } from '@apollo/client';
 import { useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
-import { ActionButton } from '@/components/action-button';
 import { useAppForm } from '@/components/app-form';
 import { ConfirmButton } from '@/components/confirm-button';
 import { DialogLayout } from '@/components/dialog-layout';
+import { List } from '@/components/list';
 import { EmptyState } from '@/components/page';
 import { Section } from '@/components/section';
 import { Button } from '@/components/ui/button';
@@ -99,43 +99,41 @@ export function ApiKeyManager() {
               />
             }
           />
-          {keys.length === 0 ? null : (
-            <View role="list" className="gap-1">
-              {keys.map((key) => (
-                <View
-                  key={key.id}
-                  role="listitem"
-                  className="flex-row items-center gap-3 rounded-lg border border-foreground/10 bg-secondary px-3 py-2"
-                >
-                  <View className="flex-1 gap-0.5">
-                    <Text numberOfLines={1} className="text-foreground text-sm">
-                      {key.name || 'Unnamed key'}
-                      {key.start ? <Text className="font-mono text-foreground/60"> {key.start}…</Text> : null}
-                    </Text>
-                    <Text className="text-foreground/60 text-xs">{describeKey(key)}</Text>
-                  </View>
-                  <ActionButton
-                    variant="ghost"
-                    size="icon-sm"
-                    label={`Tools for ${key.name || 'key'}`}
-                    onPress={() => setSwitching(key.id)}
-                    iconSlot={<Settings className="h-4 w-4" />}
-                  />
-                  <ConfirmButton
-                    variant="ghost"
-                    size="icon-sm"
-                    className="hover:text-negative"
-                    label={`Revoke ${key.name || 'key'}`}
-                    title={`Revoke “${key.name || 'this key'}”?`}
-                    description="Anything signed in with it stops working at once. This cannot be undone."
-                    confirmLabel="Revoke"
-                    onConfirm={() => confirmDelete(key)}
-                    iconSlot={<Trash2 className="h-4 w-4" />}
-                  />
+          <List
+            divided={false}
+            contentSlot={keys.map((key) => (
+              <View
+                key={key.id}
+                className="flex-row items-center gap-3 rounded-lg border border-foreground/10 bg-secondary px-3 py-2"
+              >
+                <View className="flex-1 gap-0.5">
+                  <Text numberOfLines={1} className="text-foreground text-sm">
+                    {key.name || 'Unnamed key'}
+                    {key.start ? <Text className="font-mono text-foreground/60"> {key.start}…</Text> : null}
+                  </Text>
+                  <Text className="text-foreground/60 text-xs">{describeKey(key)}</Text>
                 </View>
-              ))}
-            </View>
-          )}
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label={`Tools for ${key.name || 'key'}`}
+                  onPress={() => setSwitching(key.id)}
+                  iconSlot={<Settings className="h-4 w-4" />}
+                />
+                <ConfirmButton
+                  variant="ghost"
+                  size="icon-sm"
+                  className="hover:text-negative"
+                  aria-label={`Revoke ${key.name || 'key'}`}
+                  title={`Revoke “${key.name || 'this key'}”?`}
+                  description="Anything signed in with it stops working at once. This cannot be undone."
+                  confirmLabel="Revoke"
+                  onConfirm={() => confirmDelete(key)}
+                  iconSlot={<Trash2 className="h-4 w-4" />}
+                />
+              </View>
+            ))}
+          />
 
           <CreateApiKeyDialog open={creating} onOpenChange={setCreating} />
 

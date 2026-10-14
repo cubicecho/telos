@@ -2,6 +2,7 @@ import { useMutation, useQuery } from '@apollo/client';
 import { useState } from 'react';
 import { Text, View } from 'react-native';
 import { ConfirmButton } from '@/components/confirm-button';
+import { List } from '@/components/list';
 import { EmptyState } from '@/components/page';
 import { Section } from '@/components/section';
 import { Library, Trash2 } from '@/components/ui/icons';
@@ -69,37 +70,35 @@ export function TemplateManager() {
               />
             }
           />
-          {templates.length === 0 ? null : (
-            <View role="list" className="gap-1">
-              {templates.map((template) => (
-                <View
-                  key={template.id}
-                  role="listitem"
-                  className="group flex-row items-center gap-3 rounded-lg border border-foreground/10 bg-secondary px-3 py-2"
-                >
-                  <View className="min-w-0 flex-1">
-                    <Text numberOfLines={1} className="text-foreground text-sm">
-                      {template.name}
-                    </Text>
-                    <Text numberOfLines={1} className="text-foreground/60 text-xs">
-                      {laneNames(template.lanes)}
-                    </Text>
-                  </View>
-                  <ConfirmButton
-                    variant="ghost"
-                    size="icon-sm"
-                    className={cn('hover:text-negative focus-visible:opacity-100', HOVER_REVEAL)}
-                    label={`Delete ${template.name}`}
-                    title={`Delete “${template.name}”?`}
-                    description="Projects already made from it keep their lanes."
-                    confirmLabel="Delete"
-                    onConfirm={() => confirmDelete(template)}
-                    iconSlot={<Trash2 className="h-4 w-4" />}
-                  />
+          <List
+            divided={false}
+            contentSlot={templates.map((template) => (
+              <View
+                key={template.id}
+                className="group flex-row items-center gap-3 rounded-lg border border-foreground/10 bg-secondary px-3 py-2"
+              >
+                <View className="min-w-0 flex-1">
+                  <Text numberOfLines={1} className="text-foreground text-sm">
+                    {template.name}
+                  </Text>
+                  <Text numberOfLines={1} className="text-foreground/60 text-xs">
+                    {laneNames(template.lanes)}
+                  </Text>
                 </View>
-              ))}
-            </View>
-          )}
+                <ConfirmButton
+                  variant="ghost"
+                  size="icon-sm"
+                  className={cn('hover:text-negative focus-visible:opacity-100', HOVER_REVEAL)}
+                  aria-label={`Delete ${template.name}`}
+                  title={`Delete “${template.name}”?`}
+                  description="Projects already made from it keep their lanes."
+                  confirmLabel="Delete"
+                  onConfirm={() => confirmDelete(template)}
+                  iconSlot={<Trash2 className="h-4 w-4" />}
+                />
+              </View>
+            ))}
+          />
         </View>
       }
     />

@@ -68,7 +68,7 @@ export function RunRow({
     );
 
   return (
-    <View role="listitem" className="gap-1">
+    <View className="gap-1">
       <DisclosureRow
         open={open}
         onOpenChange={setOpen}
@@ -101,8 +101,7 @@ export function RunRow({
                 variant="ghost"
                 size="sm"
                 disabled={deleting}
-                label={`Delete the run ${title}`}
-                tooltip={false}
+                aria-label={`Delete the run ${title}`}
                 title="Delete this run?"
                 description={ofDraft ? DELETE_DRAFT_RUN : DELETE_TODO_RUN}
                 onConfirm={remove}

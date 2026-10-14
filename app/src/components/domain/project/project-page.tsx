@@ -2,7 +2,6 @@ import { useMutation } from '@apollo/client';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Text, View } from 'react-native';
-import { ActionButton } from '@/components/action-button';
 import { MessageSquare } from '@/components/app-icons';
 import { DescriptionList, PropertyRow } from '@/components/description-list';
 import { AiSetupChecklist } from '@/components/domain/ai/ai-setup-checklist';
@@ -13,6 +12,7 @@ import { LabelPicker } from '@/components/domain/label/label-picker';
 import { SaveTemplateDialog } from '@/components/domain/template/save-template-dialog';
 import { HeaderContentFooter } from '@/components/header-content-footer';
 import { PageHeader } from '@/components/page-header';
+import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Copy, Ellipsis, Pencil, Trash2 } from '@/components/ui/icons';
 import { Menu, MenuContent, MenuItem, MenuTrigger } from '@/components/ui/menu';
@@ -144,10 +144,10 @@ export function ProjectPage({
                   header reads as its name and its numbers rather than a row of icons. */}
                   <Menu>
                     <MenuTrigger asChild>
-                      <ActionButton
+                      <Button
                         variant="ghost"
                         size="icon"
-                        label="Project actions"
+                        aria-label="Project actions"
                         iconSlot={<Ellipsis className="h-4 w-4" />}
                       />
                     </MenuTrigger>

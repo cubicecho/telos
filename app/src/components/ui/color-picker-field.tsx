@@ -42,6 +42,7 @@ function ColorFieldControl(control: Omit<ColorFieldProps, keyof FieldProps>) {
   );
 }
 
+/** A `ColorPicker` bound to a form field holding a hex colour. */
 export function ColorField(props: ColorFieldProps) {
   const [fieldProps, control] = splitProps(props);
   return <FieldWrapper {...fieldProps} controlSlot={<ColorFieldControl {...control} />} />;

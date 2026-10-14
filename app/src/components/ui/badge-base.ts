@@ -1,6 +1,7 @@
 import { cva } from 'class-variance-authority';
 import { Children, type ReactNode } from 'react';
 
+/** The meanings a badge can carry, which pick its colours. */
 export type BadgeVariant =
   | 'default'
   | 'secondary'
@@ -54,7 +55,7 @@ export type BadgeProps = {
 
 /** Whether `children` holds anything to show, which is what decides pill or dot. */
 export function badgeHasLabel(children: ReactNode): boolean {
-  return !(children === undefined || children === null || children === false || children === '');
+  return children !== undefined && children !== null && children !== false && children !== '';
 }
 
 /**
@@ -115,7 +116,7 @@ const BADGE_INK = {
 } satisfies Record<BadgeVariant, string>;
 
 /** The label's type and colour, per variant. */
-export const badgeTextVariants = cva('text-xs font-medium', {
+export const badgeTextVariants = cva('text-xs font-semibold', {
   variants: {
     variant: { ...BADGE_INK, link: 'text-info underline-offset-4' },
   },
@@ -132,7 +133,7 @@ export const badgeInkVariants = cva('', {
 });
 
 /** The label's class when `backgroundColor` replaced the variant's own. */
-export const badgeTextFallback = 'text-xs font-medium text-foreground';
+export const badgeTextFallback = 'text-xs font-semibold text-foreground';
 
 /** `badgeInkVariants`' counterpart, for when `backgroundColor` replaced the variant's own. */
 export const badgeInkFallback = 'text-foreground';

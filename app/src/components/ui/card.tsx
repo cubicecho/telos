@@ -26,6 +26,7 @@ type CardProps = ViewProps & {
   onPress?: React.ComponentProps<typeof Pressable>['onPress'] | undefined;
 };
 
+/** A bordered surface for one thing, pressable when given `onPress`. */
 const Card = React.forwardRef<React.ElementRef<typeof View>, CardProps>(
   ({ className, accentColor, accentLabel, onPress, children, ...props }, ref) => {
     const classes = cn(
@@ -60,6 +61,7 @@ const Card = React.forwardRef<React.ElementRef<typeof View>, CardProps>(
 );
 Card.displayName = 'Card';
 
+/** The top of a card, holding its title and description. */
 const CardHeader = React.forwardRef<React.ElementRef<typeof View>, ViewProps>(({ className, ...props }, ref) => (
   <View ref={ref} className={cn('flex flex-col gap-1.5 p-6', className)} {...props} />
 ));
@@ -80,6 +82,7 @@ const CARD_TITLE = 'text-base font-semibold leading-none text-foreground';
 
 // One arm per level because the compiler emits `<h1>`–`<h3>` from a *literal* `aria-level`; a level
 // held in a variable would be a tag chosen at runtime, which it refuses (see `page-header.tsx`).
+/** The card's title, a heading of rank `level`. */
 const CardTitle = React.forwardRef<React.ElementRef<typeof Text>, CardTitleProps>(
   ({ className, level = 3, ...props }, ref) => {
     if (level === 1) {
@@ -93,16 +96,19 @@ const CardTitle = React.forwardRef<React.ElementRef<typeof Text>, CardTitleProps
 );
 CardTitle.displayName = 'CardTitle';
 
+/** The muted line under the card's title. */
 const CardDescription = React.forwardRef<React.ElementRef<typeof Text>, TextProps>(({ className, ...props }, ref) => (
   <Text ref={ref} className={cn('text-sm text-foreground/60', className)} {...props} />
 ));
 CardDescription.displayName = 'CardDescription';
 
+/** The card's body. */
 const CardContent = React.forwardRef<React.ElementRef<typeof View>, ViewProps>(({ className, ...props }, ref) => (
   <View ref={ref} className={cn('p-6 pt-0', className)} {...props} />
 ));
 CardContent.displayName = 'CardContent';
 
+/** The row at the bottom of a card, for its actions. */
 const CardFooter = React.forwardRef<React.ElementRef<typeof View>, ViewProps>(({ className, ...props }, ref) => (
   <View ref={ref} className={cn('flex flex-row items-center p-6 pt-0', className)} {...props} />
 ));

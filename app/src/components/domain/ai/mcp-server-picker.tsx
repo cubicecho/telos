@@ -1,6 +1,6 @@
 import { useQuery } from '@apollo/client';
 import { Text, View } from 'react-native';
-import { ActionButton } from '@/components/action-button';
+import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Field, FieldContent, FieldDescription, FieldTitle } from '@/components/ui/field';
 import { X } from '@/components/ui/icons';
@@ -77,10 +77,10 @@ export function McpServerPicker({
           {missing.map((slug) => (
             <View key={slug} className="flex-row items-center gap-2">
               <Text className="flex-1 text-negative text-xs">“{slug}” no longer exists, so it is left out.</Text>
-              <ActionButton
+              <Button
                 variant="ghost"
                 size="icon-sm"
-                label={`Remove ${slug}`}
+                aria-label={`Remove ${slug}`}
                 onPress={() => toggle(slug, false)}
                 iconSlot={<X className="h-4 w-4" />}
               />

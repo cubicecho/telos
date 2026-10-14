@@ -3,6 +3,7 @@ import { Link } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
 import type { AiStatusQuery } from '@/__generated__/graphql';
+import { List } from '@/components/list';
 import { EmptyState } from '@/components/page';
 import { Section } from '@/components/section';
 import { StatTile } from '@/components/stat-tile';
@@ -122,64 +123,63 @@ export function AiStatus({ pollMs = STATUS_POLL_MS }: { pollMs?: number }) {
               }
             />
             {retryState.error ? <Text className="text-negative text-sm">{describeError(retryState.error)}</Text> : null}
-            {shown.length > 0 ? (
-              <View role="list" aria-label={focused.label} className="gap-2">
-                {shown.map((todo) => (
-                  <View
-                    key={todo.todoId}
-                    role="listitem"
-                    className="gap-1 rounded-lg border border-foreground/10 bg-secondary px-3 py-2.5"
-                  >
-                    <View className="flex-row items-center gap-2">
-                      <Badge variant={focused.variant}>{focused.label}</Badge>
-                      <Text className="min-w-0 flex-1 font-medium text-foreground text-sm">{todo.title}</Text>
-                      {todo.state === 'attention' ? (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          aria-label={`Send “${todo.title}” round again`}
-                          disabled={retryState.loading}
-                          onPress={() => retryTodo({ variables: { id: todo.todoId } }).catch(() => undefined)}
-                          content="Retry"
-                        />
-                      ) : null}
-                      {todo.liveRunId ? (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          aria-label={`Watch the agent work “${todo.title}”`}
-                          onPress={() => setWatching(todo.liveRunId ?? null)}
-                          content="Watch"
-                        />
-                      ) : null}
-                      <Link href={`/projects/${todo.projectId}?view=board`} asChild>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          aria-label={`Open the board “${todo.title}” is on`}
-                          content="Board"
-                        />
-                      </Link>
-                    </View>
-                    <Text className="text-foreground/60 text-xs">
-                      {where(todo)}
-                      {todo.failures > 0
-                        ? ` · ${todo.failures} failed ${todo.failures === 1 ? 'attempt' : 'attempts'}`
-                        : ''}
-                    </Text>
-                    {todo.reason ? (
-                      <Text
-                        selectable
-                        numberOfLines={3}
-                        className={cn('text-sm', todo.state === 'attention' ? 'text-warning' : 'text-foreground/60')}
-                      >
-                        {todo.reason}
-                      </Text>
+            <List
+              label={focused.label}
+              divided={false}
+              contentSlot={shown.map((todo) => (
+                <View
+                  key={todo.todoId}
+                  className="gap-1 rounded-lg border border-foreground/10 bg-secondary px-3 py-2.5"
+                >
+                  <View className="flex-row items-center gap-2">
+                    <Badge variant={focused.variant}>{focused.label}</Badge>
+                    <Text className="min-w-0 flex-1 font-medium text-foreground text-sm">{todo.title}</Text>
+                    {todo.state === 'attention' ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        aria-label={`Send “${todo.title}” round again`}
+                        disabled={retryState.loading}
+                        onPress={() => retryTodo({ variables: { id: todo.todoId } }).catch(() => undefined)}
+                        content="Retry"
+                      />
                     ) : null}
+                    {todo.liveRunId ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        aria-label={`Watch the agent work “${todo.title}”`}
+                        onPress={() => setWatching(todo.liveRunId ?? null)}
+                        content="Watch"
+                      />
+                    ) : null}
+                    <Link href={`/projects/${todo.projectId}?view=board`} asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        aria-label={`Open the board “${todo.title}” is on`}
+                        content="Board"
+                      />
+                    </Link>
                   </View>
-                ))}
-              </View>
-            ) : null}
+                  <Text className="text-foreground/60 text-xs">
+                    {where(todo)}
+                    {todo.failures > 0
+                      ? ` · ${todo.failures} failed ${todo.failures === 1 ? 'attempt' : 'attempts'}`
+                      : ''}
+                  </Text>
+                  {todo.reason ? (
+                    <Text
+                      selectable
+                      numberOfLines={3}
+                      className={cn('text-sm', todo.state === 'attention' ? 'text-warning' : 'text-foreground/60')}
+                    >
+                      {todo.reason}
+                    </Text>
+                  ) : null}
+                </View>
+              ))}
+            />
           </View>
         }
       />
@@ -200,13 +200,10 @@ export function AiStatus({ pollMs = STATUS_POLL_MS }: { pollMs?: number }) {
                   >
                     {project.name}
                   </Link>
-                  <View role="list" aria-label={`${project.name}’s lanes`}>
-                    {project.lanes.map((lane) => (
-                      <View
-                        key={lane.laneId}
-                        role="listitem"
-                        className="flex-row flex-wrap items-baseline gap-x-3 gap-y-0.5 border-foreground/10 border-b py-1.5"
-                      >
+                  <List
+                    label={`${project.name}’s lanes`}
+                    contentSlot={project.lanes.map((lane) => (
+                      <View key={lane.laneId} className="flex-row flex-wrap items-baseline gap-x-3 gap-y-0.5 py-0.5">
                         <Text className="min-w-32 text-foreground text-sm">{lane.name}</Text>
                         <Text className="text-foreground/60 text-xs">
                           {lane.station ? 'agent' : lane.isDone ? 'done lane' : 'resting place'}
@@ -225,7 +222,7 @@ export function AiStatus({ pollMs = STATUS_POLL_MS }: { pollMs?: number }) {
                         </Text>
                       </View>
                     ))}
-                  </View>
+                  />
                 </View>
               ))}
             </View>
@@ -282,13 +279,11 @@ function RecentFailures({ pollMs }: { pollMs: number }) {
             count={runs.length}
             emptySlot={<Text className="text-foreground/60 text-sm">No run failed.</Text>}
           />
-          {runs.length > 0 ? (
-            <View role="list" aria-label="Failed runs" className="gap-2">
-              {runs.map((run) => (
-                <RunRow key={run.id} run={run} showTodo />
-              ))}
-            </View>
-          ) : null}
+          <List
+            label="Failed runs"
+            divided={false}
+            contentSlot={runs.map((run) => <RunRow key={run.id} run={run} showTodo />)}
+          />
         </View>
       }
     />

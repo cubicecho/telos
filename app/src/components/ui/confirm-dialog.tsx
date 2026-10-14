@@ -66,12 +66,7 @@ export function ConfirmDialog({
 }: ConfirmDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        role="alertdialog"
-        showCloseButton={false}
-        onInteractOutside={holdOpen}
-        className="sm:max-w-[360px]"
-      >
+      <DialogContent role="alertdialog" showCloseButton={false} onInteractOutside={holdOpen} className="sm:max-w-sm">
         {/* Keyed by the text, so a prompt raised over an open one for something else starts
             empty too. Closing unmounts the body on both platforms, which is what empties the
             box between openings. */}
@@ -149,7 +144,9 @@ function ConfirmDialogBody({
             value={typed}
             onChangeText={setTyped}
             onSubmitEditing={() => {
-              if (!locked) onConfirm();
+              if (locked === false) {
+                onConfirm();
+              }
             }}
             autoFocus
           />

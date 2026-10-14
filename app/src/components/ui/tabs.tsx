@@ -17,11 +17,14 @@ type TabsState = { value: string; setValue: (value: string) => void };
 
 const TabsContext = createContext<TabsState>({ value: '', setValue: () => {} });
 
+/** The root of a set of tabs: it holds which one is active. */
 function Tabs({ value: controlled, onValueChange, defaultValue, className, children }: TabsProps) {
   const [uncontrolled, setUncontrolled] = useState(defaultValue ?? '');
   const value = controlled ?? uncontrolled;
   const setValue = (next: string) => {
-    if (controlled === undefined) setUncontrolled(next);
+    if (controlled === undefined) {
+      setUncontrolled(next);
+    }
     onValueChange?.(next);
   };
   return (
@@ -37,6 +40,7 @@ type Span = { x: number; width: number };
 /** How a trigger tells its list where the selected tab is, so the list can bring it into view. */
 const TabsListContext = createContext<(tab: Span) => void>(() => {});
 
+/** The row of tab buttons. */
 function TabsList({ 'aria-label': ariaLabel, 'aria-labelledby': ariaLabelledBy, className, children }: TabsListProps) {
   const scroller = useRef<ScrollView>(null);
   // Refs, not state: none of the three is drawn, and a scroll would otherwise render the row.
@@ -47,7 +51,9 @@ function TabsList({ 'aria-label': ariaLabel, 'aria-labelledby': ariaLabelledBy, 
   const reveal = () => {
     const tab = selected.current;
     // The triggers can be laid out before the scroller is; it calls back when it has a width.
-    if (!tab || viewport.current === 0) return;
+    if (!tab || viewport.current === 0) {
+      return;
+    }
     const end = tab.x + tab.width;
     if (tab.x < offset.current) {
       scroller.current?.scrollTo({ x: Math.max(0, tab.x - TABS_LIST_INSET) });
@@ -104,7 +110,9 @@ function label(children: ReactNode, className: string): ReactNode[] {
   const parts: ReactNode[] = [];
   let run: (string | number)[] = [];
   const flush = () => {
-    if (run.length === 0) return;
+    if (run.length === 0) {
+      return;
+    }
     parts.push(
       <Text key={`text-${parts.length}`} className={className}>
         {run.join('')}
@@ -113,8 +121,9 @@ function label(children: ReactNode, className: string): ReactNode[] {
     run = [];
   };
   for (const child of Children.toArray(children)) {
-    if (typeof child === 'string' || typeof child === 'number') run.push(child);
-    else {
+    if (typeof child === 'string' || typeof child === 'number') {
+      run.push(child);
+    } else {
       flush();
       parts.push(child);
     }
@@ -123,6 +132,7 @@ function label(children: ReactNode, className: string): ReactNode[] {
   return parts;
 }
 
+/** One tab's button, which shows the pane with the same `value`. */
 function TabsTrigger({ value, disabled = false, className, children, trailingSlot }: TabsTriggerProps) {
   const tabs = useContext(TabsContext);
   const reveal = useContext(TabsListContext);
@@ -134,7 +144,9 @@ function TabsTrigger({ value, disabled = false, className, children, trailingSlo
   // off the end of the row. `reveal` is the list's, new every render, and not what this follows.
   // biome-ignore lint/correctness/useExhaustiveDependencies: runs when the tab becomes active
   useEffect(() => {
-    if (active && span.current) reveal(span.current);
+    if (active && span.current) {
+      reveal(span.current);
+    }
   }, [active]);
 
   return (
@@ -143,7 +155,9 @@ function TabsTrigger({ value, disabled = false, className, children, trailingSlo
       onLayout={(event) => {
         const { x, width } = event.nativeEvent.layout;
         span.current = { x, width };
-        if (active) reveal(span.current);
+        if (active) {
+          reveal(span.current);
+        }
       }}
       aria-selected={active}
       aria-disabled={disabled}
@@ -162,10 +176,17 @@ function TabsTrigger({ value, disabled = false, className, children, trailingSlo
   );
 }
 
+/** One tab's pane, rendered while its tab is active. */
 function TabsContent({ value, className, children }: TabsContentProps) {
   const tabs = useContext(TabsContext);
-  if (tabs.value !== value) return null;
-  return <View className={cn('mt-2', className)}>{children}</View>;
+  if (tabs.value !== value) {
+    return null;
+  }
+  return (
+    <View role="tabpanel" className={cn('mt-2', className)}>
+      {children}
+    </View>
+  );
 }
 
 export { Tabs, TabsContent, TabsList, TabsTrigger };

@@ -60,6 +60,9 @@ const PRESSABLE = Platform.select({
  */
 const SLOT = Platform.select({ web: 'block', default: undefined });
 
+/**
+ * One number on a card: a label, the figure and a hint, pressable as a filter when given `onPress`.
+ */
 export function StatTile({
   label,
   value,
@@ -74,11 +77,8 @@ export function StatTile({
   const toggle = onPress !== undefined && selected !== undefined;
   // The pressed state in each platform's spelling. react-native-web forwards `aria-*` and drops
   // `accessibilityState`; the device reads `accessibilityState` and has no `aria-pressed`.
-  const pressed = toggle
-    ? Platform.OS === 'web'
-      ? { 'aria-pressed': selected }
-      : { accessibilityState: { selected } }
-    : {};
+  const pressedState = Platform.OS === 'web' ? { 'aria-pressed': selected } : { accessibilityState: { selected } };
+  const pressed = toggle ? pressedState : {};
 
   // The label, hint and icon. A selected tile keeps its card fill and is marked by its border
   // alone, so this ink is the same whether or not it is chosen.
@@ -90,6 +90,20 @@ export function StatTile({
     className,
   );
 
+  const figure =
+    typeof value === 'string' || typeof value === 'number' ? (
+      <Text
+        testID="stat-tile-value"
+        className={cn('font-semibold text-2xl text-foreground tabular-nums', valueClassName)}
+      >
+        {value}
+      </Text>
+    ) : (
+      <View testID="stat-tile-value" className={cn(SLOT, 'min-w-0', valueClassName)}>
+        {value}
+      </View>
+    );
+
   const body = (
     <>
       <View testID="stat-tile-label-row" className="min-w-0 flex-row items-center gap-2">
@@ -98,24 +112,11 @@ export function StatTile({
             <IconClassContext.Provider value={cn('size-4 shrink-0', ink)}>{iconSlot}</IconClassContext.Provider>
           </View>
         ) : null}
-        <Text testID="stat-tile-label" className={cn('min-w-0 flex-1 truncate font-medium text-sm', ink)}>
+        <Text testID="stat-tile-label" className={cn('min-w-0 flex-1 truncate font-semibold text-sm', ink)}>
           {label}
         </Text>
       </View>
-      {loading ? (
-        <View testID="stat-tile-skeleton" aria-hidden className={BAR} />
-      ) : typeof value === 'string' || typeof value === 'number' ? (
-        <Text
-          testID="stat-tile-value"
-          className={cn('font-semibold text-2xl text-foreground tabular-nums', valueClassName)}
-        >
-          {value}
-        </Text>
-      ) : (
-        <View testID="stat-tile-value" className={cn(SLOT, 'min-w-0', valueClassName)}>
-          {value}
-        </View>
-      )}
+      {loading ? <View testID="stat-tile-skeleton" aria-hidden className={BAR} /> : figure}
       {hint ? (
         <Text testID="stat-tile-hint" className={cn('text-xs', ink)}>
           {hint}

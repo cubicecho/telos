@@ -54,6 +54,7 @@ type DayPickerExtras = Omit<
   | 'required'
 >;
 
+/** A month grid for picking one day or a range of days. */
 export function Calendar(props: CalendarProps & DayPickerExtras) {
   const {
     mode: _mode,

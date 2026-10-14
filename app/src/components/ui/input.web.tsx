@@ -6,6 +6,7 @@ import {
   INPUT_TRAILING_CLASS,
   INPUT_TRAILING_PAD_CLASS,
   INPUT_WRAPPER_CLASS,
+  type InputAutoComplete,
   type InputHandle,
   type InputKeyPressEvent,
   type InputKeyPressHandler,
@@ -22,7 +23,8 @@ import { cn } from '@/lib/utils';
  * DOM input type, of which `InputType` is the cross-platform part. `onKeyPress` hands over the
  * React keyboard event, which is a shared handler's `{ nativeEvent: { key } }` and a shadcn call
  * site's `e.key` at once. `autoCapitalize` keeps the DOM's wider set, and `autoCorrect` is the
- * shared boolean or the DOM's `"on"` / `"off"`.
+ * shared boolean or the DOM's `"on"` / `"off"`. `autoComplete` keeps the DOM's wider set too, of
+ * which `InputAutoComplete` is the part a device also understands.
  */
 export type InputProps = Omit<ComponentPropsWithoutRef<'input'>, 'type' | 'className' | 'onKeyPress' | 'autoCorrect'> &
   Omit<
@@ -40,6 +42,7 @@ export type InputProps = Omit<ComponentPropsWithoutRef<'input'>, 'type' | 'class
     | 'aria-invalid'
     | 'autoCapitalize'
     | 'autoCorrect'
+    | 'autoComplete'
   > & {
     autoCorrect?: boolean | 'on' | 'off' | undefined;
     type?: HTMLInputTypeAttribute | undefined;
@@ -47,6 +50,7 @@ export type InputProps = Omit<ComponentPropsWithoutRef<'input'>, 'type' | 'class
     onKeyPress?: KeyboardEventHandler<HTMLInputElement> | undefined;
   };
 
+/** A one-line text box, with optional slots at its start and end. */
 function Input({
   className,
   type = 'text',
@@ -86,7 +90,9 @@ function Input({
         // `keydown`, not the DOM's `keypress`: that one is deprecated and never fires for Escape,
         // the key `onKeyPress` is most often passed to hear. react-native-web makes the same swap.
         onKeyPress?.(e);
-        if (e.defaultPrevented) return;
+        if (e.defaultPrevented) {
+          return;
+        }
         if (e.key === 'Enter' && onSubmitEditing) {
           e.preventDefault();
           onSubmitEditing();
@@ -100,7 +106,7 @@ function Input({
       {...props}
       className={cn(
         INPUT_CLASS,
-        'file:border-0 file:bg-transparent file:text-sm file:font-medium disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-negative aria-invalid:focus:border-active',
+        'file:border-0 file:bg-transparent file:text-sm file:font-semibold disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-negative aria-invalid:focus:border-active',
         leadingSlot != null && INPUT_LEADING_PAD_CLASS,
         trailingSlot != null && INPUT_TRAILING_PAD_CLASS,
         className,
@@ -108,7 +114,9 @@ function Input({
     />
   );
 
-  if (leadingSlot == null && trailingSlot == null) return field;
+  if (leadingSlot == null && trailingSlot == null) {
+    return field;
+  }
 
   return (
     <div data-slot="input-wrapper" className={cn(INPUT_WRAPPER_CLASS, wrapperClassName)}>
@@ -134,5 +142,5 @@ function Input({
  */
 const SLOT_ICON = "text-foreground/60 [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4";
 
-export type { InputHandle, InputKeyPressEvent, InputKeyPressHandler, InputType };
+export type { InputAutoComplete, InputHandle, InputKeyPressEvent, InputKeyPressHandler, InputType };
 export { Input };

@@ -14,6 +14,7 @@ export type SwitchProps = Omit<ComponentPropsWithRef<typeof SwitchPrimitive.Root
   accessibilityLabel?: string | undefined;
 };
 
+/** A control that is on or off. */
 function Switch({ className, size = 'default', accessibilityLabel, 'aria-label': ariaLabel, ...props }: SwitchProps) {
   return (
     <SwitchPrimitive.Root
@@ -23,7 +24,7 @@ function Switch({ className, size = 'default', accessibilityLabel, 'aria-label':
       aria-label={ariaLabel ?? accessibilityLabel}
       className={cn(
         SWITCH_TRACK_CLASS,
-        'peer group/switch inline-flex cursor-pointer shadow-xs transition-colors focus-visible:outline-none data-[state=unchecked]:focus-visible:bg-hover data-[state=checked]:focus-visible:bg-active/90 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-negative data-[state=checked]:bg-active data-[state=unchecked]:bg-foreground/15 data-[size=sm]:h-4 data-[size=sm]:w-7',
+        'peer group/switch inline-flex cursor-pointer transition-colors focus-visible:outline-none data-[state=unchecked]:focus-visible:bg-hover data-[state=checked]:focus-visible:bg-active/90 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-negative data-[state=checked]:bg-active data-[state=unchecked]:bg-foreground/50 data-[size=sm]:h-4 data-[size=sm]:w-7',
         className,
       )}
     >
@@ -31,7 +32,7 @@ function Switch({ className, size = 'default', accessibilityLabel, 'aria-label':
         data-slot="switch-thumb"
         className={cn(
           SWITCH_THUMB_CLASS,
-          'pointer-events-none block shadow-lg ring-0 transition-transform data-[state=checked]:translate-x-4 data-[state=unchecked]:translate-x-0 group-data-[size=sm]/switch:h-3 group-data-[size=sm]/switch:w-3 group-data-[size=sm]/switch:data-[state=checked]:translate-x-3',
+          'pointer-events-none block ring-0 transition-transform data-[state=checked]:translate-x-4 data-[state=unchecked]:translate-x-0 group-data-[size=sm]/switch:h-3 group-data-[size=sm]/switch:w-3 group-data-[size=sm]/switch:data-[state=checked]:translate-x-3',
         )}
       />
     </SwitchPrimitive.Root>

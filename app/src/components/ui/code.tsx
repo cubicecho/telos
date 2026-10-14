@@ -2,9 +2,10 @@ import type { ReactNode } from 'react';
 import { Platform, ScrollView, Text, View } from 'react-native';
 import { cn, type SlotNode } from '@/lib/utils';
 
+/** Monospaced text inline in a sentence. */
 export function Code({ className, children }: { className?: string | undefined; children: ReactNode }) {
   return (
-    <Text className={cn('rounded bg-foreground/10 px-1 py-0.5 font-mono text-xs text-foreground', className)}>
+    <Text className={cn('rounded-sm bg-foreground/10 px-1 py-0.5 font-mono text-xs text-foreground', className)}>
       {children}
     </Text>
   );

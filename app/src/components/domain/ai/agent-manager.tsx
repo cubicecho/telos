@@ -2,10 +2,10 @@ import { useMutation, useQuery } from '@apollo/client';
 import { useEffect, useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
 import type { AgentFieldsFragment } from '@/__generated__/graphql';
-import { ActionButton } from '@/components/action-button';
 import { useAppForm } from '@/components/app-form';
 import { ConfirmButton } from '@/components/confirm-button';
 import { DialogLayout } from '@/components/dialog-layout';
+import { List } from '@/components/list';
 import { EmptyState } from '@/components/page';
 import { Section } from '@/components/section';
 import { Badge } from '@/components/ui/badge';
@@ -126,55 +126,53 @@ export function AgentManager() {
               />
             }
           />
-          {agents.length === 0 ? null : (
-            <View role="list" className="gap-1">
-              {agents.map((agent) => (
-                <View
-                  key={agent.id}
-                  role="listitem"
-                  className="flex-row items-center gap-3 rounded-lg border border-foreground/10 bg-secondary px-3 py-2"
-                >
-                  <View className="flex-1 gap-0.5">
-                    <Text numberOfLines={1} className="text-foreground text-sm">
-                      {agent.name}
-                    </Text>
-                    <Text numberOfLines={1} className="text-foreground/60 text-xs">
-                      {agent.model ?? inheritedText(inherited?.model)} ·{' '}
-                      {agent.baseUrl ?? inheritedText(inherited?.baseUrl)}
-                    </Text>
-                  </View>
-                  {agent.enabled ? null : <Badge variant="outline">Off</Badge>}
-                  <Badge variant={agent.hasApiKey ? 'secondary' : 'outline'}>
-                    {agent.hasApiKey ? 'Key set' : 'No key'}
-                  </Badge>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onPress={() => setKeying(agent)}
-                    content={agent.hasApiKey ? 'Replace key' : 'Set key'}
-                  />
-                  <ActionButton
-                    variant="ghost"
-                    size="icon-sm"
-                    label={`Edit ${agent.name}`}
-                    onPress={() => setEditing({ agent })}
-                    iconSlot={<Pencil className="h-4 w-4" />}
-                  />
-                  <ConfirmButton
-                    variant="ghost"
-                    size="icon-sm"
-                    className="hover:text-negative"
-                    label={`Delete ${agent.name}`}
-                    title={`Delete “${agent.name}”?`}
-                    description="Lanes it works lose their agent, and its runs lose their agent. This cannot be undone."
-                    confirmLabel="Delete"
-                    onConfirm={() => confirmDelete(agent)}
-                    iconSlot={<Trash2 className="h-4 w-4" />}
-                  />
+          <List
+            divided={false}
+            contentSlot={agents.map((agent) => (
+              <View
+                key={agent.id}
+                className="flex-row items-center gap-3 rounded-lg border border-foreground/10 bg-secondary px-3 py-2"
+              >
+                <View className="flex-1 gap-0.5">
+                  <Text numberOfLines={1} className="text-foreground text-sm">
+                    {agent.name}
+                  </Text>
+                  <Text numberOfLines={1} className="text-foreground/60 text-xs">
+                    {agent.model ?? inheritedText(inherited?.model)} ·{' '}
+                    {agent.baseUrl ?? inheritedText(inherited?.baseUrl)}
+                  </Text>
                 </View>
-              ))}
-            </View>
-          )}
+                {agent.enabled ? null : <Badge variant="outline">Off</Badge>}
+                <Badge variant={agent.hasApiKey ? 'secondary' : 'outline'}>
+                  {agent.hasApiKey ? 'Key set' : 'No key'}
+                </Badge>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onPress={() => setKeying(agent)}
+                  content={agent.hasApiKey ? 'Replace key' : 'Set key'}
+                />
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label={`Edit ${agent.name}`}
+                  onPress={() => setEditing({ agent })}
+                  iconSlot={<Pencil className="h-4 w-4" />}
+                />
+                <ConfirmButton
+                  variant="ghost"
+                  size="icon-sm"
+                  className="hover:text-negative"
+                  aria-label={`Delete ${agent.name}`}
+                  title={`Delete “${agent.name}”?`}
+                  description="Lanes it works lose their agent, and its runs lose their agent. This cannot be undone."
+                  confirmLabel="Delete"
+                  onConfirm={() => confirmDelete(agent)}
+                  iconSlot={<Trash2 className="h-4 w-4" />}
+                />
+              </View>
+            ))}
+          />
 
           {/* Keyed so switching from one agent to another starts a fresh form. */}
           {editing ? (

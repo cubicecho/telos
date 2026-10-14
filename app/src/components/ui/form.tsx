@@ -1,11 +1,13 @@
-import type { AnyFieldApi, DeepKeys, DeepValue } from '@tanstack/react-form';
+import { Slot } from '@radix-ui/react-slot';
+import type { DeepKeys } from '@tanstack/react-form';
 import { createFormHook, createFormHookContexts, useStore } from '@tanstack/react-form';
-import { Slot } from 'radix-ui';
 import type { ComponentType, ReactNode } from 'react';
 import * as React from 'react';
 import { Text, View } from 'react-native';
-import { Button } from '@/components/ui/button';
+import { PasswordInput, type PasswordInputProps, revealLabelsFor } from '@/components/password-input';
+import { Button, type ButtonPropsWithout } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { DescriptionHint, DescriptionHintText, type DescriptionPlacement } from '@/components/ui/description-hint';
 import {
   FieldContent,
   FieldDescription as FieldDescriptionPrimitive,
@@ -18,12 +20,35 @@ import type { FormElementProps } from '@/components/ui/form-element-base';
 import { Input } from '@/components/ui/input';
 import type { InputProps } from '@/components/ui/input-base';
 import type { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectSeparator,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import type { TextareaProps } from '@/components/ui/textarea-base';
+import { messageOf } from '@/lib/error-message';
+import { type BindableForm, type FormBinding, fieldOf, type NamesOfType, type ValuesOf } from '@/lib/form-binding';
+import { numberText, parseNumber } from '@/lib/number-draft';
+import {
+  blocksOf,
+  isNote,
+  isSeparator,
+  menuValueOf,
+  type SelectOption,
+  type SelectSeparatorEntry,
+  storedValueOf,
+  withEmptyOption,
+} from '@/lib/select-options';
 import { cn, type SlotNode } from '@/lib/utils';
 
+/** TanStack Form's contexts, which the bound fields read their field and form from. */
 export const { fieldContext, formContext, useFieldContext, useFormContext } = createFormHookContexts();
 
 /**
@@ -31,18 +56,6 @@ export const { fieldContext, formContext, useFieldContext, useFormContext } = cr
  * names the control by `htmlFor` or the control points back at it by `aria-labelledby`.
  */
 const IdContext = React.createContext<{ id: string; asGroup: boolean } | null>(null);
-
-function messageOf(error: unknown): string | undefined {
-  // A validator may yield a string, a `{ message }`, or something else entirely — a
-  // standard-schema issue, a thrown value. Narrow, then fall back to `String`, because showing
-  // the wrong text beats showing none.
-  if (error == null) return undefined;
-  if (typeof error === 'string') return error;
-  if (typeof error === 'object' && 'message' in error) {
-    return String((error as { message: unknown }).message);
-  }
-  return String(error);
-}
 
 /**
  * The field's first error, or nothing — and *when* is most of what this does.
@@ -56,7 +69,9 @@ function useFieldError(): string | undefined {
   const errors = useStore(field.store, (s) => s.meta.errors);
   const isTouched = useStore(field.store, (s) => s.meta.isTouched);
   const submissionAttempts = useStore(field.form.store, (s) => s.submissionAttempts);
-  if (!isTouched && submissionAttempts === 0) return undefined;
+  if (isTouched === false && submissionAttempts === 0) {
+    return undefined;
+  }
   return messageOf(errors[0]);
 }
 
@@ -67,7 +82,9 @@ function useFieldError(): string | undefined {
  */
 function useFieldIds() {
   const context = React.useContext(IdContext);
-  if (!context) throw new Error('Form field components must be used within <Field>');
+  if (!context) {
+    throw new Error('Form field components must be used within <Field>');
+  }
   const { id, asGroup } = context;
   return {
     labelId: `${id}-label`,
@@ -89,10 +106,11 @@ function useFieldComponentContext() {
  * submits; on native it is a `View` and `SubmitButton` is the only path to
  * submission. Either way the submit is routed through form context.
  */
-function Form({ className, children }: Omit<FormElementProps, 'onSubmit'>) {
+function Form({ id, className, children }: Omit<FormElementProps, 'onSubmit'>) {
   const form = useFormContext();
   return (
     <FormElement
+      id={id}
       onSubmit={() => {
         form.handleSubmit();
       }}
@@ -148,11 +166,11 @@ function FieldLabel({ ...props }: React.ComponentProps<typeof Label>) {
  * radix's `Slot` is used on both platforms. It only clones its child with merged
  * props; there is no DOM in it, so it works under React Native unchanged.
  */
-function FieldControl({ ...props }: React.ComponentProps<typeof Slot.Root>) {
+function FieldControl({ ...props }: React.ComponentProps<typeof Slot>) {
   const { controlId, labelId, descriptionId, messageId, hasError, asGroup } = useFieldComponentContext();
   const describedBy = [descriptionId, hasError ? messageId : null].filter(Boolean).join(' ');
   return (
-    <Slot.Root
+    <Slot
       id={controlId}
       aria-labelledby={asGroup ? labelId : undefined}
       aria-describedby={describedBy || undefined}
@@ -162,14 +180,24 @@ function FieldControl({ ...props }: React.ComponentProps<typeof Slot.Root>) {
   );
 }
 
+/** The field's help text, carrying the id the control's `aria-describedby` points at. */
 function FieldDescription({ ...props }: React.ComponentProps<typeof FieldDescriptionPrimitive>) {
   const { descriptionId } = useFieldComponentContext();
   return <FieldDescriptionPrimitive id={descriptionId} {...props} />;
 }
 
+/** The description behind a popover, kept where `aria-describedby` can still reach it. */
+function FieldDescriptionText({ children }: { children: ReactNode }) {
+  const { descriptionId } = useFieldComponentContext();
+  return <DescriptionHintText id={descriptionId}>{children}</DescriptionHintText>;
+}
+
+/** The field's error message, drawn only while there is one. */
 function FieldError({ ...props }: React.ComponentProps<typeof FieldErrorPrimitive>) {
   const { error, messageId } = useFieldComponentContext();
-  if (!error) return null;
+  if (!error) {
+    return null;
+  }
   return (
     <FieldErrorPrimitive id={messageId} {...props}>
       {error}
@@ -177,18 +205,55 @@ function FieldError({ ...props }: React.ComponentProps<typeof FieldErrorPrimitiv
   );
 }
 
+/** The floor a cell holds: what makes the row wrap instead of squeezing. */
+const CELL_FLOOR = {
+  2: 'min-w-[45%]',
+  3: 'min-w-[30%]',
+} as const;
+
+type FieldRowProps = {
+  /**
+   * The fields, as the web `FieldRow` takes them. Each gets a cell of its own, and one that
+   * renders nothing (`{isEdit && <field.InputField … />}`) leaves no empty cell behind.
+   */
+  contentSlot?: ReactNode;
+  /** How many fit on a line before the row wraps. */
+  perRow?: keyof typeof CELL_FLOOR | undefined;
+  className?: string | undefined;
+  cellClassName?: string | undefined;
+};
+
+/**
+ * The fields, one entry each, keyed. A fragment is how a slot holding several things arrives,
+ * and `Children.toArray` counts it as one child, so a fragment at the top is opened once.
+ */
+function fieldsOf(content: ReactNode): Array<{ key: string; node: ReactNode }> {
+  const flat = React.Children.toArray(content).flatMap((child) =>
+    React.isValidElement<{ children?: ReactNode }>(child) && child.type === React.Fragment
+      ? React.Children.toArray(child.props.children)
+      : [child],
+  );
+  return flat.map((node, position) => ({
+    key: React.isValidElement(node) && node.key ? node.key : `cell-${position}`,
+    node,
+  }));
+}
+
 /**
  * Fields side by side, two to a row — what `grid grid-cols-2 gap-4` did on web.
  * `grid` has no native equivalent, and the `flex-1` has to sit on each cell
  * rather than on the field, which would then only be laid out correctly inside
- * a row. `min-w-[45%]` is what makes a third field wrap instead of squeezing.
+ * a row. The cell's minimum width is what makes a third field wrap instead of
+ * squeezing.
  */
-function FieldRow({ className, children }: { className?: string; children: ReactNode }) {
+function FieldRow({ contentSlot, perRow = 2, className, cellClassName }: FieldRowProps) {
   return (
     <View className={cn('flex-row flex-wrap gap-4', className)}>
-      {React.Children.map(children, (child) =>
-        child == null || child === false ? null : <View className="min-w-[45%] flex-1">{child}</View>,
-      )}
+      {fieldsOf(contentSlot).map(({ key, node }) => (
+        <View key={key} className={cn('flex-1', CELL_FLOOR[perRow], cellClassName)}>
+          {node}
+        </View>
+      ))}
     </View>
   );
 }
@@ -201,6 +266,15 @@ type BoundFieldProps = {
   label: ReactNode;
   /** A line under the control — what to put in it, or what changing it costs. */
   description?: ReactNode | undefined;
+  /**
+   * Where the description is drawn. `inline` (the default) puts it under the control; `popover`
+   * puts it behind a small button beside the label, named "About <label>". For a description that
+   * is a paragraph off a schema: one press away rather than stacked down the form. On the web the
+   * control is described by it either way.
+   */
+  descriptionPlacement?: DescriptionPlacement | undefined;
+  /** The `popover` button's glyph. A question mark by default. */
+  descriptionIconSlot?: SlotNode | undefined;
   /** Draws the asterisk and sets `aria-required` on the control. */
   required?: boolean | undefined;
   /** `horizontal` puts the control first and the label beside it: a checkbox, a switch. */
@@ -217,6 +291,8 @@ type BoundFieldProps = {
 const FIELD_KEYS = new Set<string>([
   'label',
   'description',
+  'descriptionPlacement',
+  'descriptionIconSlot',
   'required',
   'orientation',
   'asGroup',
@@ -234,8 +310,11 @@ function splitProps<T>(props: BoundFieldProps & T): [BoundFieldProps, T] {
   const field: Record<string, unknown> = {};
   const control: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(props)) {
-    if (FIELD_KEYS.has(key)) field[key] = value;
-    else control[key] = value;
+    if (FIELD_KEYS.has(key)) {
+      field[key] = value;
+    } else {
+      control[key] = value;
+    }
   }
   return [field as BoundFieldProps, control as T];
 }
@@ -252,6 +331,8 @@ function FieldWrapper({
   label,
   controlSlot,
   description,
+  descriptionPlacement = 'inline',
+  descriptionIconSlot,
   required = false,
   orientation = 'vertical',
   asGroup,
@@ -260,8 +341,9 @@ function FieldWrapper({
   descriptionClassName,
   errorClassName,
 }: FieldWrapperProps) {
-  const title = (
-    <FieldLabel className={labelClassName}>
+  const folded = Boolean(description) && descriptionPlacement === 'popover';
+  const labelNode = (
+    <FieldLabel className={cn(folded && 'min-w-0 shrink', labelClassName)}>
       {label}
       {required ? (
         // Decoration: the name stays "Email", not "Email star". `aria-required` says it instead.
@@ -271,10 +353,29 @@ function FieldWrapper({
       ) : null}
     </FieldLabel>
   );
+  // Beside the label and not inside it: the label is a `Text`, a button in a `Text` is not
+  // something the device lays out, and on the web it would be a button inside a `<label>`.
+  const title = folded ? (
+    <View testID="field-label-row" className="min-w-0 flex-row items-center gap-2">
+      {labelNode}
+      <DescriptionHint
+        testID="field-description-trigger"
+        label={label}
+        fallbackName="About this field"
+        description={description}
+        iconSlot={descriptionIconSlot}
+      />
+    </View>
+  ) : (
+    labelNode
+  );
   const wired = <FieldControl aria-required={required || undefined}>{controlSlot}</FieldControl>;
   const rest = (
     <>
-      {description ? <FieldDescription className={descriptionClassName}>{description}</FieldDescription> : null}
+      {description && folded === false ? (
+        <FieldDescription className={descriptionClassName}>{description}</FieldDescription>
+      ) : null}
+      {folded ? <FieldDescriptionText>{description}</FieldDescriptionText> : null}
       <FieldError className={errorClassName} />
     </>
   );
@@ -301,13 +402,12 @@ function FieldWrapper({
 
 type InputFieldProps = BoundFieldProps & Omit<InputProps, 'value' | 'onChangeText' | 'onBlur' | keyof BoundFieldProps>;
 
-/** A text box and the field around it. `className` is the field's, as on every bound field. */
-function InputField(props: InputFieldProps) {
+/** The text box behind `InputField`, for every `type` but `number`. */
+function TextField(props: InputFieldProps) {
   const [fieldProps, input] = splitProps(props);
-  // The stored value is whatever the schema says — string, number or null — and
-  // this component is generic over all of them, so there is nothing narrower to
-  // write here. Both edges are handled explicitly: `String(… ?? "")` going in,
-  // and the `type === "number"` branch coming out.
+  // The stored value is whatever the schema says, a string or null, and this component is
+  // generic over both, so there is nothing narrower to write here. `String(… ?? "")` is the
+  // one edge: a `TextInput` takes only a string.
   // biome-ignore lint/suspicious/noExplicitAny: see above
   const field = useFieldContext<any>();
 
@@ -319,18 +419,64 @@ function InputField(props: InputFieldProps) {
           {...input}
           value={String(field.state.value ?? '')}
           onBlur={field.handleBlur}
+          onChangeText={(text) => field.handleChange(text)}
+        />
+      }
+    />
+  );
+}
+
+type NumberFieldProps = BoundFieldProps &
+  Omit<InputProps, 'value' | 'defaultValue' | 'onChangeText' | 'onBlur' | 'type' | keyof BoundFieldProps>;
+
+/**
+ * A number box whose field holds `number | null`: empty is `null`, not `0`.
+ *
+ * What was typed is kept as a draft and drawn while it still means the stored number, so `1.`
+ * survives to take its next digit. A lone `-` or `1e` stores `null` and stays in the box. On blur
+ * the text settles to the stored number.
+ */
+function NumberField(props: NumberFieldProps) {
+  const [fieldProps, input] = splitProps(props);
+  const field = useFieldContext<number | null>();
+  const [draft, setDraft] = React.useState<string | undefined>(undefined);
+  const stored = field.state.value ?? null;
+
+  return (
+    <FieldWrapper
+      {...fieldProps}
+      controlSlot={
+        <Input
+          // `type="number"` alone raises the digits-only keypad on a phone, which has no point.
+          inputMode="decimal"
+          {...input}
+          type="number"
+          value={numberText(draft, stored)}
+          onBlur={() => {
+            setDraft(undefined);
+            field.handleBlur();
+          }}
           onChangeText={(text) => {
-            if (input.type === 'number') {
-              // `valueAsNumber` is DOM-only; parse the text so native agrees.
-              field.handleChange(text === '' ? null : Number(text));
-            } else {
-              field.handleChange(text);
-            }
+            setDraft(text);
+            field.handleChange(parseNumber(text));
           }}
         />
       }
     />
   );
+}
+
+/**
+ * A text box and the field around it. `className` is the field's, as on every bound field.
+ *
+ * `type="number"` is {@link NumberField}, so a call site written before that field existed keeps
+ * storing `number | null`. New code names `NumberField`.
+ */
+function InputField(props: InputFieldProps) {
+  if (props.type === 'number') {
+    return <NumberField {...props} />;
+  }
+  return <TextField {...props} />;
 }
 
 type TextAreaFieldProps = BoundFieldProps &
@@ -356,39 +502,125 @@ function TextAreaField(props: TextAreaFieldProps) {
   );
 }
 
-type SelectOption = {
-  label: string;
-  value: string;
-};
+type PasswordFieldProps = BoundFieldProps &
+  Omit<PasswordInputProps, 'value' | 'onChangeText' | 'onBlur' | keyof BoundFieldProps>;
 
-type SelectFieldProps = BoundFieldProps & {
-  options: readonly SelectOption[];
-  placeholder?: string;
-};
-
-function SelectField(props: SelectFieldProps) {
-  const [fieldProps, { options, placeholder }] = splitProps(props);
-  const field = useFieldContext<string>();
+/**
+ * A password box with its reveal button, and the field around it. Not `InputField` with
+ * `type="password"`, which has no button. A string `label` names the button too: "Show API key".
+ */
+function PasswordField(props: PasswordFieldProps) {
+  const [fieldProps, input] = splitProps(props);
+  const field = useFieldContext<string | null>();
+  const revealLabels = revealLabelsFor(fieldProps.label);
 
   return (
     <FieldWrapper
       {...fieldProps}
       controlSlot={
-        <Select value={field.state.value} onValueChange={(v) => field.handleChange(v)}>
-          <SelectTrigger onBlur={field.handleBlur}>
-            <SelectValue placeholder={placeholder} />
-          </SelectTrigger>
-          <SelectContent>
-            {options.map(({ label: optionLabel, value }) => (
-              <SelectItem key={value} value={value}>
-                {optionLabel}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <PasswordInput
+          {...input}
+          showLabel={input.showLabel ?? revealLabels.showLabel}
+          hideLabel={input.hideLabel ?? revealLabels.hideLabel}
+          value={field.state.value ?? ''}
+          onBlur={field.handleBlur}
+          onChangeText={(text) => field.handleChange(text)}
+        />
       }
     />
   );
+}
+
+/** What the list of a `SelectField` holds: the options, and the rules between them. */
+type SelectFieldEntry = SelectOption | SelectSeparatorEntry;
+
+type SelectFieldProps = BoundFieldProps & {
+  /**
+   * The choices, in the order they are drawn. An option's `group` puts it under that heading, and
+   * `{ separator: true }` rules a line across the list: the list the web `SelectField` takes,
+   * minus its notes, which need `ComboboxField`.
+   */
+  options: readonly SelectFieldEntry[];
+  placeholder?: string;
+  /** The trigger will not open: a list with nothing in it yet, a choice another field decides. */
+  disabled?: boolean | undefined;
+  /**
+   * Adds a first row for "nothing", which writes `null`. The field then holds `string | null`,
+   * and reads `null`, `undefined` and `""` as that row.
+   */
+  clearable?: boolean | undefined;
+  /**
+   * What the row for "nothing" says. Read only when `clearable`.
+   *
+   * @defaultValue `"None"`
+   */
+  emptyLabel?: string | undefined;
+};
+
+type SelectControlProps = Pick<SelectFieldProps, 'options' | 'placeholder' | 'disabled' | 'clearable' | 'emptyLabel'> &
+  Omit<React.ComponentProps<typeof SelectTrigger>, 'children' | 'onBlur' | 'disabled'>;
+
+/**
+ * The select as one control, so the wiring `FieldControl` hands down lands on the trigger. The
+ * root renders no element on either platform: handed the `id` and the `aria-*` props it drops
+ * them, leaving a trigger the label does not name and an error message nothing points at.
+ */
+function SelectControl({
+  options,
+  placeholder,
+  disabled,
+  clearable = false,
+  emptyLabel = 'None',
+  ...wired
+}: SelectControlProps) {
+  const field = useFieldContext<string | null>();
+  const entries = React.useMemo(
+    () => (clearable ? withEmptyOption(options, emptyLabel) : options),
+    [options, clearable, emptyLabel],
+  );
+  const blocks = React.useMemo(() => blocksOf(entries), [entries]);
+  const value = clearable ? menuValueOf(field.state.value) : (field.state.value ?? '');
+  const chosen = entries.find((entry): entry is SelectOption => 'value' in entry && entry.value === value);
+  return (
+    <Select
+      value={value}
+      onValueChange={(next) => field.handleChange(clearable ? storedValueOf(next) : next)}
+      disabled={disabled}
+    >
+      <SelectTrigger {...wired} onBlur={field.handleBlur}>
+        <SelectValue placeholder={placeholder}>{chosen?.label}</SelectValue>
+      </SelectTrigger>
+      <SelectContent>
+        {blocks.map((block, index) => {
+          if (isSeparator(block)) {
+            // biome-ignore lint/suspicious/noArrayIndexKey: a rule has no identity of its own
+            return <SelectSeparator key={`block-${index}`} />;
+          }
+          // The list's type holds no note, so this only tells the compiler what is left.
+          if (isNote(block)) {
+            return null;
+          }
+          return (
+            // biome-ignore lint/suspicious/noArrayIndexKey: nor does a repeated heading
+            <SelectGroup key={`block-${index}`}>
+              {block.group ? <SelectLabel>{block.group}</SelectLabel> : null}
+              {block.options.map((option) => (
+                <SelectItem key={option.value} value={option.value} className={option.className}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          );
+        })}
+      </SelectContent>
+    </Select>
+  );
+}
+
+/** A select bound to a form field holding one of the options' values. */
+function SelectField(props: SelectFieldProps) {
+  const [fieldProps, control] = splitProps(props);
+  return <FieldWrapper {...fieldProps} controlSlot={<SelectControl {...control} />} />;
 }
 
 type CheckboxFieldProps = Omit<BoundFieldProps, 'label'> & {
@@ -475,7 +707,7 @@ type SubmitButtonProps = {
    * `disabled={false}` never enables an invalid form.
    */
   disabled?: boolean | undefined;
-} & Omit<React.ComponentProps<typeof Button>, 'disabled' | 'content' | 'loading' | 'loadingLabel'>;
+} & ButtonPropsWithout<'disabled' | 'content' | 'loading' | 'loadingLabel'>;
 
 /**
  * The submit control: reads `canSubmit` / `isSubmitting` from form context, so
@@ -507,7 +739,7 @@ function SubmitButton({
         form.handleSubmit();
       }}
       {...props}
-      disabled={disabled === true || !canSubmit}
+      disabled={disabled === true || canSubmit === false}
       loading={isSubmitting}
       loadingLabel={savingLabel}
       iconSlot={iconSlot}
@@ -522,8 +754,10 @@ function SubmitButton({
  */
 const FIELD_COMPONENTS = {
   InputField,
+  NumberField,
   TextAreaField,
   TextareaField: TextAreaField,
+  PasswordField,
   SelectField,
   CheckboxField,
   SwitchField,
@@ -565,49 +799,6 @@ function createAppForm<TFields extends Record<string, ComponentType<any>>>(field
 const { useAppForm, withForm } = createAppForm({});
 
 /**
- * What a bound field needs off a form, and nothing else — structural, so `bindToForm` works with
- * a plain `useForm` as well as with `useAppForm`.
- */
-type BindableForm = {
-  state: { values: unknown };
-  // Not `=> ReactNode`: TanStack types `Field` as a function component that may return a promise.
-  Field: (props: never) => ReactNode | Promise<ReactNode>;
-};
-
-type ValuesOf<TForm extends BindableForm> = TForm extends { state: { values: infer TValues } } ? TValues : never;
-
-type Validate<TValue> = (context: { value: TValue; fieldApi: AnyFieldApi; signal: AbortSignal }) => unknown;
-
-type Listen<TValue> = (context: { value: TValue; fieldApi: AnyFieldApi }) => void;
-
-/** The names of the fields holding a `TValue`, `null` allowed. See the web `app-form`. */
-type NamesOfType<TValues, TValue> = {
-  [TName in DeepKeys<TValues>]: NonNullable<DeepValue<TValues, TName>> extends TValue ? TName : never;
-}[DeepKeys<TValues>] &
-  DeepKeys<TValues>;
-
-type FormBinding<TForm extends BindableForm, TName extends DeepKeys<ValuesOf<TForm>>> = {
-  form: TForm;
-  /** A key of the form's values. Checked: `naem` is a type error, not a field that stays empty. */
-  name: TName;
-  validators?:
-    | Partial<
-        Record<
-          'onMount' | 'onChange' | 'onChangeAsync' | 'onBlur' | 'onBlurAsync' | 'onSubmit' | 'onSubmitAsync',
-          Validate<DeepValue<ValuesOf<TForm>, TName>>
-        >
-      >
-    | undefined;
-  /** How long to wait before running the async validators, in milliseconds. */
-  asyncDebounceMs?: number | undefined;
-  listeners?:
-    | Partial<
-        Record<'onMount' | 'onUnmount' | 'onChange' | 'onBlur' | 'onSubmit', Listen<DeepValue<ValuesOf<TForm>, TName>>>
-      >
-    | undefined;
-};
-
-/**
  * Writes the render prop once: a field component as one line, over a form and a name. The web
  * `app-form`'s, under the same name.
  *
@@ -633,20 +824,12 @@ function bindToForm<TProps extends object, TValue = unknown>(
     listeners,
     ...rest
   }: TProps & FormBinding<TForm, TName>) {
-    // The generic `Field` cannot be described without repeating the twenty-odd type parameters
-    // already correct on `form`. The cast is here, once, and `name` above is what it protects.
-    const Subscribe = form.Field as ComponentType<{
-      name: unknown;
-      validators?: unknown | undefined;
-      asyncDebounceMs?: number | undefined;
-      listeners?: unknown | undefined;
-      children: (field: AnyFieldApi) => ReactNode;
-    }>;
+    const Subscribe = fieldOf(form);
     return (
       <Subscribe name={name} validators={validators} asyncDebounceMs={asyncDebounceMs} listeners={listeners}>
         {(field) => (
           <fieldContext.Provider value={field}>
-            <Bound {...(rest as unknown as TProps)} />
+            <Bound {...(rest as TProps)} />
           </fieldContext.Provider>
         )}
       </Subscribe>
@@ -656,7 +839,7 @@ function bindToForm<TProps extends object, TValue = unknown>(
   return FormBoundField;
 }
 
-export type { BoundFieldProps as FieldProps };
+export type { BoundFieldProps as FieldProps, SelectFieldEntry, SelectOption, SelectSeparatorEntry };
 export {
   bindToForm,
   CheckboxField,
@@ -670,6 +853,8 @@ export {
   FieldWrapper,
   Form,
   InputField,
+  NumberField,
+  PasswordField,
   SelectField,
   SubmitButton,
   SwitchField,
