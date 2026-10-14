@@ -50,7 +50,7 @@ export default function LoginScreen() {
           <Text role="heading" aria-level={1} className="font-semibold text-3xl text-foreground tracking-tight">
             Telos
           </Text>
-          <Text className="mt-1 text-muted-foreground text-sm">Projects, todos, and what blocks them.</Text>
+          <Text className="mt-1 text-foreground/60 text-sm">Projects, todos, and what blocks them.</Text>
         </View>
 
         <form.AppForm>
@@ -65,20 +65,20 @@ export default function LoginScreen() {
           </Form>
         </form.AppForm>
 
-        {error ? <Text className="mt-4 text-destructive text-sm">{describeError(error)}</Text> : null}
+        {error ? <Text className="mt-4 text-negative text-sm">{describeError(error)}</Text> : null}
 
         {sent ? (
           <CardLayout
             className="mt-6"
-            iconSlot={<CircleCheck className="size-4 text-primary" />}
+            iconSlot={<CircleCheck className="size-4 text-positive" />}
             title="Sign-in link sent"
             contentSlot={
               magicLink ? (
                 <View className="gap-2">
-                  <Text className="text-muted-foreground text-sm">
+                  <Text className="text-foreground/60 text-sm">
                     This instance has no mail relay, so the link is shown here and printed to the server log.
                   </Text>
-                  <Link href={magicLink} className="break-all text-primary text-sm underline">
+                  <Link href={magicLink} className="break-all text-info text-sm underline">
                     {magicLink}
                   </Link>
                 </View>
@@ -87,7 +87,7 @@ export default function LoginScreen() {
                    was ever sent anywhere. The link is in the server log, and
                    saying so is the difference between a reader waiting for an
                    email that will not come and one who knows where to look. */
-                <Text className="text-muted-foreground text-sm">
+                <Text className="text-foreground/60 text-sm">
                   This instance sends no mail — the link was written to the server log. Whoever runs it can read it from
                   there, or set <Code>EXPOSE_MAGIC_LINK=true</Code> to show it on this page.
                 </Text>

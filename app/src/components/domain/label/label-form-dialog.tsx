@@ -1,9 +1,11 @@
 import { useApolloClient, useMutation } from '@apollo/client';
 import { useEffect } from 'react';
+import { Text } from 'react-native';
 import { useAppForm } from '@/components/app-form';
+import { DialogLayout } from '@/components/dialog-layout';
+import { Button } from '@/components/ui/button';
 import { COLOR_SWATCHES, isHexColor } from '@/components/ui/color-picker';
 import { Form } from '@/components/ui/form';
-import { FormDialog, FormDialogFooter } from '@/components/ui/form-dialog';
 import { describeError } from '@/lib/errors';
 import { CreateLabelDocument, LabelsDocument, UpdateLabelDocument } from '@/lib/graphql';
 import { newId } from '@/lib/ids';
@@ -86,34 +88,47 @@ export function LabelFormDialog({
   const error = createError ?? updateError;
 
   return (
-    <FormDialog
-      open={open}
-      onOpenChange={onOpenChange}
-      title={label ? 'Rename label' : 'New label'}
-      description="Labels can be attached to both projects and todos."
-    >
-      <form.AppForm>
-        <Form className="gap-4">
-          <form.AppField
-            name="name"
-            validators={{ onChange: ({ value }) => (value.trim() === '' ? 'Give the label a name.' : undefined) }}
-          >
-            {(field) => <field.InputField label="Name" autoFocus placeholder="urgent" />}
-          </form.AppField>
-          {/* cubeui's picker also takes a typed hex, so the colour can be half-typed. */}
-          <form.AppField
-            name="color"
-            validators={{
-              onChange: ({ value }) => (isHexColor(value) ? undefined : 'Pick a colour, or finish the hex.'),
-            }}
-          >
-            {(field) => <field.ColorField label="Colour" />}
-          </form.AppField>
-          <FormDialogFooter onCancel={() => onOpenChange(false)} error={error ? describeError(error) : null}>
+    <form.AppForm>
+      <DialogLayout
+        open={open}
+        onOpenChange={onOpenChange}
+        title={label ? 'Rename label' : 'New label'}
+        description="Labels can be attached to both projects and todos."
+        size="sm"
+        hasUnsavedChanges={() => !form.state.isDefaultValue}
+        footerSlot={
+          error ? (
+            <Text role="alert" className="text-negative text-sm">
+              {describeError(error)}
+            </Text>
+          ) : null
+        }
+        footerActionsSlot={(close) => (
+          <>
+            <Button variant="outline" onPress={close} content="Cancel" />
             <form.SubmitButton isEdit={label !== undefined} editLabel="Save" />
-          </FormDialogFooter>
-        </Form>
-      </form.AppForm>
-    </FormDialog>
+          </>
+        )}
+        contentSlot={
+          <Form className="gap-4">
+            <form.AppField
+              name="name"
+              validators={{ onChange: ({ value }) => (value.trim() === '' ? 'Give the label a name.' : undefined) }}
+            >
+              {(field) => <field.InputField label="Name" autoFocus placeholder="urgent" />}
+            </form.AppField>
+            {/* cubeui's picker also takes a typed hex, so the colour can be half-typed. */}
+            <form.AppField
+              name="color"
+              validators={{
+                onChange: ({ value }) => (isHexColor(value) ? undefined : 'Pick a colour, or finish the hex.'),
+              }}
+            >
+              {(field) => <field.ColorField label="Colour" />}
+            </form.AppField>
+          </Form>
+        }
+      />
+    </form.AppForm>
   );
 }

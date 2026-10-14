@@ -122,7 +122,7 @@ export function ProjectActivityLine({ activity }: { activity: ProjectActivity })
   return (
     <View className="flex-row items-center gap-2">
       {running > 0 ? <LiveDot /> : null}
-      <Text className="text-muted-foreground text-sm">
+      <Text className="text-foreground/60 text-sm">
         {[
           running > 0 ? `${running} running${drafting > 0 ? `, ${draftReplies(drafting)}` : ''}` : 'Nothing running',
           drafts > 0 ? `${spend}, ${draftReplies(drafts)} among them` : spend,

@@ -240,21 +240,25 @@ export default function ProjectScreen() {
                 </TabsTrigger>
               </TabsList>
 
-              {/* Todos are added from the list alone: the other views are for
+              {/* Adding and narrowing are one set of tools over the same todos,
+              so they sit closer to each other than to the tabs or the list. */}
+              <View className="gap-3">
+                {/* Todos are added from the list alone: the other views are for
               reading what is there. */}
-              {current === 'list' ? (
-                <TodoComposer ref={composerRef} projectId={project.id} nextPosition={nextPosition} lanes={lanes} />
-              ) : null}
-              {/* Filtering todos means nothing over a list of runs. */}
-              {todoView ? (
-                <TodoFilterBar
-                  ref={filterRef}
-                  filter={filter}
-                  onChange={setFilter}
-                  todos={all}
-                  matched={todos.length}
-                />
-              ) : null}
+                {current === 'list' ? (
+                  <TodoComposer ref={composerRef} projectId={project.id} nextPosition={nextPosition} lanes={lanes} />
+                ) : null}
+                {/* Filtering todos means nothing over a list of runs. */}
+                {todoView ? (
+                  <TodoFilterBar
+                    ref={filterRef}
+                    filter={filter}
+                    onChange={setFilter}
+                    todos={all}
+                    matched={todos.length}
+                  />
+                ) : null}
+              </View>
             </View>
 
             {/* No `empty`: an empty project still has a board to show, and the
@@ -281,6 +285,7 @@ export default function ProjectScreen() {
                         live={activity.live}
                         stuck={activity.stuck}
                         waiting={activity.waiting}
+                        nextPosition={nextPosition}
                       />
                     )}
                   </View>
@@ -310,7 +315,7 @@ export default function ProjectScreen() {
                   <View className="gap-6 px-4">
                     <View className="gap-2">
                       {open.length === 0 ? (
-                        <Text className="text-muted-foreground text-sm">
+                        <Text className="text-foreground/60 text-sm">
                           {isFiltering(filter)
                             ? 'Nothing open matches.'
                             : all.length === 0
@@ -340,7 +345,7 @@ export default function ProjectScreen() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="-ml-3 self-start text-muted-foreground"
+                          className="-ml-3 self-start text-foreground/60"
                           aria-expanded={showCompleted}
                           onPress={() => setShowCompleted((shown) => !shown)}
                           content={`${showCompleted ? 'Hide' : 'Show'} completed (${completed.length})`}

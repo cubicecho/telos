@@ -19,7 +19,7 @@ export function LaneBadge({ lane, className }: { lane: LaneSummary; className?: 
   return (
     // The label is its own `Text` so it can be muted: a badge's string ink is the variant's.
     <Badge variant="outline" className={cn('self-auto', className)}>
-      <Text className="font-medium text-muted-foreground text-xs">{lane.name}</Text>
+      <Text className="font-medium text-foreground/60 text-xs">{lane.name}</Text>
     </Badge>
   );
 }

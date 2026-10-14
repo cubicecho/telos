@@ -69,7 +69,7 @@ export const TodoFilterBar = forwardRef<
           </MenuTrigger>
           <MenuContent align="start" className="w-56">
             {labels.length === 0 ? (
-              <Text className="px-2 py-3 text-center text-muted-foreground text-sm">
+              <Text className="px-2 py-3 text-center text-foreground/60 text-sm">
                 No labels on this project's todos.
               </Text>
             ) : (
@@ -115,7 +115,7 @@ export const TodoFilterBar = forwardRef<
           filtered one it is the difference between "this project is empty" and
           "nothing here matches what you typed". */}
       {active ? (
-        <Text className="text-muted-foreground text-xs" aria-live="polite">
+        <Text className="text-foreground/60 text-xs" aria-live="polite">
           {matched === 0
             ? 'No todos match.'
             : `${matched} of ${todos.length} ${todos.length === 1 ? 'todo' : 'todos'}.`}

@@ -35,7 +35,7 @@ export function McpServerPicker({
   return (
     <View className="gap-2">
       <Text className="font-medium text-foreground text-sm">MCP servers</Text>
-      <Text className="text-muted-foreground text-xs">
+      <Text className="text-foreground/60 text-xs">
         Telos's own tools are chosen below. The servers themselves are kept under MCP servers, in settings.
       </Text>
       <Field orientation="horizontal">
@@ -56,7 +56,7 @@ export function McpServerPicker({
             query={query}
             what="your MCP servers"
             count={servers.length + missing.length}
-            emptySlot={<Text className="text-muted-foreground text-xs">No servers yet, so it reaches none.</Text>}
+            emptySlot={<Text className="text-foreground/60 text-xs">No servers yet, so it reaches none.</Text>}
           />
           {servers.map((server) => (
             <Field key={server.id} orientation="horizontal">
@@ -76,7 +76,7 @@ export function McpServerPicker({
           ))}
           {missing.map((slug) => (
             <View key={slug} className="flex-row items-center gap-2">
-              <Text className="flex-1 text-destructive text-xs">“{slug}” no longer exists, so it is left out.</Text>
+              <Text className="flex-1 text-negative text-xs">“{slug}” no longer exists, so it is left out.</Text>
               <ActionButton
                 variant="ghost"
                 size="icon-sm"

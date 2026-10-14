@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { Text, View } from 'react-native';
 import { ActionButton } from '@/components/action-button';
 import { MessageSquare } from '@/components/app-icons';
-import { ConfirmButton } from '@/components/confirm-button';
 import { DescriptionList, PropertyRow } from '@/components/description-list';
 import { AiSetupChecklist } from '@/components/domain/ai/ai-setup-checklist';
 import type { ProjectActivity } from '@/components/domain/ai/project-activity';
@@ -14,7 +13,9 @@ import { LabelPicker } from '@/components/domain/label/label-picker';
 import { SaveTemplateDialog } from '@/components/domain/template/save-template-dialog';
 import { HeaderContentFooter } from '@/components/header-content-footer';
 import { PageHeader } from '@/components/page-header';
-import { Copy, Pencil, Trash2 } from '@/components/ui/icons';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { Copy, Ellipsis, Pencil, Trash2 } from '@/components/ui/icons';
+import { Menu, MenuContent, MenuItem, MenuTrigger } from '@/components/ui/menu';
 import { useAi } from '@/lib/ai';
 import { describeError } from '@/lib/errors';
 import {
@@ -66,6 +67,7 @@ export function ProjectPage({
   const [editing, setEditing] = useState(false);
   const [savingTemplate, setSavingTemplate] = useState(false);
   const [drafting, setDrafting] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const ai = useAi();
   const canDraft = ai.on && project.aiEnabled;
   const [notice, setNotice] = useState<string | null>(null);
@@ -138,45 +140,49 @@ export function ProjectPage({
                     }
                   />
                   <LabelPicker attached={project.labels} onToggle={toggleLabel} align="end" />
-                  {canDraft ? (
-                    <ActionButton
-                      variant="ghost"
-                      size="icon"
-                      onPress={() => {
-                        setNotice(null);
-                        setDrafting(true);
-                      }}
-                      label="Talk a request over"
-                      iconSlot={<MessageSquare className="h-4 w-4" />}
-                    />
-                  ) : null}
-                  <ActionButton
-                    variant="ghost"
-                    size="icon"
-                    onPress={() => {
-                      setNotice(null);
-                      setSavingTemplate(true);
-                    }}
-                    label="Save lanes as a template"
-                    iconSlot={<Copy className="h-4 w-4" />}
-                  />
-                  <ActionButton
-                    variant="ghost"
-                    size="icon"
-                    onPress={() => setEditing(true)}
-                    label="Edit project"
-                    iconSlot={<Pencil className="h-4 w-4" />}
-                  />
-                  <ConfirmButton
-                    variant="ghost"
-                    size="icon"
-                    className="hover:text-destructive"
-                    label="Delete project"
-                    title={`Delete “${project.name}”?`}
-                    description={`Its ${project.todoCount} todo${project.todoCount === 1 ? '' : 's'} go with it. This cannot be undone.`}
-                    onConfirm={confirmDelete}
-                    iconSlot={<Trash2 className="h-4 w-4" />}
-                  />
+                  {/* One button for everything done to the project itself, so the
+                  header reads as its name and its numbers rather than a row of icons. */}
+                  <Menu>
+                    <MenuTrigger asChild>
+                      <ActionButton
+                        variant="ghost"
+                        size="icon"
+                        label="Project actions"
+                        iconSlot={<Ellipsis className="h-4 w-4" />}
+                      />
+                    </MenuTrigger>
+                    <MenuContent align="end" className="w-56" aria-label="Project actions">
+                      {canDraft ? (
+                        <MenuItem
+                          label="Talk a request over"
+                          iconSlot={<MessageSquare className="h-3.5 w-3.5" />}
+                          onSelect={() => {
+                            setNotice(null);
+                            setDrafting(true);
+                          }}
+                        />
+                      ) : null}
+                      <MenuItem
+                        label="Save lanes as a template"
+                        iconSlot={<Copy className="h-3.5 w-3.5" />}
+                        onSelect={() => {
+                          setNotice(null);
+                          setSavingTemplate(true);
+                        }}
+                      />
+                      <MenuItem
+                        label="Edit project"
+                        iconSlot={<Pencil className="h-3.5 w-3.5" />}
+                        onSelect={() => setEditing(true)}
+                      />
+                      <MenuItem
+                        label="Delete project"
+                        destructive
+                        iconSlot={<Trash2 className="h-3.5 w-3.5" />}
+                        onSelect={() => setConfirmingDelete(true)}
+                      />
+                    </MenuContent>
+                  </Menu>
                 </>
               }
             />
@@ -188,12 +194,12 @@ export function ProjectPage({
             {pinned ? (
               <View className="gap-2 px-4 pt-3">
                 {actionError ? (
-                  <Text className="text-destructive text-sm" aria-live="polite">
+                  <Text className="text-negative text-sm" aria-live="polite">
                     {actionError}
                   </Text>
                 ) : null}
                 {notice ? (
-                  <Text className="text-muted-foreground text-sm" aria-live="polite">
+                  <Text className="text-foreground/60 text-sm" aria-live="polite">
                     {notice}
                   </Text>
                 ) : null}
@@ -218,6 +224,17 @@ export function ProjectPage({
       />
 
       <ProjectFormDialog open={editing} onOpenChange={setEditing} project={project} />
+      <ConfirmDialog
+        open={confirmingDelete}
+        onOpenChange={setConfirmingDelete}
+        title={`Delete “${project.name}”?`}
+        description={`Its ${project.todoCount} todo${project.todoCount === 1 ? '' : 's'} go with it. This cannot be undone.`}
+        confirmLabel="Delete"
+        onConfirm={() => {
+          setConfirmingDelete(false);
+          confirmDelete();
+        }}
+      />
       <SaveTemplateDialog
         open={savingTemplate}
         onOpenChange={setSavingTemplate}
@@ -243,7 +260,7 @@ function Stat({ label, value }: { label: string; value: number }) {
     <PropertyRow
       label={label}
       value={value}
-      labelClassName="text-xs uppercase tracking-wide"
+      labelClassName="text-xs uppercase tracking-wider"
       valueClassName="font-medium text-lg tabular-nums"
     />
   );

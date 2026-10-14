@@ -1,16 +1,17 @@
 import { useMutation, useQuery } from '@apollo/client';
 import { useEffect, useMemo, useState } from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import type { AgentFieldsFragment } from '@/__generated__/graphql';
 import { ActionButton } from '@/components/action-button';
 import { useAppForm } from '@/components/app-form';
 import { ConfirmButton } from '@/components/confirm-button';
+import { DialogLayout } from '@/components/dialog-layout';
+import { EmptyState } from '@/components/page';
 import { Section } from '@/components/section';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
-import { FormDialog, FormDialogFooter } from '@/components/ui/form-dialog';
-import { ChevronDown, Pencil, Plus, Trash2 } from '@/components/ui/icons';
+import { ChevronDown, Pencil, Plus, Trash2, UserRound } from '@/components/ui/icons';
 import { LoadState } from '@/components/ui/load-failure';
 import { Menu, MenuContent, MenuItem, MenuTrigger } from '@/components/ui/menu';
 import { AGENT_STARTERS, type AgentStarter, draftFromStarter } from '@/lib/agent-starters';
@@ -25,6 +26,7 @@ import {
   UpdateAgentDocument,
 } from '@/lib/graphql';
 import { newId } from '@/lib/ids';
+import { CARD_TITLE } from '@/lib/styles';
 import {
   DISCOVERY_HELP,
   discoveryOptions,
@@ -80,6 +82,7 @@ export function AgentManager() {
   return (
     <Section
       surface="card"
+      titleClassName={CARD_TITLE}
       title="Agents"
       description="Models with instructions. Give a lane an agent and it works each todo that arrives there."
       actionSlot={
@@ -95,6 +98,7 @@ export function AgentManager() {
             </MenuContent>
           </Menu>
           <Button
+            variant="positive"
             size="sm"
             onPress={() => setEditing({ starter: null })}
             iconSlot={<Plus className="h-4 w-4" />}
@@ -105,7 +109,7 @@ export function AgentManager() {
       contentSlot={
         <View className="gap-4">
           {deleteError ? (
-            <Text className="text-destructive text-sm" aria-live="polite">
+            <Text className="text-negative text-sm" aria-live="polite">
               {deleteError}
             </Text>
           ) : null}
@@ -114,7 +118,13 @@ export function AgentManager() {
             query={agentsQuery}
             what="your agents"
             count={agents.length}
-            emptySlot={<Text className="text-muted-foreground text-sm">No agents yet.</Text>}
+            emptySlot={
+              <EmptyState
+                icon={UserRound}
+                title="No agents yet."
+                description="An agent is a model with instructions. Give one to a lane and it works what arrives there."
+              />
+            }
           />
           {agents.length === 0 ? null : (
             <View role="list" className="gap-1">
@@ -122,13 +132,13 @@ export function AgentManager() {
                 <View
                   key={agent.id}
                   role="listitem"
-                  className="flex-row items-center gap-3 rounded-lg border border-border bg-card px-3 py-2"
+                  className="flex-row items-center gap-3 rounded-lg border border-foreground/10 bg-secondary px-3 py-2"
                 >
                   <View className="flex-1 gap-0.5">
                     <Text numberOfLines={1} className="text-foreground text-sm">
                       {agent.name}
                     </Text>
-                    <Text numberOfLines={1} className="text-muted-foreground text-xs">
+                    <Text numberOfLines={1} className="text-foreground/60 text-xs">
                       {agent.model ?? inheritedText(inherited?.model)} ·{' '}
                       {agent.baseUrl ?? inheritedText(inherited?.baseUrl)}
                     </Text>
@@ -153,7 +163,7 @@ export function AgentManager() {
                   <ConfirmButton
                     variant="ghost"
                     size="icon-sm"
-                    className="hover:text-destructive"
+                    className="hover:text-negative"
                     label={`Delete ${agent.name}`}
                     title={`Delete “${agent.name}”?`}
                     description="Lanes it works lose their agent, and its runs lose their agent. This cannot be undone."
@@ -288,23 +298,33 @@ export function AgentFormDialog({
   };
 
   return (
-    <FormDialog
-      open={open}
-      onOpenChange={onOpenChange}
-      title={isEdit ? `Edit ${agent.name}` : starter ? `New ${starter.name}` : 'New agent'}
-      description={
-        starter
-          ? `${starter.description} Its prompt and settings are filled in: give it a base URL and a model, or leave them to your agent defaults.`
-          : 'Any OpenAI-compatible endpoint: Ollama, llama.cpp, vLLM or a hosted API. A blank field inherits your agent defaults, shown greyed.'
-      }
-      className="sm:max-w-[560px]"
-    >
-      <form.AppForm>
-        <Form className="gap-4">
-          {/* A scroll area clips what is drawn outside it, which a field's focus ring is: the
-          padding is room for the ring, and the negative margin keeps the fields lined up
-          with the dialog's title. */}
-          <ScrollView className="-m-1 max-h-[60vh]" contentContainerClassName="gap-4 p-1">
+    <form.AppForm>
+      <DialogLayout
+        open={open}
+        onOpenChange={onOpenChange}
+        title={isEdit ? `Edit ${agent.name}` : starter ? `New ${starter.name}` : 'New agent'}
+        description={
+          starter
+            ? `${starter.description} Its prompt and settings are filled in: give it a base URL and a model, or leave them to your agent defaults.`
+            : 'Any OpenAI-compatible endpoint: Ollama, llama.cpp, vLLM or a hosted API. A blank field inherits your agent defaults, shown greyed.'
+        }
+        size="lg"
+        hasUnsavedChanges={() => !form.state.isDefaultValue}
+        footerSlot={
+          error ? (
+            <Text role="alert" className="text-negative text-sm">
+              {describeError(error)}
+            </Text>
+          ) : null
+        }
+        footerActionsSlot={(close) => (
+          <>
+            <Button variant="outline" onPress={close} content="Cancel" />
+            <form.SubmitButton isEdit={isEdit} createLabel="Create agent" editLabel="Save" />
+          </>
+        )}
+        contentSlot={
+          <Form className="gap-4">
             <form.AppField name="name" validators={required('a name')}>
               {(field) => <field.InputField label="Name" autoFocus placeholder="Reviewer" />}
             </form.AppField>
@@ -318,7 +338,7 @@ export function AgentFormDialog({
             <form.AppField name="baseUrl" listeners={{ onBlur: () => askModels() }}>
               {(field) => <field.InputField label="Base URL" type="url" placeholder={hints.baseUrl} />}
             </form.AppField>
-            <Text className="-mt-2 text-muted-foreground text-xs">{BASE_URL_HELP}</Text>
+            <Text className="-mt-2 text-foreground/60 text-xs">{BASE_URL_HELP}</Text>
             <form.AppField name="apiKey" listeners={{ onBlur: () => askModels() }}>
               {(field) => (
                 <field.PasswordField
@@ -357,7 +377,7 @@ export function AgentFormDialog({
               {(own) => {
                 const missing = missingSetup(own, inherited);
                 return missing ? (
-                  <Text className="text-destructive text-sm" aria-live="polite">
+                  <Text className="text-negative text-sm" aria-live="polite">
                     {missing}
                   </Text>
                 ) : null;
@@ -372,7 +392,7 @@ export function AgentFormDialog({
                 />
               )}
             </form.AppField>
-            <Text className="-mt-2 text-muted-foreground text-xs">{EFFORT_HELP}</Text>
+            <Text className="-mt-2 text-foreground/60 text-xs">{EFFORT_HELP}</Text>
             <form.AppField name="systemPrompt">
               {(field) => (
                 <field.TextAreaField label="System prompt" placeholder="Optional. Who the agent is, in any lane." />
@@ -384,7 +404,7 @@ export function AgentFormDialog({
             <form.AppField name="toolDiscovery">
               {(field) => <field.SelectField label="Tool discovery" options={discoveryOptions(hints.toolDiscovery)} />}
             </form.AppField>
-            <Text className="-mt-2 text-muted-foreground text-xs">{DISCOVERY_HELP}</Text>
+            <Text className="-mt-2 text-foreground/60 text-xs">{DISCOVERY_HELP}</Text>
             <form.AppField name="toolSelectModel">
               {() => (
                 <ModelField
@@ -404,13 +424,10 @@ export function AgentFormDialog({
 
             <FormGroupTitle title="Requests" />
             {numbers('requests')}
-          </ScrollView>
-          <FormDialogFooter onCancel={() => onOpenChange(false)} error={error ? describeError(error) : null}>
-            <form.SubmitButton isEdit={isEdit} createLabel="Create agent" editLabel="Save" />
-          </FormDialogFooter>
-        </Form>
-      </form.AppForm>
-    </FormDialog>
+          </Form>
+        }
+      />
+    </form.AppForm>
   );
 }
 
@@ -444,43 +461,53 @@ function AgentKeyDialog({
   }
 
   return (
-    <FormDialog
-      open={open}
-      onOpenChange={onOpenChange}
-      title={`API key for ${agent.name}`}
-      description={
-        agent.hasApiKey
-          ? 'A key is set. A new one replaces it; it cannot be shown.'
-          : 'No key is set. Local servers such as Ollama need none.'
-      }
-    >
-      <form.AppForm>
-        <Form className="gap-4">
-          <form.AppField
-            name="apiKey"
-            validators={{ onChange: ({ value }) => (value.trim() === '' ? 'Paste a key, or cancel.' : undefined) }}
-          >
-            {(field) => <field.PasswordField label="API key" autoFocus />}
-          </form.AppField>
-          <FormDialogFooter
-            onCancel={() => onOpenChange(false)}
-            error={error ? describeError(error) : null}
-            secondarySlot={
-              agent.hasApiKey ? (
-                <Button
-                  variant="ghost"
-                  className="text-destructive"
-                  disabled={loading}
-                  onPress={() => save(null)}
-                  content="Clear key"
-                />
-              ) : null
-            }
-          >
+    <form.AppForm>
+      <DialogLayout
+        open={open}
+        onOpenChange={onOpenChange}
+        title={`API key for ${agent.name}`}
+        description={
+          agent.hasApiKey
+            ? 'A key is set. A new one replaces it; it cannot be shown.'
+            : 'No key is set. Local servers such as Ollama need none.'
+        }
+        size="sm"
+        hasUnsavedChanges={() => !form.state.isDefaultValue}
+        footerSlot={
+          <>
+            {agent.hasApiKey ? (
+              <Button
+                variant="ghost"
+                className="text-negative"
+                disabled={loading}
+                onPress={() => save(null)}
+                content="Clear key"
+              />
+            ) : null}
+            {error ? (
+              <Text role="alert" className="text-negative text-sm">
+                {describeError(error)}
+              </Text>
+            ) : null}
+          </>
+        }
+        footerActionsSlot={(close) => (
+          <>
+            <Button variant="outline" onPress={close} content="Cancel" />
             <form.SubmitButton createLabel={agent.hasApiKey ? 'Replace key' : 'Set key'} disabled={loading} />
-          </FormDialogFooter>
-        </Form>
-      </form.AppForm>
-    </FormDialog>
+          </>
+        )}
+        contentSlot={
+          <Form className="gap-4">
+            <form.AppField
+              name="apiKey"
+              validators={{ onChange: ({ value }) => (value.trim() === '' ? 'Paste a key, or cancel.' : undefined) }}
+            >
+              {(field) => <field.PasswordField label="API key" autoFocus />}
+            </form.AppField>
+          </Form>
+        }
+      />
+    </form.AppForm>
   );
 }

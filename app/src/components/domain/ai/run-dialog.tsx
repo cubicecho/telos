@@ -52,11 +52,11 @@ export function RunDialog({
             <RunLog run={run} />
           </View>
         ) : query.error ? (
-          <Text className="text-destructive text-sm">{describeError(query.error)}</Text>
+          <Text className="text-negative text-sm">{describeError(query.error)}</Text>
         ) : query.loading ? (
           <Spinner label="Loading the run" />
         ) : (
-          <Text className="text-muted-foreground text-sm">That run has been deleted.</Text>
+          <Text className="text-foreground/60 text-sm">That run has been deleted.</Text>
         )
       }
     />

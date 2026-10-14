@@ -79,7 +79,7 @@ describe('TodoRuns', () => {
       { request: { query: CancelRunDocument, variables: { id: 'r1' } }, result: cancel },
     ]);
 
-    await user.click(await screen.findByRole('button', { name: /^Review · Reviewer/ }));
+    await user.click(await screen.findByRole('button', { name: /^(?!Delete).*Review · Reviewer/ }));
     expect(await screen.findByRole('log', { name: 'Run log' })).toHaveTextContent('→ list_todos({})');
 
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
@@ -107,7 +107,7 @@ describe('TodoRuns', () => {
       ),
     ]);
 
-    await user.click(await screen.findByRole('button', { name: /^Review · Reviewer/ }));
+    await user.click(await screen.findByRole('button', { name: /^(?!Delete).*Review · Reviewer/ }));
     const log = await screen.findByRole('log', { name: 'Run log' });
     expect(within(log).getByText('Turn 1')).toBeInTheDocument();
     expect(within(log).getByText('Look at the diff first.')).toBeInTheDocument();

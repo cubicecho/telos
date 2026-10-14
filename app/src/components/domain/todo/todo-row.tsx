@@ -176,10 +176,7 @@ export function TodoRow({
       // Spread and cast because React Native's `ViewProps` does not declare the
       // DOM keyboard props react-native-web forwards.
       {...({ onKeyDown: onRowKeyDown } as ViewProps)}
-      className={cn(
-        'group rounded-lg border border-border bg-card px-3 py-2.5',
-        todo.isBlocked && !done && 'opacity-70',
-      )}
+      className="group rounded-lg border border-foreground/10 bg-secondary px-3 py-2.5"
     >
       <View className="flex-row items-start gap-3">
         <Checkbox
@@ -203,12 +200,12 @@ export function TodoRow({
             <Pressable
               role="button"
               onPress={() => setEditing(true)}
-              className="min-w-0 flex-1 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
+              className="min-w-0 flex-1 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-active focus-visible:ring-offset-1"
             >
               <Text
                 className={cn(
                   'text-foreground text-sm leading-5 hover:underline',
-                  done && 'text-muted-foreground line-through',
+                  done && 'text-foreground/60 line-through',
                 )}
               >
                 {todo.title}
@@ -223,13 +220,13 @@ export function TodoRow({
               invisible — a todo with a paragraph behind it looks exactly like
               one without. */}
           {todo.notes ? (
-            <Text numberOfLines={1} className="mt-1 text-muted-foreground text-xs">
+            <Text numberOfLines={1} className="mt-1 text-foreground/60 text-xs">
               {todo.notes}
             </Text>
           ) : null}
 
           {todo.isBlocked && !done ? (
-            <Text className="mt-1 text-muted-foreground text-xs">
+            <Text className="mt-1 text-foreground/60 text-xs">
               Blocked by {todo.blockedBy.map((blocker) => blocker.title).join(', ')}
             </Text>
           ) : null}
@@ -243,7 +240,7 @@ export function TodoRow({
           ) : null}
 
           {actionError ? (
-            <Text className="mt-1 text-destructive text-xs" aria-live="polite">
+            <Text className="mt-1 text-negative text-xs" aria-live="polite">
               {actionError}
             </Text>
           ) : null}

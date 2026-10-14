@@ -108,7 +108,7 @@ export function TodoSearch({ open, onOpenChange }: { open: boolean; onOpenChange
               query={query}
               what="todos"
               count={found.length}
-              emptySlot={<Text className="text-muted-foreground text-sm">Nothing matches “{asked}”.</Text>}
+              emptySlot={<Text className="text-foreground/60 text-sm">Nothing matches “{asked}”.</Text>}
             />
           )}
           {found.length === 0 ? null : (
@@ -121,15 +121,15 @@ export function TodoSearch({ open, onOpenChange }: { open: boolean; onOpenChange
                   aria-selected={at === active}
                   onPress={() => pick(todo)}
                   onHoverIn={() => setActive(at)}
-                  className={cn('rounded-md px-3 py-2', at === active && 'bg-accent')}
+                  className={cn('rounded-md px-3 py-2', at === active && 'bg-hover')}
                 >
                   <Text
                     numberOfLines={1}
-                    className={cn('text-foreground text-sm', todo.completedAt && 'text-muted-foreground line-through')}
+                    className={cn('text-foreground text-sm', todo.completedAt && 'text-foreground/60 line-through')}
                   >
                     {todo.title}
                   </Text>
-                  <Text numberOfLines={1} className="text-muted-foreground text-xs">
+                  <Text numberOfLines={1} className="text-foreground/60 text-xs">
                     {todo.project?.name ?? 'No project'}
                     {todo.lane ? ` · ${todo.lane.name}` : ''}
                   </Text>

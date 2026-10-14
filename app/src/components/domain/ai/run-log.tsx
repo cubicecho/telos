@@ -23,7 +23,7 @@ export interface RunEvent {
 }
 
 export const RUN_STATUS: Record<string, { label: string; variant: BadgeVariant }> = {
-  running: { label: 'Running', variant: 'warning' },
+  running: { label: 'Running', variant: 'info' },
   ok: { label: 'Finished', variant: 'positive' },
   error: { label: 'Failed', variant: 'destructive' },
   stopped: { label: 'Stopped', variant: 'outline' },
@@ -34,12 +34,12 @@ export function RunStatusBadge({ status }: { status: string }) {
   return <Badge variant={shown.variant}>{shown.label}</Badge>;
 }
 
-/** A dot that says "this is happening now". */
+/** A dot that says "this is happening now", in the same `info` as a running run's badge. */
 export function LiveDot({ className }: { className?: string }) {
   return (
     <View
       aria-hidden
-      className={cn('size-2 shrink-0 rounded-full bg-positive', Platform.OS === 'web' && 'animate-pulse', className)}
+      className={cn('size-2 shrink-0 rounded-full bg-info', Platform.OS === 'web' && 'animate-pulse', className)}
     />
   );
 }
@@ -136,12 +136,12 @@ export function RunLog({ run, className }: { run: RunFieldsFragment; className?:
           }
         />
       ) : run.model ? (
-        <Text className="text-muted-foreground text-xs">Model {run.model}</Text>
+        <Text className="text-foreground/60 text-xs">Model {run.model}</Text>
       ) : null}
 
       <ScrollView
         ref={scroller}
-        className="max-h-96 rounded-md border border-border"
+        className="max-h-96 rounded-md border border-foreground/10"
         contentContainerClassName="gap-1.5 p-3"
         scrollEventThrottle={100}
         onScroll={({ nativeEvent }) => {
@@ -154,7 +154,7 @@ export function RunLog({ run, className }: { run: RunFieldsFragment; className?:
       >
         <View role="log" aria-label="Run log" aria-live={running ? 'polite' : 'off'} className="gap-1.5">
           {events.length === 0 ? (
-            <Text className="text-muted-foreground text-xs">{running ? 'Nothing yet.' : 'Nothing logged.'}</Text>
+            <Text className="text-foreground/60 text-xs">{running ? 'Nothing yet.' : 'Nothing logged.'}</Text>
           ) : (
             events.map((event, index) => (
               // The log is append-only, and a streamed block only grows at the
@@ -166,7 +166,7 @@ export function RunLog({ run, className }: { run: RunFieldsFragment; className?:
           {running ? (
             <View className="flex-row items-center gap-2 pt-1">
               <LiveDot />
-              <Text className="text-muted-foreground text-xs">
+              <Text className="text-foreground/60 text-xs">
                 {run.cancelRequestedAt ? 'Asked to stop…' : 'Working…'}
               </Text>
             </View>
@@ -175,14 +175,14 @@ export function RunLog({ run, className }: { run: RunFieldsFragment; className?:
       </ScrollView>
 
       {run.error ? (
-        <Text selectable className="text-destructive text-sm">
+        <Text selectable className="text-negative text-sm">
           {run.error}
         </Text>
       ) : null}
       {/* The final output is the last thing it said, which the log already
           holds when it streamed; shown on its own only when it did not. */}
       {run.output && !said ? (
-        <Text selectable className="whitespace-pre-wrap rounded-md bg-muted px-3 py-2 text-foreground text-sm">
+        <Text selectable className="whitespace-pre-wrap rounded-md bg-foreground/10 px-3 py-2 text-foreground text-sm">
           {run.output}
         </Text>
       ) : null}
@@ -193,8 +193,8 @@ export function RunLog({ run, className }: { run: RunFieldsFragment; className?:
 function PromptBlock({ label, text }: { label: string; text: string }) {
   return (
     <View className="gap-1">
-      <Text className="font-medium text-muted-foreground text-xs">{label}</Text>
-      <ScrollView className="max-h-64 rounded-md bg-muted" contentContainerClassName="px-3 py-2">
+      <Text className="font-medium text-foreground/60 text-xs">{label}</Text>
+      <ScrollView className="max-h-64 rounded-md bg-foreground/10" contentContainerClassName="px-3 py-2">
         <Text selectable className="whitespace-pre-wrap font-mono text-foreground text-xs">
           {text}
         </Text>
@@ -215,7 +215,7 @@ function LogEntry({ event }: { event: RunEvent }) {
       return (
         <View className="flex-row items-center gap-2 py-1">
           <Separator className="w-auto flex-1" />
-          <Text className="text-muted-foreground text-xs">{text || 'Next turn'}</Text>
+          <Text className="text-foreground/60 text-xs">{text || 'Next turn'}</Text>
           <Separator className="w-auto flex-1" />
         </View>
       );
@@ -223,7 +223,7 @@ function LogEntry({ event }: { event: RunEvent }) {
       return (
         <Text
           selectable
-          className="whitespace-pre-wrap border-border border-l-2 pl-2 text-muted-foreground text-xs italic"
+          className="whitespace-pre-wrap border-foreground/10 border-l-2 pl-2 text-foreground/60 text-xs italic"
         >
           {text}
         </Text>
@@ -265,9 +265,9 @@ function MonoLine({ line, title, failed = false }: { line: string; title: string
     <Text
       selectable
       numberOfLines={long && !open ? 3 : undefined}
-      className={cn('whitespace-pre-wrap font-mono text-xs', failed ? 'text-destructive' : 'text-muted-foreground')}
+      className={cn('whitespace-pre-wrap font-mono text-xs', failed ? 'text-negative' : 'text-foreground/60')}
     >
-      {title ? <Text className="text-muted-foreground/70">{title} </Text> : null}
+      {title ? <Text className="text-foreground/60">{title} </Text> : null}
       {line}
     </Text>
   );
@@ -275,7 +275,7 @@ function MonoLine({ line, title, failed = false }: { line: string; title: string
   return (
     <Pressable role="button" aria-expanded={open} onPress={() => setOpen(!open)}>
       {body}
-      <Text className="text-muted-foreground text-xs underline">{open ? 'Show less' : 'Show all'}</Text>
+      <Text className="text-foreground/60 text-xs underline">{open ? 'Show less' : 'Show all'}</Text>
     </Pressable>
   );
 }

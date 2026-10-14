@@ -122,7 +122,7 @@ function DraftStart({
 
   if (agents.loading && !agents.data) return <Spinner />;
   if (agentList.length === 0) {
-    return <Text className="text-muted-foreground text-sm">Add an agent in Settings to talk a request over.</Text>;
+    return <Text className="text-foreground/60 text-sm">Add an agent in Settings to talk a request over.</Text>;
   }
 
   return (
@@ -173,7 +173,7 @@ function DraftStart({
       </View>
 
       <View className="flex-row items-center justify-end gap-2">
-        {error ? <Text className="flex-1 text-destructive text-sm">{describeError(error)}</Text> : null}
+        {error ? <Text className="flex-1 text-negative text-sm">{describeError(error)}</Text> : null}
         <Button disabled={!message.trim() || loading} onPress={send} content="Start" />
       </View>
     </View>
@@ -248,7 +248,7 @@ function DraftTalk({
   }
 
   if (!draft) {
-    if (query.error) return <Text className="text-destructive text-sm">{describeError(query.error)}</Text>;
+    if (query.error) return <Text className="text-negative text-sm">{describeError(query.error)}</Text>;
     return <Spinner />;
   }
   const agentName = draft.agent?.name ?? 'The agent';
@@ -259,19 +259,17 @@ function DraftTalk({
       <View className="gap-3" aria-live="polite">
         {draft.messages.map((line) => (
           <View key={line.id} className="gap-1">
-            <Text className="font-medium text-muted-foreground text-xs">
-              {line.role === 'user' ? 'You' : agentName}
-            </Text>
+            <Text className="font-medium text-foreground/60 text-xs">{line.role === 'user' ? 'You' : agentName}</Text>
             <Text className="text-foreground text-sm">{line.content}</Text>
           </View>
         ))}
         {waiting ? (
           <View className="flex-row items-center gap-2">
             <Spinner />
-            <Text className="text-muted-foreground text-sm">{agentName} is thinking…</Text>
+            <Text className="text-foreground/60 text-sm">{agentName} is thinking…</Text>
           </View>
         ) : null}
-        {draft.error ? <Text className="text-destructive text-sm">{draft.error}</Text> : null}
+        {draft.error ? <Text className="text-negative text-sm">{draft.error}</Text> : null}
       </View>
 
       <View className="gap-2">
@@ -298,7 +296,7 @@ function DraftTalk({
         </View>
       </View>
 
-      <View className="gap-2 border-border border-t pt-4">
+      <View className="gap-2 border-foreground/10 border-t pt-4">
         <Label htmlFor="draft-title">Title</Label>
         <Input id="draft-title" value={title} onChangeText={setTitle} maxLength={200} placeholder="From the brief" />
         <Label htmlFor="draft-brief">Brief</Label>
@@ -313,7 +311,7 @@ function DraftTalk({
       </View>
 
       {draft.runs.length > 0 ? (
-        <View className="gap-2 border-border border-t pt-4">
+        <View className="gap-2 border-foreground/10 border-t pt-4">
           <Text className="font-medium text-foreground text-sm">Replies</Text>
           <View role="list" aria-label="Replies" className="gap-2">
             {draft.runs.map((run) => (
@@ -324,7 +322,7 @@ function DraftTalk({
       ) : null}
 
       {actionError ? (
-        <Text className="text-destructive text-sm" aria-live="polite">
+        <Text className="text-negative text-sm" aria-live="polite">
           {actionError}
         </Text>
       ) : null}

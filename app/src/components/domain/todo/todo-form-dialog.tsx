@@ -149,7 +149,7 @@ export function TodoFormDialog({
         hasUnsavedChanges={() => !form.state.isDefaultValue}
         footerSlot={
           details && error ? (
-            <Text role="alert" className="text-sm text-destructive">
+            <Text role="alert" className="text-sm text-negative">
               {describeError(error)}
             </Text>
           ) : null

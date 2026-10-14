@@ -1,10 +1,11 @@
 import { useMutation, useQuery } from '@apollo/client';
 import { useRouter } from 'expo-router';
 import { useEffect } from 'react';
-import { Text, View } from 'react-native';
+import { Text } from 'react-native';
 import { useAppForm } from '@/components/app-form';
+import { DialogLayout } from '@/components/dialog-layout';
+import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
-import { FormDialog, FormDialogFooter } from '@/components/ui/form-dialog';
 import { describeError } from '@/lib/errors';
 import {
   ApplyBoardTemplateDocument,
@@ -163,42 +164,57 @@ export function ProjectFormDialog({
   const error = createError ?? updateError;
 
   return (
-    <FormDialog
-      open={open}
-      onOpenChange={onOpenChange}
-      title={project ? 'Edit project' : 'New project'}
-      description="A project is a list of todos. Nothing more, on purpose."
-    >
-      <form.AppForm>
-        <Form className="gap-4">
-          <form.AppField
-            name="name"
-            validators={{ onChange: ({ value }) => (value.trim() === '' ? 'Give the project a name.' : undefined) }}
-          >
-            {(field) => <field.InputField label="Name" autoFocus placeholder="Kitchen renovation" />}
-          </form.AppField>
-          <form.AppField name="description">
-            {(field) => <field.TextAreaField label="Description" placeholder="Optional." />}
-          </form.AppField>
-          {project === undefined && templates.length > 0 ? (
-            <form.AppField name="template">
-              {(field) => (
-                <field.SelectField
-                  label="Start from"
-                  options={[
-                    { label: 'The usual lanes', value: DEFAULT_LANES },
-                    ...templates.map((row) => ({ label: row.name, value: row.id })),
-                  ]}
-                />
-              )}
+    <form.AppForm>
+      <DialogLayout
+        open={open}
+        onOpenChange={onOpenChange}
+        title={project ? 'Edit project' : 'New project'}
+        description="A project is a list of todos. Nothing more, on purpose."
+        size="md"
+        hasUnsavedChanges={() => !form.state.isDefaultValue}
+        footerSlot={
+          error ? (
+            <Text role="alert" className="text-negative text-sm">
+              {describeError(error)}
+            </Text>
+          ) : null
+        }
+        footerActionsSlot={(close) => (
+          <>
+            <Button variant="outline" onPress={close} content="Cancel" />
+            <form.SubmitButton isEdit={project !== undefined} editLabel="Save" />
+          </>
+        )}
+        contentSlot={
+          <Form className="gap-4">
+            <form.AppField
+              name="name"
+              validators={{ onChange: ({ value }) => (value.trim() === '' ? 'Give the project a name.' : undefined) }}
+            >
+              {(field) => <field.InputField label="Name" autoFocus placeholder="Kitchen renovation" />}
             </form.AppField>
-          ) : null}
-          {project !== undefined && openLanes.length > 0 ? (
-            <View className="gap-1">
+            <form.AppField name="description">
+              {(field) => <field.TextAreaField label="Description" placeholder="Optional." />}
+            </form.AppField>
+            {project === undefined && templates.length > 0 ? (
+              <form.AppField name="template">
+                {(field) => (
+                  <field.SelectField
+                    label="Start from"
+                    options={[
+                      { label: 'The usual lanes', value: DEFAULT_LANES },
+                      ...templates.map((row) => ({ label: row.name, value: row.id })),
+                    ]}
+                  />
+                )}
+              </form.AppField>
+            ) : null}
+            {project !== undefined && openLanes.length > 0 ? (
               <form.AppField name="newTodoLane">
                 {(field) => (
                   <field.SelectField
                     label="New todos land in"
+                    description="A request, a finished draft, and the todos an agent splits one into."
                     options={[
                       { label: 'The first open lane', value: FIRST_OPEN_LANE },
                       ...openLanes.map((lane) => ({ label: lane.name, value: lane.id })),
@@ -206,16 +222,10 @@ export function ProjectFormDialog({
                   />
                 )}
               </form.AppField>
-              <Text className="text-muted-foreground text-xs">
-                A request, a finished draft, and the todos an agent splits one into.
-              </Text>
-            </View>
-          ) : null}
-          <FormDialogFooter onCancel={() => onOpenChange(false)} error={error ? describeError(error) : null}>
-            <form.SubmitButton isEdit={project !== undefined} editLabel="Save" />
-          </FormDialogFooter>
-        </Form>
-      </form.AppForm>
-    </FormDialog>
+            ) : null}
+          </Form>
+        }
+      />
+    </form.AppForm>
   );
 }

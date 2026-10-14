@@ -40,7 +40,7 @@ export default function VerifyScreen() {
             title="That link didn't work"
             description={`${error ? describeError(error) : 'The link is missing its token.'} Sign-in links expire after 15 minutes.`}
             actionSlot={
-              <Link href="/login" className="text-primary text-sm underline">
+              <Link href="/login" className="text-info text-sm underline">
                 Request a new one
               </Link>
             }
@@ -48,7 +48,7 @@ export default function VerifyScreen() {
         ) : (
           <View className="flex-row items-center justify-center gap-2">
             <Spinner />
-            <Text className="text-muted-foreground text-sm">Signing you in…</Text>
+            <Text className="text-foreground/60 text-sm">Signing you in…</Text>
           </View>
         )}
       </View>

@@ -42,12 +42,12 @@ export function DependencyPicker({
           size={size}
           className={className}
           label={waiting > 0 ? `Dependencies, waiting on ${waiting}` : 'Dependencies'}
-          iconSlot={<Link2 className={cn('h-4 w-4', waiting > 0 ? 'text-foreground' : 'text-muted-foreground')} />}
+          iconSlot={<Link2 className={cn('h-4 w-4', waiting > 0 ? 'text-foreground' : 'text-foreground/60')} />}
         />
       </MenuTrigger>
       <MenuContent align={align} aria-label="Dependencies" className="max-h-64 w-64 overflow-y-auto">
         {options.length === 0 ? (
-          <Text className="px-2 py-3 text-center text-muted-foreground text-sm">Nothing else in this project yet.</Text>
+          <Text className="px-2 py-3 text-center text-foreground/60 text-sm">Nothing else in this project yet.</Text>
         ) : (
           options.map((option) => {
             const selected = dependencyIds.has(option.id);

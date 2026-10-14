@@ -48,7 +48,7 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
         details
         actionsSlot={<Button variant="outline" size="sm" onPress={() => window.location.reload()} content="Reload" />}
       />
-      <Text className="mx-auto max-w-md px-6 pb-12 text-center text-muted-foreground text-sm">
+      <Text className="mx-auto max-w-md px-6 pb-12 text-center text-foreground/60 text-sm">
         This is a bug in Telos, not something you did. Your data is untouched.
       </Text>
     </View>

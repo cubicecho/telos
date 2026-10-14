@@ -6,6 +6,7 @@ import type { LiveRun, StuckTodo, WaitingTodo } from '@/components/domain/ai/pro
 import { WatchRunDialog } from '@/components/domain/ai/watch-run-dialog';
 import { TodoFormDialog } from '@/components/domain/todo/todo-form-dialog';
 import type { TodoSummary } from '@/components/domain/todo/types';
+import { useCreateTodo } from '@/components/domain/todo/use-create-todo';
 import { useAi } from '@/lib/ai';
 import type { CachedLane } from '@/lib/cache';
 import { describeError } from '@/lib/errors';
@@ -53,6 +54,7 @@ export function Board({
   live,
   stuck,
   waiting,
+  nextPosition,
 }: {
   projectId: string;
   /** The project's own AI switch. */
@@ -65,6 +67,8 @@ export function Board({
   stuck?: ReadonlyMap<string, StuckTodo> | undefined;
   /** The todos waiting to be asked for, or asked for and not yet started, from the same poll. */
   waiting?: ReadonlyMap<string, WaitingTodo> | undefined;
+  /** Where a new todo goes in the project's order: after every todo, filtered out or not. */
+  nextPosition: number;
 }) {
   const [dragging, setDragging] = useState<TodoSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -104,6 +108,7 @@ export function Board({
 
   const actions = useLaneActions(projectId);
   const moveTodo = useMoveTodo(projectId);
+  const { create: createTodo } = useCreateTodo(projectId, lanes);
 
   // Returns the promise so a caller that awaits — LaneComposer does — is
   // awaiting something that cannot reject. Every lane action goes through
@@ -146,7 +151,7 @@ export function Board({
   return (
     <View className="gap-2">
       {error ? (
-        <Text className="text-destructive text-sm" aria-live="polite">
+        <Text className="text-negative text-sm" aria-live="polite">
           {error}
         </Text>
       ) : null}
@@ -179,6 +184,7 @@ export function Board({
               onReorder={(delta) => run(() => actions.moveLane(lanes, lane, delta))}
               onToggleDone={() => run(() => actions.toggleDoneLane(lane))}
               onDelete={() => run(() => actions.deleteLane(lane))}
+              onCreateTodo={(title) => run(() => createTodo(title, nextPosition, lane))}
               laneAgent={agentsOn ? (laneAgents.get(lane.id) ?? null) : undefined}
               agentName={agents.find((agent) => agent.id === laneAgents.get(lane.id)?.agentId)?.name}
               // Offered once the settings are in, so a save cannot overwrite them with defaults.
@@ -194,7 +200,7 @@ export function Board({
       {/* Todos with no lane at all only happen between a lane being deleted and
           the refetch that rehomes them, but saying so beats them vanishing. */}
       {todos.some((todo) => todo.lane == null) ? (
-        <Text className="text-muted-foreground text-xs">Some todos are not in a lane yet. Reload to place them.</Text>
+        <Text className="text-foreground/60 text-xs">Some todos are not in a lane yet. Reload to place them.</Text>
       ) : null}
 
       {/* Keyed by id so reopening on a different card resets the form, and

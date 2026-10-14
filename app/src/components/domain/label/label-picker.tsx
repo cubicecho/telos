@@ -41,7 +41,7 @@ export function LabelPicker({
         <ActionButton
           variant="ghost"
           size={size}
-          className={cn('text-muted-foreground', className)}
+          className={cn('text-foreground/60', className)}
           label="Labels"
           iconSlot={<Tag className="h-4 w-4" />}
         />
@@ -56,7 +56,9 @@ export function LabelPicker({
           count={labels.length}
           compact
           rows={2}
-          emptySlot={<Text className="px-2 py-3 text-center text-muted-foreground text-sm">No labels yet.</Text>}
+          emptySlot={
+            <Text className="px-2 py-3 text-center font-medium text-foreground/60 text-sm">No labels yet.</Text>
+          }
         />
         {labels.map((label) => {
           const isAttached = attachedIds.has(label.id);

@@ -3,11 +3,13 @@ import { Link } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
 import type { AiStatusQuery } from '@/__generated__/graphql';
+import { EmptyState } from '@/components/page';
 import { Section } from '@/components/section';
 import { StatTile } from '@/components/stat-tile';
 import { Badge } from '@/components/ui/badge';
 import type { BadgeVariant } from '@/components/ui/badge-base';
 import { Button } from '@/components/ui/button';
+import { CircleCheck } from '@/components/ui/icons';
 import { LoadState } from '@/components/ui/load-failure';
 import { useAi } from '@/lib/ai';
 import { describeError } from '@/lib/errors';
@@ -44,7 +46,7 @@ const STATES: Array<{ value: State; label: string; blurb: string; variant: Badge
     blurb: 'An agent gave up on these, or finished and has nowhere to send them.',
     variant: 'destructive',
   },
-  { value: 'running', label: 'Running', blurb: 'An agent is working these now.', variant: 'warning' },
+  { value: 'running', label: 'Running', blurb: 'An agent is working these now.', variant: 'info' },
   { value: 'blocked', label: 'Blocked', blurb: 'These wait on something unfinished.', variant: 'outline' },
   { value: 'queued', label: 'Queued', blurb: 'An agent will start these when it has room.', variant: 'secondary' },
   { value: 'parked', label: 'Parked', blurb: 'No agent will reach these where they are.', variant: 'outline' },
@@ -91,12 +93,9 @@ export function AiStatus({ pollMs = STATUS_POLL_MS }: { pollMs?: number }) {
             loading={!status}
             onPress={state.value === 'done' ? undefined : () => setFocus(state.value)}
             selected={focus === state.value}
-            valueClassName={state.value === 'attention' && counts.attention > 0 ? 'text-destructive' : undefined}
-            iconSlot={
-              (state.value === 'attention' || state.value === 'running') && counts[state.value] > 0 ? (
-                <LiveDot />
-              ) : undefined
-            }
+            valueClassName={state.value === 'attention' && counts.attention > 0 ? 'text-negative' : undefined}
+            // Only work in progress pulses: "needs you" is waiting, and its red count says so.
+            iconSlot={state.value === 'running' && counts.running > 0 ? <LiveDot /> : undefined}
           />
         ))}
       </View>
@@ -111,23 +110,25 @@ export function AiStatus({ pollMs = STATUS_POLL_MS }: { pollMs?: number }) {
               what="where things stand"
               count={shown.length}
               emptySlot={
-                <Text className="text-muted-foreground text-sm">
-                  {focus === 'attention'
-                    ? `Nothing is waiting on you. ${counts.running} running, ${counts.queued} queued.`
-                    : 'None.'}
-                </Text>
+                focus === 'attention' ? (
+                  <EmptyState
+                    icon={CircleCheck}
+                    title="Nothing is waiting on you."
+                    description={`${counts.running} running, ${counts.queued} queued.`}
+                  />
+                ) : (
+                  <EmptyState icon={CircleCheck} title={`Nothing ${focused.label.toLowerCase()}.`} />
+                )
               }
             />
-            {retryState.error ? (
-              <Text className="text-destructive text-sm">{describeError(retryState.error)}</Text>
-            ) : null}
+            {retryState.error ? <Text className="text-negative text-sm">{describeError(retryState.error)}</Text> : null}
             {shown.length > 0 ? (
               <View role="list" aria-label={focused.label} className="gap-2">
                 {shown.map((todo) => (
                   <View
                     key={todo.todoId}
                     role="listitem"
-                    className="gap-1 rounded-lg border border-border bg-card px-3 py-2.5"
+                    className="gap-1 rounded-lg border border-foreground/10 bg-secondary px-3 py-2.5"
                   >
                     <View className="flex-row items-center gap-2">
                       <Badge variant={focused.variant}>{focused.label}</Badge>
@@ -160,7 +161,7 @@ export function AiStatus({ pollMs = STATUS_POLL_MS }: { pollMs?: number }) {
                         />
                       </Link>
                     </View>
-                    <Text className="text-muted-foreground text-xs">
+                    <Text className="text-foreground/60 text-xs">
                       {where(todo)}
                       {todo.failures > 0
                         ? ` · ${todo.failures} failed ${todo.failures === 1 ? 'attempt' : 'attempts'}`
@@ -170,7 +171,7 @@ export function AiStatus({ pollMs = STATUS_POLL_MS }: { pollMs?: number }) {
                       <Text
                         selectable
                         numberOfLines={3}
-                        className={cn('text-sm', todo.state === 'attention' ? 'text-warning' : 'text-muted-foreground')}
+                        className={cn('text-sm', todo.state === 'attention' ? 'text-warning' : 'text-foreground/60')}
                       >
                         {todo.reason}
                       </Text>
@@ -188,7 +189,7 @@ export function AiStatus({ pollMs = STATUS_POLL_MS }: { pollMs?: number }) {
         description="Every lane in your AI projects, and where its todos stand."
         contentSlot={
           status && status.projects.length === 0 ? (
-            <Text className="text-muted-foreground text-sm">No project has AI on.</Text>
+            <Text className="text-foreground/60 text-sm">No project has AI on.</Text>
           ) : (
             <View className="gap-4">
               {(status?.projects ?? []).map((project) => (
@@ -204,17 +205,17 @@ export function AiStatus({ pollMs = STATUS_POLL_MS }: { pollMs?: number }) {
                       <View
                         key={lane.laneId}
                         role="listitem"
-                        className="flex-row flex-wrap items-baseline gap-x-3 gap-y-0.5 border-border border-b py-1.5"
+                        className="flex-row flex-wrap items-baseline gap-x-3 gap-y-0.5 border-foreground/10 border-b py-1.5"
                       >
                         <Text className="min-w-32 text-foreground text-sm">{lane.name}</Text>
-                        <Text className="text-muted-foreground text-xs">
+                        <Text className="text-foreground/60 text-xs">
                           {lane.station ? 'agent' : lane.isDone ? 'done lane' : 'resting place'}
                         </Text>
-                        <Text className="flex-1 text-right text-muted-foreground text-xs">
+                        <Text className="flex-1 text-right text-foreground/60 text-xs">
                           {STATES.filter((state) => lane[state.value] > 0).map((state, index) => (
                             <Text
                               key={state.value}
-                              className={state.value === 'attention' ? 'text-destructive' : undefined}
+                              className={state.value === 'attention' ? 'text-negative' : undefined}
                             >
                               {index > 0 ? ' · ' : ''}
                               {lane[state.value]} {state.label.toLowerCase()}
@@ -247,7 +248,7 @@ function RunnerLine({ seenAt, loaded }: { seenAt: string | null | undefined; loa
   return (
     <View className="flex-row items-center gap-2">
       {quiet ? <View aria-hidden className="size-2 rounded-full bg-warning" /> : <LiveDot />}
-      <Text className="text-muted-foreground text-sm">
+      <Text className="text-foreground/60 text-sm">
         {seconds === null
           ? 'The runner has not asked for work since the server started. Nothing will be picked up until it does.'
           : quiet
@@ -279,7 +280,7 @@ function RecentFailures({ pollMs }: { pollMs: number }) {
             query={query}
             what="the failed runs"
             count={runs.length}
-            emptySlot={<Text className="text-muted-foreground text-sm">No run failed.</Text>}
+            emptySlot={<Text className="text-foreground/60 text-sm">No run failed.</Text>}
           />
           {runs.length > 0 ? (
             <View role="list" aria-label="Failed runs" className="gap-2">

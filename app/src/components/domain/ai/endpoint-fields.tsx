@@ -89,19 +89,19 @@ export function EndpointStatus({
       {error ? (
         <>
           <Badge variant="destructive">Failed</Badge>
-          <Text className="flex-1 text-destructive text-xs" aria-live="polite">
+          <Text className="flex-1 text-negative text-xs" aria-live="polite">
             {error}
           </Text>
         </>
       ) : models ? (
         <>
           <Badge variant="positive">Connected</Badge>
-          <Text className="flex-1 text-muted-foreground text-xs" aria-live="polite">
+          <Text className="flex-1 text-foreground/60 text-xs" aria-live="polite">
             {models.length === 1 ? '1 model' : `${models.length} models`} at {asked?.baseUrl}
           </Text>
         </>
       ) : !canLoad ? (
-        <Text className="flex-1 text-muted-foreground text-xs">Give a base URL to list its models.</Text>
+        <Text className="flex-1 text-foreground/60 text-xs">Give a base URL to list its models.</Text>
       ) : null}
     </View>
   );
@@ -195,7 +195,7 @@ export function FormGroupTitle({ title, description }: { title: string; descript
       <Text role="heading" aria-level={3} className="font-medium text-foreground text-sm">
         {title}
       </Text>
-      {description ? <Text className="text-muted-foreground text-xs">{description}</Text> : null}
+      {description ? <Text className="text-foreground/60 text-xs">{description}</Text> : null}
     </View>
   );
 }

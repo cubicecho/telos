@@ -47,12 +47,12 @@ export function RunTodoButton({ todoId, title }: { todoId: string; title: string
         content="Run now"
       />
       {error ? (
-        <Text className="text-destructive text-xs" aria-live="polite">
+        <Text className="text-negative text-xs" aria-live="polite">
           {error}
         </Text>
       ) : null}
       {asked ? (
-        <Text className="text-muted-foreground text-xs" aria-live="polite">
+        <Text className="text-foreground/60 text-xs" aria-live="polite">
           Asked. An agent takes it when its lane has room.
         </Text>
       ) : null}

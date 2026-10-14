@@ -7,11 +7,12 @@ import { Archive } from '@/components/app-icons';
 import { ArchivedTodoList } from '@/components/domain/todo/archived-todos';
 import { TodoFormDialog } from '@/components/domain/todo/todo-form-dialog';
 import type { TodoSummary } from '@/components/domain/todo/types';
+import { EmptyState } from '@/components/page';
 import { Section } from '@/components/section';
 import { StatTile } from '@/components/stat-tile';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Play, Upload } from '@/components/ui/icons';
+import { CircleCheck, Play, Upload } from '@/components/ui/icons';
 import { LoadState } from '@/components/ui/load-failure';
 import { SegmentedButton, SegmentedGroup } from '@/components/ui/segmented';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -137,10 +138,10 @@ function NeedsAttention({ pollMs }: { pollMs: number }) {
             query={query}
             what="what needs attention"
             count={todos.length}
-            emptySlot={<Text className="text-muted-foreground text-sm">Nothing is waiting on you.</Text>}
+            emptySlot={<EmptyState icon={CircleCheck} title="Nothing is waiting on you." />}
           />
           {error ? (
-            <Text className="text-destructive text-sm" aria-live="polite">
+            <Text className="text-negative text-sm" aria-live="polite">
               {error}
             </Text>
           ) : null}
@@ -150,7 +151,7 @@ function NeedsAttention({ pollMs }: { pollMs: number }) {
                 <View
                   key={todo.todoId}
                   role="listitem"
-                  className="gap-1 rounded-lg border border-border bg-card px-3 py-2.5"
+                  className="gap-1 rounded-lg border border-foreground/10 bg-secondary px-3 py-2.5"
                 >
                   <View className="flex-row flex-wrap items-center gap-2">
                     {todo.outOfAttempts ? <Badge variant="destructive">Out of attempts</Badge> : null}
@@ -182,7 +183,7 @@ function NeedsAttention({ pollMs }: { pollMs: number }) {
                       />
                     </Link>
                   </View>
-                  <Text className="text-muted-foreground text-xs">
+                  <Text className="text-foreground/60 text-xs">
                     {[todo.projectName, todo.laneName ?? 'no lane', attemptsLine(todo)].filter(Boolean).join(' · ')}
                   </Text>
                   {todo.reason ? (
@@ -252,12 +253,12 @@ function AccountSpend({ pollMs }: { pollMs: number }) {
           {query.error && !spend ? <LoadState query={query} what="the spend" count={0} /> : null}
           {/* Retention deletes old runs, so a window longer than it is not whole. */}
           {spend?.keptSince ? (
-            <Text className="text-muted-foreground text-sm">
+            <Text className="text-foreground/60 text-sm">
               {`Runs are kept for ${spend.retentionDays} ${spend.retentionDays === 1 ? 'day' : 'days'}, so these figures start on ${formatTimestamp(spend.keptSince)}, not ${SPEND_DAYS} days back.`}
             </Text>
           ) : null}
           {total && total.draftReplies > 0 ? (
-            <Text className="text-muted-foreground text-sm">A draft reply’s tokens are an estimate.</Text>
+            <Text className="text-foreground/60 text-sm">A draft reply’s tokens are an estimate.</Text>
           ) : null}
           {spend && spend.total.runs > 0 ? (
             <View className="flex-row flex-wrap gap-6">
@@ -290,7 +291,7 @@ function SpendList({
           <View
             key={line.id ?? line.name}
             role="listitem"
-            className="flex-row flex-wrap items-baseline gap-x-3 gap-y-0.5 border-border border-b py-1.5"
+            className="flex-row flex-wrap items-baseline gap-x-3 gap-y-0.5 border-foreground/10 border-b py-1.5"
           >
             {linked && line.id ? (
               <Link href={`/projects/${line.id}?view=runs`} className="min-w-0 flex-1 text-foreground text-sm">
@@ -299,7 +300,7 @@ function SpendList({
             ) : (
               <Text className="min-w-0 flex-1 text-foreground text-sm">{line.name}</Text>
             )}
-            <Text className="text-muted-foreground text-xs">{runsLine(line)}</Text>
+            <Text className="text-foreground/60 text-xs">{runsLine(line)}</Text>
             <Text className="min-w-24 text-right text-foreground text-sm tabular-nums">
               {`${line.totalTokens.toLocaleString()} tokens`}
             </Text>
@@ -345,7 +346,7 @@ function AccountRuns({ pollMs }: { pollMs: number }) {
           what="the runs"
           count={runs.length}
           emptySlot={
-            <Text className="text-muted-foreground text-sm">
+            <Text className="text-foreground/60 text-sm">
               {filter === 'all' ? 'No agent has worked any of your projects yet.' : 'No runs like that.'}
             </Text>
           }
@@ -389,7 +390,7 @@ function AccountArtifacts() {
         query={query}
         what="the artifacts"
         count={artifacts.length}
-        emptySlot={<Text className="text-muted-foreground text-sm">No run has left anything behind yet.</Text>}
+        emptySlot={<Text className="text-foreground/60 text-sm">No run has left anything behind yet.</Text>}
       />
       {artifacts.length === 0 ? null : (
         <View role="list" aria-label="Artifacts" className="gap-1">

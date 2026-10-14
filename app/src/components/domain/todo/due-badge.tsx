@@ -30,8 +30,8 @@ export function DueBadge({ dueAt, done, className }: { dueAt: string | null; don
             press props for the tooltip to hang itself on. */}
         <TooltipTrigger asChild>
           <View className={cn('shrink-0', className)}>
-            <Badge variant="outline" className={late ? 'border-destructive/40' : undefined}>
-              <Text className={cn('font-medium text-xs', late ? 'text-destructive' : 'text-muted-foreground')}>
+            <Badge variant="outline" className={late ? 'border-negative/40' : undefined}>
+              <Text className={cn('font-medium text-xs', late ? 'text-negative' : 'text-foreground/60')}>
                 {/* Said in the text as well as in the colour, so a reader who
                     cannot distinguish the red is still told. Prefixed rather than
                     folded into the phrase, because the text is sometimes relative

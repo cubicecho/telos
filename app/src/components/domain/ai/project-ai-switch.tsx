@@ -46,12 +46,12 @@ export function ProjectAiSwitch({ projectId, enabled }: { projectId: string; ena
           disabled={loading}
           accessibilityLabel="AI works on this project"
         />
-        <Text className="text-muted-foreground text-sm">
+        <Text className="text-foreground/60 text-sm">
           {enabled ? 'AI works on this project' : 'AI is off for this project'}
         </Text>
       </View>
       {error ? (
-        <Text className="text-destructive text-xs" aria-live="polite">
+        <Text className="text-negative text-xs" aria-live="polite">
           {error}
         </Text>
       ) : null}
@@ -99,12 +99,12 @@ export function ProjectAutoRunSwitch({ projectId, enabled }: { projectId: string
           disabled={loading}
           accessibilityLabel="Agents start on todos by themselves"
         />
-        <Text className="text-muted-foreground text-sm">
+        <Text className="text-foreground/60 text-sm">
           {enabled ? 'Agents start on todos by themselves' : 'Agents wait to be asked'}
         </Text>
       </View>
       {error ? (
-        <Text className="text-destructive text-xs" aria-live="polite">
+        <Text className="text-negative text-xs" aria-live="polite">
           {error}
         </Text>
       ) : null}

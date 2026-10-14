@@ -125,6 +125,7 @@ function board(
         live={live}
         stuck={stuck}
         waiting={waiting}
+        nextPosition={todos.length}
       />
     </MockedProvider>,
   );
