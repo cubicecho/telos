@@ -1,3 +1,10 @@
+# [2.3.0](https://github.com/cubicecho/telos/compare/v2.2.0...v2.3.0) (2026-10-14)
+
+
+### Features
+
+* **app:** an "All projects" overview of every project's todos ([3ff7ec7](https://github.com/cubicecho/telos/commit/3ff7ec7c76788d228b01e1c119017d4a36d5d902))
+
 # [2.2.0](https://github.com/cubicecho/telos/compare/v2.1.0...v2.2.0) (2026-10-14)
 
 
