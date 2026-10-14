@@ -1,3 +1,10 @@
+# [2.2.0](https://github.com/cubicecho/telos/compare/v2.1.0...v2.2.0) (2026-10-14)
+
+
+### Features
+
+* **app:** a Refactoring UI pass over the app ([9265204](https://github.com/cubicecho/telos/commit/9265204eb6de135a3a11d8f4936a0476e044b390))
+
 # [2.1.0](https://github.com/cubicecho/telos/compare/v2.0.2...v2.1.0) (2026-10-12)
 
 
