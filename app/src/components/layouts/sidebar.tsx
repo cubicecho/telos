@@ -2,7 +2,7 @@ import { useQuery } from '@apollo/client';
 import { Link, usePathname } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Platform, Text, View } from 'react-native';
-import { Activity, History, LogOut } from '@/components/app-icons';
+import { Activity, History, List, LogOut } from '@/components/app-icons';
 import { useAttentionCount } from '@/components/domain/ai/ai-status';
 import { ProjectFormDialog } from '@/components/domain/project/project-form-dialog';
 import { TodoSearch, useSearchShortcut } from '@/components/domain/todo/todo-search';
@@ -54,6 +54,14 @@ export function Sidebar() {
         }
         contentSlot={
           <View role="navigation" aria-label="Projects">
+            <Link href="/overview" asChild>
+              <SidebarNavItem
+                href="/overview"
+                label="All projects"
+                iconSlot={<List />}
+                active={pathname === '/overview'}
+              />
+            </Link>
             <SidebarSection
               title="Projects"
               status={
