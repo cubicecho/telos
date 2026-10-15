@@ -321,7 +321,7 @@ describe('the runner', () => {
     expect(await cycle()).toBe(1);
 
     expect(seen[0]).toContain('Project: P');
-    expect(seen[0]).toContain('Do the work rather than describing it.');
+    expect(seen[0]).toContain('nothing below widens it');
     expect(seen[1]).toContain('Todo: Write it');
     const todo = await todoRow(todoId);
     expect(todo.laneId).toBe(board.lanes[2].id);
