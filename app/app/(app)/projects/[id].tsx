@@ -324,7 +324,14 @@ export default function ProjectScreen() {
                         </Text>
                       ) : (
                         open.map((todo) => (
-                          <TodoRow key={todo.id} todo={todo} projectId={project.id} siblings={all} lanes={lanes} />
+                          <TodoRow
+                            key={todo.id}
+                            todo={todo}
+                            projectId={project.id}
+                            siblings={all}
+                            lanes={lanes}
+                            live={aiHere ? activity.live.get(todo.id) : undefined}
+                          />
                         ))
                       )}
                     </View>
@@ -335,7 +342,14 @@ export default function ProjectScreen() {
                           {`Blocked (${blocked.length})`}
                         </SectionHeading>
                         {blocked.map((todo) => (
-                          <TodoRow key={todo.id} todo={todo} projectId={project.id} siblings={all} lanes={lanes} />
+                          <TodoRow
+                            key={todo.id}
+                            todo={todo}
+                            projectId={project.id}
+                            siblings={all}
+                            lanes={lanes}
+                            live={aiHere ? activity.live.get(todo.id) : undefined}
+                          />
                         ))}
                       </View>
                     ) : null}
@@ -352,7 +366,14 @@ export default function ProjectScreen() {
                         />
                         {showCompleted
                           ? completed.map((todo) => (
-                              <TodoRow key={todo.id} todo={todo} projectId={project.id} siblings={all} lanes={lanes} />
+                              <TodoRow
+                                key={todo.id}
+                                todo={todo}
+                                projectId={project.id}
+                                siblings={all}
+                                lanes={lanes}
+                                live={aiHere ? activity.live.get(todo.id) : undefined}
+                              />
                             ))
                           : null}
                       </View>
