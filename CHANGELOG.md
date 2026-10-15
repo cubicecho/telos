@@ -1,3 +1,10 @@
+# [2.4.0](https://github.com/cubicecho/telos/compare/v2.3.1...v2.4.0) (2026-10-15)
+
+
+### Features
+
+* **app:** show the agent working a todo in the project's list ([63cf1b1](https://github.com/cubicecho/telos/commit/63cf1b1b8c22dba3db18733dd52bc4e299e41e00))
+
 ## [2.3.1](https://github.com/cubicecho/telos/compare/v2.3.0...v2.3.1) (2026-10-15)
 
 
