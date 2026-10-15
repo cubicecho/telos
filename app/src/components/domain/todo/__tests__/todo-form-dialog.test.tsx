@@ -1,4 +1,4 @@
-import { MockedProvider } from '@apollo/client/testing';
+import { MockedProvider, type MockedResponse } from '@apollo/client/testing';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { format } from 'date-fns';
@@ -68,7 +68,25 @@ function aiState(instance: boolean, account: boolean) {
   };
 }
 
-function open(todo: TodoSummary, mocks: ReturnType<typeof save>[], onOpenChange = vi.fn(), ai = aiState(false, false)) {
+/** The todo's runs, which carry its project's AI switch. */
+function todoRuns(aiEnabled: boolean) {
+  return {
+    request: { query: TodoRunsDocument, variables: { id: TODO.id } },
+    result: {
+      data: {
+        todo: {
+          __typename: 'Todo',
+          id: TODO.id,
+          project: { __typename: 'Project', id: 'p1', aiEnabled },
+          runs: [],
+          artifacts: [],
+        },
+      },
+    },
+  };
+}
+
+function open(todo: TodoSummary, mocks: MockedResponse[], onOpenChange = vi.fn(), ai = aiState(false, false)) {
   render(
     <MockedProvider mocks={[ai, ...mocks]}>
       <TodoFormDialog open onOpenChange={onOpenChange} todo={todo} />
@@ -209,7 +227,7 @@ describe('TodoFormDialog', () => {
     const user = userEvent.setup();
     const onOpenChange = open(
       TODO,
-      [save({ title: TODO.title, notes: null, dueAt: null, aiIgnored: true })],
+      [todoRuns(true), save({ title: TODO.title, notes: null, dueAt: null, aiIgnored: true })],
       vi.fn(),
       aiState(true, true),
     );
@@ -219,22 +237,24 @@ describe('TodoFormDialog', () => {
 
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
   });
-  it('shows the Runs tab only when the project has AI on as well as the account', async () => {
-    const todoRuns = (aiEnabled: boolean) => ({
-      request: { query: TodoRunsDocument, variables: { id: TODO.id } },
-      result: {
-        data: {
-          todo: {
-            __typename: 'Todo',
-            id: TODO.id,
-            project: { __typename: 'Project', id: 'p1', aiEnabled },
-            runs: [],
-            artifacts: [],
-          },
-        },
-      },
-    });
 
+  it('hides "AI ignores this" while the project has AI off, and keeps what it held', async () => {
+    const user = userEvent.setup();
+    // Sent as stored: a mock with `aiIgnored: false` would not match.
+    const onOpenChange = open(
+      { ...TODO, aiIgnored: true },
+      [todoRuns(false), save({ title: TODO.title, notes: null, dueAt: null, aiIgnored: true })],
+      vi.fn(),
+      aiState(true, true),
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(screen.queryByLabelText('AI ignores this')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
+  });
+  it('shows the Runs tab only when the project has AI on as well as the account', async () => {
     const first = render(
       <MockedProvider mocks={[aiState(true, true), todoRuns(false)]}>
         <TodoFormDialog open onOpenChange={vi.fn()} todo={TODO} />
