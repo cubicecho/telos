@@ -1,3 +1,10 @@
+## [2.5.2](https://github.com/cubicecho/telos/compare/v2.5.1...v2.5.2) (2026-10-15)
+
+
+### Bug Fixes
+
+* **runs:** let a planner refine its todo, and stop edits re-queuing work ([73bc289](https://github.com/cubicecho/telos/commit/73bc2896b75473e57854f1e1ae9a8083b28fb695))
+
 ## [2.5.1](https://github.com/cubicecho/telos/compare/v2.5.0...v2.5.1) (2026-10-15)
 
 
