@@ -19,6 +19,10 @@ export default defineConfig({
   resolve: { alias },
   test: {
     globals: true,
+    // Worker threads rather than Vitest's default child processes: a thread
+    // starts faster and shares the process's memory, and nothing here needs
+    // process isolation — PGlite runs in-thread, and each test builds its own.
+    pool: 'threads',
     exclude: ['**/node_modules/**', '**/dist/**'],
     // A test that forgets to build its own throwaway database gets an empty URL
     // and fails loudly, rather than quietly writing to the developer's Postgres.
