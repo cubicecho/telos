@@ -10,39 +10,49 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# Codegen imports @telos/db, which refuses to load without one. Nothing here
+# connects — postgres-js is lazy, and the tests build their own in-memory
+# database.
+env:
+  DATABASE_URL: postgres://ci:ci@127.0.0.1:5432/ci
+
+# Lint, typecheck and each test project are separate jobs, so they run side by
+# side rather than one after another, and each gets a runner's cores to itself.
 jobs:
-  check:
+  # Formatting, lint and import order in one pass. `ci` differs from
+  # `npm run check:biome` only in never writing fixes. Biome skips
+  # `__generated__`, so this needs no codegen.
+  lint:
     runs-on: ubuntu-latest
-    env:
-      # Codegen imports @telos/db, which refuses to load without one. Nothing
-      # here connects — postgres-js is lazy, and the tests build their own
-      # in-memory database.
-      DATABASE_URL: postgres://ci:ci@127.0.0.1:5432/ci
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          # Matches the Dockerfile: the server runs its TypeScript sources
-          # directly under --experimental-strip-types, so the runtime major is
-          # part of the contract, not just a build detail.
-          node-version: 24
-          cache: npm
-      - run: npm ci
+      - uses: ./.github/actions/setup
+      - run: npx biome ci .
+
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
       - run: npm run codegen
+      - run: npm run check:types
 
-      # Formatting, lint and import order in one pass. `ci` differs from
-      # `npm run check:biome` only in never writing fixes.
-      - name: Lint
-        run: npx biome ci .
-
-      - name: Typecheck
-        run: npm run check:types
-
-      # Two projects: server and db tests run Postgres in-process (PGlite) and
-      # the component tests run in jsdom, so there is no service container here
-      # and there doesn't need to be one.
-      - name: Test
-        run: npm test
+  # The two Vitest projects: server and db tests run Postgres in-process
+  # (PGlite) and the component tests run in jsdom, so there is no service
+  # container here and there doesn't need to be one.
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      # One project failing says nothing about the other's answer.
+      fail-fast: false
+      matrix:
+        project: [node, dom]
+    name: test (${{ matrix.project }})
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - run: npm run codegen
+      - run: npx vitest run --project ${{ matrix.project }}
 
   image:
     runs-on: ubuntu-latest
