@@ -1,5 +1,5 @@
 import * as dbSchema from '@telos/db/schema';
-import { and, asc, desc, eq, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, ne, sql } from 'drizzle-orm';
 import { extendSchema, GraphQLError, type GraphQLObjectType, type GraphQLSchema, parse } from 'graphql';
 import { requireSystem } from '../ai-gate.ts';
 import { assertNoCycle, findBlocked } from '../blocking.ts';
@@ -121,6 +121,13 @@ const RUNS_SDL = parse(`
     dependsOn: [String!]
   }
 
+  "The todo rewritten by its run: what a field leaves out stays as it was."
+  input RefinedTodoInput {
+    title: String
+    brief: String
+    acceptance: String
+  }
+
   "Something that happened in a run, for the live view."
   input RunEventInput {
     "tool_call, tool_result, hook, notice, turn, thinking or output."
@@ -170,8 +177,10 @@ const RUNS_SDL = parse(`
     promptTokens: Int
     completionTokens: Int
     totalTokens: Int
-    "The new todos the agent proposed, if any. They land where the project's new todos do, and this one waits on them."
+    "The todos the agent split this one into, if any: two or more. This one waits on them. One is read as a refine."
     todos: [ProposedTodoInput!]
+    "The todo as the agent rewrote it, if it did. It then passes, as a report would. Never with todos."
+    refine: RefinedTodoInput
     "What happened since the last heartbeat."
     events: [RunEventInput!]
     "What the agent was told, when no heartbeat reported it."
@@ -300,11 +309,18 @@ async function assignmentFor(tx: AnyRow, todo: AnyRow, lane: AnyRow, project: An
   const report = thread.filter((note) => note.kind === 'report').at(-1)?.body ?? null;
 
   // Why it is back: the reason (or the note) on the move that brought it here,
-  // when that move was not its first arrival.
+  // when that move was not its first arrival. An edit is not an arrival
+  // (`arrivedIn` in ready.ts).
   const [arrival] = await tx
     .select({ reason: dbSchema.todoEvents.reason, noteId: dbSchema.todoEvents.noteId })
     .from(dbSchema.todoEvents)
-    .where(and(eq(dbSchema.todoEvents.todoId, todo.id), eq(dbSchema.todoEvents.toLaneId, lane.id)))
+    .where(
+      and(
+        eq(dbSchema.todoEvents.todoId, todo.id),
+        eq(dbSchema.todoEvents.toLaneId, lane.id),
+        ne(dbSchema.todoEvents.kind, 'edit'),
+      ),
+    )
     .orderBy(desc(dbSchema.todoEvents.at))
     .limit(1);
   const why =
@@ -404,6 +420,60 @@ interface ProposedTodo {
   brief?: string | null;
   acceptance?: string | null;
   dependsOn?: string[] | null;
+}
+
+interface RefinedTodo {
+  title?: string | null;
+  brief?: string | null;
+  acceptance?: string | null;
+}
+
+/** Why a run that both refined and split its todo fails: the two say different things about it. */
+const REFINED_AND_SPLIT = 'The reply both rewrote the todo and split it. A todo is either refined or split.';
+
+/**
+ * The columns a refine rewrites: each field it gave, trimmed. What it leaves
+ * out or leaves empty stays as it was.
+ *
+ * @param refine - What the agent rewrote, or a lone proposed todo read as one.
+ * @returns The columns to set; null when it changes nothing.
+ */
+function refinementOf(
+  refine: RefinedTodo | null | undefined,
+): { title?: string; notes?: string; acceptance?: string } | null {
+  const title = refine?.title?.trim();
+  const notes = refine?.brief?.trim();
+  const acceptance = refine?.acceptance?.trim();
+  const set = {
+    ...(title ? { title } : {}),
+    ...(notes ? { notes } : {}),
+    ...(acceptance ? { acceptance } : {}),
+  };
+  return Object.keys(set).length > 0 ? set : null;
+}
+
+/**
+ * Where a split's pieces land: where the project's new todos do, unless that is
+ * the lane that split them. New todos land there to be planned, and these
+ * already were, so they go on down its success route instead, when it has one
+ * that is not the done lane. Otherwise a planning lane would plan its own
+ * pieces again.
+ *
+ * @param tx - The transaction.
+ * @param todo - The todo that was split.
+ * @param lane - The lane whose run split it, if it still exists.
+ * @returns The lane, or null when the project has no open lane.
+ */
+async function piecesLaneId(tx: AnyRow, todo: AnyRow, lane: AnyRow | null): Promise<string | null> {
+  const intake = await findNewTodoLaneId(tx, todo.projectId);
+  if (!lane || intake !== lane.id || !lane.onSuccessLaneId) {
+    return intake;
+  }
+  const [next] = await tx
+    .select({ id: dbSchema.lanes.id, isDone: dbSchema.lanes.isDone })
+    .from(dbSchema.lanes)
+    .where(eq(dbSchema.lanes.id, lane.onSuccessLaneId));
+  return next && !next.isDone ? next.id : intake;
 }
 
 export interface RunEventInput {
@@ -555,6 +625,7 @@ interface RunResult {
   completionTokens?: number | null;
   totalTokens?: number | null;
   todos?: ProposedTodo[] | null;
+  refine?: RefinedTodo | null;
   events?: RunEventInput[] | null;
   prompt?: RunPrompt | null;
   artifacts?: ArtifactInput[] | null;
@@ -584,8 +655,8 @@ function spend(run: AnyRow, result: RunResult) {
  * Otherwise every run is read the same way. A failed run, or a reply that
  * opens with FAIL, sends the todo down the failure route; anything else
  * passes, down the success route, or into the archive when that is what the
- * lane does with a pass. A pass that proposed new todos leaves its todo where
- * it is, waiting on them. A todo a person moved while the agent worked stays
+ * lane does with a pass. A pass that refined the todo rewrites it first. A pass
+ * that split it leaves it where it is, waiting on its pieces. A todo a person moved while the agent worked stays
  * where the person put it: the run's opinion is recorded, but the person's
  * move wins.
  *
@@ -623,11 +694,19 @@ async function finish(context: Context, runId: string, result: RunResult): Promi
       return stopped;
     }
 
+    // A reply is one outcome: a verdict, a report, a refine (the todo
+    // rewritten, then passed) or a split (two or more pieces). A lone proposed
+    // todo is the todo said again, so it is read as a refine; a reply that
+    // both refines and splits fails, as there is no telling which it meant.
     const ok = result.status === 'ok';
     const verdict = ok ? verdictOf(output) : 'none';
-    const passed = ok && verdict !== 'fail';
-    const proposed = passed ? (result.todos ?? []).filter((todo) => todo.title?.trim()) : [];
-    const error = ok ? null : result.error?.trim() || 'The run failed.';
+    const proposed = (result.todos ?? []).filter((todo) => todo.title?.trim());
+    const refined = refinementOf(result.refine);
+    const mixed = ok && verdict !== 'fail' && refined !== null && proposed.length > 0;
+    const passed = ok && verdict !== 'fail' && !mixed;
+    const pieces = passed && proposed.length > 1 ? proposed : [];
+    const rewrite = passed ? (refined ?? (proposed.length === 1 ? refinementOf(proposed[0]) : null)) : null;
+    const error = mixed ? REFINED_AND_SPLIT : ok ? null : result.error?.trim() || 'The run failed.';
 
     const actor: Actor = { kind: 'agent', userId: run.userId, runId: run.id };
     await stampActor(tx, actor);
@@ -653,13 +732,19 @@ async function finish(context: Context, runId: string, result: RunResult): Promi
     const stillHere = lane && todo.laneId === lane.id;
     const targetId = stillHere ? (passed ? lane.onSuccessLaneId : lane.onFailureLaneId) : null;
 
-    if (proposed.length > 0) {
-      await writeChildren(tx, todo, await findNewTodoLaneId(tx, todo.projectId), proposed);
+    // An edit, not an arrival (`arrivedIn` in ready.ts): rewriting the todo
+    // does not hand it back to this lane's agent.
+    if (rewrite) {
+      await tx.update(dbSchema.todos).set(rewrite).where(eq(dbSchema.todos.id, todo.id));
+    }
+
+    if (pieces.length > 0) {
+      await writeChildren(tx, todo, await piecesLaneId(tx, todo, lane), pieces);
       await tx.insert(dbSchema.todoNotes).values({
         userId: run.userId,
         todoId: todo.id,
         kind: 'report',
-        body: `Split into ${proposed.length} todo${proposed.length === 1 ? '' : 's'}: ${proposed.map((todo) => todo.title.trim()).join('; ')}`,
+        body: `Split into ${pieces.length} todos: ${pieces.map((todo) => todo.title.trim()).join('; ')}`,
         actorKind: 'agent',
         runId: run.id,
       });

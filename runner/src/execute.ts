@@ -375,12 +375,12 @@ async function work(
     },
   });
 
-  const { report, todos } = readReply(loop.turn.content.trim());
+  const { report, todos, refine } = readReply(loop.turn.content.trim());
   const spent = {
     toolCalls: loop.toolCalls.length,
     promptTokens: loop.usage.prompt,
     completionTokens: loop.usage.completion,
     totalTokens: loop.usage.total,
   };
-  return { status: 'ok', output: report, todos, ...spent };
+  return { status: 'ok', output: report, todos, refine, ...spent };
 }

@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm';
 import { resultRows } from './blocking.ts';
 import { pruneTombstones } from './changes.ts';
-import { TOUCHED } from './ready.ts';
+import { arrivedIn, TOUCHED } from './ready.ts';
 
 // Old runs, pruned: each account says how many days a finished run and its log
 // are kept (users.runRetentionDays; null is for good), and the server deletes
@@ -61,10 +61,8 @@ export async function pruneRuns(db: AnyDb, now: Date = new Date()): Promise<numb
             '-infinity'::timestamptz
           ))
           -- A success here since it arrived: the lane's agent is done with it.
-          OR (r.status = 'ok' AND r.lane_id = t.lane_id AND r.started_at >= coalesce(
-            (SELECT max(e.at) FROM todo_events e WHERE e.todo_id = t.id AND e.to_lane_id = t.lane_id),
-            t.created_at
-          ))
+          OR (r.status = 'ok' AND r.lane_id = t.lane_id
+            AND r.started_at >= ${arrivedIn(sql`t.id`, sql`t.lane_id`, sql`t.created_at`)})
         )
       )
     RETURNING r.id

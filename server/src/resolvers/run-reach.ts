@@ -15,10 +15,11 @@ import { requireAuth } from './auth.ts';
 // - its own board, for anything that adds to a board or changes it: a todo, a
 //   request, a draft, the project's text, a template made of it.
 //
-// It may not move, finish, archive, delete, retry, re-run or set aside its own
-// todo, stop its own run, or change what its own todo waits on: what happens
-// to its todo is `finishRun`'s to decide, reading the result against the lane.
-// Editing its own todo's text and leaving notes on it are fine.
+// It may not edit, move, finish, archive, delete, retry, re-run or set aside
+// its own todo, stop its own run, or change what its own todo waits on: what
+// happens to its todo is `finishRun`'s to decide, reading the result against
+// the lane. A run that rewrites its todo says so in its reply, as a refine.
+// Leaving notes on it is fine.
 //
 // A todo out of reach is NOT_FOUND, as one AI cannot see is (ai-reach.ts): the
 // run is not told that it exists. Its own todo is FORBIDDEN, since it knows
@@ -225,9 +226,6 @@ async function assertRun(context: Context, run: Run, runId: unknown): Promise<vo
   }
 }
 
-/** Fields of a todo whose change is the outcome of its run, not an edit. */
-const OUTCOME_FIELDS = ['completedAt', 'laneId'] as const;
-
 type Args = Record<string, AnyDb>;
 
 /** What each mutation a run might make is held to, by name. */
@@ -242,9 +240,7 @@ const RUN_REACH: Record<string, (context: Context, run: Run, args: Args) => Prom
     await assertParent(context, run, args.parentId);
   },
   updateTodo: async (context, run, args) => {
-    const id = namedId(args.where);
-    const outcome = OUTCOME_FIELDS.some((field) => args.set?.[field] !== undefined);
-    await assertTodo(context, run, id, outcome ? 'complete or move' : null);
+    await assertTodo(context, run, namedId(args.where), 'edit');
     if (args.set && 'parentId' in args.set) {
       await assertParent(context, run, args.set.parentId);
     }

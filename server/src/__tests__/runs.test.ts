@@ -295,14 +295,15 @@ describe('finishRun', () => {
       (await db.select().from(dbSchema.todos).where(eq(dbSchema.todos.parentId, parentId))).map(
         (child: { laneId: string }) => child.laneId,
       );
+    const pieces = [{ title: 'One piece' }, { title: 'Another' }];
     const unset = await board.addTodo('Unset');
-    await finish((await claim(unset)).runId, { status: 'ok', todos: [{ title: 'Piece' }] });
-    expect(await lanesOfChildren(unset)).toEqual([board.lanes[0].id]);
+    await finish((await claim(unset)).runId, { status: 'ok', todos: pieces });
+    expect(await lanesOfChildren(unset)).toEqual([board.lanes[0].id, board.lanes[0].id]);
 
     await board.person.expectOk(SET_NEW_TODO_LANE, { id: board.projectId, laneId: board.lanes[2].id });
     const done = await board.addTodo('Done lane');
-    await finish((await claim(done)).runId, { status: 'ok', todos: [{ title: 'Piece' }] });
-    expect(await lanesOfChildren(done)).toEqual([board.lanes[0].id]);
+    await finish((await claim(done)).runId, { status: 'ok', todos: pieces });
+    expect(await lanesOfChildren(done)).toEqual([board.lanes[0].id, board.lanes[0].id]);
   });
 
   it('takes no todos from a run that failed', async () => {
@@ -311,6 +312,103 @@ describe('finishRun', () => {
     await finish((await claim(todoId)).runId, { status: 'ok', output: 'FAIL: no.', todos: [{ title: 'Fix it' }] });
     expect(await db.select().from(dbSchema.todos).where(eq(dbSchema.todos.parentId, todoId))).toEqual([]);
     expect((await todoRow(todoId)).laneId).toBe(board.lanes[1].id);
+  });
+
+  it('sends the pieces of a todo split in the new-todo lane on down its success route, already planned', async () => {
+    await setLane(board.person, board.lanes[0].id, { onSuccessLaneId: board.lanes[1].id });
+    const parentId = await board.addTodo('Build the thing');
+    await finish((await claim(parentId)).runId, {
+      status: 'ok',
+      todos: [{ title: 'Design it' }, { title: 'Make it' }],
+    });
+    const children = await db.select().from(dbSchema.todos).where(eq(dbSchema.todos.parentId, parentId));
+    expect(children.map((child: { laneId: string }) => child.laneId)).toEqual([board.lanes[1].id, board.lanes[1].id]);
+    expect((await todoRow(parentId)).laneId).toBe(board.lanes[0].id);
+  });
+
+  it('rewrites a todo its run refined, keeps what the refine left out, and passes it on', async () => {
+    await setLane(board.person, board.lanes[0].id, { onSuccessLaneId: board.lanes[1].id });
+    const todoId = await board.addTodo('Do the thing');
+    await db.update(dbSchema.todos).set({ acceptance: 'It works.' }).where(eq(dbSchema.todos.id, todoId));
+    const run = await finish((await claim(todoId)).runId, {
+      status: 'ok',
+      output: 'Narrowed it to the export.',
+      refine: { title: 'Speed up the CSV export', brief: '  Stream rows instead of building one string.  ' },
+    });
+    expect(run).toMatchObject({ status: 'ok', verdict: 'none' });
+    expect(await todoRow(todoId)).toMatchObject({
+      title: 'Speed up the CSV export',
+      notes: 'Stream rows instead of building one string.',
+      acceptance: 'It works.',
+      laneId: board.lanes[1].id,
+    });
+    expect(await db.select().from(dbSchema.todos).where(eq(dbSchema.todos.parentId, todoId))).toEqual([]);
+  });
+
+  it('reads a lone proposed todo as a refine, not a copy of the todo to wait on', async () => {
+    await setLane(board.person, board.lanes[0].id, { onSuccessLaneId: board.lanes[1].id });
+    const todoId = await board.addTodo('Do the thing');
+    await finish((await claim(todoId)).runId, {
+      status: 'ok',
+      todos: [{ title: 'Do the thing, cleanly', acceptance: 'Tests pass.', dependsOn: ['Nothing'] }],
+    });
+    expect(await todoRow(todoId)).toMatchObject({
+      title: 'Do the thing, cleanly',
+      acceptance: 'Tests pass.',
+      laneId: board.lanes[1].id,
+    });
+    expect(await db.select().from(dbSchema.todos).where(eq(dbSchema.todos.parentId, todoId))).toEqual([]);
+    expect(await db.select().from(dbSchema.todoDependencies)).toEqual([]);
+  });
+
+  it('fails a run that both refined and split its todo, and does neither', async () => {
+    await setLane(board.person, board.lanes[0].id, { onFailureLaneId: board.lanes[1].id });
+    const todoId = await board.addTodo('Do the thing');
+    const run = await finish((await claim(todoId)).runId, {
+      status: 'ok',
+      output: 'Both.',
+      refine: { title: 'Something else' },
+      todos: [{ title: 'One' }, { title: 'Two' }],
+    });
+    expect(run).toMatchObject({ status: 'error', error: expect.stringMatching(/either refined or split/) });
+    expect(await todoRow(todoId)).toMatchObject({ title: 'Do the thing', laneId: board.lanes[1].id });
+    expect(await db.select().from(dbSchema.todos).where(eq(dbSchema.todos.parentId, todoId))).toEqual([]);
+  });
+
+  it('does not hand a refined todo back to the lane that refined it', async () => {
+    await setLane(board.person, board.lanes[0].id, { onSuccessLaneId: null });
+    const todoId = await board.addTodo('Do the thing');
+    await finish((await claim(todoId)).runId, { status: 'ok', refine: { title: 'Do the thing well' } });
+    expect((await todoRow(todoId)).laneId).toBe(board.lanes[0].id);
+    expect(await queue()).toEqual([]);
+  });
+
+  it('does not hand a split todo back to its lane when its pieces are done, though a person edited it', async () => {
+    const move = (id: string, laneId: string) =>
+      board.person.expectOk(`mutation ($id: ID!, $laneId: ID!) { moveTodo(id: $id, laneId: $laneId) { id } }`, {
+        id,
+        laneId,
+      });
+    await board.person.expectOk(SET_NEW_TODO_LANE, { id: board.projectId, laneId: board.lanes[1].id });
+    const parentId = await board.addTodo('Build the thing');
+    await finish((await claim(parentId)).runId, {
+      status: 'ok',
+      todos: [{ title: 'Design it' }, { title: 'Make it' }],
+    });
+    await board.person.expectOk(
+      `mutation ($id: UUID!) { updateTodo(set: { title: "Build the whole thing" }, where: { id: { eq: $id } }) { id } }`,
+      { id: parentId },
+    );
+    const children = await db.select().from(dbSchema.todos).where(eq(dbSchema.todos.parentId, parentId));
+    for (const child of children) {
+      await move(child.id, board.lanes[2].id);
+    }
+    expect(await queue()).toEqual([]);
+
+    // A person moving it back in is an arrival, and the lane works it again.
+    await move(parentId, board.lanes[1].id);
+    await move(parentId, board.lanes[0].id);
+    expect((await queue()).map((row) => row.todoId)).toEqual([parentId]);
   });
 
   it('leaves a todo a person moved mid-run where the person put it', async () => {

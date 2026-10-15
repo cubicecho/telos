@@ -100,6 +100,13 @@ export interface ProposedTodo {
   dependsOn?: string[] | null;
 }
 
+/** A todo as its run rewrote it: a field left out stays as it was. */
+export interface RefinedTodo {
+  title?: string | null;
+  brief?: string | null;
+  acceptance?: string | null;
+}
+
 export interface RunResult {
   status: 'ok' | 'error' | 'stopped';
   output?: string | null;
@@ -109,6 +116,7 @@ export interface RunResult {
   completionTokens?: number;
   totalTokens?: number;
   todos?: ProposedTodo[];
+  refine?: RefinedTodo | null;
   events?: RunEvent[];
   /** What the agent was told, when no heartbeat got it there first. */
   prompt?: RunPrompt;
