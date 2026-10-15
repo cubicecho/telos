@@ -7,7 +7,6 @@ import { eq } from 'drizzle-orm';
 import express from 'express';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mintApiKey } from '../auth.ts';
-import { createSchema } from '../build-schema.ts';
 import type { Actor } from '../context.ts';
 import { DOOR_TOOLS } from '../door.ts';
 import { mountMcp } from '../mcp.ts';
@@ -15,7 +14,7 @@ import { createContextFactory } from '../request-context.ts';
 import { AI_MUTATIONS } from '../resolvers/actor-lock.ts';
 import { RUN_REACH_EXEMPT, RUN_REACH_MUTATIONS } from '../resolvers/run-reach.ts';
 import { CLAIM, createBoard, FINISH, runnerClient, SET_AUTO_RUN } from './board.ts';
-import { authFor, createClient, createTestDb, createUser, type TestDb } from './helpers.ts';
+import { authFor, createClient, createTestDb, createUser, schemaFor, type TestDb } from './helpers.ts';
 
 // The AI door end to end: a real HTTP server, the MCP SDK's own client, and an
 // API key in the header — the path Claude Code takes. What a key may see and
@@ -94,7 +93,7 @@ afterEach(async () => {
 /** Serves /mcp over the test database on an ephemeral port and returns its URL. */
 async function serve(ai = true): Promise<URL> {
   const app = express();
-  const { schema } = createSchema(db, { ai });
+  const { schema } = schemaFor(db, ai);
   const handler = mountMcp(app, {
     ai,
     db,

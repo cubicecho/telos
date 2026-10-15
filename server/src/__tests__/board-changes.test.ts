@@ -1,10 +1,9 @@
 import { type ExecutionResult, parse, subscribe } from 'graphql';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { createSchema } from '../build-schema.ts';
 import type { Actor, Context } from '../context.ts';
 import { createLoaders } from '../loaders.ts';
 import { type Board, createBoard } from './board.ts';
-import { authFor, createTestDb, createUser, type TestDb } from './helpers.ts';
+import { authFor, createTestDb, createUser, schemaFor, type TestDb } from './helpers.ts';
 
 // Live boards: the database announces each change (the board_notify trigger),
 // and `boardChanged` relays the ones to a project its owner is watching.
@@ -22,7 +21,7 @@ beforeEach(async () => {
 type Changes = AsyncIterableIterator<ExecutionResult>;
 
 async function watch(projectId: string, actor: Actor): Promise<Changes | ExecutionResult> {
-  const { schema } = createSchema(db, { ai: true });
+  const { schema } = schemaFor(db, true);
   const contextValue: Context = { db, auth: authFor(db), userId: actor.userId, actor, loaders: createLoaders(db) };
   return (await subscribe({ schema, document: parse(WATCH), variableValues: { projectId }, contextValue })) as
     | Changes

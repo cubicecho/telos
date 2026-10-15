@@ -9,11 +9,10 @@ import express from 'express';
 import { graphql } from 'graphql';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { type Board, createBoard, SET_AUTO_RUN, setLane } from '../../../server/src/__tests__/board.ts';
-import { authFor, createTestDb, type TestDb } from '../../../server/src/__tests__/helpers.ts';
+import { authFor, createTestDb, schemaFor, type TestDb } from '../../../server/src/__tests__/helpers.ts';
 // The runner never imports the server or the database; its test does, to stand
 // a real telos up for it to talk to.
 import { toHeaders } from '../../../server/src/auth.ts';
-import { createSchema } from '../../../server/src/build-schema.ts';
 import { mountMcp } from '../../../server/src/mcp.ts';
 import { createContextFactory } from '../../../server/src/request-context.ts';
 import { answerDraft, ESTIMATED_NOTICE, takeDrafts } from '../drafts.ts';
@@ -110,7 +109,7 @@ async function listen(handler: (req: IncomingMessage, res: ServerResponse) => vo
  */
 async function serveTelos(): Promise<string> {
   const app = express();
-  const { schema } = createSchema(db, { ai: true });
+  const { schema } = schemaFor(db, true);
   const contextFor = createContextFactory(db, authFor(db), { ai: true, runnerKey: RUNNER_KEY });
   app.post('/graphql', express.json(), async (req, res) => {
     const result = await graphql({
