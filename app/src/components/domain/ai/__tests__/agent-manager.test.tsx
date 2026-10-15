@@ -233,7 +233,7 @@ describe('AgentManager', () => {
     ]);
 
     expect(await screen.findByText('No agents yet.')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Start from' }));
+    await user.click(screen.getByRole('button', { name: 'From a template' }));
     expect((await screen.findAllByRole('menuitem')).map((item) => item.textContent)).toEqual([
       'Refiner',
       'Planner',
@@ -256,7 +256,7 @@ describe('AgentManager', () => {
     const user = userEvent.setup();
     manager([agents([]), servers([SERVER]), tools]);
 
-    await user.click(await screen.findByRole('button', { name: 'Start from' }));
+    await user.click(await screen.findByRole('button', { name: 'From a template' }));
     await user.click(await screen.findByRole('menuitem', { name: /Refiner/ }));
 
     expect(await screen.findByRole('checkbox', { name: 'Every server' })).not.toBeChecked();

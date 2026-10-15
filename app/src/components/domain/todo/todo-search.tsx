@@ -90,7 +90,7 @@ export function TodoSearch({ open, onOpenChange }: { open: boolean; onOpenChange
         <DialogContent className="gap-3 sm:max-w-xl">
           <DialogHeader>
             <DialogTitle>Find a todo</DialogTitle>
-            <DialogDescription>By title or notes, in every project.</DialogDescription>
+            <DialogDescription>By title or description, in every project.</DialogDescription>
           </DialogHeader>
           <SearchInput
             autoFocus

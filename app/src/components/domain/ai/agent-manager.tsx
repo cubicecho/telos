@@ -89,9 +89,9 @@ export function AgentManager() {
         <View className="flex-row gap-2">
           <Menu>
             <MenuTrigger asChild>
-              <Button variant="outline" size="sm" content="Start from" trailingSlot={<ChevronDown />} />
+              <Button variant="outline" size="sm" content="From a template" trailingSlot={<ChevronDown />} />
             </MenuTrigger>
-            <MenuContent align="end" aria-label="Agent starters">
+            <MenuContent align="end" aria-label="Agent templates">
               {AGENT_STARTERS.map((starter) => (
                 <MenuItem key={starter.id} label={starter.name} onSelect={() => setEditing({ starter })} />
               ))}

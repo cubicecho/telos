@@ -185,7 +185,7 @@ export function TodoFormDialog({
                   {(field) => <field.InputField label="Title" autoFocus placeholder="Replace the tap" />}
                 </form.AppField>
                 <form.AppField name="notes">
-                  {(field) => <field.TextAreaField label="Notes" placeholder="Optional." />}
+                  {(field) => <field.TextAreaField label="Description" placeholder="Optional." />}
                 </form.AppField>
                 <form.AppField name="acceptance">
                   {(field) => (

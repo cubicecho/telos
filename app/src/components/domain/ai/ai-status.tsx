@@ -43,7 +43,7 @@ type WorkTodo = AiStatusQuery['aiStatus']['todos'][number];
 const STATES: Array<{ value: State; label: string; blurb: string; variant: BadgeVariant }> = [
   {
     value: 'attention',
-    label: 'Needs you',
+    label: 'Handed back',
     blurb: 'An agent gave up on these, or finished and has nowhere to send them.',
     variant: 'destructive',
   },

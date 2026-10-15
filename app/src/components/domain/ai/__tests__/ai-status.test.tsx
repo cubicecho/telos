@@ -105,7 +105,7 @@ describe('AiStatus', () => {
       </MockedProvider>,
     );
 
-    const needs = await screen.findByRole('list', { name: 'Needs you' });
+    const needs = await screen.findByRole('list', { name: 'Handed back' });
     expect(within(needs).getByText('Flaky')).toBeInTheDocument();
     expect(within(needs).getByText('It broke.')).toBeInTheDocument();
     expect(within(needs).getByText('Site · Doing · 4 failed attempts')).toBeInTheDocument();

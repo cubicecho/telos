@@ -47,7 +47,7 @@ export const TodoFilterBar = forwardRef<
         <View className="min-w-48 flex-1">
           <SearchInput
             ref={ref}
-            label="Filter todos by title or notes"
+            label="Filter todos by title or description"
             clearLabel="Clear the filter"
             value={filter.text}
             placeholder="Filter todos…  (press /)"
