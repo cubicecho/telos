@@ -1,3 +1,10 @@
+# [2.5.0](https://github.com/cubicecho/telos/compare/v2.4.0...v2.5.0) (2026-10-15)
+
+
+### Features
+
+* **app:** fold the agent defaults' fields behind a disclosure ([ed09d36](https://github.com/cubicecho/telos/commit/ed09d364c8bf1178594c327f0b399c0a597e1eb1))
+
 # [2.4.0](https://github.com/cubicecho/telos/compare/v2.3.1...v2.4.0) (2026-10-15)
 
 
