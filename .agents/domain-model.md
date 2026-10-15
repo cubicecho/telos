@@ -1,260 +1,211 @@
-# Domain model: todos, lanes and agents
+# Domain model
 
-A proposal, plus the glossary it rests on. Steps 1–3 of the order of work
-below have shipped; **(new)** marks a term or rule from steps 4–5 that does not
-exist yet. Everything else describes the code as it stands.
+What telos is made of: its concepts, who may change them, and what always holds. This file
+describes the code **as it is on this branch**. Proposed changes are `M` items in
+`.agents/coding-standards-todos.md` and in the pull request that makes them; the commit
+that makes one true writes it in here. Use these terms in code, tests, docs and reviews.
+AGENTS.md says how each rule is built; this file says what the things are.
 
-## The principle
+## Purpose
 
-A todo's behaviour belongs to the server. An agent never changes its own todo.
-It returns an **outcome**, and `finishRun` applies it according to the lane's
-**role**.
+A self-hostable todo app: people keep todos in projects, and agents they set up work the
+todos in the lanes they are given, through the same API a person or an MCP client uses.
 
-Today that holds for moves, completion and dependencies (`run-reach.ts`), but
-not for text: a run may `updateTodo` its own todo. Nothing types the reply
-either. Any reply that is not FAIL passes, so a planner that does the work, or
-rewrites the todo and then also splits it, looks to the server just like one
-that planned. The proposal closes both gaps:
+## Flow
 
-1. **Outcomes are typed.** A reply is one of pass, fail, report, refine or split.
-   The runner parses it, and only `finishRun` acts on it.
-2. **A lane's role says which outcomes it accepts.** An outcome a lane does not
-   accept is a failure, with a reason the agent sees on its next attempt.
-3. **A split turns the todo into an umbrella.** No agent works it again. It
-   completes when its pieces do.
-4. **Arrival means arrival.** Editing a todo is not arriving in a lane, so it
-   cannot re-queue work that is already done.
+```
+person / API key → todo in a lane → (lane has an agent, todo is ready) → claim → run
+  → agent replies → finishRun applies the outcome → todo moves on a route, or stays
+person → draft ⇄ agent → todo
+```
 
-Agents still "exist" as they do now: a model, a persona and some tools, and any
-agent can sit in any lane. The lane, not the agent, decides what kind of
-answer counts.
+The runner knows only the server's HTTP API; the server never knows how a runner works.
+An agent knows nothing of lanes: the lane decides which agent works its todos and where
+they go next.
 
-## Why it misbehaved (fixed by steps 1–3)
+## Actors
 
-- **The planner is offered the wrong outcomes.** `STANDING_SYSTEM` gives two
-  choices: report what you did, or propose a `todos` block. Rewriting the todo
-  is not one of them, so the planner either does the work, which passes and
-  moves the todo on, or proposes a single cleaner copy, which becomes a child.
-  The Planner starter's "one is a fine answer" makes the copy more likely.
-- **Re-planning comes from a bug in arrival.** `readyTodos` does not re-run a
-  todo that already has an `ok` run in its lane since it *arrived*
-  (`ready.ts`, around line 115). Arrival is read as the latest `todo_events`
-  row with `to_lane_id = lane`, and the history trigger stamps `to_lane_id` on
-  *every* event, edits included (`richer_todos` migration, `record_todo_event`).
-  So when a planner calls `updateTodo` on its own todo mid-run (which is
-  allowed), or a person edits the parked parent later, that edit counts as a
-  fresh arrival. Once the children finish and the parent unblocks, the planner
-  gets it again. The `why` in `assignmentFor` has the same mistake: an edit can
-  pose as "why it came back".
-- **The pieces land back in the planning lane.** Children go to the new-todo
-  lane, which on a plan → work → review board is usually the planning lane. So
-  every piece is planned a second time and may be split again.
-- **A run's MCP `createTodo` is a split nobody records.** The todos it creates
-  have no `parentId` and no dependency, and the parent passes and moves on.
+| Actor | Is | Reaches telos through | May change |
+|---|---|---|---|
+| `user` | A signed-in person | A session on `/graphql` | Everything they own, including every switch, agent, key, lane and MCP server |
+| `apiKey` | An MCP client acting for a person | `/mcp` (or `/graphql`) with an API key | `AI_MUTATIONS` on projects and todos AI can see, less the tools its owner switched off (`door.ts`) |
+| `agent` | A run, while it is live | `/mcp` with the run token | Notes on its own todo; the todos under it and those its todo's runs made, in its own project (`run-reach.ts`). Its own todo only through its reply's outcome, which `finishRun` applies: a refine rewrites title, brief and acceptance. Never its own todo's lane, completion or dependencies directly |
+| `system` | The runner, or the server itself | `x-runner-key` | `RUNNER_MUTATIONS` only: claim, heartbeat and finish a run or a draft's reply |
+| `anonymous` | Nobody signed in | — | Sign-in only |
 
-## Proposal
+`apiKey` and `agent` are the **AI actors** (`isAiActor`): they see only projects with AI on
+and todos not marked hands off, and every AI switch above them must be on.
 
-### Outcomes (shipped, without roles)
+## Lifecycles
 
-The runner parses a reply into exactly one outcome:
+### Todo: where it is
 
-| Outcome | Reply | What `finishRun` does |
+```
+create (in a lane) --move--> another lane --move into done lane / complete--> done
+done --move out / reopen--> open
+any --deleteTodo--> archived --restoreTodo--> back in its lane
+any --deleteTodo(hard: true)--> gone (sessions owed a sessionDelete, artifacts detached)
+```
+
+Every change is a **history event**, written by the `todos_history` trigger: `create`,
+`move`, `complete`, `reopen`, `edit`, `retry`, `run`, `archive`, `restore`. Several changes
+in one transaction are one event.
+
+- **Arrival:** the latest non-`edit` event that put the todo in its lane, else its
+  creation (`arrivedIn` in `server/src/ready.ts`). Work since arrival counts; an edit is
+  never an arrival.
+- **Touched:** a person's event, or a `retry` or `run` event. It resets the attempt count
+  (`TOUCHED`, `failuresSinceTouched` in `ready.ts`).
+
+### Todo: what agents make of it (`aiStatus`)
+
+Checked in this order; the first that holds wins (`workStates` in `ready.ts`, the same
+rules `readyTodos` filters by):
+
+1. `running`: a run holds it.
+2. `parked`: nothing will work it where it is: no lane, hands off, no agent, or the agent
+   switched off.
+3. `attention`: more failed runs since it was touched than the lane's `maxAttempts`, or an
+   `ok` run in this lane since it arrived and nowhere to send it (**finished here**).
+4. `blocked`: it waits on an open dependency.
+5. `parked` again: auto-run is off and nobody asked for a run.
+6. `queued`: the lane's agent will start on it when there is room.
+
+Done todos are counted per lane, not listed. The activity page's `accountAttention` is a
+different rule with the same name: out of attempts, or its last run errored.
+
+### Run
+
+```
+claim --> running --heartbeat...--> ok | error | stopped
+```
+
+A run of a todo ends with a verdict `pass`, `fail` or `none`. A lapsed lease frees the todo;
+a stop request (a switch turned off, `cancelRun`) is answered on the next heartbeat, and a
+stopped run writes nothing. `finishRun` turns the reply into one **outcome** and applies it:
+
+| Outcome | Reply | Applied as |
 |---|---|---|
-| **pass** | opens with `PASS` | Takes the success route, or archives (`archiveOnSuccess`) |
-| **fail** | opens with `FAIL`, or the run errored | Takes the failure route and counts an attempt |
-| **report** | anything else | The same as pass; the reply goes on the thread as a report |
-| **refine** | a fenced `refine` block: `title`, `brief`, `acceptance` | Rewrites the todo, then as pass |
-| **split** | a fenced `todos` block with two or more items | Writes the pieces and makes the todo an umbrella (below) |
+| ruling | Opens with `PASS` or `FAIL` | Success or failure route; a verdict note |
+| report | Anything else | As a pass; a report note |
+| refine | A fenced `refine` block, or a `todos` block of one | Rewrites title, brief, acceptance (what it omits stays), then as a pass |
+| split | A fenced `todos` block of two or more | Pieces filed under the todo, which waits on them where it is |
+| error | The run failed, or a reply both refines and splits | Failure route; counts an attempt |
 
-A one-item `todos` block is read as a refine. Mixing a `refine` block with a
-`todos` block is a fail ("a todo is either refined or split").
+### Run request
 
-### Lane role (new)
+`runTodo` sets it; the claim, or the todo moving, finishing, being archived or marked
+hands off clears it. It asks for one run where the todo stands and gets round nothing:
+not the AI switches, a blocker or the WIP limit.
 
-`lanes.role`: `plan | work | review | null`. It decides two things: which
-outcomes count, and which standing protocol the runner sends. The agent is
-told only about the outcomes it can use, so the prompt and the rule cannot
-disagree.
+### Draft
 
-| Role | Accepts | A reply it does not accept |
-|---|---|---|
-| `plan` | refine, split | report/pass → fail: "a planning lane rewrites or splits the todo; it does not do the work" |
-| `work` | report, split, fail | (all are fine) |
-| `review` | pass, fail | refine/split → fail |
-| `null` | everything, as today | none |
+```
+person says something --> waiting --agent's reply (a draft run)--> answered --...--> made into a todo
+                                                                          \--> discarded
+```
 
-`null` keeps every existing board working. Board templates set the role.
+## Invariants
 
-### Split → umbrella (new)
-
-On a split, `finishRun`:
-
-1. Writes the pieces with `parentId` set to the todo, linking them to each
-   other through `dependsOn` as now.
-2. Puts the pieces where the todo would go next. Shipped so far
-   (`piecesLaneId`): pieces go to the new-todo lane, except that a todo split
-   *in* the new-todo lane sends them on down its success route, unless that is
-   the done lane. With roles, a `plan` lane's success route.
-3. Sets `todos.split_at` on the parent. The todo is now an **umbrella**.
-4. Writes **no** dependency edges from the parent to its pieces. The umbrella
-   waits on its pieces because it is an umbrella, not because of blockers, so
-   the board's blocker lines show real ordering only.
-
-An umbrella:
-
-- is never ready for an agent (`readyTodos` adds `t.split_at IS NULL`);
-- stays in its lane and shows as a group card with progress (n of m pieces done);
-- completes itself, as `system`, when its last unarchived piece completes.
-  It is moved to the done lane, and archived if it was split in an
-  `archiveOnSuccess` lane. The same trigger or resolver that completes pieces
-  checks this, so it holds however a piece is completed;
-- reopens if a piece is reopened (or a new piece is added under it), the same
-  way a parent with a reopened child should be honest about it;
-- can be **dissolved** by a person (`unsplitTodo`): `split_at` is cleared and
-  it is an ordinary todo again. That is how someone says "plan this again".
-
-`aiStatus` gets a `waiting` state for umbrellas, separate from `blocked`.
-
-### Arrival (shipped)
-
-Arrival is an event with `to_lane_id = lane` **and** `kind <> 'edit'`, i.e. a
-create, move, reopen, restore, retry or run. It is defined once, as `arrivedIn`
-in `ready.ts`, and used by `readyTodos`, `workStates`, `retention.ts` and
-`assignmentFor`'s `why`. This alone stops a split parent being re-planned after
-an edit.
-
-### What a run may write (shipped)
-
-- A run no longer edits its own todo's text. A refine outcome replaces that.
-  Notes on its own todo stay allowed.
-- `createTodo` from a run is off by default (`RUN_DEFAULT_WRITES`), because pieces of
-  the run's own todo come back as a split. An agent whose job really is to
-  file unrelated todos (a triage agent) can have it switched on, and what it
-  creates is filed as it is now.
-
-### The Planner starter (shipped, in `agent-starters.ts`)
-
-> Your job is to make this todo ready for one person to do in one sitting.
-> If it already is one piece of work, rewrite it in a `refine` block: a clear
-> title, a brief that says what to change and where, and acceptance someone
-> could check. If it is genuinely several pieces of work, split it into a
-> `todos` block of two or more. Never do the work yourself.
-
-### Order of work
-
-1. The arrival fix, with a test: a split parent that someone edits is not
-   re-queued.
-2. Pieces land at the success route, not the new-todo lane.
-3. Outcomes and the `refine` block in the runner and `finishRun`. Close
-   own-todo text edits in `run-reach.ts`.
-4. Umbrellas: `split_at`, `readyTodos`, auto-complete, the `waiting` state and
-   the group card.
-5. `lanes.role` and per-role standing protocols, set by board templates.
-
-Steps 1–3 fix both reported problems and need no migration. Step 4 adds one
-column, and step 5 one more.
+| Invariant | Enforced by |
+|---|---|
+| Every table is scoped to its owner | `scope` in `server/src/tenancy.ts`; `tenancy.test.ts` |
+| A todo with a lane is complete if and only if the lane is the done lane | `server/src/lanes.ts`, `assertCompletionMatchesLane` |
+| At most one done lane per project; every project has a lane | `uq_lanes_project_done`; `seedMissingLanes`, last-lane delete refused |
+| A blocked todo is never completed or archived on success | `assertNotBlocked`, `assertNoBlockedCompletions`; `moveOn`, `archiveOn` in `runs.ts` |
+| A person cannot move a blocked todo to another lane; a route can, to any lane but the done lane | `moveTodo` in `server/src/resolvers/lanes.ts`; `moveOn` in `runs.ts` |
+| Dependencies have no cycles | `assertNoCycle`, the only way in being `addTodoDependency` / `setTodoDependencies` |
+| One running run per todo, and per draft | `uq_runs_todo_running`, `uq_runs_draft_running` |
+| Only `finishRun` changes a run's own todo | `server/src/resolvers/run-reach.ts` |
+| A todo is refined or split, never both | `finish` in `server/src/resolvers/runs.ts` |
+| A lane archives on success or has a success route, not both | `assertArchiveOnSuccessFits` |
+| History and the change feed are written by triggers only | `todos_history`, `change_log` triggers; no CRUD on either |
+| A report or verdict note is never changed | `server/src/resolvers/notes.ts` |
+| AI sees nothing in a project with AI off, or under a hands-off todo | `tenancy.ts`, `ai-reach.ts`, `visibleToAi` |
+| Every AI switch must be on for any agent to run | `readyTodos`, `ai-gate.ts`, `resolveActor` |
 
 ## Glossary
 
 ### Places
 
-- **Instance:** one telos deployment. It has the instance AI switch.
-- **Account (user):** owns everything below it, and has its own AI switch and
-  agent defaults.
-- **Project (board):** holds lanes and todos. It has its own AI switch,
-  **auto-run**, a description and context sent to every run, and a
-  **new-todo lane**.
-- **Lane:** a column on a board. It may have an agent, routes, a WIP limit,
-  max attempts and a **role (new)**.
-- **Done lane:** the one lane per project where todos are complete. Moving a
-  todo in completes it; moving it out reopens it.
-- **New-todo lane:** where requests, finished drafts and split pieces land:
-  `projects.newTodoLaneId`, else the first open lane. Pieces of a todo split
-  in this lane go on down its success route instead.
-- **Route:** where a todo goes when its run passes (success route) or fails
-  (failure route). With no route, it stays.
-- **Lane role (new):** `plan`, `work`, `review` or none. Decides which
-  outcomes count in the lane.
+- **Account (user):** owns everything below it; has an AI switch and agent defaults.
+  Owner: `users`.
+- **Instance:** one telos deployment; has the instance AI switch, flipped by an admin.
+  Owner: `server/src/instance.ts`.
+- **Project:** holds lanes and todos; has an AI switch, **auto-run**, a
+  description and context sent to every run, and a new-todo lane. Owner: `projects`.
+- **Lane:** a column of a project. It may have an agent, routes, a WIP limit and max
+  attempts. Owner: `server/src/lanes.ts`.
+- **Done lane:** the one lane per project where todos are complete.
+- **New-todo lane:** where requests, drafts made into todos and split pieces land:
+  `projects.newTodoLaneId`, else the first open lane (`findNewTodoLaneId`). Pieces of a
+  todo split *in* this lane go on down its success route instead, unless that is the done
+  lane (`piecesLaneId`).
+- **Route:** where a todo goes when its run passes (**success route**, or archive on
+  success) or fails (**failure route**). With no route it stays.
+- **Board template:** a saved set of lanes for starting a project.
 
 ### Work
 
-- **Todo:** one piece of work. Its fields:
-  - **title**;
-  - **brief** (the `notes` column);
-  - **acceptance**, what done means and what an agent is judged against;
-  - **due date**;
-  - **position**.
-- **Dependency (blocker):** "this todo waits on that one". A **blocked** todo
-  can neither be completed nor change lane.
-- **Parent / piece:** `parentId`. The todo a piece was split out of, or that
-  a person filed it under.
-- **Umbrella (new):** a todo that was split (`split_at`). No agent works it.
-  It completes when its pieces do.
-- **Request:** a todo an AI filed for a person to see (`submitRequest`). A
-  person can withdraw it with `cancelRequest`.
-- **Draft:** a conversation with a refiner agent that becomes a todo
-  (`makeTodoFromDraft`).
-- **Board template:** a saved set of lanes (and, with step 5, their roles)
-  for starting a board.
-- **Archive:** put away, not deleted. Hidden from reads, and can be restored.
-- **Hands off:** `aiIgnored`. No agent reads or works the todo. Only a person
-  can set it or clear it.
+- **Todo:** one piece of work: title, **brief** (the `notes` column), **acceptance** (what
+  done means, and what an agent is judged against), due date, position. Owner: `todos`.
+- **Dependency (blocker):** "this todo waits on that one". Owner: `server/src/blocking.ts`.
+- **Parent / piece:** `parentId`: the todo a piece was split out of, or that someone filed
+  it under. A split parent depends on its pieces.
+- **Request:** a todo an AI actor filed for a person (`submitRequest`), withdrawable with
+  `cancelRequest`. The word also means other things in the code: a run request
+  (`runRequestedAt`), a draft's "rough request", the agent form's "Requests" group.
+- **Draft:** a conversation with an agent that becomes a todo (`makeTodoFromDraft`).
+  Owner: `server/src/resolvers/drafts.ts`.
+- **Archive:** put away, not gone: what `deleteTodo` does. Hidden from reads, restorable;
+  only `deleteTodo(hard: true)` removes the row (`archivedAt`).
+- **Hands off:** `aiIgnored`. No agent reads or works the todo; only a person sets it.
+- **Label:** a coloured tag on a todo or a project.
 
 ### What happened
 
-- **Thread:** a todo's notes. A note has a kind:
-  - **note**, written by a person or an agent;
-  - **report**, what a run said it did;
-  - **verdict**, a PASS or FAIL.
-- **History (event):** written by a trigger, never by resolvers. Each event
-  has a kind (create, move, complete, reopen, edit, retry, run, archive or
-  restore), an **actor**, and a run when one made it.
-- **Arrival:** the latest non-edit event that put the todo in its current
-  lane. Work done "since arrival" counts. Work from before it is history.
-- **Touched:** a person's event, or a retry or run event. It resets the
-  failure count.
-- **Actor:** who wrote something:
-  - **user**;
-  - **key**, an API key;
-  - **agent**, a run;
-  - **system**, the runner or the server itself.
+- **Thread:** a todo's notes, each a **note** (a person's or an agent's), a **report**
+  (what a run said it did) or a **verdict** (a PASS or FAIL). Owner: `todo_notes`.
+- **History event:** see the todo's lifecycle. Owner: the `todos_history` trigger.
+- **Arrival, touched:** see the todo's lifecycle. Owner: `server/src/ready.ts`.
+- **Attempt:** a failed run since the todo was last touched. At `maxAttempts` it is left
+  for a person.
+- **Artifact:** a file or link a run (`declared`, `detected`) or an MCP client (`client`)
+  recorded making. Outlives its todo. Owner: `artifacts`.
+- **Change feed:** `changes(since:)`, what changed in a project since a cursor. Owner:
+  `server/src/changes.ts`.
 
 ### Agents and runs
 
-- **Agent:** a model, its instructions (persona and job), its MCP servers and
-  tool switches. A blank field inherits the account's **agent defaults**. An
-  agent has no idea of lanes. The same agent can work any lane.
-- **Starter:** the starting text for a new agent (refiner, planner, worker,
-  reviewer).
-- **Runner:** the process that takes ready todos, runs agents and reports back.
-  It reads and writes only over HTTP, as `system`.
-- **Ready:** a todo an agent would take now (`readyTodos`). All of these must
-  hold:
-  - AI is on at every level;
-  - the project has auto-run on, or someone made a run request;
-  - the todo is not done, archived, hands-off, blocked, an umbrella (new),
-    already running, already worked since arrival, or over max attempts;
-  - the lane is under its WIP limit.
-- **Run request:** `runTodo`, which asks for one run where the todo stands.
-  It is cleared by the claim, or by the todo moving.
-- **Claim / lease / heartbeat:** a runner takes a ready todo and holds it for
-  a lease, which it renews with heartbeats. A lapsed lease frees the todo.
-- **Run:** one agent working one todo, or answering a draft. A run ends `ok`,
-  `error` or `stopped`, with a **verdict** (pass, fail or none).
-- **Run token / run reach:** what a run's MCP calls may touch: its own board,
-  and its own todo with what sits under it. Its own todo it may only read and
-  note; it rewrites it with a refine.
-- **Assignment:** what a run is handed. That is:
-  - the project text;
-  - the todo's title, brief and acceptance;
-  - its last report;
-  - why it came back;
-  - its notes.
-- **Standing protocol:** how a reply is read, sent with every run after the
-  agent's own instructions. With step 5, one protocol per lane role.
-- **Reply → outcome:** pass, fail, report, refine or split. `finishRun`
-  is the only thing that applies an outcome to the todo.
-- **Attempt:** a failed run since the todo was last touched. Once `maxAttempts`
-  is used up, it is left for a person.
-- **Session:** a todo as seen by an agent's MCP hooks, one per agent per todo.
-- **Artifact:** a file or link a run recorded making.
+- **Agent:** a model, its instructions, its MCP servers and tool switches; a blank field
+  inherits the account's **agent defaults**. It has no idea of lanes. Owner: `agents`,
+  `server/src/agent-defaults.ts`.
+- **Starter:** starting text for a new agent: Refiner, Planner, Worker, Reviewer
+  (`app/src/lib/agent-starters.ts`).
+- **MCP server:** an account's tool server; an agent names which it reaches by slug.
+  Owner: `server/src/mcp-servers.ts`.
+- **Runner:** works ready todos and drafts over HTTP as `system`. Owner: `runner/`.
+- **Ready:** a todo the runner would take now (`readyTodos`). Owner: `server/src/ready.ts`.
+- **Claim, lease, heartbeat:** taking a ready todo, holding it for a time, renewing that.
+- **Run:** one agent working one todo (`kind = 'todo'`) or answering a draft
+  (`kind = 'draft'`). Owner: `server/src/resolvers/runs.ts`.
+- **Run token, run reach:** what a run's `/mcp` calls may touch (see Actors).
+- **Assignment:** what a run is handed: project text, the todo, its last report, why it
+  came back, its thread (`assignmentFor`).
+- **Standing protocol:** how every reply is read, sent after the agent's instructions
+  (`STANDING_SYSTEM` in `runner/src/prompts.ts`).
+- **Outcome:** what a reply amounts to; see the run's lifecycle. Owner: `finish` in
+  `server/src/resolvers/runs.ts`.
+- **Session:** a todo as an agent's MCP hooks see it, one per agent per todo; a run is a
+  turn of it. Owner: `todo_sessions`.
+
+## Explain test
+
+A person keeps todos in the lanes of a project. A lane with an agent works each todo that
+is ready in it: the runner claims it and the agent gets an assignment, with the standing
+protocol. Its reply is one outcome, a ruling, a report, a refine or a split, and only
+`finishRun` applies it to the todo, which then takes the lane's success or failure route,
+or waits where it is on its pieces. The todo's history says when it arrived in its lane,
+and work since then is not repeated. People and API keys change todos directly within
+their reach; a run changes the todos it made freely, and its own todo only through its
+outcome, and AI sees nothing its owner has switched off or marked hands off.
