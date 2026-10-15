@@ -1,6 +1,5 @@
 import { useQuery } from '@apollo/client';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
-import { View } from 'react-native';
 import { ACCOUNT_VIEWS, AccountActivity } from '@/components/domain/ai/account-activity';
 import { PageLayout } from '@/components/page-layout';
 import { useAi } from '@/lib/ai';
@@ -23,14 +22,12 @@ export default function ActivityScreen() {
       title="Activity"
       description="What your agents did across every project: what needs you, what it cost, and what they left behind."
       contentSlot={
-        <View className="py-6">
-          {ai.on ? (
-            <AccountActivity
-              view={ACCOUNT_VIEWS.find((name) => name === view) ?? 'runs'}
-              onViewChange={(next) => router.setParams({ view: next })}
-            />
-          ) : null}
-        </View>
+        ai.on ? (
+          <AccountActivity
+            view={ACCOUNT_VIEWS.find((name) => name === view) ?? 'runs'}
+            onViewChange={(next) => router.setParams({ view: next })}
+          />
+        ) : null
       }
     />
   );

@@ -49,51 +49,49 @@ export default function SettingsScreen() {
       title="Settings"
       description="Theme and palette are kept on this device; everything else belongs to your account."
       contentSlot={
-        <View className="py-6">
-          {ai.settings ? (
-            <Tabs
-              value={current}
-              // `undefined` rather than `general`, so the default leaves no trace on the URL.
-              onValueChange={(next) => router.setParams({ tab: next === 'general' ? undefined : next })}
-              className="flex flex-col gap-6"
-            >
-              <TabsList aria-label="Settings" className="self-start">
-                <TabsTrigger value="general">General</TabsTrigger>
-                <TabsTrigger value="ai">AI</TabsTrigger>
-                {ai.on ? (
-                  <>
-                    <TabsTrigger value="agents">Agents</TabsTrigger>
-                    <TabsTrigger value="mcp">MCP servers</TabsTrigger>
-                  </>
-                ) : null}
-              </TabsList>
-              <TabsContent value="general" className="mt-0">
-                {general}
-              </TabsContent>
-              <TabsContent value="ai" className="mt-0">
-                <View className="gap-6">
-                  <AiSettings />
-                </View>
-              </TabsContent>
+        ai.settings ? (
+          <Tabs
+            value={current}
+            // `undefined` rather than `general`, so the default leaves no trace on the URL.
+            onValueChange={(next) => router.setParams({ tab: next === 'general' ? undefined : next })}
+            className="flex flex-col gap-6"
+          >
+            <TabsList aria-label="Settings" className="self-start">
+              <TabsTrigger value="general">General</TabsTrigger>
+              <TabsTrigger value="ai">AI</TabsTrigger>
               {ai.on ? (
                 <>
-                  <TabsContent value="agents" className="mt-0">
-                    <View className="gap-6">
-                      <AgentSettings />
-                    </View>
-                  </TabsContent>
-                  <TabsContent value="mcp" className="mt-0">
-                    <View className="gap-6">
-                      <McpServerManager />
-                    </View>
-                  </TabsContent>
+                  <TabsTrigger value="agents">Agents</TabsTrigger>
+                  <TabsTrigger value="mcp">MCP servers</TabsTrigger>
                 </>
               ) : null}
-            </Tabs>
-          ) : (
-            general
-          )}
-        </View>
+            </TabsList>
+            <TabsContent value="general" className="mt-0">
+              {general}
+            </TabsContent>
+            <TabsContent value="ai" className="mt-0">
+              <View className="gap-6">
+                <AiSettings />
+              </View>
+            </TabsContent>
+            {ai.on ? (
+              <>
+                <TabsContent value="agents" className="mt-0">
+                  <View className="gap-6">
+                    <AgentSettings />
+                  </View>
+                </TabsContent>
+                <TabsContent value="mcp" className="mt-0">
+                  <View className="gap-6">
+                    <McpServerManager />
+                  </View>
+                </TabsContent>
+              </>
+            ) : null}
+          </Tabs>
+        ) : (
+          general
+        )
       }
     />
   );

@@ -248,7 +248,7 @@ export function RowSkeleton({
             key={index}
             testID="row-skeleton"
             aria-hidden
-            className="h-8 animate-pulse rounded-md bg-hover"
+            className="h-8 animate-pulse rounded-md bg-foreground/10"
           />
         ))}
       </View>
@@ -268,8 +268,8 @@ export function RowSkeleton({
           {/* `animate-pulse` resolves to nothing on device and is kept for the same reason
               `page.tsx` keeps `container mx-auto`: the class is what the compiled web half needs,
               and dropping it here to tidy the native file would quietly regress the DOM. */}
-          <View className="h-4 w-1/3 animate-pulse rounded-md bg-hover" />
-          <View className="h-3 w-2/3 animate-pulse rounded-md bg-hover" />
+          <View className="h-4 w-1/3 animate-pulse rounded-md bg-foreground/10" />
+          <View className="h-3 w-2/3 animate-pulse rounded-md bg-foreground/10" />
         </Card>
       ))}
     </View>

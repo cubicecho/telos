@@ -1,8 +1,8 @@
 import { useQuery } from '@apollo/client';
-import { View } from 'react-native';
 import { List } from '@/components/app-icons';
 import { ProjectTaskList } from '@/components/domain/project/project-task-list';
-import { CardGrid, EmptyState } from '@/components/page';
+import { EmptyState } from '@/components/empty-state';
+import { CardGrid } from '@/components/page';
 import { PageLayout } from '@/components/page-layout';
 import { LoadState } from '@/components/ui/load-failure';
 import { ProjectsDocument } from '@/lib/graphql';
@@ -21,15 +21,16 @@ export default function OverviewScreen() {
       width="full"
       title="All projects"
       description="Every project's todos, one list each."
+      contentClassName="px-4"
       contentSlot={
-        <View className="gap-4 px-4 py-6">
+        <>
           <LoadState
             query={projectsQuery}
             what="your projects"
             count={projects.length}
             emptySlot={
               <EmptyState
-                icon={List}
+                iconSlot={<List />}
                 title="No projects yet"
                 description="Make one from the sidebar, and its todos show up here."
               />
@@ -38,7 +39,7 @@ export default function OverviewScreen() {
           {projects.length > 0 ? (
             <CardGrid contentSlot={projects.map((project) => <ProjectTaskList key={project.id} project={project} />)} />
           ) : null}
-        </View>
+        </>
       }
     />
   );

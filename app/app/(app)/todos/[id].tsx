@@ -1,7 +1,7 @@
 import { useQuery } from '@apollo/client';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { View } from 'react-native';
-import { EmptyState } from '@/components/page';
+import { EmptyState } from '@/components/empty-state';
 import { PageLayout } from '@/components/page-layout';
 import { Button } from '@/components/ui/button';
 import { CircleAlert } from '@/components/ui/icons';
@@ -40,7 +40,7 @@ export default function TodoLinkScreen() {
     return (
       <View className="flex-1 justify-center px-6">
         <EmptyState
-          icon={CircleAlert}
+          iconSlot={<CircleAlert />}
           title="Todo not found"
           description="That todo doesn't exist, or isn't yours."
           actionSlot={

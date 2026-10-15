@@ -1,5 +1,5 @@
 import { Tabs as TabsPrimitive } from 'radix-ui';
-import type * as React from 'react';
+import * as React from 'react';
 import { useEffect, useRef } from 'react';
 import {
   TABS_LIST_CLASS,
@@ -105,12 +105,16 @@ function TabsTrigger({
   disabled,
   children,
   trailingSlot,
+  linkSlot,
   ...props
 }: Wide<TabsTriggerProps, React.ComponentProps<typeof TabsPrimitive.Trigger>>) {
   return (
     <TabsPrimitive.Trigger
       data-slot="tabs-trigger"
       {...(disabled === undefined ? {} : { disabled })}
+      // A link is the tab itself: radix merges the tab's role, state and keys onto it. `type` is
+      // a button's, and on an `<a>` would only be a stray attribute.
+      {...(linkSlot === undefined ? {} : { asChild: true, type: undefined })}
       // An icon child takes the trigger's colour through `currentColor`, so only
       // its size is set here; device has no inheritance and uses a context.
       className={cn(
@@ -122,8 +126,14 @@ function TabsTrigger({
       )}
       {...props}
     >
-      {children}
-      {trailingSlot}
+      {linkSlot === undefined ? (
+        <>
+          {children}
+          {trailingSlot}
+        </>
+      ) : (
+        React.cloneElement(linkSlot, undefined, children, trailingSlot)
+      )}
     </TabsPrimitive.Trigger>
   );
 }

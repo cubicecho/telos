@@ -7,8 +7,8 @@ import { Archive } from '@/components/app-icons';
 import { ArchivedTodoList } from '@/components/domain/todo/archived-todos';
 import { TodoFormDialog } from '@/components/domain/todo/todo-form-dialog';
 import type { TodoSummary } from '@/components/domain/todo/types';
+import { EmptyState } from '@/components/empty-state';
 import { List } from '@/components/list';
-import { EmptyState } from '@/components/page';
 import { Section } from '@/components/section';
 import { StatTile } from '@/components/stat-tile';
 import { Badge } from '@/components/ui/badge';
@@ -139,7 +139,7 @@ function NeedsAttention({ pollMs }: { pollMs: number }) {
             query={query}
             what="what needs attention"
             count={todos.length}
-            emptySlot={<EmptyState icon={CircleCheck} title="Nothing is waiting on you." />}
+            emptySlot={<EmptyState iconSlot={<CircleCheck />} title="Nothing is waiting on you." />}
           />
           {error ? (
             <Text className="text-negative text-sm" aria-live="polite">

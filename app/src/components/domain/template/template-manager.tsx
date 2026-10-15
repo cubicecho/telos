@@ -2,8 +2,8 @@ import { useMutation, useQuery } from '@apollo/client';
 import { useState } from 'react';
 import { Text, View } from 'react-native';
 import { ConfirmButton } from '@/components/confirm-button';
+import { EmptyState } from '@/components/empty-state';
 import { List } from '@/components/list';
-import { EmptyState } from '@/components/page';
 import { Section } from '@/components/section';
 import { Library, Trash2 } from '@/components/ui/icons';
 import { LoadState } from '@/components/ui/load-failure';
@@ -64,7 +64,7 @@ export function TemplateManager() {
             count={templates.length}
             emptySlot={
               <EmptyState
-                icon={Library}
+                iconSlot={<Library />}
                 title="No templates yet."
                 description="Save one from a project's header, and its lanes can start the next project."
               />

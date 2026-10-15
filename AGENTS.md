@@ -638,13 +638,15 @@ a value it failed to read.
 - Every screen in `(app)` is a cubeui `PageLayout`: title, description and
   actions in its header, `width="prose"` for reading pages and `"full"` for the
   board. The `(app)` shell's main does not scroll; the `PageLayout` body does,
-  so the header stays put. A project's header is `ProjectPage` in
+  so the header stays put. The body spaces itself (`gap-4 py-4`, matching the
+  header), so a screen hands `contentSlot` its blocks directly rather than
+  wrapping them in a padded `View`. A project's header is `ProjectPage` in
   `domain/project/project-page.tsx`, which is `PageLayout` written out so that
   `ProjectBar` (the AI switches, and what the agents are doing) can sit under
   the title as a second row, edge to edge; every project view runs the full
   width, and only the list has the composer. A screen whose whole content is "nothing
-  here" or "that failed" is `EmptyState` (from `page.tsx`), not a hand-built
-  column. Icon buttons are `size="icon"` in headers, `"icon-sm"` in list rows
+  here" or "that failed" is `EmptyState` (`@/components/empty-state`, its glyph as
+  `iconSlot={<Icon />}`), not a hand-built column. Icon buttons are `size="icon"` in headers, `"icon-sm"` in list rows
   and `"icon-xs"` inside a todo row or a board card.
 - `import './preflight.ts';` stays first in `server/src/index.ts`, separated by a
   blank line so Biome's import sorting leaves it there. It has to run before

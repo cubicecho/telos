@@ -3,8 +3,8 @@ import { Link } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
 import type { AiStatusQuery } from '@/__generated__/graphql';
+import { EmptyState } from '@/components/empty-state';
 import { List } from '@/components/list';
-import { EmptyState } from '@/components/page';
 import { Section } from '@/components/section';
 import { StatTile } from '@/components/stat-tile';
 import { Badge } from '@/components/ui/badge';
@@ -113,12 +113,12 @@ export function AiStatus({ pollMs = STATUS_POLL_MS }: { pollMs?: number }) {
               emptySlot={
                 focus === 'attention' ? (
                   <EmptyState
-                    icon={CircleCheck}
+                    iconSlot={<CircleCheck />}
                     title="Nothing is waiting on you."
                     description={`${counts.running} running, ${counts.queued} queued.`}
                   />
                 ) : (
-                  <EmptyState icon={CircleCheck} title={`Nothing ${focused.label.toLowerCase()}.`} />
+                  <EmptyState iconSlot={<CircleCheck />} title={`Nothing ${focused.label.toLowerCase()}.`} />
                 )
               }
             />

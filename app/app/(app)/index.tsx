@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { View } from 'react-native';
 import { AiSetupChecklist } from '@/components/domain/ai/ai-setup-checklist';
 import { ProjectFormDialog } from '@/components/domain/project/project-form-dialog';
-import { EmptyState } from '@/components/page';
+import { EmptyState } from '@/components/empty-state';
 import { Button } from '@/components/ui/button';
 import { Plus } from '@/components/ui/icons';
 import { LoadFailure } from '@/components/ui/load-failure';
@@ -41,7 +41,7 @@ export default function HomeScreen() {
   return (
     <View className="flex-1 justify-center gap-6 px-6">
       <EmptyState
-        icon={Plus}
+        iconSlot={<Plus />}
         title="Nothing here yet"
         description="A project holds a list of todos. Start with one."
         actionSlot={<Button onPress={() => setCreating(true)} content="Create a project" />}
