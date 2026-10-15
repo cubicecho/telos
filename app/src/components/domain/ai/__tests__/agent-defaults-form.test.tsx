@@ -29,7 +29,7 @@ const BLANK = {
   __typename: 'AgentDefaults',
   id: 'u1',
   baseUrl: null as string | null,
-  model: null,
+  model: null as string | null,
   temperature: null,
   maxTokens: null,
   contextLength: null,
@@ -58,7 +58,25 @@ function form(mocks: any[]) {
   );
 }
 
+/** Opens the fold the fields sit behind, once the defaults have loaded. */
+async function unfold(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(await screen.findByRole('button', { name: /Endpoint, model and limits/ }));
+}
+
 describe('AgentDefaultsForm', () => {
+  it('starts folded, naming the stored model and endpoint', async () => {
+    const user = userEvent.setup();
+    form([read({ ...BLANK, baseUrl: 'http://llm.local/v1', model: 'qwen3:14b' })]);
+
+    const fold = await screen.findByRole('button', { name: /Endpoint, model and limits/ });
+    expect(fold).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByText('qwen3:14b · http://llm.local/v1')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Temperature')).not.toBeInTheDocument();
+
+    await user.click(fold);
+    expect(screen.getByLabelText('Temperature')).toBeInTheDocument();
+  });
+
   it('shows what a blank falls to, and saves zero as a value and blank as null', async () => {
     const user = userEvent.setup();
     const values = {
@@ -78,6 +96,7 @@ describe('AgentDefaultsForm', () => {
       data: { setAgentDefaults: { ...BLANK, baseUrl: values.baseUrl, temperature: 0 } },
     }));
     form([read(BLANK), { request: { query: SetAgentDefaultsDocument, variables: { values } }, result: save }]);
+    await unfold(user);
 
     const temperature = await screen.findByLabelText('Temperature');
     expect(temperature).toHaveAttribute('placeholder', '0.7');
@@ -95,6 +114,7 @@ describe('AgentDefaultsForm', () => {
   it('refuses a temperature the runner would drop', async () => {
     const user = userEvent.setup();
     form([read(BLANK)]);
+    await unfold(user);
 
     await user.type(await screen.findByLabelText('Temperature'), '5');
     expect(await screen.findByText('Must be at most 2.')).toBeInTheDocument();
@@ -141,6 +161,7 @@ describe('AgentDefaultsForm', () => {
       },
       { request: { query: SetAgentDefaultsApiKeyDocument, variables: { apiKey: 'sk-inline' } }, result: setKey },
     ]);
+    await unfold(user);
 
     expect(await screen.findByText('1 model at http://llm.local/v1')).toBeInTheDocument();
     expect(screen.getByRole('combobox', { name: 'Model' })).toBeInTheDocument();

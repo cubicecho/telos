@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
 import { useAppForm } from '@/components/app-form';
 import { DialogLayout } from '@/components/dialog-layout';
+import { Disclosure } from '@/components/disclosure';
 import { Section } from '@/components/section';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -34,6 +35,11 @@ type DefaultsFormValues = LayerDraft & { apiKey: string };
  * The default key is write-only, as an agent's is, and is sent only to the
  * default endpoint: an agent with a base URL of its own never gets it. Blank
  * keeps what is stored; clearing it is the key dialog's job.
+ *
+ * The fields fold behind a disclosure, shut by default, so the agents below
+ * are what Settings shows first; its summary line names the stored model and
+ * endpoint. The form is held here, not in the fold, so closing it keeps
+ * whatever was typed.
  */
 export function AgentDefaultsForm() {
   const query = useQuery(AgentDefaultsDocument);
@@ -118,98 +124,108 @@ export function AgentDefaultsForm() {
         <View className="gap-4">
           <LoadState query={query} what="your agent defaults" count={defaults ? 1 : 0} />
           {defaults ? (
-            <form.AppForm>
-              <Form className="gap-4">
-                <FormGroupTitle title="Endpoint" description="Where agents run unless they name their own." />
-                <form.AppField name="baseUrl" listeners={{ onBlur: () => askModels() }}>
-                  {(field) => <field.InputField label="Base URL" type="url" placeholder="http://localhost:11434/v1" />}
-                </form.AppField>
-                <Text className="-mt-2 text-foreground/60 text-xs">{BASE_URL_HELP}</Text>
-                <form.AppField name="apiKey" listeners={{ onBlur: () => askModels() }}>
-                  {(field) => (
-                    <field.PasswordField
-                      label="API key"
-                      placeholder={
-                        defaults.hasApiKey
-                          ? 'A key is set: leave blank to keep it'
-                          : 'Optional. Local servers such as Ollama need none.'
-                      }
-                    />
-                  )}
-                </form.AppField>
-                <form.Subscribe selector={(state) => state.values.baseUrl}>
-                  {(baseUrl) => (
-                    <EndpointStatus
-                      endpoint={endpoint}
-                      canLoad={Boolean(baseUrl.trim())}
-                      onLoad={() => askModels(true)}
-                    />
-                  )}
-                </form.Subscribe>
+            <Disclosure
+              title="Endpoint, model and limits"
+              titleClassName="text-foreground"
+              description={`${defaults.model || 'No model'} · ${defaults.baseUrl || 'No base URL'}`}
+              contentClassName="mt-2"
+              contentSlot={
+                <form.AppForm>
+                  <Form className="gap-4">
+                    <FormGroupTitle title="Endpoint" description="Where agents run unless they name their own." />
+                    <form.AppField name="baseUrl" listeners={{ onBlur: () => askModels() }}>
+                      {(field) => (
+                        <field.InputField label="Base URL" type="url" placeholder="http://localhost:11434/v1" />
+                      )}
+                    </form.AppField>
+                    <Text className="-mt-2 text-foreground/60 text-xs">{BASE_URL_HELP}</Text>
+                    <form.AppField name="apiKey" listeners={{ onBlur: () => askModels() }}>
+                      {(field) => (
+                        <field.PasswordField
+                          label="API key"
+                          placeholder={
+                            defaults.hasApiKey
+                              ? 'A key is set: leave blank to keep it'
+                              : 'Optional. Local servers such as Ollama need none.'
+                          }
+                        />
+                      )}
+                    </form.AppField>
+                    <form.Subscribe selector={(state) => state.values.baseUrl}>
+                      {(baseUrl) => (
+                        <EndpointStatus
+                          endpoint={endpoint}
+                          canLoad={Boolean(baseUrl.trim())}
+                          onLoad={() => askModels(true)}
+                        />
+                      )}
+                    </form.Subscribe>
 
-                <FormGroupTitle title="Model" />
-                <form.AppField name="model">
-                  {() => (
-                    <ModelField
-                      label="Model"
-                      models={endpoint.models}
-                      blankLabel="None"
-                      placeholder="qwen3:14b"
-                      onPick={(model) => {
-                        if (model.contextLength && !form.getFieldValue('contextLength').trim()) {
-                          form.setFieldValue('contextLength', String(model.contextLength));
-                        }
-                      }}
-                    />
-                  )}
-                </form.AppField>
-                {numbers('model')}
-                <form.AppField name="reasoningEffort">
-                  {(field) => (
-                    <field.SelectField
-                      label="Reasoning effort"
-                      options={effortOptions(hints.reasoningEffort, field.state.value)}
-                    />
-                  )}
-                </form.AppField>
-                <Text className="-mt-2 text-foreground/60 text-xs">{EFFORT_HELP}</Text>
+                    <FormGroupTitle title="Model" />
+                    <form.AppField name="model">
+                      {() => (
+                        <ModelField
+                          label="Model"
+                          models={endpoint.models}
+                          blankLabel="None"
+                          placeholder="qwen3:14b"
+                          onPick={(model) => {
+                            if (model.contextLength && !form.getFieldValue('contextLength').trim()) {
+                              form.setFieldValue('contextLength', String(model.contextLength));
+                            }
+                          }}
+                        />
+                      )}
+                    </form.AppField>
+                    {numbers('model')}
+                    <form.AppField name="reasoningEffort">
+                      {(field) => (
+                        <field.SelectField
+                          label="Reasoning effort"
+                          options={effortOptions(hints.reasoningEffort, field.state.value)}
+                        />
+                      )}
+                    </form.AppField>
+                    <Text className="-mt-2 text-foreground/60 text-xs">{EFFORT_HELP}</Text>
 
-                <FormGroupTitle title="Tools" />
-                {numbers('tools')}
-                <form.AppField name="toolDiscovery">
-                  {(field) => (
-                    <field.SelectField label="Tool discovery" options={discoveryOptions(hints.toolDiscovery)} />
-                  )}
-                </form.AppField>
-                <Text className="-mt-2 text-foreground/60 text-xs">{DISCOVERY_HELP}</Text>
-                <form.AppField name="toolSelectModel">
-                  {() => (
-                    <ModelField
-                      label="Tool selection model"
-                      models={endpoint.models}
-                      blankLabel="None"
-                      placeholder={hints.toolSelectModel}
-                    />
-                  )}
-                </form.AppField>
+                    <FormGroupTitle title="Tools" />
+                    {numbers('tools')}
+                    <form.AppField name="toolDiscovery">
+                      {(field) => (
+                        <field.SelectField label="Tool discovery" options={discoveryOptions(hints.toolDiscovery)} />
+                      )}
+                    </form.AppField>
+                    <Text className="-mt-2 text-foreground/60 text-xs">{DISCOVERY_HELP}</Text>
+                    <form.AppField name="toolSelectModel">
+                      {() => (
+                        <ModelField
+                          label="Tool selection model"
+                          models={endpoint.models}
+                          blankLabel="None"
+                          placeholder={hints.toolSelectModel}
+                        />
+                      )}
+                    </form.AppField>
 
-                <FormGroupTitle title="Requests" />
-                {numbers('requests')}
+                    <FormGroupTitle title="Requests" />
+                    {numbers('requests')}
 
-                <View className="flex-row items-center justify-end gap-3">
-                  {failure ? (
-                    <Text className="flex-1 text-negative text-sm" aria-live="polite">
-                      {describeError(failure)}
-                    </Text>
-                  ) : saved ? (
-                    <Text className="flex-1 text-foreground/60 text-sm" aria-live="polite">
-                      Saved.
-                    </Text>
-                  ) : null}
-                  <form.SubmitButton isEdit editLabel="Save defaults" />
-                </View>
-              </Form>
-            </form.AppForm>
+                    <View className="flex-row items-center justify-end gap-3">
+                      {failure ? (
+                        <Text className="flex-1 text-negative text-sm" aria-live="polite">
+                          {describeError(failure)}
+                        </Text>
+                      ) : saved ? (
+                        <Text className="flex-1 text-foreground/60 text-sm" aria-live="polite">
+                          Saved.
+                        </Text>
+                      ) : null}
+                      <form.SubmitButton isEdit editLabel="Save defaults" />
+                    </View>
+                  </Form>
+                </form.AppForm>
+              }
+            />
           ) : null}
           {keying && defaults ? (
             <DefaultKeyDialog open onOpenChange={setKeying} hasApiKey={defaults.hasApiKey} />
