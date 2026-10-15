@@ -3,6 +3,8 @@ import { useState } from 'react';
 import { Pressable, Text, View, type ViewProps } from 'react-native';
 import { Archive } from '@/components/app-icons';
 import { AiIgnoredBadge } from '@/components/domain/ai/ai-ignored-badge';
+import type { LiveRun } from '@/components/domain/ai/project-activity';
+import { LiveDot } from '@/components/domain/ai/run-log';
 import { LabelBadge, type LabelSummary } from '@/components/domain/label/label-badge';
 import { LabelPicker } from '@/components/domain/label/label-picker';
 import { LaneBadge } from '@/components/domain/lane/lane-badge';
@@ -35,11 +37,14 @@ export function TodoRow({
   projectId,
   siblings,
   lanes,
+  live,
 }: {
   todo: TodoSummary;
   projectId: string;
   siblings: readonly TodoSummary[];
   lanes: readonly CachedLane[];
+  /** The run working this todo now, when one is and AI is on for its project. */
+  live?: LiveRun | undefined;
 }) {
   const [editing, setEditing] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -215,6 +220,18 @@ export function TodoRow({
             {todo.lane && !todo.lane.isDone ? <LaneBadge lane={todo.lane} className="mt-px" /> : null}
             <AiIgnoredBadge ignored={todo.aiIgnored} className="mt-px" />
           </View>
+
+          {/* The same line the board card draws, so the list says as much
+              about an agent at work as the board does. */}
+          {live ? (
+            <View className="mt-1 flex-row items-center gap-2">
+              <LiveDot />
+              <Text numberOfLines={1} className="min-w-0 flex-1 text-foreground/60 text-xs">
+                {live.cancelRequestedAt ? 'Stopping' : 'Working'}
+                {live.agent ? ` · ${live.agent.name}` : ''}
+              </Text>
+            </View>
+          ) : null}
 
           {/* One line of the notes, because their presence is otherwise
               invisible — a todo with a paragraph behind it looks exactly like
