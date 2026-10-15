@@ -13,6 +13,8 @@ on:
     branches: [main]
     paths:
       - "site/**"
+      # The glossary page is built from the domain model.
+      - ".agents/domain-model.md"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
@@ -49,7 +51,7 @@ jobs:
       # The site is the only public face of some of these repos, so a deploy
       # that publishes an empty directory should fail here, not silently.
       - name: The build produced a site
-        run: test -s _site/index.html
+        run: test -s _site/index.html && test -s _site/glossary/index.html
 
       - uses: actions/configure-pages@v5
 
