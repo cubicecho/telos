@@ -1,3 +1,10 @@
+## [2.5.1](https://github.com/cubicecho/telos/compare/v2.5.0...v2.5.1) (2026-10-15)
+
+
+### Bug Fixes
+
+* **runner:** let the standing protocol defer to the agent's instructions ([57ca543](https://github.com/cubicecho/telos/commit/57ca543f590c1e25db0194b1eca7e83c54af6674))
+
 # [2.5.0](https://github.com/cubicecho/telos/compare/v2.4.0...v2.5.0) (2026-10-15)
 
 
