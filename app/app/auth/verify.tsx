@@ -2,7 +2,7 @@ import { useMutation } from '@apollo/client';
 import { Link, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef } from 'react';
 import { Text, View } from 'react-native';
-import { EmptyState } from '@/components/page';
+import { EmptyState } from '@/components/empty-state';
 import { CircleAlert } from '@/components/ui/icons';
 import { Spinner } from '@/components/ui/spinner';
 import { setToken } from '@/lib/auth';
@@ -36,7 +36,7 @@ export default function VerifyScreen() {
       <View className="w-full max-w-sm items-center">
         {!token || error ? (
           <EmptyState
-            icon={CircleAlert}
+            iconSlot={<CircleAlert />}
             title="That link didn't work"
             description={`${error ? describeError(error) : 'The link is missing its token.'} Sign-in links expire after 15 minutes.`}
             actionSlot={

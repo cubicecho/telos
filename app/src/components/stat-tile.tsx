@@ -43,7 +43,7 @@ type StatTileProps = {
 const ICON_BOX = cn('shrink-0', Platform.select({ web: '[&_svg]:size-4 [&_svg]:shrink-0', default: undefined }));
 
 /** A bar standing in for the figure — `Skeleton`'s look, on both platforms, at one line of it. */
-const BAR = cn('h-8 w-20 rounded-md bg-hover', Platform.OS === 'web' && 'animate-pulse');
+const BAR = cn('h-8 w-20 rounded-md bg-foreground/10', Platform.OS === 'web' && 'animate-pulse');
 
 /**
  * What a pressable tile adds on the web: a compiled `Pressable` is a `<button>`, which centres its

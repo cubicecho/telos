@@ -5,8 +5,8 @@ import { McpSecretKind, type McpServerFieldsFragment } from '@/__generated__/gra
 import { useAppForm } from '@/components/app-form';
 import { ConfirmButton } from '@/components/confirm-button';
 import { DialogLayout } from '@/components/dialog-layout';
+import { EmptyState } from '@/components/empty-state';
 import { List } from '@/components/list';
-import { EmptyState } from '@/components/page';
 import { Section } from '@/components/section';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -109,7 +109,11 @@ export function McpServerManager() {
             what="your MCP servers"
             count={servers.length}
             emptySlot={
-              <EmptyState icon={Plug} title="No servers yet." description="A server lends your agents its tools." />
+              <EmptyState
+                iconSlot={<Plug />}
+                title="No servers yet."
+                description="A server lends your agents its tools."
+              />
             }
           />
           <List

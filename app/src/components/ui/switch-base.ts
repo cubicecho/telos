@@ -1,3 +1,5 @@
+import type { TooltipSide } from '@/components/ui/tooltip-base';
+
 export type SwitchProps = {
   checked?: boolean | undefined;
   /** Where an uncontrolled switch starts. Ignored once `checked` is passed. */
@@ -24,6 +26,15 @@ export type SwitchProps = {
    * Native has no description relation, so on device the line is read where it is drawn.
    */
   'aria-describedby'?: string | undefined;
+  /**
+   * The switch's tooltip, as on `Button`: shown on hover and focus on the web and on a long press on
+   * device, and the switch's description. With it, `disabled` keeps the switch focusable and
+   * refuses the press (`aria-disabled`), so the reason it cannot be changed can still be read —
+   * "Turn the task on first".
+   */
+  hint?: string | undefined;
+  /** Which edge of the switch the tooltip sits on. The default is `top`. */
+  side?: TooltipSide | undefined;
   className?: string | undefined;
 };
 

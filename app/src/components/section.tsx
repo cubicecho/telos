@@ -32,7 +32,7 @@ type SectionProps = {
    */
   level?: 1 | 2 | 3 | 4 | 5 | 6 | undefined;
   /**
-   * `card` draws the group on a card: the border, background and shadow `Card` has, with the
+   * `card` draws the group on a card: the border and background `Card` has, with the
    * padding inside it. `none` (the default) is a label and a gap and nothing else.
    */
   surface?: 'none' | 'card' | undefined;
@@ -119,7 +119,7 @@ export function Section({
       {...(folded ? { 'aria-describedby': descriptionId } : {})}
       className={cn(
         'min-w-0 gap-3',
-        surface === 'card' && 'rounded-lg border border-foreground/10 bg-secondary p-4 text-foreground shadow-sm',
+        surface === 'card' && 'rounded-lg border border-foreground/10 bg-secondary p-4 text-foreground',
         className,
       )}
     >

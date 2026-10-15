@@ -4,8 +4,8 @@ import { Text, View } from 'react-native';
 import { useAppForm } from '@/components/app-form';
 import { ConfirmButton } from '@/components/confirm-button';
 import { DialogLayout } from '@/components/dialog-layout';
+import { EmptyState } from '@/components/empty-state';
 import { List } from '@/components/list';
-import { EmptyState } from '@/components/page';
 import { Section } from '@/components/section';
 import { Button } from '@/components/ui/button';
 import { Field, FieldContent, FieldDescription, FieldLegend, FieldSet, FieldTitle } from '@/components/ui/field';
@@ -93,7 +93,7 @@ export function ApiKeyManager() {
             count={keys.length}
             emptySlot={
               <EmptyState
-                icon={KeyRound}
+                iconSlot={<KeyRound />}
                 title="No keys yet."
                 description="A key lets an MCP client work in Telos as you."
               />

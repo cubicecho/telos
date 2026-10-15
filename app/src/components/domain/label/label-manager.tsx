@@ -4,8 +4,8 @@ import { Text, View } from 'react-native';
 import { ConfirmButton } from '@/components/confirm-button';
 import type { LabelSummary } from '@/components/domain/label/label-badge';
 import { LabelFormDialog } from '@/components/domain/label/label-form-dialog';
+import { EmptyState } from '@/components/empty-state';
 import { List } from '@/components/list';
-import { EmptyState } from '@/components/page';
 import { Section } from '@/components/section';
 import { Button } from '@/components/ui/button';
 import { ColorDot } from '@/components/ui/color-dot';
@@ -74,7 +74,7 @@ export function LabelManager() {
             count={labels.length}
             emptySlot={
               <EmptyState
-                icon={Tag}
+                iconSlot={<Tag />}
                 title="No labels yet."
                 description="Labels mark projects and todos, and filter them."
               />

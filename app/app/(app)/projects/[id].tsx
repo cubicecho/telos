@@ -13,7 +13,7 @@ import { TodoFilterBar } from '@/components/domain/todo/todo-filter-bar';
 import { TodoFormDialog } from '@/components/domain/todo/todo-form-dialog';
 import { TodoRow } from '@/components/domain/todo/todo-row';
 import type { TodoSummary } from '@/components/domain/todo/types';
-import { EmptyState } from '@/components/page';
+import { EmptyState } from '@/components/empty-state';
 import { PageLayout } from '@/components/page-layout';
 import { SectionHeading } from '@/components/section-heading';
 import { Button } from '@/components/ui/button';
@@ -160,7 +160,7 @@ export default function ProjectScreen() {
     return (
       <View className="flex-1 justify-center px-6">
         <EmptyState
-          icon={CircleAlert}
+          iconSlot={<CircleAlert />}
           title="Project not found"
           description="That project doesn't exist, or isn't yours."
           actionSlot={

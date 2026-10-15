@@ -13,7 +13,7 @@ import type {
 } from '@/components/ui/dialog-base';
 import { DIALOG_CONTENT_CLASS } from '@/components/ui/dialog-base';
 import { X } from '@/components/ui/icons';
-import { cn } from '@/lib/utils';
+import { bridgePress, cn } from '@/lib/utils';
 
 /** The shared contract, widened to what the radix part (or element) underneath accepts. */
 type Wide<Base, Radix> = Base & Omit<Radix, keyof Base>;
@@ -41,9 +41,14 @@ function Dialog({
 /** The element that opens the dialog. */
 function DialogTrigger({
   asChild,
+  children,
   ...props
 }: Wide<DialogTriggerProps, React.ComponentProps<typeof DialogPrimitive.Trigger>>) {
-  return <DialogPrimitive.Trigger data-slot="dialog-trigger" asChild={asChild ?? false} {...props} />;
+  return (
+    <DialogPrimitive.Trigger data-slot="dialog-trigger" asChild={asChild ?? false} {...props}>
+      {asChild ? bridgePress(children) : children}
+    </DialogPrimitive.Trigger>
+  );
 }
 
 /** Where the dialog is mounted, outside the tree that opened it. */
@@ -55,6 +60,7 @@ function DialogPortal(props: Wide<DialogPortalProps, React.ComponentProps<typeof
 function DialogClose({
   asChild,
   className,
+  children,
   ...props
 }: Wide<DialogCloseProps, React.ComponentProps<typeof DialogPrimitive.Close>>) {
   return (
@@ -63,7 +69,9 @@ function DialogClose({
       asChild={asChild ?? false}
       {...(className === undefined ? {} : { className })}
       {...props}
-    />
+    >
+      {asChild ? bridgePress(children) : children}
+    </DialogPrimitive.Close>
   );
 }
 

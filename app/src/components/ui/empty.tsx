@@ -18,7 +18,7 @@ const Empty = React.forwardRef<React.ElementRef<typeof View>, ViewProps>(({ clas
     ref={ref}
     testID="empty"
     className={cn(
-      'w-full min-w-0 items-center justify-center gap-3 rounded-lg border-dashed border-foreground/10 py-10',
+      'w-full min-w-0 items-center justify-center gap-3 rounded-lg border border-dashed border-foreground/10 py-10',
       className,
     )}
     {...props}

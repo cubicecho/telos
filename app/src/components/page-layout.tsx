@@ -49,6 +49,10 @@ export type PageLayoutProps = {
   onScroll?: HeaderContentFooterProps['onScroll'];
   className?: string | undefined;
   headerClassName?: string | undefined;
+  /**
+   * Merged after the body's own `gap-4 py-4`, so `py-0` or `gap-6` replaces just that half. The
+   * body's `px-4` comes with `width` and is not here.
+   */
   contentClassName?: string | undefined;
   footerClassName?: string | undefined;
 };
@@ -91,7 +95,9 @@ export function PageLayout({
       scrollRef={scrollRef}
       onScroll={onScroll}
       className={cn('h-full', className)}
-      contentClassName={contentClassName}
+      // Room under the header's rule and between the blocks a page stacks; a page that wants
+      // its rows flush says so with `py-0` or `gap-0`, merged after.
+      contentClassName={cn('gap-4 py-4', contentClassName)}
       footerClassName={footerClassName}
       headerSlot={
         <PageHeader

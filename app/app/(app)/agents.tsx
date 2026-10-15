@@ -1,6 +1,5 @@
 import { useQuery } from '@apollo/client';
 import { Redirect } from 'expo-router';
-import { View } from 'react-native';
 import { AiStatus } from '@/components/domain/ai/ai-status';
 import { PageLayout } from '@/components/page-layout';
 import { useAi } from '@/lib/ai';
@@ -20,7 +19,7 @@ export default function AgentsScreen() {
     <PageLayout
       title="Agents"
       description="What your agents are doing, what waits on you, and whether the runner is there."
-      contentSlot={<View className="py-6">{ai.on ? <AiStatus /> : null}</View>}
+      contentSlot={ai.on ? <AiStatus /> : null}
     />
   );
 }

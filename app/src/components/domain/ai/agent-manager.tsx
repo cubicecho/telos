@@ -5,8 +5,8 @@ import type { AgentFieldsFragment } from '@/__generated__/graphql';
 import { useAppForm } from '@/components/app-form';
 import { ConfirmButton } from '@/components/confirm-button';
 import { DialogLayout } from '@/components/dialog-layout';
+import { EmptyState } from '@/components/empty-state';
 import { List } from '@/components/list';
-import { EmptyState } from '@/components/page';
 import { Section } from '@/components/section';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -120,7 +120,7 @@ export function AgentManager() {
             count={agents.length}
             emptySlot={
               <EmptyState
-                icon={UserRound}
+                iconSlot={<UserRound />}
                 title="No agents yet."
                 description="An agent is a model with instructions. Give one to a lane and it works what arrives there."
               />

@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Platform, Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import type { RunFieldsFragment, RunSummaryFieldsFragment } from '@/__generated__/graphql';
 import { Disclosure } from '@/components/disclosure';
 import { Badge } from '@/components/ui/badge';
@@ -36,12 +36,7 @@ export function RunStatusBadge({ status }: { status: string }) {
 
 /** A dot that says "this is happening now", in the same `info` as a running run's badge. */
 export function LiveDot({ className }: { className?: string }) {
-  return (
-    <View
-      aria-hidden
-      className={cn('size-2 shrink-0 rounded-full bg-info', Platform.OS === 'web' && 'animate-pulse', className)}
-    />
-  );
+  return <Badge variant="info" pulse className={cn('shrink-0 self-center', className)} />;
 }
 
 export function runEvents(run: Pick<RunFieldsFragment, 'events'>): RunEvent[] {
