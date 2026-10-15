@@ -26,9 +26,11 @@ import type { TodoSummary } from './types';
  * re-state.
  *
  * Beside the form, the todo's record: its notes thread and its history, each a
- * tab, loaded only when opened. "AI ignores this" is the one AI field, drawn —
- * and sent — only while AI is on for the account. With AI on for the project
- * as well, a Runs tab shows what the lanes' agents made of it.
+ * tab, loaded only when opened. "AI ignores this" is the one AI field, drawn
+ * only while AI is on for the account and the project both, and sent whenever
+ * it is on for the account — hidden, the field still holds the stored value, so
+ * sending it changes nothing. With AI on for the project, a Runs tab shows what
+ * the lanes' agents made of it too.
  *
  * A `DialogLayout`, so the title and the Save stay put and only the body
  * scrolls: a long thread or history would otherwise carry the whole dialog,
@@ -63,9 +65,11 @@ export function TodoFormDialog({
   const [tab, setTab] = useState<string>(initialTab);
   const [focusedNote, setFocusedNote] = useState<string | null>(focusNoteId);
   // Asked only while the account's AI is on: off, the schema has no runs. The
-  // answer carries the project's switch, which is what decides the tab.
+  // answer carries the project's switch, which decides the tab and the
+  // "AI ignores this" checkbox. Until it arrives both read as off.
   const runsQuery = useTodoRuns(todo.id, { skip: !ai.on });
-  const showRuns = ai.on && runsQuery.data?.todo?.project?.aiEnabled === true;
+  const projectAi = ai.on && runsQuery.data?.todo?.project?.aiEnabled === true;
+  const showRuns = projectAi;
   // Only what the todo itself rules out; the rest (no agent, blocked, being
   // worked) the server answers with a reason when asked.
   const canRun = todo.completedAt == null && todo.aiIgnored === false && todo.lane != null && !todo.lane.isDone;
@@ -115,7 +119,9 @@ export function TodoFormDialog({
       notes: orNull(value.notes),
       acceptance: orNull(value.acceptance),
       dueAt: value.dueAt ? value.dueAt.toISOString() : null,
-      // Only while AI is on: off, the flag is not this form's to change.
+      // Only while the account's AI is on: off, the flag is not this form's to
+      // change. With the project's off the checkbox is hidden, and this is the
+      // value it was opened with.
       ...(ai.on ? { aiIgnored: value.aiIgnored } : {}),
     };
 
@@ -201,7 +207,7 @@ export function TodoFormDialog({
                     />
                   )}
                 </form.AppField>
-                {ai.on ? (
+                {projectAi ? (
                   <form.AppField name="aiIgnored">
                     {(field) => (
                       <field.CheckboxField
