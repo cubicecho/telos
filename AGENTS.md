@@ -94,6 +94,8 @@ telos/
 │   ├── admin.ts             # `npm run admin -- --user <email>`: make an account an admin
 │   └── __tests__/
 ├── .agents/mvp-plan.md      # The plan this repo was built from
+├── .agents/domain-model.md  # What telos is: concepts, actors, lifecycles, invariants, glossary
+├── .agents/coding-standards-todos.md  # Proposed model changes and refactors (the ledger)
 ├── vitest.config.ts
 ├── biome.json
 └── package.json
