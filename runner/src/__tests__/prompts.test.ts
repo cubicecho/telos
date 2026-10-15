@@ -61,14 +61,38 @@ describe('readReply', () => {
     expect(readReply(reply)).toEqual({
       report: 'PASS\nLooks right.',
       todos: [{ title: 'Add tests', brief: null, acceptance: null, dependsOn: [] }],
+      refine: null,
     });
   });
 
   it('leaves a reply with no todos block as it is', () => {
-    expect(readReply('Done: added the box.')).toEqual({ report: 'Done: added the box.', todos: [] });
+    expect(readReply('Done: added the box.')).toEqual({ report: 'Done: added the box.', todos: [], refine: null });
   });
 
   it('reads no todos from a block that is not JSON', () => {
     expect(readReply('Done.\n```todos\nnot json\n```').todos).toEqual([]);
+  });
+
+  it('takes a refine block out of the report and reads the todo it rewrote', () => {
+    const reply =
+      'Narrowed it down.\n\n```refine\n{"title":"Stream the export","body":"Rows, not one string.","extra":1}\n```';
+
+    expect(readReply(reply)).toEqual({
+      report: 'Narrowed it down.',
+      todos: [],
+      refine: { title: 'Stream the export', brief: 'Rows, not one string.', acceptance: null },
+    });
+  });
+
+  it('reads both blocks when a reply holds both, for the server to refuse', () => {
+    const read = readReply('```refine\n{"title":"A"}\n```\n```todos\n[{"title":"B"},{"title":"C"}]\n```');
+
+    expect(read.report).toBe('');
+    expect(read.refine?.title).toBe('A');
+    expect(read.todos.map((todo) => todo.title)).toEqual(['B', 'C']);
+  });
+
+  it('reads no refine from a block that holds no object', () => {
+    expect(readReply('Done.\n```refine\n["a list"]\n```').refine).toBeNull();
   });
 });

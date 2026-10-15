@@ -1,23 +1,41 @@
 import { parseJson } from '@cubicecho/agent-core';
-import type { Assignment, ProposedTodo } from './telos.ts';
+import type { Assignment, ProposedTodo, RefinedTodo } from './telos.ts';
 
 // What an agent is told. The agent's own instructions say what to do with a
 // todo; the standing protocol after them says how a reply is read, which is
-// the same for every agent: a reply opening with PASS or FAIL is a verdict,
-// anything else a report, and new todos come in a fenced `todos` block.
+// the same for every agent. A reply settles its todo one way: a ruling (PASS
+// or FAIL), a report, a refine (the todo rewritten, in a fenced `refine`
+// block) or a split (two or more todos, in a fenced `todos` block). The server
+// decides what each does to the todo (`finishRun`).
 
 export const STANDING_SYSTEM = `You work one todo on a Telos board, as your instructions above say.
 
 Your instructions say what your job is; nothing below widens it. When a tool fails, say so
 plainly and say what you tried; do not report success you did not have.
 
-Your reply goes on the todo for the next agent and the person to read. When your instructions ask
-you to rule on the todo, begin with PASS or FAIL on its own line, then say why; FAIL sends it back,
-so name what is not met. Otherwise report what you did and how it can be checked against the
-todo's acceptance criteria.
+Your reply goes on the todo for the next agent and the person to read, and it settles the todo in
+one of these ways. Use the one your instructions ask for.
 
-When the todo is better done as several smaller ones, propose them in a fenced block marked
-todos, holding a JSON array, after anything else you say:
+A ruling. When your instructions ask you to rule on the todo, begin with PASS or FAIL on its own
+line, then say why; FAIL sends it back, so name what is not met.
+
+A report. When you did the work, say what you did and how it can be checked against the todo's
+acceptance criteria.
+
+A refine. When your job is to make the todo ready for someone else to do and it is one piece of
+work, rewrite it in a fenced block marked refine, holding a JSON object, after anything else you
+say. A field you leave out stays as it is:
+
+\`\`\`refine
+{
+  "title": "imperative, under about ten words",
+  "brief": "what to do, where, and what to watch out for",
+  "acceptance": "how someone can tell this todo is done"
+}
+\`\`\`
+
+A split. When the todo is genuinely several pieces of work, propose two or more todos in a fenced
+block marked todos, holding a JSON array, after anything else you say:
 
 \`\`\`todos
 [
@@ -31,7 +49,10 @@ todos, holding a JSON array, after anything else you say:
 \`\`\`
 
 The todo then waits until they are done. Order them so none depends on a later one, and use
-"dependsOn" only for a real ordering constraint.`;
+"dependsOn" only for a real ordering constraint.
+
+Never both refine and split: a reply with both fails. You cannot edit, move or finish this todo
+with tools; what your reply says is what happens to it.`;
 
 /**
  * The system prompt for a run: where it is, who the agent is and what it does
@@ -81,23 +102,58 @@ export function assignmentPrompt(assignment: Assignment): string {
 
 /** A fenced block marked `todos`, anywhere in a reply. */
 const TODOS_BLOCK = /```todos[^\S\n]*\n([\s\S]*?)```/;
+/** A fenced block marked `refine`, anywhere in a reply. */
+const REFINE_BLOCK = /```refine[^\S\n]*\n([\s\S]*?)```/;
+
+/** What a reply says, read apart. */
+export interface Reply {
+  /** What the agent said, without its blocks. */
+  report: string;
+  /** The todos a `todos` block proposed; none without one. */
+  todos: ProposedTodo[];
+  /** The todo as a `refine` block rewrote it; null without one. */
+  refine: RefinedTodo | null;
+}
 
 /**
- * Splits a reply into what the agent said and the todos it proposed. The
- * `todos` block is taken out of what it said, since the todos are written as
- * todos and the JSON is nothing anyone would read back.
+ * Splits a reply into what the agent said, the todos it proposed and the todo
+ * as it rewrote it. The blocks are taken out of what it said, since what they
+ * hold is written to the board and the JSON is nothing anyone would read back.
+ * What to make of a reply holding both is the server's to say.
  *
  * @param reply - The agent's whole reply.
- * @returns The report without the block, and the todos it held; none when there was no block.
+ * @returns The report without the blocks, and what they held.
  */
-export function readReply(reply: string): { report: string; todos: ProposedTodo[] } {
-  const block = TODOS_BLOCK.exec(reply);
-  if (block === null) {
-    return { report: reply, todos: [] };
-  }
+export function readReply(reply: string): Reply {
+  const todosBlock = TODOS_BLOCK.exec(reply);
+  const refineBlock = REFINE_BLOCK.exec(reply);
+  const report = [todosBlock, refineBlock]
+    .reduce((text, block) => (block === null ? text : text.replace(block[0], '')), reply)
+    .trim();
   return {
-    report: reply.replace(block[0], '').trim(),
-    todos: proposedTodos(parseJson<unknown>(block[1])),
+    report: todosBlock === null && refineBlock === null ? reply : report,
+    todos: todosBlock === null ? [] : proposedTodos(parseJson<unknown>(todosBlock[1])),
+    refine: refineBlock === null ? null : refinedTodo(parseJson<unknown>(refineBlock[1])),
+  };
+}
+
+/**
+ * The todo a `refine` block rewrites, read forgivingly: the fields it gave as
+ * text, and nothing else.
+ *
+ * @param parsed - What `parseJson` made of the block.
+ * @returns The rewrite; null when the block held no object.
+ */
+export function refinedTodo(parsed: unknown): RefinedTodo | null {
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    return null;
+  }
+  const item = parsed as Record<string, unknown>;
+  const text = (value: unknown) => (typeof value === 'string' ? value : null);
+  return {
+    title: text(item.title),
+    brief: text(item.brief) ?? text(item.body),
+    acceptance: text(item.acceptance),
   };
 }
 

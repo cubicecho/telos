@@ -94,6 +94,8 @@ telos/
 │   ├── admin.ts             # `npm run admin -- --user <email>`: make an account an admin
 │   └── __tests__/
 ├── .agents/mvp-plan.md      # The plan this repo was built from
+├── .agents/domain-model.md  # What telos is: concepts, actors, lifecycles, invariants, glossary
+├── .agents/coding-standards-todos.md  # Proposed model changes and refactors (the ledger)
 ├── vitest.config.ts
 ├── biome.json
 └── package.json
@@ -199,15 +201,16 @@ that is off is left out of the key's listing (`mcp.ts`) *and* refused by the
 lock (`toolsOff` on the actor, read in `auth.ts`), for the root fields the tool
 uses. A run has the same switches through its agent (`agents.tools_off`,
 edited in the agent form): null is the run default (`runToolsOff` in
-`door.ts`: every read, `create_todo`, `set_todo_dependencies` and the note
-tools), computed in code so a tool the door gains later is off for a run until
+`door.ts`: every read, `set_todo_dependencies` and the note tools; not
+`create_todo`, since a run's pieces of its own todo come back in its reply),
+computed in code so a tool the door gains later is off for a run until
 someone switches it on; `record_artifact` is never a run's (`NOT_FOR_RUNS`).
 Whatever its switches say, a run writes only its own todo, the todos under it
 and the todos a run of its todo created, and its own board
 (`resolvers/run-reach.ts`, applied by the lock after `ai-reach.ts`): out of
-reach is NOT_FOUND, and moving, finishing, archiving, deleting, re-running or
-re-pointing the dependencies of its own todo is FORBIDDEN, since that is
-`finishRun`'s to decide. A mutation added to `AI_MUTATIONS` needs an entry in
+reach is NOT_FOUND, and editing, moving, finishing, archiving, deleting,
+re-running or re-pointing the dependencies of its own todo is FORBIDDEN, since
+that is `finishRun`'s to decide: a run rewrites its todo with a refine. A mutation added to `AI_MUTATIONS` needs an entry in
 `RUN_REACH` or `RUN_REACH_EXEMPT`, which a test holds. The AI switches sit
 above all of this. `/mcp` is a 404 unless the instance's switch is on.
 
@@ -221,17 +224,25 @@ ideas, one name each:
   `wipLimit` how many it works at once, `maxAttempts` how many failures it
   takes before leaving the todo for a person.
 - **Run** — one agent working one todo (or answering a draft). It ends in
-  success or failure, with a report and optionally new todos.
+  success or failure, with a report, and may rewrite (refine) or split its todo.
 - **Draft**, **board template** — as below.
 
 There is no lane prompt and no per-lane contract: what a lane asks for is its
 agent's instructions, and every reply is read the same way (`verdictOf` in
 `resolvers/runs.ts`). A reply that opens with FAIL fails and takes the failure
 route; one that opens with PASS passes; anything else is a report and passes.
-A passing run may propose todos in a fenced `todos` block: they land in the
-project's new-todo lane (`projects.newTodoLaneId`, else its first open lane,
-`findNewTodoLaneId` in `lanes.ts`, also used by requests and finished drafts),
-and the todo waits on them where it is. `archiveOnSuccess` is the other answer
+A passing run may refine its todo with a fenced `refine` block (`title`,
+`brief`, `acceptance`; what it leaves out stays), which `finishRun` writes
+before the todo passes on. Or it may split it with a fenced `todos` block of
+two or more: the pieces land in the project's new-todo lane
+(`projects.newTodoLaneId`, else its first open lane, `findNewTodoLaneId` in
+`lanes.ts`, also used by requests and finished drafts), and the todo waits on
+them where it is. A todo split *in* the new-todo lane sends its pieces on down
+that lane's success route instead, unless that is the done lane, so they are
+not planned twice (`piecesLaneId`). A one-item `todos` block is read as a
+refine, and a reply with both blocks fails: a todo is refined or split. Only
+a non-edit event is an arrival (`arrivedIn` in `ready.ts`), so editing a todo
+never re-queues work its lane already did. `archiveOnSuccess` is the other answer
 to a pass: `finishRun` completes the todo, puts it in the done lane and
 archives it in one write, as the run. It is that or a success route, never
 both; the lane write guard (`assertArchiveOnSuccessFits`) holds it and says

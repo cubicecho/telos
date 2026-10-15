@@ -106,13 +106,14 @@ export function toolsCalling(field: string, args: Record<string, unknown>): stri
 }
 
 /**
- * The writing tools a run has unless its agent says otherwise: it adds work,
- * leaves notes and takes back its own. Every reading tool is on as well. What
- * changes work already on the board, or reaches past it (projects, requests,
+ * The writing tools a run has unless its agent says otherwise: it orders the
+ * pieces of its todo, leaves notes and takes back its own. Every reading tool
+ * is on as well. Adding work is off: a run that would break its todo up says so
+ * in its reply, as a split, which makes the pieces its todo's. What adds to the
+ * board, changes work already on it, or reaches past it (projects, requests,
  * drafts, templates), a person turns on for an agent that should have it.
  */
 export const RUN_DEFAULT_WRITES: ReadonlySet<string> = new Set([
-  'create_todo',
   'set_todo_dependencies',
   'add_todo_note',
   'edit_todo_note',

@@ -621,25 +621,20 @@ describe('the board’s agents and runs', () => {
     await b.person.expectOk(SET_AGENT, { id: b.agentId, set: { toolsOff: off } });
   }
 
-  it('gives a run reading, adding work and notes, unless its agent says otherwise', async () => {
+  it('gives a run reading, ordering and notes, unless its agent says otherwise', async () => {
     const b = await agentBoard();
     const { todoId, token } = await liveRun(b);
     const url = await serve();
     const run = await connectRun(url, token);
-    const defaults = [
-      ...READS,
-      'create_todo',
-      'set_todo_dependencies',
-      'add_todo_note',
-      'edit_todo_note',
-      'delete_todo_note',
-    ];
+    const defaults = [...READS, 'set_todo_dependencies', 'add_todo_note', 'edit_todo_note', 'delete_todo_note'];
     expect((await run.listTools()).tools.map((tool) => tool.name).sort()).toEqual([...defaults].sort());
     expect(await callError(run, 'move_todo', { id: todoId, laneId: b.lanes[1].id })).toMatch(
       /Tool move_todo not found/,
     );
-    const { createTodo } = await call(run, 'create_todo', { projectId: b.projectId, title: 'Follow-up' });
-    expect((await rowOf(createTodo.id)).title).toBe('Follow-up');
+    // Its pieces come back in its reply, as a split.
+    expect(await callError(run, 'create_todo', { projectId: b.projectId, title: 'Follow-up' })).toMatch(
+      /Tool create_todo not found/,
+    );
     await call(run, 'add_todo_note', { todoId, body: 'Halfway.' });
 
     // Its agent switches the rest on, all but `record_artifact`: a run has the runner's.
@@ -651,10 +646,10 @@ describe('the board’s agents and runs', () => {
     expect(await callError(opened, 'record_artifact', { todoId })).toMatch(/Tool record_artifact not found/);
 
     // And can switch a default one off.
-    await setRunTools(b, ['create_todo']);
+    await setRunTools(b, ['add_todo_note']);
     const narrowed = await connectRun(url, token);
-    expect(await callError(narrowed, 'create_todo', { projectId: b.projectId, title: 'Again' })).toMatch(
-      /Tool create_todo not found/,
+    expect(await callError(narrowed, 'add_todo_note', { todoId, body: 'Again' })).toMatch(
+      /Tool add_todo_note not found/,
     );
   });
 
@@ -682,8 +677,11 @@ describe('the board’s agents and runs', () => {
       /cannot change what waits on its own todo/,
     );
     expect(await rowOf(todoId)).toMatchObject({ laneId: b.lanes[0].id, archivedAt: null });
-    // Its text and its thread are fine.
-    await call(run, 'update_todo', { id: todoId, brief: 'Narrowed down.' });
+    // Its text too: a run rewrites its todo in its reply, as a refine.
+    expect(await callError(run, 'update_todo', { id: todoId, brief: 'Narrowed down.' })).toMatch(
+      /cannot edit its own todo/,
+    );
+    // Its thread is fine.
     await call(run, 'add_todo_note', { todoId, body: 'Split it.' });
 
     // What is under its todo, and what it made, are its to work.
@@ -730,7 +728,7 @@ describe('the board’s agents and runs', () => {
     const { mcpTools } = await b.person.expectOk('{ mcpTools { name forRuns runDefault } }');
     const named = (name: string) => mcpTools.find((tool: { name: string }) => tool.name === name);
     expect(named('todos')).toEqual({ name: 'todos', forRuns: true, runDefault: true });
-    expect(named('create_todo')).toEqual({ name: 'create_todo', forRuns: true, runDefault: true });
+    expect(named('create_todo')).toEqual({ name: 'create_todo', forRuns: true, runDefault: false });
     expect(named('move_todo')).toEqual({ name: 'move_todo', forRuns: true, runDefault: false });
     expect(named('record_artifact')).toEqual({ name: 'record_artifact', forRuns: false, runDefault: false });
   });

@@ -17,7 +17,7 @@ import { INSTANCE_AI_ON } from './instance.ts';
 //   - the project is not archived, and the todo is open and not blocked
 //   - nothing is working it now (a running run inside its lease)
 //   - the lane's agent has not already finished with it: no `ok` run in this lane
-//     since the todo last arrived here
+//     since the todo last arrived here (`arrivedIn`: an edit is not an arrival)
 //   - it has failed no more than `maxAttempts` times since a person last
 //     touched it, which is what stops a Doing↔Review loop spending forever
 //   - the lane has room under its WIP limit
@@ -48,6 +48,24 @@ export const RUN_FAILED = sql`(r.status = 'error' OR r.verdict = 'fail')`;
  * `runTodo`), which a key or an agent may do from the MCP door.
  */
 export const TOUCHED = sql`(e.actor_kind = 'user' OR e.kind IN ('retry', 'run'))`;
+
+/**
+ * When a todo last arrived in a lane: the newest event that put it there, or
+ * its creation. Every event names the lane the todo is in, but an edit is not
+ * an arrival: rewriting a todo whose lane is done with it, as a person or as a
+ * run's refine, must not hand it back to the lane's agent.
+ *
+ * @param todoId - The todo's id column, as the surrounding query names it.
+ * @param laneId - The lane's id column.
+ * @param createdAt - The todo's creation column, the arrival when no event says.
+ * @returns A scalar subquery.
+ */
+export function arrivedIn(todoId: SQL, laneId: SQL, createdAt: SQL): SQL {
+  return sql`coalesce(
+    (SELECT max(e.at) FROM todo_events e WHERE e.todo_id = ${todoId} AND e.to_lane_id = ${laneId} AND e.kind <> 'edit'),
+    ${createdAt}
+  )`;
+}
 
 /**
  * How many of a todo's runs failed since it was last touched: the count a
@@ -115,10 +133,7 @@ export async function readyTodos(
         AND NOT EXISTS (
           SELECT 1 FROM runs r
           WHERE r.todo_id = t.id AND r.lane_id = l.id AND r.status = 'ok'
-            AND r.started_at >= coalesce(
-              (SELECT max(e.at) FROM todo_events e WHERE e.todo_id = t.id AND e.to_lane_id = l.id),
-              t.created_at
-            )
+            AND r.started_at >= ${arrivedIn(sql`t.id`, sql`l.id`, sql`t.created_at`)}
         )
         AND ${failuresSinceTouched(sql`t.id`)} <= l.max_attempts
     )
@@ -276,10 +291,7 @@ export async function workStates(
           l.name AS lane_name, l.position AS lane_position, l.agent_id IS NOT NULL AS has_agent,
           a.name AS agent_name, coalesce(a.enabled, true) AS agent_enabled,
           l.max_attempts,
-          coalesce(
-            (SELECT max(e.at) FROM todo_events e WHERE e.todo_id = t.id AND e.to_lane_id = l.id),
-            t.created_at
-          ) AS arrived
+          ${arrivedIn(sql`t.id`, sql`l.id`, sql`t.created_at`)} AS arrived
         FROM todos t
         JOIN projects p ON p.id = t.project_id
         LEFT JOIN lanes l ON l.id = t.lane_id
