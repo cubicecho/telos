@@ -1,0 +1,43 @@
+name: Set up
+description: Node, and the workspace's node_modules restored from cache while the lockfile is unchanged.
+
+# `npm ci` was about two minutes of every job. Caching npm's download cache
+# (setup-node's `cache: npm`) still leaves the install itself, so this caches
+# the installed tree, keyed on the lockfile.
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        # Matches the Dockerfile: the server runs its TypeScript sources
+        # directly under --experimental-strip-types, so the runtime major is
+        # part of the contract, not just a build detail.
+        node-version: 24
+        # Only read on a miss, when `npm ci` downloads.
+        cache: npm
+
+    - id: restore
+      uses: actions/cache/restore@v4
+      with:
+        # The workspaces keep their own node_modules wherever a version
+        # differs from the root's.
+        path: |
+          node_modules
+          */node_modules
+        key: node-modules-${{ runner.os }}-node24-${{ hashFiles('package-lock.json') }}
+
+    - if: steps.restore.outputs.cache-hit != 'true'
+      shell: bash
+      run: npm ci
+
+    # Saved straight after the install rather than when the job ends, so what
+    # is cached is exactly what `npm ci` made, and not whatever a later step
+    # wrote under node_modules (Vite's pre-bundled deps, for one).
+    - if: steps.restore.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: |
+          node_modules
+          */node_modules
+        key: ${{ steps.restore.outputs.cache-primary-key }}
