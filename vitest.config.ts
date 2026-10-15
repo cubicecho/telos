@@ -22,7 +22,15 @@ export default defineConfig({
     // Worker threads rather than Vitest's default child processes: a thread
     // starts faster and shares the process's memory, and nothing here needs
     // process isolation — PGlite runs in-thread, and each test builds its own.
+    //
+    // And unisolated: a worker loads the server once and runs every file it is
+    // given against that, rather than re-importing it per file — importing was
+    // most of the node project's time. It holds because no node test uses
+    // `vi.mock`, and one that changes the environment or a global puts it back.
+    // Vitest 3 reads this from the root only, which is why the dom project,
+    // which does mock modules, runs on forks: that pool keeps isolating.
     pool: 'threads',
+    poolOptions: { threads: { isolate: false } },
     exclude: ['**/node_modules/**', '**/dist/**'],
     // A test that forgets to build its own throwaway database gets an empty URL
     // and fails loudly, rather than quietly writing to the developer's Postgres.
@@ -64,7 +72,31 @@ export default defineConfig({
         },
         test: {
           name: 'dom',
+          // Isolated per file, because these tests `vi.mock` modules. Measured
+          // the same speed as threads.
+          pool: 'forks',
           environment: 'jsdom',
+          // Pre-bundled, so a test file loads each of these as one module
+          // instead of the hundreds behind its barrel. `date-fns` alone, which
+          // cubeui's date input imports whole, took 2.6s per file unbundled.
+          deps: {
+            optimizer: {
+              web: {
+                enabled: true,
+                include: [
+                  'date-fns',
+                  'radix-ui',
+                  'lucide-react',
+                  'react-day-picker',
+                  '@tanstack/react-form',
+                  '@dnd-kit/core',
+                  '@dnd-kit/sortable',
+                  '@apollo/client',
+                  'tailwind-merge',
+                ],
+              },
+            },
+          },
           setupFiles: ['./vitest.setup.ts'],
           include: ['app/**/*.test.tsx'],
         },
