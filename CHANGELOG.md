@@ -1,3 +1,10 @@
+## [2.3.1](https://github.com/cubicecho/telos/compare/v2.3.0...v2.3.1) (2026-10-15)
+
+
+### Bug Fixes
+
+* **app:** hide "AI ignores this" when the project has AI off ([d5d2889](https://github.com/cubicecho/telos/commit/d5d28895686d3e7dd304a5808fcee59aaf752666))
+
 # [2.3.0](https://github.com/cubicecho/telos/compare/v2.2.0...v2.3.0) (2026-10-14)
 
 
