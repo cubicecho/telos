@@ -510,22 +510,28 @@ describe('the runner', () => {
   it('stops when telos says stop, and the stopped run writes nothing', async () => {
     const todoId = await board.addTodo('Write it');
     let release: () => void = () => {};
+    let heldToTheEnd = false;
     llm.script = async () => {
-      // Hold the model's answer until the person has cancelled.
+      // Hold the model's answer until the person has cancelled. The timer is
+      // only there so a runner that never stops cannot hang the suite.
       const [run] = await runsOf(todoId);
       await board.person.expectOk(`mutation ($id: ID!) { cancelRun(id: $id) { id } }`, { id: run.id });
       await new Promise<void>((resolve) => {
         release = resolve;
-        setTimeout(resolve, 2000);
+        setTimeout(() => {
+          heldToTheEnd = true;
+          resolve();
+        }, 2000);
       });
       return { content: 'Wrote it anyway.' };
     };
 
-    const started = Date.now();
     await cycle();
     release();
 
-    expect(Date.now() - started).toBeLessThan(2000);
+    // The cycle ended on the stop, not on the model's answer. Asked of the
+    // timer rather than the clock, so a busy machine cannot fail it.
+    expect(heldToTheEnd).toBe(false);
     const [run] = await runsOf(todoId);
     expect(run.status).toBe('stopped');
     expect((await todoRow(todoId)).laneId).toBe(board.lanes[0].id);
