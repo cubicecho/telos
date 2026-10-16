@@ -1,3 +1,29 @@
+# [5.0.0](https://github.com/cubicecho/telos/compare/v4.0.0...v5.0.0) (2026-10-16)
+
+
+* feat!: better-auth's own endpoints, served as GraphQL ([fff3ba2](https://github.com/cubicecho/telos/commit/fff3ba2faa82606e5042c90763d8da39d1b9554c)), closes [#85](https://github.com/cubicecho/telos/issues/85)
+* feat!: drafts are gone ([8e402ad](https://github.com/cubicecho/telos/commit/8e402ad2f247bc62262b048b4043b531bdea2fd5))
+
+
+### BREAKING CHANGES
+
+* requestMagicLink is signInMagicLink (`ok` is `status`),
+verifyMagicLink is magicLinkVerify (`userId` is `user { id }`).
+createApiKey takes `expiresIn` in seconds instead of `expiresInDays` and
+returns the key's fields directly. deleteApiKey takes `keyId` and returns
+`{ success }`; someone else's key is NOT_FOUND rather than false.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+* the drafts, draft_messages tables and runs.kind, runs.draft_id
+are dropped, and every draft's runs deleted with them (migration
+20261016201228_drop_drafts); a run's todo_id is not null. The API loses
+drafts/draft, startDraft, sayToDraft, stopDraft, makeTodoFromDraft,
+discardDraft, runnerDrafts, claimDraft, finishDraft and SpendLine.draftReplies,
+and the MCP door loses the draft tools. The runner no longer answers drafts,
+and the Refiner starter goes with them.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
 # [4.0.0](https://github.com/cubicecho/telos/compare/v3.0.0...v4.0.0) (2026-10-16)
 
 
