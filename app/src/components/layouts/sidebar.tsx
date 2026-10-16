@@ -3,7 +3,7 @@ import { Link, usePathname } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Platform, Text, View } from 'react-native';
 import { Activity, History, List, LogOut } from '@/components/app-icons';
-import { useAttentionCount } from '@/components/domain/ai/ai-status';
+import { useHandedBackCount } from '@/components/domain/ai/ai-status';
 import { ProjectFormDialog } from '@/components/domain/project/project-form-dialog';
 import { TodoSearch, useSearchShortcut } from '@/components/domain/todo/todo-search';
 import { Sidebar as SidebarFrame, SidebarNavItem, SidebarSection } from '@/components/sidebar';
@@ -23,7 +23,7 @@ export function Sidebar() {
   useSearchShortcut(useCallback(() => setSearching(true), []));
   const projects = projectsQuery.data?.projects ?? [];
   const ai = useAi();
-  const attention = useAttentionCount();
+  const handedBack = useHandedBackCount();
 
   function signOut() {
     clearToken();
@@ -106,7 +106,7 @@ export function Sidebar() {
                   href="/agents"
                   label="Agents"
                   iconSlot={<Activity />}
-                  count={attention > 0 ? attention : undefined}
+                  count={handedBack > 0 ? handedBack : undefined}
                   active={pathname === '/agents'}
                 />
               </Link>

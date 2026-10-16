@@ -7,7 +7,7 @@ import type { Actor, Context } from '../context.ts';
 import { type WorkState, workStates } from '../ready.ts';
 import { runnerSeenAt } from '../runner-seen.ts';
 
-// Lanes' agents, as a person reads them: what needs them, what is running,
+// Lanes' agents, as a person reads them: what they handed back, what is running,
 // what waits, per lane; and whether the runner is there at all. Plus the two
 // things anyone can do about a todo in a lane with an agent, a key or an agent at the MCP
 // door included: send one it gave up on round again, and ask for one to be
@@ -25,10 +25,12 @@ const AI_STATUS_SDL = parse(`
     title: String!
     projectId: ID!
     laneId: ID
-    "attention, running, blocked, queued or parked."
+    "handedBack, running, blocked, queued or parked."
     state: String!
     "Why it is where it is, when that needs saying."
     reason: String
+    "Why its lane's agent handed it back: gaveUp (it failed more times than the lane allows) or finished (with nowhere to send it). Null unless its state is handedBack."
+    handedBack: String
     "Failed runs since a person last touched it, or anyone sent it round again."
     failures: Int!
     "The run working it now."
@@ -46,7 +48,7 @@ const AI_STATUS_SDL = parse(`
     "Whether an agent works this lane."
     station: Boolean!
     isDone: Boolean!
-    attention: Int!
+    handedBack: Int!
     running: Int!
     blocked: Int!
     queued: Int!
@@ -208,7 +210,7 @@ async function whyNotRunnable(db: AnyRow, todo: AnyRow): Promise<string | null> 
   return null;
 }
 
-const STATES: WorkState[] = ['attention', 'running', 'blocked', 'queued', 'parked', 'done'];
+const STATES: WorkState[] = ['handedBack', 'running', 'blocked', 'queued', 'parked', 'done'];
 
 export function applyAiStatusExtension(schema: GraphQLSchema): GraphQLSchema {
   const extendedSchema = extendSchema(schema, AI_STATUS_SDL);

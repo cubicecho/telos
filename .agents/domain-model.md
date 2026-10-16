@@ -67,14 +67,16 @@ rules `readyTodos` filters by):
 1. `running`: a run holds it.
 2. `parked`: nothing will work it where it is: no lane, hands off, no agent, or the agent
    switched off.
-3. `attention`: more failed runs since it was touched than the lane's `maxAttempts`, or an
-   `ok` run in this lane since it arrived and nowhere to send it (**finished here**).
+3. `handedBack`: more failed runs since it was touched than the lane's `maxAttempts`
+   (`gaveUp`), or an `ok` run in this lane since it arrived and nowhere to send it
+   (`finished`, **finished here**).
 4. `blocked`: it waits on an open dependency.
 5. `parked` again: auto-run is off and nobody asked for a run.
 6. `queued`: the lane's agent will start on it when there is room.
 
-Done todos are counted per lane, not listed. The activity page's `accountAttention` is a
-different rule with the same name: out of attempts, or its last run errored.
+Done todos are counted per lane, not listed. The activity page's `accountHandedBack` and
+the sidebar count are the `handedBack` todos, by the same rule. A todo whose last run
+failed with attempts left is not handed back: its agent tries again.
 
 ### Run
 
@@ -204,8 +206,8 @@ the site.
   agent is switched off, it is hands off, or auto-run is off and nobody asked for a run.
 - **Handed back:** its lane's agent is done with it and it cannot move on without you:
   the agent gave up after more failed runs than the lane's max attempts, or it finished
-  and the lane has nowhere to send it. Owner: `aiStatus` `attention`, and the activity
-  page's `accountAttention`, a different rule (both become this by M9).
+  and the lane has nowhere to send it. Owner: `aiStatus` `handedBack`, with `gaveUp` or
+  `finished`; the activity page's `accountHandedBack`.
 
 ### What happened
 

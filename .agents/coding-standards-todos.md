@@ -25,7 +25,7 @@ Nothing here is implemented until approved.
 | M6 | Model change | Lanes get a role (plan, work, review) that says which outcomes count there | A planner that does the work, or a reviewer that splits, fails instead of passing | M5 | declined |
 | M7 | Model change | A refine may also set its todo's dependencies | A planner can say what its todo waits on, still only through `finishRun` | — | approved |
 | M8 | Model change | One blocked rule: a blocked todo moves between open lanes, never into the done lane | A person and a route follow the same rule | — | approved |
-| M9 | Model change | `attention` becomes **handed back**, one rule everywhere | One name for "its agent is done with it and it cannot move on without you" | — | approved |
+| M9 | Model change | `attention` becomes **handed back**, one rule everywhere | One name for "its agent is done with it and it cannot move on without you" | — | done |
 | M10 | Model change | Starters are **agent templates**; the Refiner template goes | A template is what people call starting text; refining is the Planner's job | — | approved |
 | A4 | API change | A todo's `notes` column and every `brief` become **description** | "Notes" is the thread; "brief" is a second word for the same field | — | approved |
 | R5 | Refactor [readability] | Retire "assignment": a run is handed its todo, with context | One word for the thing being worked | — | approved |
@@ -139,7 +139,9 @@ attempts; finished, nowhere to send it), and the activity page and sidebar count
 exactly the handed-back todos. A todo whose last run errored but has attempts left is
 **failing**, not handed back; whether the activity page keeps a quieter failing list is
 decided when this is built. Parked stays: nothing will work it because of how things are
-set up, not because of what its runs did. The name may be refined later. Status: approved.
+set up, not because of what its runs did. The name may be refined later. Built: no failing
+list, since a card already marks a failed run and its agent tries again; the API names
+changed as a breaking change. Status: done.
 
 ### M10 — Rename and delete: agent templates
 

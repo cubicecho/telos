@@ -83,7 +83,7 @@ function workTodo(state: string, reason: string | null, { awaitsRun = false, run
   ]);
 }
 
-const STUCK = workTodo('attention', 'It broke.');
+const STUCK = workTodo('handedBack', 'It broke.');
 const AWAITS_RUN = workTodo('parked', 'Auto-run is off.', { awaitsRun: true });
 const RUN_REQUESTED = workTodo('queued', null, { runRequested: true });
 

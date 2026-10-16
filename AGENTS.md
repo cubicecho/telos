@@ -415,10 +415,10 @@ and reuses the project's rows (`RunRow`, `ArtifactRow`, `ArchivedTodoList`,
 both a person's (`requireSession`) and behind `requireAi`: `accountSpend` adds
 up a window's runs by project and by agent, drafts' replies included, over
 every project the account owns, and returns `keptSince` when run retention is
-shorter than the window; `accountAttention` is the open todos that are out of
-attempts or whose last run errored, found by `todo_id` so no draft is among
-them, with `failuresSinceTouched` as the count. An error stops counting when a
-person touches the todo, as an attempt does. An artifact's row must draw
+shorter than the window; `accountHandedBack` is the todos in `workStates`'s
+`handedBack` state, the latest run first, so the page and the sidebar count
+list the same todos. A todo that failed with attempts left is not among them:
+its agent tries again, and its card marks the failure. An artifact's row must draw
 without its todo. The sidebar link and the route both go when `useAi().on` is
 false.
 

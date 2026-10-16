@@ -32,7 +32,7 @@ function lane(laneId: string, name: string, counts: Record<string, number>, stat
     name,
     station,
     isDone: false,
-    attention: 0,
+    handedBack: 0,
     running: 0,
     blocked: 0,
     queued: 0,
@@ -49,7 +49,7 @@ const STATUS = {
       aiStatus: {
         __typename: 'AiStatus',
         todos: [
-          todo('t1', 'Flaky', 'attention', { reason: 'It broke.', failures: 4 }),
+          todo('t1', 'Flaky', 'handedBack', { reason: 'It broke.', failures: 4 }),
           todo('t2', 'Busy', 'running', { liveRunId: 'r9' }),
           todo('t3', 'Next', 'queued'),
         ],
@@ -59,7 +59,7 @@ const STATUS = {
             projectId: 'p1',
             name: 'Site',
             lanes: [
-              lane('l1', 'Doing', { attention: 1, running: 1, queued: 1 }),
+              lane('l1', 'Doing', { handedBack: 1, running: 1, queued: 1 }),
               lane('l2', 'Done', { done: 5 }, false),
             ],
           },

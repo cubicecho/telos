@@ -34,9 +34,9 @@ const SPEND = `query ($since: DateTime!) {
     byAgent { ${LINE} }
   }
 }`;
-const ATTENTION = `query {
-  accountAttention {
-    todoId title projectId projectName laneId laneName outOfAttempts errored reason runId attempts maxAttempts
+const HANDED_BACK = `query {
+  accountHandedBack {
+    todoId title projectId projectName laneId laneName handedBack reason runId attempts maxAttempts
   }
 }`;
 const ACCOUNT_LISTS = `query {
@@ -104,8 +104,13 @@ async function spend(since: string = ago(30), client: TestClient = board.person)
 }
 
 // biome-ignore lint/suspicious/noExplicitAny: response shape
-async function attention(client: TestClient = board.person): Promise<any[]> {
-  return (await client.expectOk(ATTENTION)).accountAttention;
+async function handedBack(client: TestClient = board.person): Promise<any[]> {
+  return (await client.expectOk(HANDED_BACK)).accountHandedBack;
+}
+
+/** Has a lane's agent give a todo up after its first failure. */
+async function giveUpAtOnce(client: TestClient, laneId: string): Promise<void> {
+  await setLane(client, laneId, { maxAttempts: 0 });
 }
 
 describe('accountSpend', () => {
@@ -216,18 +221,28 @@ describe('accountSpend', () => {
   });
 });
 
-describe('accountAttention', () => {
+describe('accountHandedBack', () => {
+  beforeEach(async () => {
+    await giveUpAtOnce(board.person, board.lanes[0].id);
+  });
+
   it('lists nothing while every run passed', async () => {
     await runOnce(await board.addTodo('Write it'), { status: 'ok', output: 'Wrote it.' });
     await board.addTodo('Untouched');
-    expect(await attention()).toEqual([]);
+    expect(await handedBack()).toEqual([]);
   });
 
-  it('lists a todo whose last run errored, with the error, the run and where it is', async () => {
+  it('lists nothing for a todo that failed with attempts left: its agent tries again', async () => {
+    await setLane(board.person, board.lanes[0].id, { maxAttempts: 1 });
+    await runOnce(await board.addTodo('Write it'), { status: 'error', error: 'The model did not answer.' });
+    expect(await handedBack()).toEqual([]);
+  });
+
+  it('lists a todo its agent gave up on, with the error, the run and where it is', async () => {
     const todoId = await board.addTodo('Write it');
     const runId = await runOnce(todoId, { status: 'error', error: 'The model did not answer.' });
 
-    expect(await attention()).toEqual([
+    expect(await handedBack()).toEqual([
       {
         todoId,
         title: 'Write it',
@@ -235,19 +250,18 @@ describe('accountAttention', () => {
         projectName: 'P',
         laneId: board.lanes[0].id,
         laneName: board.lanes[0].name,
-        outOfAttempts: false,
-        errored: true,
+        handedBack: 'gaveUp',
         reason: 'The model did not answer.',
         runId,
         attempts: 1,
-        maxAttempts: expect.any(Number),
+        maxAttempts: 0,
       },
     ]);
   });
 
-  it('lists a todo out of attempts, even when its runs were sent back rather than errored', async () => {
+  it('lists a todo its agent gave up on when its runs were sent back rather than errored', async () => {
     // The work lane hands on to a reviewer, who sends what fails back to it.
-    await setLane(board.person, board.lanes[0].id, { onSuccessLaneId: board.lanes[1].id, maxAttempts: 0 });
+    await setLane(board.person, board.lanes[0].id, { onSuccessLaneId: board.lanes[1].id });
     await setLane(board.person, board.lanes[1].id, {
       agentId: board.agentId,
       onSuccessLaneId: board.lanes[2].id,
@@ -255,24 +269,28 @@ describe('accountAttention', () => {
     });
     const todoId = await board.addTodo('Write it');
     await runOnce(todoId, { status: 'ok', output: 'Wrote it.' });
-    expect(await attention()).toEqual([]);
+    expect(await handedBack()).toEqual([]);
 
     const runId = await runOnce(todoId, { status: 'ok', output: 'FAIL: the second paragraph is missing.' });
-    const [row] = await attention();
-    expect(row).toMatchObject({
-      todoId,
-      laneId: board.lanes[0].id,
-      outOfAttempts: true,
-      errored: false,
-      runId,
-      attempts: 1,
-      maxAttempts: 0,
-    });
+    const [row] = await handedBack();
+    expect(row).toMatchObject({ todoId, laneId: board.lanes[0].id, handedBack: 'gaveUp', runId, attempts: 1 });
     expect(row.reason).toContain('the second paragraph is missing');
   });
 
-  it('gathers them across projects, the latest failure first', async () => {
+  it('lists a todo its agent finished with and has nowhere to send', async () => {
+    await setLane(board.person, board.lanes[0].id, { onSuccessLaneId: null });
+    const todoId = await board.addTodo('Write it');
+    const runId = await runOnce(todoId, { status: 'ok', output: 'Wrote it.' });
+
+    expect(await handedBack()).toMatchObject([
+      { todoId, handedBack: 'finished', reason: 'To do finished with it and has nowhere to send it.', runId },
+    ]);
+  });
+
+  it('gathers them across projects, the latest run first', async () => {
     const second = await secondProject();
+    const secondLane = (await db.select().from(dbSchema.lanes).where(eq(dbSchema.lanes.agentId, second.agentId)))[0];
+    await giveUpAtOnce(board.person, secondLane.id);
     const first = await board.addTodo('Write it');
     await runOnce(first, { status: 'error', error: 'No.' });
     const other = await second.addTodo('Review it');
@@ -282,69 +300,65 @@ describe('accountAttention', () => {
       .set({ startedAt: new Date(Date.now() + 60_000) })
       .where(eq(dbSchema.runs.id, runId));
 
-    expect(await attention()).toMatchObject([
+    expect(await handedBack()).toMatchObject([
       { todoId: other, projectId: second.projectId, projectName: 'Q' },
       { todoId: first, projectId: board.projectId, projectName: 'P' },
     ]);
   });
 
-  it('drops a todo once a later run passes, or a person sends it round again', async () => {
-    const passed = await board.addTodo('Passes later');
-    await runOnce(passed, { status: 'error', error: 'No.' });
+  it('drops a todo once a person sends it round again', async () => {
+    const kept = await board.addTodo('Kept');
+    await runOnce(kept, { status: 'error', error: 'No.' });
     const retried = await board.addTodo('Retried');
     await runOnce(retried, { status: 'error', error: 'No.' });
-    expect(await attention()).toHaveLength(2);
-
-    await runOnce(passed, { status: 'ok', output: 'Wrote it.' });
-    expect((await attention()).map((row) => row.todoId)).toEqual([retried]);
+    expect(await handedBack()).toHaveLength(2);
 
     await board.person.expectOk(`mutation ($id: ID!) { retryTodo(id: $id) }`, { id: retried });
-    expect(await attention()).toEqual([]);
+    expect((await handedBack()).map((row) => row.todoId)).toEqual([kept]);
   });
 
   it('never lists a draft: a failed reply is not a todo waiting on anyone', async () => {
     await board.addTodo('Plain');
     await answeredDraft(board, runner, { error: 'model unreachable' });
     await claimedDraft(board, runner);
-    expect(await attention()).toEqual([]);
+    expect(await handedBack()).toEqual([]);
   });
 
-  it('leaves out what nobody is waiting on: archived, done, ignored, being worked, or in a project with AI off', async () => {
+  it('leaves out what nobody is waiting on: archived, done, ignored, or in a project with AI off', async () => {
     const archived = await board.addTodo('Archived');
     const done = await board.addTodo('Done');
     const ignored = await board.addTodo('Ignored');
-    const working = await board.addTodo('Working');
-    for (const todoId of [archived, done, ignored, working]) {
+    for (const todoId of [archived, done, ignored]) {
       await runOnce(todoId, { status: 'error', error: 'No.' });
     }
-    expect(await attention()).toHaveLength(4);
+    expect(await handedBack()).toHaveLength(3);
 
     const setAi = `mutation ($id: ID!, $enabled: Boolean!) { setProjectAiEnabled(projectId: $id, enabled: $enabled) { id } }`;
     await board.person.expectOk(setAi, { id: board.projectId, enabled: false });
-    expect(await attention()).toEqual([]);
+    expect(await handedBack()).toEqual([]);
     await board.person.expectOk(setAi, { id: board.projectId, enabled: true });
-    expect(await attention()).toHaveLength(4);
+    expect(await handedBack()).toHaveLength(3);
 
     await db.update(dbSchema.todos).set({ archivedAt: new Date() }).where(eq(dbSchema.todos.id, archived));
     await db.update(dbSchema.todos).set({ completedAt: new Date() }).where(eq(dbSchema.todos.id, done));
     await db.update(dbSchema.todos).set({ aiIgnored: true }).where(eq(dbSchema.todos.id, ignored));
-    await runner.expectOk(CLAIM, { todoId: working, laneId: board.lanes[0].id });
-    expect(await attention()).toEqual([]);
+    expect(await handedBack()).toEqual([]);
   });
 
   it('is the account’s own, and a person’s', async () => {
     const other = await createBoard(db, 'other@example.com');
+    await giveUpAtOnce(other.person, other.lanes[0].id);
     await runOnce(await other.addTodo('Theirs'), { status: 'error', error: 'No.' });
-    expect(await attention()).toEqual([]);
-    expect(await attention(other.person)).toHaveLength(1);
+    expect(await handedBack()).toEqual([]);
+    expect(await handedBack(other.person)).toHaveLength(1);
 
     const key = createClient(db, board.userId, {
       ai: true,
       actor: { kind: 'apiKey', userId: board.userId, keyId: KEY_ID },
     });
-    expect((await key.expectError(ATTENTION)).code).toBe('FORBIDDEN');
+    expect((await key.expectError(HANDED_BACK)).code).toBe('FORBIDDEN');
     await db.update(dbSchema.users).set({ aiEnabled: false }).where(eq(dbSchema.users.id, board.userId));
-    expect((await board.person.expectError(ATTENTION)).code).toBe('NOT_FOUND');
+    expect((await board.person.expectError(HANDED_BACK)).code).toBe('NOT_FOUND');
   });
 });
 

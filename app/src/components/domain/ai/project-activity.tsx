@@ -84,7 +84,7 @@ export function useProjectActivity(projectId: string, { skip = false }: { skip?:
   const drafting = useMemo(() => (rows ?? []).filter((run) => run.kind === DRAFT_RUN), [rows]);
   const work = query.data?.work.todos;
   const stuck = useMemo(
-    () => new Map((work ?? []).filter((todo) => todo.state === 'attention').map((todo) => [todo.todoId, todo])),
+    () => new Map((work ?? []).filter((todo) => todo.state === 'handedBack').map((todo) => [todo.todoId, todo])),
     [work],
   );
   const waiting = useMemo(

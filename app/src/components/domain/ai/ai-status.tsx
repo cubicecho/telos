@@ -14,7 +14,7 @@ import { CircleCheck } from '@/components/ui/icons';
 import { LoadState } from '@/components/ui/load-failure';
 import { useAi } from '@/lib/ai';
 import { describeError } from '@/lib/errors';
-import { AiAttentionDocument, AiStatusDocument, RecentFailuresDocument, RetryTodoDocument } from '@/lib/graphql';
+import { AiHandedBackDocument, AiStatusDocument, RecentFailuresDocument, RetryTodoDocument } from '@/lib/graphql';
 import { cn } from '@/lib/utils';
 import { RunDialog } from './run-dialog';
 import { formatDuration, LiveDot } from './run-log';
@@ -28,8 +28,8 @@ import { RunRow } from './run-row';
 /** How often the page asks again. */
 export const STATUS_POLL_MS = 5000;
 
-/** How often the sidebar asks how many todos need a person. */
-export const ATTENTION_POLL_MS = 30_000;
+/** How often the sidebar asks how many todos were handed back. */
+export const HANDED_BACK_POLL_MS = 30_000;
 
 /** Longer than this since the runner asked for work, and it is probably not running. */
 export const RUNNER_QUIET_SECONDS = 60;
@@ -37,12 +37,12 @@ export const RUNNER_QUIET_SECONDS = 60;
 /** How far back "failed lately" looks. */
 const FAILURE_HOURS = 24;
 
-type State = 'attention' | 'running' | 'blocked' | 'queued' | 'parked' | 'done';
+type State = 'handedBack' | 'running' | 'blocked' | 'queued' | 'parked' | 'done';
 type WorkTodo = AiStatusQuery['aiStatus']['todos'][number];
 
 const STATES: Array<{ value: State; label: string; blurb: string; variant: BadgeVariant }> = [
   {
-    value: 'attention',
+    value: 'handedBack',
     label: 'Handed back',
     blurb: 'An agent gave up on these, or finished and has nowhere to send them.',
     variant: 'destructive',
@@ -55,14 +55,14 @@ const STATES: Array<{ value: State; label: string; blurb: string; variant: Badge
 ];
 
 export function AiStatus({ pollMs = STATUS_POLL_MS }: { pollMs?: number }) {
-  const [focus, setFocus] = useState<State>('attention');
+  const [focus, setFocus] = useState<State>('handedBack');
   const [watching, setWatching] = useState<string | null>(null);
   const query = useQuery(AiStatusDocument, { pollInterval: pollMs, fetchPolicy: 'cache-and-network' });
   const status = query.data?.aiStatus;
   const [retryTodo, retryState] = useMutation(RetryTodoDocument, { refetchQueries: [AiStatusDocument] });
 
   const counts = useMemo(() => {
-    const tally: Record<State, number> = { attention: 0, running: 0, blocked: 0, queued: 0, parked: 0, done: 0 };
+    const tally: Record<State, number> = { handedBack: 0, running: 0, blocked: 0, queued: 0, parked: 0, done: 0 };
     for (const todo of status?.todos ?? []) tally[todo.state as State] += 1;
     for (const project of status?.projects ?? []) for (const lane of project.lanes) tally.done += lane.done;
     return tally;
@@ -94,7 +94,7 @@ export function AiStatus({ pollMs = STATUS_POLL_MS }: { pollMs?: number }) {
             loading={!status}
             onPress={state.value === 'done' ? undefined : () => setFocus(state.value)}
             selected={focus === state.value}
-            valueClassName={state.value === 'attention' && counts.attention > 0 ? 'text-negative' : undefined}
+            valueClassName={state.value === 'handedBack' && counts.handedBack > 0 ? 'text-negative' : undefined}
             // Only work in progress pulses: "needs you" is waiting, and its red count says so.
             iconSlot={state.value === 'running' && counts.running > 0 ? <LiveDot /> : undefined}
           />
@@ -111,7 +111,7 @@ export function AiStatus({ pollMs = STATUS_POLL_MS }: { pollMs?: number }) {
               what="where things stand"
               count={shown.length}
               emptySlot={
-                focus === 'attention' ? (
+                focus === 'handedBack' ? (
                   <EmptyState
                     iconSlot={<CircleCheck />}
                     title="Nothing is waiting on you."
@@ -134,7 +134,7 @@ export function AiStatus({ pollMs = STATUS_POLL_MS }: { pollMs?: number }) {
                   <View className="flex-row items-center gap-2">
                     <Badge variant={focused.variant}>{focused.label}</Badge>
                     <Text className="min-w-0 flex-1 font-medium text-foreground text-sm">{todo.title}</Text>
-                    {todo.state === 'attention' ? (
+                    {todo.state === 'handedBack' ? (
                       <Button
                         variant="outline"
                         size="sm"
@@ -172,7 +172,7 @@ export function AiStatus({ pollMs = STATUS_POLL_MS }: { pollMs?: number }) {
                     <Text
                       selectable
                       numberOfLines={3}
-                      className={cn('text-sm', todo.state === 'attention' ? 'text-warning' : 'text-foreground/60')}
+                      className={cn('text-sm', todo.state === 'handedBack' ? 'text-warning' : 'text-foreground/60')}
                     >
                       {todo.reason}
                     </Text>
@@ -212,7 +212,7 @@ export function AiStatus({ pollMs = STATUS_POLL_MS }: { pollMs?: number }) {
                           {STATES.filter((state) => lane[state.value] > 0).map((state, index) => (
                             <Text
                               key={state.value}
-                              className={state.value === 'attention' ? 'text-negative' : undefined}
+                              className={state.value === 'handedBack' ? 'text-negative' : undefined}
                             >
                               {index > 0 ? ' · ' : ''}
                               {lane[state.value]} {state.label.toLowerCase()}
@@ -290,13 +290,13 @@ function RecentFailures({ pollMs }: { pollMs: number }) {
   );
 }
 
-/** How many todos wait on a person, for the sidebar. Nothing while AI is off. */
-export function useAttentionCount(): number {
+/** How many todos lanes' agents handed back, for the sidebar. Nothing while AI is off. */
+export function useHandedBackCount(): number {
   const ai = useAi();
-  const query = useQuery(AiAttentionDocument, {
+  const query = useQuery(AiHandedBackDocument, {
     skip: !ai.on,
-    pollInterval: ai.on ? ATTENTION_POLL_MS : 0,
+    pollInterval: ai.on ? HANDED_BACK_POLL_MS : 0,
     fetchPolicy: 'cache-and-network',
   });
-  return (query.data?.aiStatus.todos ?? []).filter((todo) => todo.state === 'attention').length;
+  return (query.data?.aiStatus.todos ?? []).filter((todo) => todo.state === 'handedBack').length;
 }

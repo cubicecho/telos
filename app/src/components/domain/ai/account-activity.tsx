@@ -2,7 +2,7 @@ import { useMutation, useQuery } from '@apollo/client';
 import { Link } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
-import type { AccountAttentionQuery, RunFilters, SpendLineFieldsFragment } from '@/__generated__/graphql';
+import type { AccountHandedBackQuery, RunFilters, SpendLineFieldsFragment } from '@/__generated__/graphql';
 import { Archive } from '@/components/app-icons';
 import { ArchivedTodoList } from '@/components/domain/todo/archived-todos';
 import { TodoFormDialog } from '@/components/domain/todo/todo-form-dialog';
@@ -22,7 +22,7 @@ import { describeError } from '@/lib/errors';
 import {
   AccountArchivedTodosDocument,
   AccountArtifactsDocument,
-  AccountAttentionDocument,
+  AccountHandedBackDocument,
   AccountRunsDocument,
   AccountSpendDocument,
   RetryTodoDocument,
@@ -38,14 +38,14 @@ import { ArtifactRow, todoLabelOf } from './todo-runs';
 // runs themselves, what they left behind, and what was archived. Each list is
 // the one a project shows, with the project named on every row.
 
-/** How often the todos needing a person, and the spend, are asked about again. */
+/** How often the handed-back todos, and the spend, are asked about again. */
 export const ACCOUNT_POLL_MS = 15_000;
 
 /** The lists under the figures, one at a time. */
 export const ACCOUNT_VIEWS = ['runs', 'artifacts', 'archived'] as const;
 export type AccountView = (typeof ACCOUNT_VIEWS)[number];
 
-type AttentionTodo = AccountAttentionQuery['accountAttention'][number];
+type HandedBackTodo = AccountHandedBackQuery['accountHandedBack'][number];
 
 export function AccountActivity({
   view,
@@ -60,7 +60,7 @@ export function AccountActivity({
 }) {
   return (
     <View className="gap-8">
-      <NeedsAttention pollMs={pollMs} />
+      <HandedBack pollMs={pollMs} />
       <AccountSpend pollMs={pollMs} />
       <Tabs
         value={view}
@@ -96,29 +96,29 @@ export function AccountActivity({
   );
 }
 
+/** Why a lane's agent handed a todo back, as the API says it. */
+const GAVE_UP = 'gaveUp';
+
 /**
- * "2 of 1 attempts", for a todo in a lane with an agent, or how many failed where there is none.
+ * "2 of 1 attempts", for a todo its agent gave up on.
  *
  * @param todo - The todo.
- * @returns The line, or null when it has used no attempt.
+ * @returns The line, or null when its agent finished with it instead.
  */
-function attemptsLine(todo: AttentionTodo): string | null {
-  if (todo.maxAttempts != null) {
-    return `${todo.attempts} of ${todo.maxAttempts} ${todo.maxAttempts === 1 ? 'attempt' : 'attempts'}`;
+function attemptsLine(todo: HandedBackTodo): string | null {
+  if (todo.handedBack !== GAVE_UP) {
+    return null;
   }
-  if (todo.attempts > 0) {
-    return `${todo.attempts} failed ${todo.attempts === 1 ? 'attempt' : 'attempts'}`;
-  }
-  return null;
+  return `${todo.attempts} of ${todo.maxAttempts} ${todo.maxAttempts === 1 ? 'attempt' : 'attempts'}`;
 }
 
-/** The todos out of attempts or whose last run errored, each with a way to send it round again. */
-function NeedsAttention({ pollMs }: { pollMs: number }) {
-  const query = useQuery(AccountAttentionDocument, { pollInterval: pollMs, fetchPolicy: 'cache-and-network' });
-  const todos = query.data?.accountAttention ?? [];
+/** The todos lanes' agents handed back, each with a way to send it round again. */
+function HandedBack({ pollMs }: { pollMs: number }) {
+  const query = useQuery(AccountHandedBackDocument, { pollInterval: pollMs, fetchPolicy: 'cache-and-network' });
+  const todos = query.data?.accountHandedBack ?? [];
   const [watching, setWatching] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [retryTodo, retryState] = useMutation(RetryTodoDocument, { refetchQueries: [AccountAttentionDocument] });
+  const [retryTodo, retryState] = useMutation(RetryTodoDocument, { refetchQueries: [AccountHandedBackDocument] });
 
   async function run(action: () => Promise<unknown>) {
     setError(null);
@@ -131,13 +131,13 @@ function NeedsAttention({ pollMs }: { pollMs: number }) {
 
   return (
     <Section
-      title="Needs attention"
-      description="Todos that are out of attempts, or whose last run never finished its work."
+      title="Handed back"
+      description="Todos a lane's agent gave up on, or finished with and has nowhere to send."
       contentSlot={
         <View className="gap-2">
           <LoadState
             query={query}
-            what="what needs attention"
+            what="what was handed back"
             count={todos.length}
             emptySlot={<EmptyState iconSlot={<CircleCheck />} title="Nothing is waiting on you." />}
           />
@@ -147,13 +147,16 @@ function NeedsAttention({ pollMs }: { pollMs: number }) {
             </Text>
           ) : null}
           <List
-            label="Needs attention"
+            label="Handed back"
             divided={false}
             contentSlot={todos.map((todo) => (
               <View key={todo.todoId} className="gap-1 rounded-lg border border-foreground/10 bg-secondary px-3 py-2.5">
                 <View className="flex-row flex-wrap items-center gap-2">
-                  {todo.outOfAttempts ? <Badge variant="destructive">Out of attempts</Badge> : null}
-                  {todo.errored ? <Badge variant="warning">Errored</Badge> : null}
+                  {todo.handedBack === GAVE_UP ? (
+                    <Badge variant="destructive">Gave up</Badge>
+                  ) : (
+                    <Badge variant="warning">Finished</Badge>
+                  )}
                   <Text className="min-w-0 flex-1 font-medium text-foreground text-sm">{todo.title}</Text>
                   <Button
                     variant="outline"
@@ -182,7 +185,7 @@ function NeedsAttention({ pollMs }: { pollMs: number }) {
                   </Link>
                 </View>
                 <Text className="text-foreground/60 text-xs">
-                  {[todo.projectName, todo.laneName ?? 'no lane', attemptsLine(todo)].filter(Boolean).join(' · ')}
+                  {[todo.projectName, todo.laneName, attemptsLine(todo)].filter(Boolean).join(' · ')}
                 </Text>
                 {todo.reason ? (
                   <Text selectable numberOfLines={3} className="text-sm text-warning">
