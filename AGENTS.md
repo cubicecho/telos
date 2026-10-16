@@ -236,11 +236,27 @@ A passing run may refine its todo with a fenced `refine` block (`title`,
 before the todo passes on. Or it may split it with a fenced `todos` block of
 two or more: the pieces land in the project's new-todo lane
 (`projects.newTodoLaneId`, else its first open lane, `findNewTodoLaneId` in
-`lanes.ts`, also used by requests and finished drafts), and the todo waits on
-them where it is. A todo split *in* the new-todo lane sends its pieces on down
+`lanes.ts`, also used by requests and finished drafts), and the todo becomes an
+umbrella (`todos.split_at`), which stays where it is. A todo split *in* the new-todo lane sends its pieces on down
 that lane's success route instead, unless that is the done lane, so they are
 not planned twice (`piecesLaneId`). A one-item `todos` block is read as a
-refine, and a reply with both blocks fails: a todo is refined or split. Only
+refine, and a reply with both blocks fails: a todo is refined or split.
+
+**An umbrella is done when its pieces are.** No agent works one (`readyTodos`
+skips `split_at`) and it has no dependency edges to its pieces: `aiStatus`
+calls it `waiting` (`LaneTally.waiting`), and `Todo.pieceCount` and
+`donePieceCount` say how far it has got. The `todos_settle_umbrella` triggers
+(umbrella migration) close it, as `system`, when its last unarchived piece is
+done or archived (into the done lane, and archived too if its lane archives on
+success), and reopen it into the project's first open lane when a piece
+reopens or a new one is filed under it; an archived umbrella is left alone. A
+person cannot complete it while a piece is open: `assertNotBlocked` and
+`assertNoBlockedCompletions` (`blocking.ts`) refuse it, naming the pieces, so
+`completeTodo`, `moveTodo` and generated writes are all bound. `unsplitTodo`
+(a person's only) makes it an ordinary todo again; a generated write to
+`splitAt` is refused (`assertSplitUntouched`).
+
+Only
 a non-edit event is an arrival (`arrivedIn` in `ready.ts`), so editing a todo
 never re-queues work its lane already did. `archiveOnSuccess` is the other answer
 to a pass: `finishRun` completes the todo, puts it in the done lane and

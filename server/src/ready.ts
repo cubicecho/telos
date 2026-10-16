@@ -15,6 +15,8 @@ import { INSTANCE_AI_ON } from './instance.ts';
 //   - its project runs by itself (auto-run), or a person asked for this todo
 //     to be run (runTodo), which holds until a run claims it
 //   - the project is not archived, and the todo is open and not blocked
+//   - it is not an umbrella: a todo split into pieces is done when they are,
+//     not by being worked
 //   - nothing is working it now (a running run inside its lease)
 //   - the lane's agent has not already finished with it: no `ok` run in this lane
 //     since the todo last arrived here (`arrivedIn`: an edit is not an arrival)
@@ -120,7 +122,7 @@ export async function readyTodos(
       WHERE ${INSTANCE_AI_ON} AND u.ai_enabled AND p.ai_enabled AND NOT t.ai_ignored AND a.enabled
         AND (p.auto_run OR t.run_requested_at IS NOT NULL)
         AND p.archived_at IS NULL
-        AND t.completed_at IS NULL AND t.archived_at IS NULL AND NOT l.is_done
+        AND t.completed_at IS NULL AND t.archived_at IS NULL AND t.split_at IS NULL AND NOT l.is_done
         ${sql.join(narrow, sql` `)}
         AND NOT EXISTS (
           SELECT 1 FROM todo_dependencies d JOIN todos b ON b.id = d.depends_on_todo_id
@@ -209,7 +211,7 @@ export async function dropRunRequests(db: AnyDb, where: { todoId: string } | { p
 }
 
 /** Where a todo stands with its lane's agent, for a person reading the board. */
-export type WorkState = 'handedBack' | 'running' | 'blocked' | 'queued' | 'parked' | 'done';
+export type WorkState = 'handedBack' | 'running' | 'waiting' | 'blocked' | 'queued' | 'parked' | 'done';
 
 /** Why a lane's agent handed a todo back. */
 export type HandBack = 'gaveUp' | 'finished';
@@ -252,6 +254,7 @@ export interface LaneTally {
  * rules `readyTodos` applies, read back as a reason instead of a filter.
  *
  *   - running: a run holds it now
+ *   - waiting: it is an umbrella, done when its pieces are
  *   - parked: no agent will ever pick it up where it is (no lane, no agent
  *     or one switched off, AI told to ignore it)
  *   - handedBack: its lane's agent gave up on it (more failures than the lane
@@ -289,6 +292,9 @@ export async function workStates(
     ai_ignored: boolean;
     auto_run: boolean;
     run_requested: boolean;
+    split: boolean;
+    pieces: number;
+    pieces_done: number;
     max_attempts: number | null;
     failures: number;
     finished_here: boolean;
@@ -302,7 +308,7 @@ export async function workStates(
       WITH base AS (
         SELECT
           t.id, t.title, t.project_id, p.name AS project_name, t.lane_id, t.ai_ignored, t.position, t.created_at, p.auto_run,
-          t.run_requested_at IS NOT NULL AS run_requested,
+          t.run_requested_at IS NOT NULL AS run_requested, t.split_at IS NOT NULL AS split,
           l.name AS lane_name, l.position AS lane_position, l.agent_id IS NOT NULL AS has_agent,
           a.name AS agent_name, coalesce(a.enabled, true) AS agent_enabled,
           l.max_attempts,
@@ -318,6 +324,7 @@ export async function workStates(
       SELECT
         b.id AS todo_id, b.title, b.project_id, b.project_name, b.lane_id, b.lane_name,
         coalesce(b.has_agent, false) AS has_agent, b.agent_name, b.agent_enabled, b.ai_ignored, b.auto_run, b.run_requested,
+        b.split, pieces.total AS pieces, pieces.done AS pieces_done,
         b.max_attempts,
         ${failuresSinceTouched(sql`b.id`)} AS failures,
         EXISTS (
@@ -346,6 +353,10 @@ export async function workStates(
         WHERE r.todo_id = b.id AND r.status IN ('ok', 'error')
         ORDER BY r.started_at DESC LIMIT 1
       ) last ON true
+      LEFT JOIN LATERAL (
+        SELECT count(*)::int AS total, count(*) FILTER (WHERE c.completed_at IS NOT NULL)::int AS done
+        FROM todos c WHERE b.split AND c.parent_id = b.id AND (c.archived_at IS NULL OR c.completed_at IS NOT NULL)
+      ) pieces ON true
       ORDER BY b.project_id, b.lane_position NULLS LAST, b.position, b.created_at
     `),
   );
@@ -400,6 +411,9 @@ function judge(row: {
   ai_ignored: boolean;
   auto_run: boolean;
   run_requested: boolean;
+  split: boolean;
+  pieces: number;
+  pieces_done: number;
   max_attempts: number | null;
   failures: number;
   finished_here: boolean;
@@ -408,6 +422,7 @@ function judge(row: {
   live_run_id: string | null;
 }): [WorkState, string | null, HandBack?] {
   if (row.live_run_id) return ['running', null];
+  if (row.split) return ['waiting', `${row.pieces_done} of ${row.pieces} pieces done.`];
   if (!row.lane_id) return ['parked', 'It is in no lane.'];
   if (row.ai_ignored) return ['parked', 'AI is told to ignore it.'];
   if (!row.has_agent) return ['parked', `${row.lane_name} has no agent.`];

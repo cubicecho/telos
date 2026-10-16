@@ -26,6 +26,10 @@ export const todos = pgTable(
     // parent should leave the pieces standing. write-guards.ts keeps the
     // chain acyclic.
     parentId: uuid('parent_id').references((): AnyPgColumn => todos.id, { onDelete: 'set null' }),
+    // When an agent split this todo into pieces, making it an umbrella: never
+    // run, closed by the `todos_settle_umbrella` trigger when its last open
+    // piece is, and reopened when one reopens. `unsplitTodo` clears it.
+    splitAt: timestamp('split_at', { withTimezone: true }),
     // "Hands off": no agent picks this todo up or reads it, whatever its
     // project's AI switch says. Only a person may set or clear it.
     aiIgnored: boolean('ai_ignored').notNull().default(false),

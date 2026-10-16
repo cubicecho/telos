@@ -8,6 +8,11 @@ import { GraphQLError } from 'graphql';
 // could complete a todo goes through `assertNotBlocked` — the ergonomic
 // `completeTodo` mutation and the generated `updateTodo` alike (see
 // resolvers/write-guards.ts), so there is no way to route around the rule.
+//
+// An umbrella's open pieces stand in its way the same way, though they are no
+// dependency and it does not show as blocked: it is waiting, and closes itself
+// when they are done (the `todos_settle_umbrella` trigger). A person who wants
+// it finished alone unsplits it first.
 
 // biome-ignore lint/suspicious/noExplicitAny: drizzle-orm 1.0 table/column type compat
 type AnyDb = any;
@@ -63,8 +68,57 @@ export async function findBlockers(db: AnyDb, todoIds: readonly string[]): Promi
   return byTodo;
 }
 
+/**
+ * The open, unarchived pieces of each umbrella among `todoIds`, keyed by umbrella id.
+ *
+ * @param db - The database or transaction.
+ * @param todoIds - The todos to look at; those not split have no pieces.
+ * @returns Each umbrella's open pieces.
+ */
+export async function findOpenPieces(db: AnyDb, todoIds: readonly string[]): Promise<Map<string, TodoRow[]>> {
+  const byTodo = new Map<string, TodoRow[]>();
+  if (todoIds.length === 0) return byTodo;
+  const umbrellas = alias(dbSchema.todos, 'umbrella_todos');
+  const rows: Array<{ umbrellaId: string; piece: TodoRow }> = await db
+    .select({ umbrellaId: umbrellas.id, piece: dbSchema.todos })
+    .from(umbrellas)
+    .innerJoin(dbSchema.todos, eq(dbSchema.todos.parentId, umbrellas.id))
+    .where(
+      and(
+        inArray(umbrellas.id, [...todoIds]),
+        isNotNull(umbrellas.splitAt),
+        isNull(dbSchema.todos.completedAt),
+        isNull(dbSchema.todos.archivedAt),
+      ),
+    );
+  for (const row of rows) {
+    const existing = byTodo.get(row.umbrellaId);
+    if (existing) existing.push(row.piece);
+    else byTodo.set(row.umbrellaId, [row.piece]);
+  }
+  return byTodo;
+}
+
+/**
+ * Why an umbrella cannot be completed by hand.
+ *
+ * @param titles - Some of its open pieces.
+ * @returns The message.
+ */
+function piecesOpen(titles: readonly string[]): string {
+  return `This todo is split, and ${titles.join(', ')} ${titles.length === 1 ? 'is' : 'are'} not done yet. It completes when its pieces do; unsplit it to finish it alone.`;
+}
+
 /** Throws unless every id in `todoIds` is free to be completed. */
 export async function assertNotBlocked(db: AnyDb, todoIds: readonly string[]): Promise<void> {
+  const pieces = await findOpenPieces(db, todoIds);
+  if (pieces.size > 0) {
+    const titles = [...pieces.values()]
+      .flat()
+      .map((row) => String(row.title))
+      .slice(0, 3);
+    throw new GraphQLError(piecesOpen(titles), { extensions: { code: 'BAD_USER_INPUT' } });
+  }
   const blocked = await findBlocked(db, todoIds);
   if (blocked.size === 0) return;
   const blockers = await findBlockers(db, [...blocked]);
@@ -79,8 +133,9 @@ export async function assertNotBlocked(db: AnyDb, todoIds: readonly string[]): P
 }
 
 /**
- * Throws if any todo of `userId`'s is completed while something it depends on is
- * still open.
+ * Throws if any unarchived todo of `userId`'s is completed while something it
+ * depends on is still open, or while it is an umbrella with an open piece. An
+ * archived one is put away: what reopens under it later does not concern it.
  *
  * The write guard cannot ask the returned rows which todos a generated update
  * completed — a mutation returns only the columns the client selected, so
@@ -89,6 +144,25 @@ export async function assertNotBlocked(db: AnyDb, todoIds: readonly string[]): P
  * mutation's transaction, so a violation rolls the whole write back.
  */
 export async function assertNoBlockedCompletions(db: AnyDb, userId: string): Promise<void> {
+  const pieces = alias(dbSchema.todos, 'piece_todos');
+  const open: Array<{ piece: string }> = await db
+    .select({ piece: pieces.title })
+    .from(dbSchema.todos)
+    .innerJoin(pieces, eq(pieces.parentId, dbSchema.todos.id))
+    .where(
+      and(
+        eq(dbSchema.todos.userId, userId),
+        isNotNull(dbSchema.todos.splitAt),
+        isNotNull(dbSchema.todos.completedAt),
+        isNull(dbSchema.todos.archivedAt),
+        isNull(pieces.completedAt),
+        isNull(pieces.archivedAt),
+      ),
+    )
+    .limit(3);
+  if (open.length > 0) {
+    throw new GraphQLError(piecesOpen(open.map((row) => row.piece)), { extensions: { code: 'BAD_USER_INPUT' } });
+  }
   const blockers = alias(dbSchema.todos, 'blocker_todos');
   const rows: Array<{ blocker: string }> = await db
     .select({ blocker: blockers.title })
@@ -99,6 +173,7 @@ export async function assertNoBlockedCompletions(db: AnyDb, userId: string): Pro
       and(
         eq(dbSchema.todos.userId, userId),
         isNotNull(dbSchema.todos.completedAt),
+        isNull(dbSchema.todos.archivedAt),
         isNull(blockers.completedAt),
         isNull(blockers.archivedAt),
       ),

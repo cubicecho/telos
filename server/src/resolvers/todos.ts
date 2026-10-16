@@ -9,9 +9,10 @@ import { stampActor } from '../provenance.ts';
 import { requireAuth } from './auth.ts';
 
 // What generated CRUD cannot express: the derived fields the project screen
-// reads, and the two state transitions that carry rules — completing a todo
-// (which the dependency graph can forbid) and adding a dependency edge (which
-// must not close a cycle, one at a time or as a whole list).
+// reads, and the state transitions that carry rules — completing a todo
+// (which the dependency graph or its open pieces can forbid), unsplitting one,
+// and adding a dependency edge (which must not close a cycle, one at a time or
+// as a whole list).
 
 // biome-ignore lint/suspicious/noExplicitAny: drizzle-orm 1.0 table/column type compat
 type AnyRow = any;
@@ -27,6 +28,10 @@ const TODOS_SDL = parse(`
     back: \`APP_URL\` + \`/todos/<id>\`. It follows the todo from project to project.
     """
     url: String!
+    "How many unarchived pieces it was split into. 0 unless it is an umbrella (\`splitAt\` is set)."
+    pieceCount: Int!
+    "How many of those pieces are done. The umbrella completes itself when this reaches \`pieceCount\`."
+    donePieceCount: Int!
   }
 
   extend type Project {
@@ -37,9 +42,15 @@ const TODOS_SDL = parse(`
   }
 
   extend type Mutation {
-    "Marks a todo done. Fails while any todo it depends on is still open. \`reason\` goes on the todo's history."
+    "Marks a todo done. Fails while any todo it depends on, or any piece of a split todo, is still open. \`reason\` goes on the todo's history."
     completeTodo(id: ID!, reason: String): Todo!
     reopenTodo(id: ID!, reason: String): Todo!
+    """
+    Makes a split todo an ordinary one again: it is no longer done with its pieces,
+    which stay as they are, and can be worked or completed by itself. Only a
+    person may unsplit a todo.
+    """
+    unsplitTodo(id: ID!, reason: String): Todo!
     "Makes \`todoId\` wait on \`dependsOnTodoId\`. Rejects cycles."
     addTodoDependency(todoId: ID!, dependsOnTodoId: ID!): Todo!
     removeTodoDependency(todoId: ID!, dependsOnTodoId: ID!): Todo!
@@ -172,6 +183,12 @@ export function applyTodosExtension(schema: GraphQLSchema): GraphQLSchema {
     return isAiActor(context) ? visibleToAi(context, blockers) : blockers;
   };
   todoFields.url.resolve = (parent: AnyRow) => appLink(`/todos/${parent.id}`);
+  todoFields.pieceCount.resolve = async (parent: AnyRow, _args: unknown, context: Context) =>
+    (await context.loaders.pieceCounts.load(String(parent.id))).total;
+  todoFields.donePieceCount.resolve = async (parent: AnyRow, _args: unknown, context: Context) => {
+    const pieces = await context.loaders.pieceCounts.load(String(parent.id));
+    return pieces.total - pieces.open;
+  };
 
   const projectFields = (extendedSchema.getType('Project') as GraphQLObjectType).getFields();
   projectFields.todoCount.resolve = async (parent: AnyRow, _args: unknown, context: Context) =>
@@ -195,6 +212,24 @@ export function applyTodosExtension(schema: GraphQLSchema): GraphQLSchema {
     const todo = await loadOwnedTodo(context, args.id);
     if (todo.completedAt == null) return todo;
     return setCompletedAt(context, todo, null, args.reason);
+  };
+
+  mutations.unsplitTodo.resolve = async (_parent: unknown, args: TransitionArgs, context: Context) => {
+    const todo = await loadOwnedTodo(context, args.id);
+    const byPerson = context.actor.kind === 'user';
+    if (byPerson === false) {
+      throw new GraphQLError('Only a person can unsplit a todo.', { extensions: { code: 'FORBIDDEN' } });
+    }
+    if (todo.splitAt == null) return todo;
+    return (context.db as AnyRow).transaction(async (tx: AnyRow) => {
+      await stampActor(tx, context.actor, { reason: args.reason });
+      const [updated] = await tx
+        .update(dbSchema.todos)
+        .set({ splitAt: null, updatedAt: new Date() })
+        .where(eq(dbSchema.todos.id, todo.id))
+        .returning();
+      return updated;
+    });
   };
 
   mutations.addTodoDependency.resolve = async (

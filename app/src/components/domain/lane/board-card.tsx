@@ -119,6 +119,12 @@ export function BoardCardBody({
         </View>
       ) : null}
 
+      {todo.splitAt ? (
+        <Text className="mt-1 text-foreground/60 text-xs tabular-nums">
+          Split · {todo.donePieceCount} of {todo.pieceCount} pieces done
+        </Text>
+      ) : null}
+
       {todo.isBlocked && !done ? (
         <Text className="mt-1 text-foreground/60 text-xs">
           Blocked by {todo.blockedBy.map((blocker) => blocker.title).join(', ')}

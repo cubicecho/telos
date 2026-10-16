@@ -78,7 +78,7 @@ description: Configuration, the AI switches, agents, lanes and runs, the MCP doo
       Every reply is read the same way: one that opens with <code>FAIL</code>
       sends the todo along the failure route, anything else passes. A passing
       run can split its todo into new ones, which land in the project's lane
-      for new todos, and the todo waits on them. A lane's success route can
+      for new todos, and the todo is done when they all are. A lane's success route can
       archive what passes instead of moving it.
     </p>
     <p>

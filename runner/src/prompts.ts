@@ -48,7 +48,7 @@ block marked todos, holding a JSON array, after anything else you say:
 ]
 \`\`\`
 
-The todo then waits until they are done. Order them so none depends on a later one, and use
+The todo is then done when they all are. Order them so none depends on a later one, and use
 "dependsOn" only for a real ordering constraint.
 
 Never both refine and split: a reply with both fails. You cannot edit, move or finish this todo

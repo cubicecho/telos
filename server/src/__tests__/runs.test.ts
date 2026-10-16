@@ -248,7 +248,7 @@ describe('finishRun', () => {
     expect(await thread(todoId)).toEqual([expect.objectContaining({ kind: 'verdict', body: 'PASS: reads well.' })]);
   });
 
-  it("puts a run's proposed todos where the project's new todos land, and leaves the parent waiting", async () => {
+  it("puts a run's proposed todos where the project's new todos land, and makes the parent an umbrella", async () => {
     await board.person.expectOk(SET_NEW_TODO_LANE, { id: board.projectId, laneId: board.lanes[1].id });
     const parentId = await board.addTodo('Build the thing');
     const { runId } = await claim(parentId);
@@ -277,13 +277,17 @@ describe('finishRun', () => {
             `${byId.get(edge.todoId)} -> ${byId.get(edge.dependsOnTodoId)}`,
         )
         .sort(),
-    ).toEqual(['Build the thing -> Design it', 'Build the thing -> Make it', 'Make it -> Design it']);
+    ).toEqual(['Make it -> Design it']);
     const childEvents = await db
       .select()
       .from(dbSchema.todoEvents)
       .where(eq(dbSchema.todoEvents.todoId, children[0].id));
     expect(childEvents[0]).toMatchObject({ kind: 'create', actorKind: 'agent', runId });
-    expect(await todoRow(parentId)).toMatchObject({ laneId: board.lanes[0].id, completedAt: null });
+    expect(await todoRow(parentId)).toMatchObject({
+      laneId: board.lanes[0].id,
+      completedAt: null,
+      splitAt: expect.any(Date),
+    });
     expect((await thread(parentId)).map((note: { body: string }) => note.body)).toEqual([
       '[...]',
       'Split into 2 todos: Design it; Make it',
@@ -383,34 +387,6 @@ describe('finishRun', () => {
     expect(await queue()).toEqual([]);
   });
 
-  it('does not hand a split todo back to its lane when its pieces are done, though a person edited it', async () => {
-    const move = (id: string, laneId: string) =>
-      board.person.expectOk(`mutation ($id: ID!, $laneId: ID!) { moveTodo(id: $id, laneId: $laneId) { id } }`, {
-        id,
-        laneId,
-      });
-    await board.person.expectOk(SET_NEW_TODO_LANE, { id: board.projectId, laneId: board.lanes[1].id });
-    const parentId = await board.addTodo('Build the thing');
-    await finish((await claim(parentId)).runId, {
-      status: 'ok',
-      todos: [{ title: 'Design it' }, { title: 'Make it' }],
-    });
-    await board.person.expectOk(
-      `mutation ($id: UUID!) { updateTodo(set: { title: "Build the whole thing" }, where: { id: { eq: $id } }) { id } }`,
-      { id: parentId },
-    );
-    const children = await db.select().from(dbSchema.todos).where(eq(dbSchema.todos.parentId, parentId));
-    for (const child of children) {
-      await move(child.id, board.lanes[2].id);
-    }
-    expect(await queue()).toEqual([]);
-
-    // A person moving it back in is an arrival, and the lane works it again.
-    await move(parentId, board.lanes[1].id);
-    await move(parentId, board.lanes[0].id);
-    expect((await queue()).map((row) => row.todoId)).toEqual([parentId]);
-  });
-
   it('leaves a todo a person moved mid-run where the person put it', async () => {
     const todoId = await board.addTodo('Write it');
     const { runId } = await claim(todoId);
@@ -428,6 +404,183 @@ describe('finishRun', () => {
     await finish(runId, { status: 'ok', output: 'Wrote it.' });
     const error = await runner.expectError(FINISH, { id: runId, result: { status: 'ok' } });
     expect(error.code).toBe('CONFLICT');
+  });
+});
+
+describe('an umbrella', () => {
+  const COMPLETE = `mutation ($id: ID!) { completeTodo(id: $id) { id } }`;
+  const REOPEN = `mutation ($id: ID!) { reopenTodo(id: $id) { id } }`;
+  const MOVE = `mutation ($id: ID!, $laneId: ID!) { moveTodo(id: $id, laneId: $laneId) { id } }`;
+  const ARCHIVE = `mutation ($id: UUID!) { deleteTodo(where: { id: { eq: $id } }) { id } }`;
+  const UNSPLIT = `mutation ($id: ID!) { unsplitTodo(id: $id) { id splitAt } }`;
+  const PROGRESS = `query ($id: UUID!) { todo(where: { id: { eq: $id } }) { pieceCount donePieceCount } }`;
+
+  /** Splits a new todo in the first lane into two pieces, which land in the second. */
+  async function split(): Promise<{ umbrellaId: string; pieceIds: string[] }> {
+    await board.person.expectOk(SET_NEW_TODO_LANE, { id: board.projectId, laneId: board.lanes[1].id });
+    const umbrellaId = await board.addTodo('Build the thing');
+    await finish((await claim(umbrellaId)).runId, {
+      status: 'ok',
+      todos: [{ title: 'Design it' }, { title: 'Make it' }],
+    });
+    const pieces = await db.select().from(dbSchema.todos).where(eq(dbSchema.todos.parentId, umbrellaId));
+    return { umbrellaId, pieceIds: pieces.map((piece: { id: string }) => piece.id) };
+  }
+
+  async function events(todoId: string) {
+    return db.select().from(dbSchema.todoEvents).where(eq(dbSchema.todoEvents.todoId, todoId));
+  }
+
+  it('is never queued, and counts its pieces', async () => {
+    const { umbrellaId, pieceIds } = await split();
+    expect(await queue()).toEqual([]);
+    await board.person.expectOk(COMPLETE, { id: pieceIds[0] });
+    expect((await board.person.expectOk(PROGRESS, { id: umbrellaId })).todo).toEqual({
+      pieceCount: 2,
+      donePieceCount: 1,
+    });
+  });
+
+  it('shows as waiting, with how many of its pieces are done', async () => {
+    const { umbrellaId, pieceIds } = await split();
+    await board.person.expectOk(COMPLETE, { id: pieceIds[0] });
+    const { aiStatus } = await board.person.expectOk(
+      `query ($id: ID!) { aiStatus(projectId: $id) { todos { todoId state reason } projects { lanes { laneId waiting } } } }`,
+      { id: board.projectId },
+    );
+    expect(aiStatus.todos.find((todo: { todoId: string }) => todo.todoId === umbrellaId)).toEqual({
+      todoId: umbrellaId,
+      state: 'waiting',
+      reason: '1 of 2 pieces done.',
+    });
+    expect(aiStatus.projects[0].lanes[0]).toEqual({ laneId: board.lanes[0].id, waiting: 1 });
+  });
+
+  it('completes itself, as the system, when its last piece completes', async () => {
+    const { umbrellaId, pieceIds } = await split();
+    await board.person.expectOk(COMPLETE, { id: pieceIds[0] });
+    expect((await todoRow(umbrellaId)).completedAt).toBeNull();
+    await board.person.expectOk(COMPLETE, { id: pieceIds[1] });
+    expect(await todoRow(umbrellaId)).toMatchObject({
+      completedAt: expect.any(Date),
+      laneId: board.lanes[2].id,
+      archivedAt: null,
+    });
+    expect((await events(umbrellaId)).at(-1)).toMatchObject({
+      kind: 'complete',
+      actorKind: 'system',
+      toLaneId: board.lanes[2].id,
+    });
+    // The piece's own completion is still the person's.
+    expect((await events(pieceIds[1])).at(-1)).toMatchObject({ kind: 'complete', actorKind: 'user' });
+  });
+
+  it('completes itself when its last open piece is archived, but not when every piece is dropped', async () => {
+    const { umbrellaId, pieceIds } = await split();
+    await board.person.expectOk(COMPLETE, { id: pieceIds[0] });
+    await board.person.expectOk(ARCHIVE, { id: pieceIds[1] });
+    expect((await todoRow(umbrellaId)).completedAt).not.toBeNull();
+
+    const other = await split();
+    await board.person.expectOk(ARCHIVE, { id: other.pieceIds[0] });
+    await board.person.expectOk(ARCHIVE, { id: other.pieceIds[1] });
+    expect((await todoRow(other.umbrellaId)).completedAt).toBeNull();
+  });
+
+  it('completes itself when its pieces are completed and archived in one write', async () => {
+    // As a lane that archives on success puts each piece away.
+    const { umbrellaId, pieceIds } = await split();
+    for (const id of pieceIds) {
+      await db
+        .update(dbSchema.todos)
+        .set({ completedAt: new Date(), archivedAt: new Date() })
+        .where(eq(dbSchema.todos.id, id));
+    }
+    expect((await todoRow(umbrellaId)).completedAt).not.toBeNull();
+  });
+
+  it('is archived when it was split in a lane that archives on success', async () => {
+    await setLane(board.person, board.lanes[0].id, { onSuccessLaneId: null, archiveOnSuccess: true });
+    const { umbrellaId, pieceIds } = await split();
+    expect((await todoRow(umbrellaId)).archivedAt).toBeNull();
+    for (const id of pieceIds) await board.person.expectOk(COMPLETE, { id });
+    expect(await todoRow(umbrellaId)).toMatchObject({ completedAt: expect.any(Date), archivedAt: expect.any(Date) });
+    expect((await events(umbrellaId)).at(-1)).toMatchObject({ kind: 'archive', actorKind: 'system' });
+  });
+
+  it('reopens into the first open lane when a piece reopens, or a new piece is added', async () => {
+    const { umbrellaId, pieceIds } = await split();
+    for (const id of pieceIds) await board.person.expectOk(COMPLETE, { id });
+    await board.person.expectOk(REOPEN, { id: pieceIds[0] });
+    expect(await todoRow(umbrellaId)).toMatchObject({ completedAt: null, laneId: board.lanes[0].id });
+    expect((await events(umbrellaId)).at(-1)).toMatchObject({ kind: 'reopen', actorKind: 'system' });
+
+    await board.person.expectOk(COMPLETE, { id: pieceIds[0] });
+    expect((await todoRow(umbrellaId)).completedAt).not.toBeNull();
+    await board.person.expectOk(
+      `mutation ($projectId: UUID!, $parentId: UUID!) {
+        createTodo(values: { projectId: $projectId, parentId: $parentId, title: "Ship it" }) { id }
+      }`,
+      { projectId: board.projectId, parentId: umbrellaId },
+    );
+    expect(await todoRow(umbrellaId)).toMatchObject({ completedAt: null, laneId: board.lanes[0].id });
+  });
+
+  it('stays archived when a piece reopens', async () => {
+    const { umbrellaId, pieceIds } = await split();
+    for (const id of pieceIds) await board.person.expectOk(COMPLETE, { id });
+    await board.person.expectOk(ARCHIVE, { id: umbrellaId });
+    await board.person.expectOk(REOPEN, { id: pieceIds[0] });
+    expect(await todoRow(umbrellaId)).toMatchObject({ completedAt: expect.any(Date), archivedAt: expect.any(Date) });
+    // Put away, it stands in no other todo's way.
+    const other = await board.addTodo('Something else');
+    await board.person.expectOk(
+      `mutation ($id: UUID!) { updateTodo(set: { completedAt: "2026-01-01T00:00:00Z" }, where: { id: { eq: $id } }) { id } }`,
+      { id: other },
+    );
+  });
+
+  it('cannot be completed by hand while a piece is open, by any door', async () => {
+    const { umbrellaId, pieceIds } = await split();
+    await board.person.expectOk(COMPLETE, { id: pieceIds[0] });
+    const refusals = [
+      await board.person.expectError(COMPLETE, { id: umbrellaId }),
+      await board.person.expectError(MOVE, { id: umbrellaId, laneId: board.lanes[2].id }),
+      await board.person.expectError(
+        `mutation ($id: UUID!) { updateTodo(set: { completedAt: "2026-01-01T00:00:00Z" }, where: { id: { eq: $id } }) { id } }`,
+        { id: umbrellaId },
+      ),
+    ];
+    for (const error of refusals) {
+      expect(error.message).toBe(
+        'This todo is split, and Make it is not done yet. It completes when its pieces do; unsplit it to finish it alone.',
+      );
+    }
+    expect((await todoRow(umbrellaId)).completedAt).toBeNull();
+  });
+
+  it('is an ordinary todo again once a person unsplits it', async () => {
+    const { umbrellaId, pieceIds } = await split();
+    expect((await board.person.expectOk(UNSPLIT, { id: umbrellaId })).unsplitTodo).toEqual({
+      id: umbrellaId,
+      splitAt: null,
+    });
+    expect((await events(umbrellaId)).at(-1)).toMatchObject({ kind: 'edit', fields: ['splitAt'], actorKind: 'user' });
+    await board.person.expectOk(COMPLETE, { id: umbrellaId });
+    expect((await todoRow(umbrellaId)).completedAt).not.toBeNull();
+    // Its pieces stay as they were, and no longer close or reopen it.
+    await board.person.expectOk(REOPEN, { id: umbrellaId });
+    for (const id of pieceIds) await board.person.expectOk(COMPLETE, { id });
+    expect((await todoRow(umbrellaId)).completedAt).toBeNull();
+  });
+
+  it('is split and unsplit only by a run and unsplitTodo', async () => {
+    const todoId = await board.addTodo('Plain');
+    const error = await board.person.expectError(
+      `mutation ($id: UUID!) { updateTodo(set: { splitAt: "2026-01-01T00:00:00Z" }, where: { id: { eq: $id } }) { id } }`,
+      { id: todoId },
+    );
+    expect(error.message).toMatch(/unsplitTodo/);
   });
 });
 

@@ -177,7 +177,7 @@ const RUNS_SDL = parse(`
     promptTokens: Int
     completionTokens: Int
     totalTokens: Int
-    "The todos the agent split this one into, if any: two or more. This one waits on them. One is read as a refine."
+    "The todos the agent split this one into, if any: two or more. This one is done when they all are. One is read as a refine."
     todos: [ProposedTodoInput!]
     "The todo as the agent rewrote it, if it did. It then passes, as a report would. Never with todos."
     refine: RefinedTodoInput
@@ -358,9 +358,10 @@ async function nextPosition(tx: AnyRow, projectId: string): Promise<number> {
 
 /**
  * Writes a run's proposed todos into `laneId`, links what they wait on by
- * title, and makes the parent wait on all of them: the request is done when
- * its pieces are. A dependency naming nothing in the batch, or one that would close
- * a cycle, is dropped — a lost ordering hint, not a lost todo.
+ * title, and makes the parent an umbrella: it is no longer run, and the
+ * `todos_settle_umbrella` trigger closes it when its last piece is done. A
+ * dependency naming nothing in the batch, or one that would close a cycle, is
+ * dropped — a lost ordering hint, not a lost todo.
  *
  * @param tx The transaction, already stamped with the agent.
  * @param parent The todo that was broken up.
@@ -374,6 +375,7 @@ async function writeChildren(
   laneId: string | null,
   proposed: ProposedTodo[],
 ): Promise<AnyRow[]> {
+  await tx.update(dbSchema.todos).set({ splitAt: new Date() }).where(eq(dbSchema.todos.id, parent.id));
   const start = await nextPosition(tx, parent.projectId);
   const written: AnyRow[] = await tx
     .insert(dbSchema.todos)
@@ -392,15 +394,12 @@ async function writeChildren(
     .returning();
 
   const byTitle = new Map(written.map((todo) => [todo.title as string, todo.id as string]));
-  const edges: Array<[string, string]> = [
-    ...proposed.flatMap((todo, at) =>
-      (todo.dependsOn ?? [])
-        .map((title) => byTitle.get(title.trim()))
-        .filter((id): id is string => !!id && id !== written[at].id)
-        .map((id): [string, string] => [written[at].id, id]),
-    ),
-    ...written.map((child): [string, string] => [parent.id, child.id]),
-  ];
+  const edges = proposed.flatMap((todo, at) =>
+    (todo.dependsOn ?? [])
+      .map((title) => byTitle.get(title.trim()))
+      .filter((id): id is string => !!id && id !== written[at].id)
+      .map((id): [string, string] => [written[at].id, id]),
+  );
   for (const [todoId, dependsOnTodoId] of edges) {
     try {
       await assertNoCycle(tx, todoId, dependsOnTodoId);

@@ -43,7 +43,7 @@ the first call. The tools say what each one does; this says how the board works.
 An agent's instructions say what it does with a todo. Every run ends the same way: a
 reply that starts with FAIL fails, and anything else passes. The todo then follows the
 lane's success or failure route, if it has one. A run may also propose new todos; they
-land where the project's new todos do, and the todo it was working waits on them. A lane
+land where the project's new todos do, and the todo it was working is done when they all are. A lane
 gives up on a todo after a few failed attempts, until a person touches it or someone
 retries it.
 

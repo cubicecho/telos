@@ -198,6 +198,18 @@ function assertRunRequestUntouched(args: Parameters<typeof writtenRows>[0]): voi
 }
 
 /**
+ * A todo is split by its agent's run, and unsplit by `unsplitTodo`, so a plain
+ * write cannot make or dissolve an umbrella.
+ */
+function assertSplitUntouched(args: Parameters<typeof writtenRows>[0]): void {
+  if (states(args, 'splitAt')) {
+    throw new GraphQLError('Use unsplitTodo to make a split todo an ordinary one again.', {
+      extensions: { code: 'BAD_USER_INPUT' },
+    });
+  }
+}
+
+/**
  * People write plain notes. Reports and verdicts are what a run leaves behind,
  * and the server writes those itself, so a generated insert cannot pass one off.
  */
@@ -477,6 +489,7 @@ export const onWrite: NonNullable<BuildSchemaConfig['onWrite']> = {
     before: async ({ args, context, tx }: WriteHookPayload) => {
       assertIgnoreFlagFromPerson(args, context as Context);
       assertRunRequestUntouched(args);
+      assertSplitUntouched(args);
       await assertForeignKeysOwned(tx, context as Context, writtenRows(args), FOREIGN_KEYS.todos);
       await stampActor(tx, (context as Context).actor);
     },

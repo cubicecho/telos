@@ -1,6 +1,6 @@
 import * as dbSchema from '@telos/db/schema';
 import DataLoader from 'dataloader';
-import { and, inArray, isNull, sql } from 'drizzle-orm';
+import { and, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm';
 import { findBlocked, findBlockers, type TodoRow } from './blocking.ts';
 
 // Per-request batching. The project screen is a list of todos each asking
@@ -35,10 +35,43 @@ async function findTodoCounts(db: AnyDb, projectIds: readonly string[]): Promise
   return byProject;
 }
 
+/**
+ * How many pieces each umbrella has, and how many are still open. A piece
+ * archived once completed counts, as done; one archived while open does not.
+ *
+ * @param db - The database.
+ * @param todoIds - The todos asked about; those not split have no pieces.
+ * @returns The counts, keyed by umbrella id.
+ */
+async function findPieceCounts(db: AnyDb, todoIds: readonly string[]): Promise<Map<string, TodoCounts>> {
+  const byTodo = new Map<string, TodoCounts>();
+  if (todoIds.length === 0) return byTodo;
+  const rows: Array<{ parentId: string; total: number; open: number }> = await db
+    .select({
+      parentId: dbSchema.todos.parentId,
+      total: sql<number>`count(*)::int`,
+      open: sql<number>`count(*) filter (where ${dbSchema.todos.completedAt} is null)::int`,
+    })
+    .from(dbSchema.todos)
+    .where(
+      and(
+        inArray(dbSchema.todos.parentId, [...todoIds]),
+        or(isNull(dbSchema.todos.archivedAt), isNotNull(dbSchema.todos.completedAt)),
+        sql`exists (select 1 from todos u where u.id = ${dbSchema.todos.parentId} and u.split_at is not null)`,
+      ),
+    )
+    .groupBy(dbSchema.todos.parentId);
+  for (const row of rows) {
+    byTodo.set(row.parentId, { total: Number(row.total), open: Number(row.open) });
+  }
+  return byTodo;
+}
+
 export interface Loaders {
   blocked: DataLoader<string, boolean>;
   blockers: DataLoader<string, TodoRow[]>;
   todoCounts: DataLoader<string, TodoCounts>;
+  pieceCounts: DataLoader<string, TodoCounts>;
 }
 
 /**
@@ -58,6 +91,10 @@ export function createLoaders(db: AnyDb): Loaders {
     todoCounts: new DataLoader<string, TodoCounts>(async (ids) => {
       const byProject = await findTodoCounts(db, ids);
       return ids.map((id) => byProject.get(id) ?? NO_TODOS);
+    }),
+    pieceCounts: new DataLoader<string, TodoCounts>(async (ids) => {
+      const byTodo = await findPieceCounts(db, ids);
+      return ids.map((id) => byTodo.get(id) ?? NO_TODOS);
     }),
   };
 }

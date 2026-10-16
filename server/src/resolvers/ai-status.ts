@@ -25,7 +25,7 @@ const AI_STATUS_SDL = parse(`
     title: String!
     projectId: ID!
     laneId: ID
-    "handedBack, running, blocked, queued or parked."
+    "handedBack, running, waiting (an umbrella, done when its pieces are), blocked, queued or parked."
     state: String!
     "Why it is where it is, when that needs saying."
     reason: String
@@ -50,6 +50,7 @@ const AI_STATUS_SDL = parse(`
     isDone: Boolean!
     handedBack: Int!
     running: Int!
+    waiting: Int!
     blocked: Int!
     queued: Int!
     parked: Int!
@@ -173,11 +174,13 @@ async function whyNotRunnable(db: AnyRow, todo: AnyRow): Promise<string | null> 
     lane_name: string;
     is_done: boolean;
     has_agent: boolean;
+    split: boolean;
     blockers: string | null;
   }>(
     await db.execute(sql`
       SELECT
         p.ai_enabled, p.archived_at IS NOT NULL AS project_archived, l.name AS lane_name, l.is_done, l.agent_id IS NOT NULL AS has_agent,
+        t.split_at IS NOT NULL AS split,
         (
           SELECT string_agg(b.title, ', ' ORDER BY b.title) FROM todo_dependencies d
           JOIN todos b ON b.id = d.depends_on_todo_id
@@ -201,6 +204,9 @@ async function whyNotRunnable(db: AnyRow, todo: AnyRow): Promise<string | null> 
   if (todo.completedAt !== null || row.is_done) {
     return 'It is already done.';
   }
+  if (row.split) {
+    return 'It is split into pieces, and is done when they are.';
+  }
   if (row.has_agent === false) {
     return `${row.lane_name} has no agent.`;
   }
@@ -210,7 +216,7 @@ async function whyNotRunnable(db: AnyRow, todo: AnyRow): Promise<string | null> 
   return null;
 }
 
-const STATES: WorkState[] = ['handedBack', 'running', 'blocked', 'queued', 'parked', 'done'];
+const STATES: WorkState[] = ['handedBack', 'running', 'waiting', 'blocked', 'queued', 'parked', 'done'];
 
 export function applyAiStatusExtension(schema: GraphQLSchema): GraphQLSchema {
   const extendedSchema = extendSchema(schema, AI_STATUS_SDL);

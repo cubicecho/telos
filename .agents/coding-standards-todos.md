@@ -21,7 +21,7 @@ Nothing here is implemented until approved.
 | M2 | Model change | The agent is the reusable part; lane presets, jobs and lane prompts go | One place for what a lane asks for | — | done |
 | M3 | Model change | "Station" is retired: a lane with an agent | One fewer word for the same thing | — | done |
 | M4 | Model change | Agent templates become starter text in the new-agent form | One fewer concept | — | done |
-| M5 | Model change | A split todo becomes an umbrella that no agent works and that completes with its pieces | A split parent is never re-planned, and needs no blocker edges | — | approved |
+| M5 | Model change | A split todo becomes an umbrella that no agent works and that completes with its pieces | A split parent is never re-planned, and needs no blocker edges | — | done |
 | M6 | Model change | Lanes get a role (plan, work, review) that says which outcomes count there | A planner that does the work, or a reviewer that splits, fails instead of passing | M5 | declined |
 | M7 | Model change | A refine may also set its todo's dependencies | A planner can say what its todo waits on, still only through `finishRun` | — | approved |
 | M8 | Model change | One blocked rule: a blocked todo moves between open lanes, never into the done lane | A person and a route follow the same rule | — | approved |
@@ -87,8 +87,12 @@ progress (n of m pieces done) and an `aiStatus` of `waiting`, and completes itse
 if it was split in an `archiveOnSuccess` lane). It reopens if a piece reopens or a new
 piece is added. A person can dissolve it (`unsplitTodo`), which makes it an ordinary todo
 again. Why it is simpler: "waits on its pieces" becomes a state with a name, instead of
-blocker edges plus a rule about arrival. One migration column. Status: approved (the
-parent closes when its last piece does, not at split time).
+blocker edges plus a rule about arrival. One migration column. Built: a trigger settles
+the umbrella, so it closes and reopens however its pieces are written; it reopens into the
+first open lane, stays archived once archived, and cannot be completed by hand while a
+piece is open (unsplit it to finish it alone). Existing split parents were backfilled from
+their "Split into" report notes, and their blocker edges dropped. Status: done (the parent
+closes when its last piece does, not at split time).
 
 ### M6 — Introduce: lane roles
 
