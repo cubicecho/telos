@@ -50,6 +50,7 @@ const config: CodegenConfig = {
           McpSecretKind: '../src/enums.ts#McpSecretKind',
           ChangeEntity: '../src/enums.ts#ChangeEntity',
           RunOutcome: '../src/enums.ts#RunOutcome',
+          RunEventKind: '../src/enums.ts#RunEventKind',
         },
         avoidOptionals: {
           // Use `null` for nullable fields instead of optionals

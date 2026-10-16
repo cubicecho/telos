@@ -840,10 +840,10 @@ describe('what a run shows as it goes, and leaves behind', () => {
     const todoId = await board.addTodo('Write it');
     const { runId } = await claim(todoId);
     const events = (count: number, from = 0) =>
-      Array.from({ length: count }, (_, at) => ({ kind: 'tool_call', name: 'fs__write', text: `call ${from + at}` }));
+      Array.from({ length: count }, (_, at) => ({ kind: 'TOOL_CALL', name: 'fs__write', text: `call ${from + at}` }));
 
     await runner.expectOk(HEARTBEAT, { id: runId, events: events(3) });
-    await runner.expectOk(HEARTBEAT, { id: runId, events: [{ kind: 'notice', text: 'x'.repeat(10_000) }] });
+    await runner.expectOk(HEARTBEAT, { id: runId, events: [{ kind: 'NOTICE', text: 'x'.repeat(10_000) }] });
     let [row] = await runsOf(todoId);
     expect(row.events.map((event: dbSchema.RunEvent) => event.kind)).toEqual([
       'tool_call',
@@ -870,15 +870,15 @@ describe('what a run shows as it goes, and leaves behind', () => {
     await runner.expectOk(HEARTBEAT, {
       id: runId,
       events: [
-        { kind: 'turn', text: '1' },
-        { kind: 'thinking', text: 'Hmm, ' },
+        { kind: 'TURN', text: '1' },
+        { kind: 'THINKING', text: 'Hmm, ' },
       ],
     });
     await runner.expectOk(HEARTBEAT, {
       id: runId,
       events: [
-        { kind: 'thinking', text: 'the plan first.' },
-        { kind: 'output', text: 'x'.repeat(20_000) },
+        { kind: 'THINKING', text: 'the plan first.' },
+        { kind: 'OUTPUT', text: 'x'.repeat(20_000) },
       ],
     });
     const [row] = await runsOf(todoId);

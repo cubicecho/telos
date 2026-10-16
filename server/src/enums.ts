@@ -88,6 +88,15 @@ export const CHANGE_ENTITIES = ['project', 'todo', 'dependency'] as const;
 export type ChangeEntity = (typeof CHANGE_ENTITIES)[number];
 export const ChangeEntityEnum = serverEnum('ChangeEntity', CHANGE_ENTITIES, 'What a change-feed entry is about.');
 
+/** What happened in a run, for the live view. */
+export const RUN_EVENT_KINDS = ['tool_call', 'tool_result', 'hook', 'notice', 'turn', 'thinking', 'output'] as const;
+export type RunEventKind = (typeof RUN_EVENT_KINDS)[number];
+export const RunEventKindEnum = serverEnum(
+  'RunEventKind',
+  RUN_EVENT_KINDS,
+  'What happened in a run: TOOL_CALL, TOOL_RESULT, HOOK, NOTICE, TURN, THINKING or OUTPUT.',
+);
+
 /** How a run can end, as the runner reports it. */
 export const RUN_OUTCOMES = ['ok', 'error', 'stopped'] as const;
 export type RunOutcome = (typeof RUN_OUTCOMES)[number];

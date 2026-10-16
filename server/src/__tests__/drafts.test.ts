@@ -45,8 +45,8 @@ const CANCEL_RUN = `mutation ($id: ID!) { cancelRun(id: $id) { id status } }`;
 const DELETE_RUN = `mutation ($id: ID!) { deleteRun(id: $id) }`;
 const PROMPT = { system: 'You refine requests.', user: 'Make the export faster' };
 const EVENTS = [
-  { kind: 'notice', text: 'Token counts are estimates.' },
-  { kind: 'output', text: 'Which export?' },
+  { kind: 'NOTICE', text: 'Token counts are estimates.' },
+  { kind: 'OUTPUT', text: 'Which export?' },
 ];
 
 // biome-ignore lint/suspicious/noExplicitAny: response shape

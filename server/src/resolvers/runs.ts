@@ -17,7 +17,7 @@ import { attachResolvers } from '../attach-resolvers.ts';
 import { assertNoCycle, findBlocked } from '../blocking.ts';
 import type { Actor, Context } from '../context.ts';
 import { stopDraftReply } from '../draft-runs.ts';
-import { RunOutcomeEnum, withEnums } from '../enums.ts';
+import { RunEventKindEnum, RunOutcomeEnum, withEnums } from '../enums.ts';
 import { badInput, conflict, forbidden, notFound } from '../errors.ts';
 import { instanceAiOn } from '../instance.ts';
 import { findDoneLaneId, findNewTodoLaneId } from '../lanes.ts';
@@ -144,8 +144,7 @@ const RUNS_SDL = parse(`
 
   "Something that happened in a run, for the live view."
   input RunEventInput {
-    "tool_call, tool_result, hook, notice, turn, thinking or output."
-    kind: String!
+    kind: RunEventKind!
     "The tool or hook it concerns."
     name: String
     ok: Boolean
@@ -794,7 +793,7 @@ async function archiveOn(
 }
 
 export function applyRunsExtension(schema: GraphQLSchema): GraphQLSchema {
-  const extendedSchema = extendSchema(withEnums(schema, [RunOutcomeEnum]), RUNS_SDL);
+  const extendedSchema = extendSchema(withEnums(schema, [RunOutcomeEnum, RunEventKindEnum]), RUNS_SDL);
   const queries: QueryResolvers = {};
   const mutations: MutationResolvers = {};
 

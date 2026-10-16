@@ -257,6 +257,17 @@ const FINISH_DRAFT = `mutation (
 }`;
 const SESSION_DELETES = `mutation ($limit: Int) { takeSessionDeletes(limit: $limit) { id todoId agentName mcpServers } }`;
 const FINISH_SESSION_DELETE = `mutation ($id: ID!, $error: String) { finishSessionDelete(id: $id, error: $error) }`;
+/**
+ * Events as the API takes them: `RunEventKind` is SCREAMING_CASE on the wire,
+ * and the runner says `tool_call`.
+ *
+ * @param events The events, if any.
+ * @returns The events to send.
+ */
+function wireEvents(events: RunEvent[] | undefined) {
+  return events?.map((event) => ({ ...event, kind: event.kind.toUpperCase() }));
+}
+
 const FINISH = `mutation ($id: ID!, $result: RunResultInput!) { finishRun(id: $id, result: $result) { id } }`;
 
 /** A GraphQL answer carrying errors, as one error. */
@@ -314,14 +325,17 @@ export function createTelos(options: { telosUrl: string; runnerKey: string; fetc
       (
         await request<{ heartbeatRun: boolean }>(HEARTBEAT, {
           id: runId,
-          events: beat.events ?? [],
+          events: wireEvents(beat.events) ?? [],
           prompt: beat.prompt ?? null,
           usage: beat.usage ?? null,
         })
       ).heartbeatRun,
     finish: async (runId, result) => {
       // `RunOutcome` is SCREAMING_CASE on the wire; the runner and its hooks say `ok`.
-      await request(FINISH, { id: runId, result: { ...result, status: result.status.toUpperCase() } });
+      await request(FINISH, {
+        id: runId,
+        result: { ...result, status: result.status.toUpperCase(), events: wireEvents(result.events) },
+      });
     },
     probes: async () => (await request<{ runnerProbes: RunnerProbe[] }>(PROBES, {})).runnerProbes,
     finishProbe: async (id, result) => {
@@ -330,7 +344,7 @@ export function createTelos(options: { telosUrl: string; runnerKey: string; fetc
     drafts: async (limit = 20) => (await request<{ runnerDrafts: string[] }>(DRAFTS, { limit })).runnerDrafts,
     claimDraft: async (id) => (await request<{ claimDraft: DraftClaim | null }>(CLAIM_DRAFT, { id })).claimDraft,
     finishDraft: async (id, runId, answer) => {
-      await request(FINISH_DRAFT, { id, runId, ...answer });
+      await request(FINISH_DRAFT, { id, runId, ...answer, events: wireEvents(answer.events) });
     },
     sessionDeletes: async (limit = 5) =>
       (await request<{ takeSessionDeletes: SessionDelete[] }>(SESSION_DELETES, { limit })).takeSessionDeletes,
