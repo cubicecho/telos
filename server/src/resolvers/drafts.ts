@@ -10,9 +10,10 @@ import { badInput, conflict, notFound } from '../errors.ts';
 import { instanceAiOn } from '../instance.ts';
 import { findNewTodoLaneId } from '../lanes.ts';
 import { runnerAgent } from '../mcp-servers.ts';
+import { loadAiProject } from '../owned.ts';
 import { stampActor } from '../provenance.ts';
 import { markRunnerSeen } from '../runner-seen.ts';
-import { loadAiProject, nextPosition } from './requests.ts';
+import { nextPosition } from './requests.ts';
 import { isUniqueViolation, reported, withEvents } from './runs.ts';
 
 // Drafts: talking a rough request over with an agent until its brief reads
@@ -222,7 +223,7 @@ export function applyDraftsExtension(schema: GraphQLSchema): GraphQLSchema {
   mutations.startDraft = async (_parent, args, context) => {
     const userId = await requireAi(context);
     const text = message(args.message);
-    const project = await loadAiProject(context, userId, args.projectId);
+    const project = await loadAiProject(context.db, userId, args.projectId);
     await ownedAgent(context.db, userId, args.agentId);
     return (context.db as AnyRow).transaction(async (tx: AnyRow) => {
       const [draft] = await tx

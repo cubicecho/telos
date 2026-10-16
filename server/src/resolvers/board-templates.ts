@@ -4,6 +4,7 @@ import { extendSchema, type GraphQLSchema, parse } from 'graphql';
 import type { MutationResolvers } from '../../__generated__/resolvers.ts';
 import { attachResolvers } from '../attach-resolvers.ts';
 import { badInput, conflict, notFound } from '../errors.ts';
+import { loadOwnedProject } from '../owned.ts';
 import { requireAuth } from './auth.ts';
 
 // Board templates: a project's lanes, with their agents and routes, saved to
@@ -30,23 +31,6 @@ const BOARD_TEMPLATES_SDL = parse(`
 /** The most lanes a template may hold. */
 const MAX_LANES = 50;
 const MAX_NAME = 100;
-
-/**
- * The caller's project, or NOT_FOUND.
- *
- * @param db The database or transaction.
- * @param projectId The project.
- * @param userId Its owner, supposedly.
- * @returns The project.
- */
-async function ownedProject(db: AnyRow, projectId: string, userId: string) {
-  const [project] = await db
-    .select()
-    .from(dbSchema.projects)
-    .where(and(eq(dbSchema.projects.id, projectId), eq(dbSchema.projects.userId, userId)));
-  if (!project) throw notFound('Project');
-  return project;
-}
 
 /**
  * A template's lanes, checked, since a person may have edited them directly.
@@ -103,7 +87,7 @@ export function applyBoardTemplatesExtension(schema: GraphQLSchema): GraphQLSche
     const name = args.name.trim();
     if (!name || name.length > MAX_NAME) throw badInput(`Name the template, in ${MAX_NAME} characters or fewer.`);
     const db = context.db as AnyRow;
-    await ownedProject(db, args.projectId, userId);
+    await loadOwnedProject(db, userId, args.projectId);
     const rows = await db
       .select()
       .from(dbSchema.lanes)
@@ -134,7 +118,7 @@ export function applyBoardTemplatesExtension(schema: GraphQLSchema): GraphQLSche
   mutations.applyBoardTemplate = async (_parent, args, context) => {
     const userId = requireAuth(context);
     return (context.db as AnyRow).transaction(async (tx: AnyRow) => {
-      const project = await ownedProject(tx, args.projectId, userId);
+      const project = await loadOwnedProject(tx, userId, args.projectId);
       const [template] = await tx
         .select()
         .from(dbSchema.boardTemplates)

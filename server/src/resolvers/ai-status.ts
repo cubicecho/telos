@@ -1,5 +1,5 @@
 import * as dbSchema from '@telos/db/schema';
-import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import { extendSchema, type GraphQLSchema, parse } from 'graphql';
 import type { MutationResolvers, QueryResolvers } from '../../__generated__/resolvers.ts';
 import { requireAi } from '../ai-gate.ts';
@@ -7,7 +7,8 @@ import { attachResolvers } from '../attach-resolvers.ts';
 import { resultRows } from '../blocking.ts';
 import type { Actor } from '../context.ts';
 import { HandBackEnum, WORK_STATES, type WorkState, WorkStateEnum, withEnums } from '../enums.ts';
-import { badInput, conflict, notFound } from '../errors.ts';
+import { badInput, conflict } from '../errors.ts';
+import { loadOwnedTodo } from '../owned.ts';
 import { workStates } from '../ready.ts';
 import { runnerSeenAt } from '../runner-seen.ts';
 
@@ -102,13 +103,7 @@ const RUN_EVENT = 'run' as const;
  * @returns The todo's row.
  */
 async function restingTodo(db: AnyRow, userId: string, id: string): Promise<AnyRow> {
-  const [todo] = await db
-    .select()
-    .from(dbSchema.todos)
-    .where(and(eq(dbSchema.todos.id, id), eq(dbSchema.todos.userId, userId), isNull(dbSchema.todos.archivedAt)));
-  if (todo === undefined) {
-    throw notFound('Todo');
-  }
+  const todo = await loadOwnedTodo(db, userId, id);
   if (todo.laneId === null) {
     throw badInput('It is in no lane, so no agent can take it. Move it to a lane with an agent.');
   }

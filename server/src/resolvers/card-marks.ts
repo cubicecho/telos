@@ -1,11 +1,10 @@
-import * as dbSchema from '@telos/db/schema';
-import { and, eq, sql } from 'drizzle-orm';
+import { sql } from 'drizzle-orm';
 import { extendSchema, type GraphQLSchema, parse } from 'graphql';
 import type { QueryResolvers } from '../../__generated__/resolvers.ts';
 import { aiAllowed } from '../ai-gate.ts';
 import { attachResolvers } from '../attach-resolvers.ts';
 import { resultRows } from '../blocking.ts';
-import { notFound } from '../errors.ts';
+import { loadOwnedProject } from '../owned.ts';
 import { failuresSinceTouched } from '../ready.ts';
 import { requireSession } from './auth.ts';
 
@@ -129,13 +128,7 @@ export function applyCardMarksExtension(schema: GraphQLSchema, options: { ai: bo
     // A person's, like the board it is drawn on.
     const userId = requireSession(context);
     const db = context.db as AnyRow;
-    const [project] = await db
-      .select({ id: dbSchema.projects.id, aiEnabled: dbSchema.projects.aiEnabled })
-      .from(dbSchema.projects)
-      .where(and(eq(dbSchema.projects.id, args.projectId), eq(dbSchema.projects.userId, userId)));
-    if (project === undefined) {
-      throw notFound('Project');
-    }
+    const project = await loadOwnedProject(db, userId, args.projectId);
 
     const runs = options.ai && project.aiEnabled && (await aiAllowed(context));
     const rows = await readMarks(db, userId, project.id, runs);

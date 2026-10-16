@@ -1,5 +1,5 @@
 import * as dbSchema from '@telos/db/schema';
-import { and, eq, isNull, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { extendSchema, type GraphQLSchema, parse } from 'graphql';
 import type { MutationResolvers } from '../../__generated__/resolvers.ts';
 import { requireAi } from '../ai-gate.ts';
@@ -7,6 +7,7 @@ import { attachResolvers } from '../attach-resolvers.ts';
 import type { Context } from '../context.ts';
 import { badInput, notFound } from '../errors.ts';
 import { findNewTodoLaneId } from '../lanes.ts';
+import { loadAiProject, loadAiTodo } from '../owned.ts';
 import { stampActor } from '../provenance.ts';
 
 // How AI hands work to the board. A request is a todo — there is no second
@@ -42,41 +43,6 @@ const REQUESTS_SDL = parse(`
     addTodoNote(todoId: ID!, body: String!): TodoNote!
   }
 `);
-
-/** A project of the caller's with AI on, or NOT_FOUND. */
-export async function loadAiProject(context: Context, userId: string, projectId: string): Promise<AnyRow> {
-  const [project] = await (context.db as AnyRow)
-    .select()
-    .from(dbSchema.projects)
-    .where(
-      and(
-        eq(dbSchema.projects.id, projectId),
-        eq(dbSchema.projects.userId, userId),
-        eq(dbSchema.projects.aiEnabled, true),
-      ),
-    );
-  if (!project) throw notFound('Project');
-  return project;
-}
-
-/** A todo of the caller's that AI may see, or NOT_FOUND. */
-export async function loadAiTodo(context: Context, userId: string, todoId: string): Promise<AnyRow> {
-  const [row] = await (context.db as AnyRow)
-    .select({ todo: dbSchema.todos })
-    .from(dbSchema.todos)
-    .innerJoin(dbSchema.projects, eq(dbSchema.projects.id, dbSchema.todos.projectId))
-    .where(
-      and(
-        eq(dbSchema.todos.id, todoId),
-        eq(dbSchema.todos.userId, userId),
-        eq(dbSchema.todos.aiIgnored, false),
-        isNull(dbSchema.todos.archivedAt),
-        eq(dbSchema.projects.aiEnabled, true),
-      ),
-    );
-  if (!row) throw notFound('Todo');
-  return row.todo;
-}
 
 /** Below the lane's last card, so a new request queues behind what is there. */
 export async function nextPosition(tx: AnyRow, projectId: string, laneId: string | null): Promise<number> {
@@ -130,9 +96,9 @@ export function applyRequestsExtension(schema: GraphQLSchema): GraphQLSchema {
   mutations.submitRequest = async (_parent, args, context) => {
     const userId = await requireAi(context);
     const title = requireText(args.title, 'title');
-    const project = await loadAiProject(context, userId, args.projectId);
+    const project = await loadAiProject(context.db, userId, args.projectId);
     if (args.parentId) {
-      const parent = await loadAiTodo(context, userId, args.parentId);
+      const parent = await loadAiTodo(context.db, userId, args.parentId);
       if (parent.projectId !== project.id) throw notFound('Parent todo');
     }
     return (context.db as AnyRow).transaction(async (tx: AnyRow) => {
@@ -157,7 +123,7 @@ export function applyRequestsExtension(schema: GraphQLSchema): GraphQLSchema {
 
   mutations.cancelRequest = async (_parent, args, context) => {
     const userId = await requireAi(context);
-    const todo = await loadAiTodo(context, userId, args.id);
+    const todo = await loadAiTodo(context.db, userId, args.id);
     const reason = args.reason?.trim() || null;
     await (context.db as AnyRow).transaction(async (tx: AnyRow) => {
       const note = reason ? await insertNote(tx, context, userId, todo.id, reason) : null;
@@ -173,7 +139,7 @@ export function applyRequestsExtension(schema: GraphQLSchema): GraphQLSchema {
   mutations.addTodoNote = async (_parent, args, context) => {
     const userId = await requireAi(context);
     const body = requireText(args.body, 'body');
-    const todo = await loadAiTodo(context, userId, args.todoId);
+    const todo = await loadAiTodo(context.db, userId, args.todoId);
     return insertNote(context.db, context, userId, todo.id, body);
   };
 

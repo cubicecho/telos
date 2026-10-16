@@ -5,7 +5,8 @@ import type { MutationResolvers } from '../../__generated__/resolvers.ts';
 import { requireAi } from '../ai-gate.ts';
 import { attachResolvers } from '../attach-resolvers.ts';
 import { badInput, forbidden } from '../errors.ts';
-import { loadAiTodo, requireText } from './requests.ts';
+import { loadAiTodo } from '../owned.ts';
+import { requireText } from './requests.ts';
 
 // Recording an artifact from outside a run. A todo's run reports what it
 // made through `finishRun`, where the runner has checked each location against
@@ -67,7 +68,7 @@ export function applyArtifactsExtension(schema: GraphQLSchema): GraphQLSchema {
         'A run records what it made with its own record_artifact tool, which the runner checks. This one is for work done outside a run.',
       );
     }
-    const todo = await loadAiTodo(context, userId, args.todoId);
+    const todo = await loadAiTodo(context.db, userId, args.todoId);
     const location = requireShortText(args.location, 'location', MAX_LOCATION);
     if (location.startsWith(NOTE_LOCATION)) {
       throw badInput(`A location under ${NOTE_LOCATION} is a note on the todo. Use add_todo_note to leave one.`);

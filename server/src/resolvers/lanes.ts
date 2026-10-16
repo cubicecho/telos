@@ -1,11 +1,12 @@
 import * as dbSchema from '@telos/db/schema';
-import { and, asc, eq, isNull } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
 import { extendSchema, type GraphQLSchema, parse } from 'graphql';
 import type { MutationResolvers } from '../../__generated__/resolvers.ts';
 import { attachResolvers } from '../attach-resolvers.ts';
 import { assertNotBlocked } from '../blocking.ts';
-import { badInput, notFound } from '../errors.ts';
+import { badInput } from '../errors.ts';
 import { syncLaneCompletion } from '../lanes.ts';
+import { loadOwnedLane, loadOwnedProject, loadOwnedTodo } from '../owned.ts';
 import { stampActor } from '../provenance.ts';
 import { requireAuth } from './auth.ts';
 
@@ -40,26 +41,6 @@ const LANES_SDL = parse(`
     reorderLanes(projectId: ID!, laneIds: [ID!]!): [Lane!]!
   }
 `);
-
-async function loadOwnedLane(db: AnyRow, userId: string, id: string): Promise<AnyRow> {
-  const rows = await db
-    .select()
-    .from(dbSchema.lanes)
-    .where(and(eq(dbSchema.lanes.id, id), eq(dbSchema.lanes.userId, userId)))
-    .limit(1);
-  if (rows.length === 0) throw notFound('Lane');
-  return rows[0];
-}
-
-async function loadOwnedProject(db: AnyRow, userId: string, id: string): Promise<AnyRow> {
-  const rows = await db
-    .select()
-    .from(dbSchema.projects)
-    .where(and(eq(dbSchema.projects.id, id), eq(dbSchema.projects.userId, userId)))
-    .limit(1);
-  if (rows.length === 0) throw notFound('Project');
-  return rows[0];
-}
 
 function projectLanes(db: AnyRow, projectId: string): Promise<AnyRow[]> {
   return db
@@ -111,14 +92,7 @@ export function applyLanesExtension(schema: GraphQLSchema): GraphQLSchema {
 
     return db.transaction(async (tx: AnyRow) => {
       await stampActor(tx, context.actor, { reason: args.reason });
-      const [todo] = await tx
-        .select()
-        .from(dbSchema.todos)
-        .where(
-          and(eq(dbSchema.todos.id, args.id), eq(dbSchema.todos.userId, userId), isNull(dbSchema.todos.archivedAt)),
-        )
-        .limit(1);
-      if (!todo) throw notFound('Todo');
+      const todo = await loadOwnedTodo(tx, userId, args.id);
 
       const lane = await loadOwnedLane(tx, userId, args.laneId);
       if (lane.projectId !== todo.projectId) {

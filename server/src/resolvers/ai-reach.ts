@@ -2,8 +2,8 @@ import * as dbSchema from '@telos/db/schema';
 import { and, eq } from 'drizzle-orm';
 import type { Context } from '../context.ts';
 import { notFound } from '../errors.ts';
+import { loadAiProject, loadAiTodo } from '../owned.ts';
 import { requireAuth } from './auth.ts';
-import { loadAiProject, loadAiTodo } from './requests.ts';
 
 // What an AI caller's arguments may name. The mutations a person's screens call
 // check that a row is the caller's and no more, since a person may touch all of
@@ -76,7 +76,7 @@ async function assertAiRun(context: Context, userId: string, id: string): Promis
   if (!run?.todoId) {
     throw notFound('Run');
   }
-  await loadAiTodo(context, userId, run.todoId).catch(() => {
+  await loadAiTodo(context.db, userId, run.todoId).catch(() => {
     throw notFound('Run');
   });
 }
@@ -96,13 +96,13 @@ async function assertSeen(context: Context, userId: string, named: Named, id: st
     throw notFound(ENTITY[named]);
   }
   if (named === 'project') {
-    await loadAiProject(context, userId, id);
+    await loadAiProject(context.db, userId, id);
   } else if (named === 'lane') {
     await assertAiLane(context, userId, id);
   } else if (named === 'run') {
     await assertAiRun(context, userId, id);
   } else {
-    await loadAiTodo(context, userId, id);
+    await loadAiTodo(context.db, userId, id);
   }
 }
 

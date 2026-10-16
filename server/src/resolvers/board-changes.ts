@@ -1,10 +1,9 @@
-import * as dbSchema from '@telos/db/schema';
-import { and, eq } from 'drizzle-orm';
 import { extendSchema, type GraphQLSchema, parse } from 'graphql';
 import type { SubscriptionResolvers } from '../../__generated__/resolvers.ts';
 import { attachResolvers } from '../attach-resolvers.ts';
 import { type BoardChange, boardEventsFor } from '../board-events.ts';
-import { forbidden, notFound } from '../errors.ts';
+import { forbidden } from '../errors.ts';
+import { loadOwnedProject } from '../owned.ts';
 import { requireAuth } from './auth.ts';
 
 // Live boards: `boardChanged` says a project changed, and which table, as each
@@ -13,9 +12,6 @@ import { requireAuth } from './auth.ts';
 //
 // For the person who owns the project. An MCP client or an agent works a board
 // through tools and cannot hold a socket open, so it has no use for one.
-
-// biome-ignore lint/suspicious/noExplicitAny: drizzle-orm 1.0 table/column type compat
-type AnyRow = any;
 
 const BOARD_CHANGES_SDL = (hasRoot: boolean) =>
   parse(`
@@ -44,11 +40,7 @@ export function applyBoardChangesExtension(schema: GraphQLSchema): GraphQLSchema
       if (context.actor.kind !== 'user') {
         throw forbidden('Only a person can watch a board.');
       }
-      const [project] = await (context.db as AnyRow)
-        .select({ id: dbSchema.projects.id })
-        .from(dbSchema.projects)
-        .where(and(eq(dbSchema.projects.id, args.projectId), eq(dbSchema.projects.userId, userId)));
-      if (!project) throw notFound('Project');
+      const project = await loadOwnedProject(context.db, userId, args.projectId);
 
       const events = boardEventsFor(context.db);
       await events.listening();
