@@ -1,8 +1,9 @@
 import * as dbSchema from '@telos/db/schema';
 import { and, asc, eq, isNotNull, isNull, lte, or } from 'drizzle-orm';
-import { extendSchema, type GraphQLObjectType, type GraphQLSchema, parse } from 'graphql';
+import { extendSchema, type GraphQLSchema, parse } from 'graphql';
+import type { MutationResolvers } from '../../__generated__/resolvers.ts';
 import { requireSystem } from '../ai-gate.ts';
-import type { Context } from '../context.ts';
+import { attachResolvers } from '../attach-resolvers.ts';
 import { instanceAiOn } from '../instance.ts';
 import { serversFor } from '../mcp-servers.ts';
 import { markRunnerSeen } from '../runner-seen.ts';
@@ -22,9 +23,6 @@ import { markRunnerSeen } from '../runner-seen.ts';
 // since the project may be gone with the todo.
 //
 // Applied only when the instance has AI on.
-
-// biome-ignore lint/suspicious/noExplicitAny: drizzle-orm 1.0 table/column type compat
-type AnyRow = any;
 
 const SESSION_DELETES_SDL = parse(`
   "A deleted todo's session, which an agent's MCP servers have yet to be told is gone."
@@ -101,20 +99,16 @@ function warnDropped(session: dbSchema.TodoSession, reason: string | null): void
  */
 export function applySessionDeletesExtension(schema: GraphQLSchema): GraphQLSchema {
   const extendedSchema = extendSchema(schema, SESSION_DELETES_SDL);
-  const mutations = (extendedSchema.getType('Mutation') as GraphQLObjectType).getFields();
+  const mutations: MutationResolvers = {};
 
-  mutations.takeSessionDeletes.resolve = async (
-    _parent: unknown,
-    args: { limit?: number | null },
-    context: Context,
-  ) => {
+  mutations.takeSessionDeletes = async (_parent, args, context) => {
     requireSystem(context);
     markRunnerSeen();
     if ((await instanceAiOn(context.db)) === false) {
       return [];
     }
     const limit = Math.min(Math.max(args.limit ?? DEFAULT_LIMIT, 1), MAX_LIMIT);
-    return (context.db as AnyRow).transaction(async (tx: AnyRow) => {
+    return context.db.transaction(async (tx) => {
       const now = new Date();
       const owed: Array<{ session: dbSchema.TodoSession; agent: dbSchema.Agent }> = await tx
         .select({ session: dbSchema.todoSessions, agent: dbSchema.agents })
@@ -161,13 +155,9 @@ export function applySessionDeletesExtension(schema: GraphQLSchema): GraphQLSche
     });
   };
 
-  mutations.finishSessionDelete.resolve = async (
-    _parent: unknown,
-    args: { id: string; error?: string | null },
-    context: Context,
-  ) => {
+  mutations.finishSessionDelete = async (_parent, args, context) => {
     requireSystem(context);
-    return (context.db as AnyRow).transaction(async (tx: AnyRow) => {
+    return context.db.transaction(async (tx) => {
       const [session]: dbSchema.TodoSession[] = await tx
         .select()
         .from(dbSchema.todoSessions)
@@ -193,5 +183,5 @@ export function applySessionDeletesExtension(schema: GraphQLSchema): GraphQLSche
     });
   };
 
-  return extendedSchema;
+  return attachResolvers(extendedSchema, { Mutation: mutations });
 }

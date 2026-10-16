@@ -1,10 +1,14 @@
 import * as dbSchema from '@telos/db/schema';
 import { and, eq, inArray, isNull } from 'drizzle-orm';
-import { extendSchema, GraphQLError, type GraphQLObjectType, type GraphQLSchema, parse } from 'graphql';
+import { extendSchema, type GraphQLSchema, parse } from 'graphql';
+import type { MutationResolvers, ProjectResolvers, TodoResolvers } from '../../__generated__/resolvers.ts';
+import { attachResolvers } from '../attach-resolvers.ts';
 import { assertNoCycle, assertNotBlocked } from '../blocking.ts';
 import { appLink } from '../config.ts';
 import { type Context, isAiActor } from '../context.ts';
+import { badInput, forbidden, notFound } from '../errors.ts';
 import { findDoneLaneId, findFirstOpenLaneId } from '../lanes.ts';
+import { loadOwnedTodo } from '../owned.ts';
 import { stampActor } from '../provenance.ts';
 import { requireAuth } from './auth.ts';
 
@@ -63,32 +67,12 @@ const TODOS_SDL = parse(`
   }
 `);
 
-/**
- * A todo the caller owns, or NOT_FOUND. The hand-written mutations sit outside
- * the generated resolvers, so they do not inherit the `scope` from tenancy.ts
- * and have to state ownership themselves.
- */
-async function loadOwnedTodo(context: Context, id: string): Promise<AnyRow> {
-  const userId = requireAuth(context);
-  const rows = await (context.db as AnyRow)
-    .select()
-    .from(dbSchema.todos)
-    .where(and(eq(dbSchema.todos.id, id), eq(dbSchema.todos.userId, userId), isNull(dbSchema.todos.archivedAt)))
-    .limit(1);
-  if (rows.length === 0) {
-    throw new GraphQLError('Todo not found', { extensions: { code: 'NOT_FOUND' } });
-  }
-  return rows[0];
-}
-
 /** Refuses an edge that would leave `todo` completed and waiting at once. */
 function assertNotCompletedBehind(todo: AnyRow, blocker: AnyRow): void {
   if (todo.completedAt != null && blocker.completedAt == null) {
     // Otherwise the todo would sit completed and blocked at once, and
     // `isBlocked` would stop meaning "cannot be completed".
-    throw new GraphQLError('Reopen this todo before making it depend on an open one.', {
-      extensions: { code: 'BAD_USER_INPUT' },
-    });
+    throw badInput('Reopen this todo before making it depend on an open one.');
   }
 }
 
@@ -109,7 +93,7 @@ async function setCompletedAt(
   reason: string | null | undefined,
 ): Promise<AnyRow> {
   const userId = requireAuth(context);
-  return (context.db as AnyRow).transaction(async (tx: AnyRow) => {
+  return context.db.transaction(async (tx) => {
     await stampActor(tx, context.actor, { reason });
     const laneId = completedAt
       ? await findDoneLaneId(tx, todo.projectId)
@@ -119,7 +103,7 @@ async function setCompletedAt(
       .set({ completedAt, updatedAt: new Date(), ...(laneId ? { laneId } : {}) })
       .where(and(eq(dbSchema.todos.id, todo.id), eq(dbSchema.todos.userId, userId)))
       .returning();
-    if (!updated) throw new GraphQLError('Todo not found', { extensions: { code: 'NOT_FOUND' } });
+    if (!updated) throw notFound('Todo');
     return updated;
   });
 }
@@ -134,7 +118,7 @@ async function visibleToAi(context: Context, blockers: AnyRow[]): Promise<AnyRow
   const candidates = blockers.filter((row) => !row.aiIgnored);
   if (candidates.length === 0) return [];
   const projectIds = [...new Set(candidates.map((row) => String(row.projectId)))];
-  const open: Array<{ id: string }> = await (context.db as AnyRow)
+  const open: Array<{ id: string }> = await context.db
     .select({ id: dbSchema.projects.id })
     .from(dbSchema.projects)
     .where(and(inArray(dbSchema.projects.id, projectIds), eq(dbSchema.projects.aiEnabled, true)));
@@ -155,7 +139,7 @@ async function hiddenFromAi(context: Context, userId: string, ids: string[]): Pr
   if (ids.length === 0) {
     return [];
   }
-  const seen: Array<{ id: string }> = await (context.db as AnyRow)
+  const seen: Array<{ id: string }> = await context.db
     .select({ id: dbSchema.todos.id })
     .from(dbSchema.todos)
     .innerJoin(dbSchema.projects, eq(dbSchema.projects.id, dbSchema.todos.projectId))
@@ -175,53 +159,53 @@ async function hiddenFromAi(context: Context, userId: string, ids: string[]): Pr
 export function applyTodosExtension(schema: GraphQLSchema): GraphQLSchema {
   const extendedSchema = extendSchema(schema, TODOS_SDL);
 
-  const todoFields = (extendedSchema.getType('Todo') as GraphQLObjectType).getFields();
-  todoFields.isBlocked.resolve = (parent: AnyRow, _args: unknown, context: Context) =>
-    context.loaders.blocked.load(String(parent.id));
-  todoFields.blockedBy.resolve = async (parent: AnyRow, _args: unknown, context: Context) => {
+  const todoFields: TodoResolvers = {};
+  todoFields.isBlocked = (parent, _args, context) => context.loaders.blocked.load(String(parent.id));
+  todoFields.blockedBy = async (parent, _args, context) => {
     const blockers = await context.loaders.blockers.load(String(parent.id));
     return isAiActor(context) ? visibleToAi(context, blockers) : blockers;
   };
-  todoFields.url.resolve = (parent: AnyRow) => appLink(`/todos/${parent.id}`);
-  todoFields.pieceCount.resolve = async (parent: AnyRow, _args: unknown, context: Context) =>
+  todoFields.url = (parent) => appLink(`/todos/${parent.id}`);
+  todoFields.pieceCount = async (parent, _args, context) =>
     (await context.loaders.pieceCounts.load(String(parent.id))).total;
-  todoFields.donePieceCount.resolve = async (parent: AnyRow, _args: unknown, context: Context) => {
+  todoFields.donePieceCount = async (parent, _args, context) => {
     const pieces = await context.loaders.pieceCounts.load(String(parent.id));
     return pieces.total - pieces.open;
   };
 
-  const projectFields = (extendedSchema.getType('Project') as GraphQLObjectType).getFields();
-  projectFields.todoCount.resolve = async (parent: AnyRow, _args: unknown, context: Context) =>
+  const projectFields: ProjectResolvers = {};
+  projectFields.todoCount = async (parent, _args, context) =>
     (await context.loaders.todoCounts.load(String(parent.id))).total;
-  projectFields.openTodoCount.resolve = async (parent: AnyRow, _args: unknown, context: Context) =>
+  projectFields.openTodoCount = async (parent, _args, context) =>
     (await context.loaders.todoCounts.load(String(parent.id))).open;
-  projectFields.url.resolve = (parent: AnyRow) => appLink(`/projects/${parent.id}`);
+  projectFields.url = (parent) => appLink(`/projects/${parent.id}`);
 
-  const mutations = (extendedSchema.getType('Mutation') as GraphQLObjectType).getFields();
+  const mutations: MutationResolvers = {};
 
-  type TransitionArgs = { id: string; reason?: string | null };
-
-  mutations.completeTodo.resolve = async (_parent: unknown, args: TransitionArgs, context: Context) => {
-    const todo = await loadOwnedTodo(context, args.id);
+  mutations.completeTodo = async (_parent, args, context) => {
+    const userId = requireAuth(context);
+    const todo = await loadOwnedTodo(context.db, userId, args.id);
     if (todo.completedAt != null) return todo;
     await assertNotBlocked(context.db, [args.id]);
     return setCompletedAt(context, todo, new Date(), args.reason);
   };
 
-  mutations.reopenTodo.resolve = async (_parent: unknown, args: TransitionArgs, context: Context) => {
-    const todo = await loadOwnedTodo(context, args.id);
+  mutations.reopenTodo = async (_parent, args, context) => {
+    const userId = requireAuth(context);
+    const todo = await loadOwnedTodo(context.db, userId, args.id);
     if (todo.completedAt == null) return todo;
     return setCompletedAt(context, todo, null, args.reason);
   };
 
-  mutations.unsplitTodo.resolve = async (_parent: unknown, args: TransitionArgs, context: Context) => {
-    const todo = await loadOwnedTodo(context, args.id);
+  mutations.unsplitTodo = async (_parent, args, context) => {
+    const userId = requireAuth(context);
+    const todo = await loadOwnedTodo(context.db, userId, args.id);
     const byPerson = context.actor.kind === 'user';
     if (byPerson === false) {
-      throw new GraphQLError('Only a person can unsplit a todo.', { extensions: { code: 'FORBIDDEN' } });
+      throw forbidden('Only a person can unsplit a todo.');
     }
     if (todo.splitAt == null) return todo;
-    return (context.db as AnyRow).transaction(async (tx: AnyRow) => {
+    return context.db.transaction(async (tx) => {
       await stampActor(tx, context.actor, { reason: args.reason });
       const [updated] = await tx
         .update(dbSchema.todos)
@@ -232,34 +216,26 @@ export function applyTodosExtension(schema: GraphQLSchema): GraphQLSchema {
     });
   };
 
-  mutations.addTodoDependency.resolve = async (
-    _parent: unknown,
-    args: { todoId: string; dependsOnTodoId: string },
-    context: Context,
-  ) => {
+  mutations.addTodoDependency = async (_parent, args, context) => {
     const userId = requireAuth(context);
     // Both ends must be the caller's — otherwise the edge would leak whether a
     // stranger's todo exists, and later report it as a blocker.
     const [todo, blocker] = await Promise.all([
-      loadOwnedTodo(context, args.todoId),
-      loadOwnedTodo(context, args.dependsOnTodoId),
+      loadOwnedTodo(context.db, userId, args.todoId),
+      loadOwnedTodo(context.db, userId, args.dependsOnTodoId),
     ]);
     assertNotCompletedBehind(todo, blocker);
     await assertNoCycle(context.db, args.todoId, args.dependsOnTodoId);
-    await (context.db as AnyRow)
+    await context.db
       .insert(dbSchema.todoDependencies)
       .values({ userId, todoId: args.todoId, dependsOnTodoId: args.dependsOnTodoId })
       .onConflictDoNothing();
-    return loadOwnedTodo(context, args.todoId);
+    return loadOwnedTodo(context.db, userId, args.todoId);
   };
 
-  mutations.removeTodoDependency.resolve = async (
-    _parent: unknown,
-    args: { todoId: string; dependsOnTodoId: string },
-    context: Context,
-  ) => {
+  mutations.removeTodoDependency = async (_parent, args, context) => {
     const userId = requireAuth(context);
-    await (context.db as AnyRow)
+    await context.db
       .delete(dbSchema.todoDependencies)
       .where(
         and(
@@ -268,18 +244,14 @@ export function applyTodosExtension(schema: GraphQLSchema): GraphQLSchema {
           eq(dbSchema.todoDependencies.dependsOnTodoId, args.dependsOnTodoId),
         ),
       );
-    return loadOwnedTodo(context, args.todoId);
+    return loadOwnedTodo(context.db, userId, args.todoId);
   };
 
-  mutations.setTodoDependencies.resolve = async (
-    _parent: unknown,
-    args: { id: string; dependsOn: string[] },
-    context: Context,
-  ) => {
+  mutations.setTodoDependencies = async (_parent, args, context) => {
     const userId = requireAuth(context);
-    const todo = await loadOwnedTodo(context, args.id);
+    const todo = await loadOwnedTodo(context.db, userId, args.id);
     const wanted = new Set(args.dependsOn);
-    const existing: Array<{ dependsOnTodoId: string }> = await (context.db as AnyRow)
+    const existing: Array<{ dependsOnTodoId: string }> = await context.db
       .select({ dependsOnTodoId: dbSchema.todoDependencies.dependsOnTodoId })
       .from(dbSchema.todoDependencies)
       .where(and(eq(dbSchema.todoDependencies.userId, userId), eq(dbSchema.todoDependencies.todoId, todo.id)));
@@ -295,11 +267,11 @@ export function applyTodosExtension(schema: GraphQLSchema): GraphQLSchema {
     const added = [...wanted].filter((id) => kept.has(id) === false);
     for (const id of added) {
       if (id === todo.id) {
-        throw new GraphQLError('A todo cannot depend on itself.', { extensions: { code: 'BAD_USER_INPUT' } });
+        throw badInput('A todo cannot depend on itself.');
       }
-      assertNotCompletedBehind(todo, await loadOwnedTodo(context, id));
+      assertNotCompletedBehind(todo, await loadOwnedTodo(context.db, userId, id));
     }
-    await (context.db as AnyRow).transaction(async (tx: AnyRow) => {
+    await context.db.transaction(async (tx) => {
       if (dropped.length > 0) {
         await tx
           .delete(dbSchema.todoDependencies)
@@ -321,8 +293,8 @@ export function applyTodosExtension(schema: GraphQLSchema): GraphQLSchema {
           .onConflictDoNothing();
       }
     });
-    return loadOwnedTodo(context, todo.id);
+    return loadOwnedTodo(context.db, userId, todo.id);
   };
 
-  return extendedSchema;
+  return attachResolvers(extendedSchema, { Todo: todoFields, Project: projectFields, Mutation: mutations });
 }

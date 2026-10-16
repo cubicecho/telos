@@ -1,7 +1,7 @@
 import { useQuery } from '@apollo/client';
 import { useMemo } from 'react';
 import { Text, View } from 'react-native';
-import type { ProjectActivityQuery } from '@/__generated__/graphql';
+import { type ProjectActivityQuery, WorkState } from '@/__generated__/graphql';
 import { ProjectActivityDocument } from '@/lib/graphql';
 import { DRAFT_RUN, LiveDot } from './run-log';
 
@@ -84,14 +84,15 @@ export function useProjectActivity(projectId: string, { skip = false }: { skip?:
   const drafting = useMemo(() => (rows ?? []).filter((run) => run.kind === DRAFT_RUN), [rows]);
   const work = query.data?.work.todos;
   const stuck = useMemo(
-    () => new Map((work ?? []).filter((todo) => todo.state === 'handedBack').map((todo) => [todo.todoId, todo])),
+    () =>
+      new Map((work ?? []).filter((todo) => todo.state === WorkState.HandedBack).map((todo) => [todo.todoId, todo])),
     [work],
   );
   const waiting = useMemo(
     () =>
       new Map(
         (work ?? [])
-          .filter((todo) => todo.awaitsRun || (todo.runRequested && todo.state === 'queued'))
+          .filter((todo) => todo.awaitsRun || (todo.runRequested && todo.state === WorkState.Queued))
           .map((todo) => [todo.todoId, todo]),
       ),
     [work],

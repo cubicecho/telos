@@ -1,10 +1,16 @@
+import type { DB } from '@telos/db';
 import * as dbSchema from '@telos/db/schema';
-import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm';
-import { extendSchema, GraphQLError, type GraphQLObjectType, type GraphQLSchema, parse } from 'graphql';
+import { and, asc, eq, inArray, sql } from 'drizzle-orm';
+import { extendSchema, type GraphQLSchema, parse } from 'graphql';
+import type { MutationResolvers, QueryResolvers } from '../../__generated__/resolvers.ts';
 import { requireAi } from '../ai-gate.ts';
+import { attachResolvers } from '../attach-resolvers.ts';
 import { resultRows } from '../blocking.ts';
-import type { Actor, Context } from '../context.ts';
-import { type WorkState, workStates } from '../ready.ts';
+import type { Actor } from '../context.ts';
+import { HandBackEnum, WORK_STATES, type WorkState, WorkStateEnum, withEnums } from '../enums.ts';
+import { badInput, conflict } from '../errors.ts';
+import { loadOwnedTodo } from '../owned.ts';
+import { workStates } from '../ready.ts';
 import { runnerSeenAt } from '../runner-seen.ts';
 
 // Lanes' agents, as a person reads them: what they handed back, what is running,
@@ -25,12 +31,11 @@ const AI_STATUS_SDL = parse(`
     title: String!
     projectId: ID!
     laneId: ID
-    "handedBack, running, waiting (an umbrella, done when its pieces are), blocked, queued or parked."
-    state: String!
+    state: WorkState!
     "Why it is where it is, when that needs saying."
     reason: String
-    "Why its lane's agent handed it back: gaveUp (it failed more times than the lane allows) or finished (with nowhere to send it). Null unless its state is handedBack."
-    handedBack: String
+    "Why its lane's agent handed it back. Null unless its state is HANDED_BACK."
+    handedBack: HandBack
     "Failed runs since a person last touched it, or anyone sent it round again."
     failures: Int!
     "The run working it now."
@@ -98,18 +103,10 @@ const RUN_EVENT = 'run' as const;
  * @param id - The todo.
  * @returns The todo's row.
  */
-async function restingTodo(db: AnyRow, userId: string, id: string): Promise<AnyRow> {
-  const [todo] = await db
-    .select()
-    .from(dbSchema.todos)
-    .where(and(eq(dbSchema.todos.id, id), eq(dbSchema.todos.userId, userId), isNull(dbSchema.todos.archivedAt)));
-  if (todo === undefined) {
-    throw new GraphQLError('Todo not found', { extensions: { code: 'NOT_FOUND' } });
-  }
+async function restingTodo(db: DB, userId: string, id: string): Promise<AnyRow> {
+  const todo = await loadOwnedTodo(db, userId, id);
   if (todo.laneId === null) {
-    throw new GraphQLError('It is in no lane, so no agent can take it. Move it to a lane with an agent.', {
-      extensions: { code: 'BAD_USER_INPUT' },
-    });
+    throw badInput('It is in no lane, so no agent can take it. Move it to a lane with an agent.');
   }
   const [live] = await db
     .select({ id: dbSchema.runs.id })
@@ -122,7 +119,7 @@ async function restingTodo(db: AnyRow, userId: string, id: string): Promise<AnyR
       ),
     );
   if (live !== undefined) {
-    throw new GraphQLError('An agent is working it now.', { extensions: { code: 'CONFLICT' } });
+    throw conflict('An agent is working it now.');
   }
   return todo;
 }
@@ -140,7 +137,7 @@ async function restingTodo(db: AnyRow, userId: string, id: string): Promise<AnyR
  * @returns Nothing.
  */
 async function recordNudge(
-  db: AnyRow,
+  db: DB,
   actor: Actor,
   todo: AnyRow,
   kind: typeof RETRY_EVENT | typeof RUN_EVENT,
@@ -167,7 +164,7 @@ async function recordNudge(
  * @param todo - The todo's row.
  * @returns The reason, as a sentence for the person who asked.
  */
-async function whyNotRunnable(db: AnyRow, todo: AnyRow): Promise<string | null> {
+async function whyNotRunnable(db: DB, todo: AnyRow): Promise<string | null> {
   const [row] = resultRows<{
     ai_enabled: boolean;
     project_archived: boolean;
@@ -216,16 +213,14 @@ async function whyNotRunnable(db: AnyRow, todo: AnyRow): Promise<string | null> 
   return null;
 }
 
-const STATES: WorkState[] = ['handedBack', 'running', 'waiting', 'blocked', 'queued', 'parked', 'done'];
-
 export function applyAiStatusExtension(schema: GraphQLSchema): GraphQLSchema {
-  const extendedSchema = extendSchema(schema, AI_STATUS_SDL);
-  const queries = (extendedSchema.getType('Query') as GraphQLObjectType).getFields();
-  const mutations = (extendedSchema.getType('Mutation') as GraphQLObjectType).getFields();
+  const extendedSchema = extendSchema(withEnums(schema, [WorkStateEnum, HandBackEnum]), AI_STATUS_SDL);
+  const queries: QueryResolvers = {};
+  const mutations: MutationResolvers = {};
 
-  queries.aiStatus.resolve = async (_parent: unknown, args: { projectId?: string | null }, context: Context) => {
+  queries.aiStatus = async (_parent, args, context) => {
     const userId = await requireAi(context);
-    const db = context.db as AnyRow;
+    const db = context.db;
     const { todos, done } = await workStates(db, userId, args.projectId);
 
     const projects: AnyRow[] = await db
@@ -254,12 +249,8 @@ export function applyAiStatusExtension(schema: GraphQLSchema): GraphQLSchema {
             )
             .orderBy(asc(dbSchema.lanes.position));
 
-    const tallies = new Map<string, Record<WorkState, number>>(
-      lanes.map((lane) => [
-        lane.id,
-        Object.fromEntries(STATES.map((state) => [state, 0])) as Record<WorkState, number>,
-      ]),
-    );
+    const noTally = () => Object.fromEntries(WORK_STATES.map((state) => [state, 0])) as Record<WorkState, number>;
+    const tallies = new Map<string, Record<WorkState, number>>(lanes.map((lane) => [lane.id, noTally()]));
     for (const todo of todos) {
       const tally = todo.laneId ? tallies.get(todo.laneId) : undefined;
       if (tally) tally[todo.state] += 1;
@@ -281,32 +272,28 @@ export function applyAiStatusExtension(schema: GraphQLSchema): GraphQLSchema {
             name: lane.name,
             station: lane.agentId != null,
             isDone: lane.isDone,
-            ...tallies.get(lane.id),
+            ...(tallies.get(lane.id) ?? noTally()),
           })),
       })),
       runnerSeenAt: runnerSeenAt(),
     };
   };
 
-  mutations.retryTodo.resolve = async (
-    _parent: unknown,
-    args: { id: string; reason?: string | null },
-    context: Context,
-  ) => {
+  mutations.retryTodo = async (_parent, args, context) => {
     const userId = await requireAi(context);
-    const db = context.db as AnyRow;
+    const db = context.db;
     const todo = await restingTodo(db, userId, args.id);
     await recordNudge(db, context.actor, todo, RETRY_EVENT, args.reason);
     return true;
   };
 
-  mutations.runTodo.resolve = async (_parent: unknown, args: { id: string }, context: Context) => {
+  mutations.runTodo = async (_parent, args, context) => {
     const userId = await requireAi(context);
-    return (context.db as AnyRow).transaction(async (tx: AnyRow) => {
+    return context.db.transaction(async (tx) => {
       const todo = await restingTodo(tx, userId, args.id);
       const refusal = await whyNotRunnable(tx, todo);
       if (refusal !== null) {
-        throw new GraphQLError(refusal, { extensions: { code: 'BAD_USER_INPUT' } });
+        throw badInput(refusal);
       }
       await recordNudge(tx, context.actor, todo, RUN_EVENT);
       // The history trigger reads none of this column, so asking writes the
@@ -320,5 +307,5 @@ export function applyAiStatusExtension(schema: GraphQLSchema): GraphQLSchema {
     });
   };
 
-  return extendedSchema;
+  return attachResolvers(extendedSchema, { Query: queries, Mutation: mutations });
 }

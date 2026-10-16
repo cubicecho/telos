@@ -1,8 +1,10 @@
+import type { DB } from '@telos/db';
 import { sql } from 'drizzle-orm';
-import { extendSchema, type GraphQLObjectType, type GraphQLSchema, parse } from 'graphql';
+import { extendSchema, type GraphQLSchema, parse } from 'graphql';
+import type { QueryResolvers } from '../../__generated__/resolvers.ts';
 import { requireAi } from '../ai-gate.ts';
+import { attachResolvers } from '../attach-resolvers.ts';
 import { resultRows } from '../blocking.ts';
-import type { Context } from '../context.ts';
 import { runnerSeenAt } from '../runner-seen.ts';
 
 // What still stands between an account and its first run, once AI is on for
@@ -10,9 +12,6 @@ import { runnerSeenAt } from '../runner-seen.ts';
 // remembered; every answer is what the tables say now.
 //
 // Applied only when the instance has AI on.
-
-// biome-ignore lint/suspicious/noExplicitAny: drizzle-orm 1.0 table/column type compat
-type AnyDb = any;
 
 const AI_SETUP_SDL = parse(`
   "What is in place for an agent to work a todo of yours. Read now, never remembered."
@@ -55,7 +54,7 @@ interface SetupRow {
  * @param userId - The account.
  * @returns The answers, apart from the runner's.
  */
-async function readSetup(db: AnyDb, userId: string): Promise<SetupRow> {
+async function readSetup(db: DB, userId: string): Promise<SetupRow> {
   const result = await db.execute(sql`
     WITH agent_projects AS (
       SELECT p.id, p.ai_enabled, p.auto_run, p.created_at
@@ -105,9 +104,9 @@ async function readSetup(db: AnyDb, userId: string): Promise<SetupRow> {
  */
 export function applyAiSetupExtension(schema: GraphQLSchema): GraphQLSchema {
   const extendedSchema = extendSchema(schema, AI_SETUP_SDL);
-  const queries = (extendedSchema.getType('Query') as GraphQLObjectType).getFields();
+  const queries: QueryResolvers = {};
 
-  queries.aiSetup.resolve = async (_parent: unknown, _args: unknown, context: Context) => {
+  queries.aiSetup = async (_parent, _args, context) => {
     const userId = await requireAi(context);
     const row = await readSetup(context.db, userId);
     return {
@@ -121,5 +120,5 @@ export function applyAiSetupExtension(schema: GraphQLSchema): GraphQLSchema {
     };
   };
 
-  return extendedSchema;
+  return attachResolvers(extendedSchema, { Query: queries });
 }

@@ -39,7 +39,7 @@ async function status(): Promise<any> {
 
 async function fail(todoId: string): Promise<void> {
   const claim = (await runner.expectOk(CLAIM, { todoId, laneId: board.lanes[0].id })).claimRun;
-  await runner.expectOk(FINISH, { id: claim.runId, result: { status: 'error', error: 'It broke.' } });
+  await runner.expectOk(FINISH, { id: claim.runId, result: { status: 'ERROR', error: 'It broke.' } });
 }
 
 describe('aiStatus', () => {
@@ -61,10 +61,10 @@ describe('aiStatus', () => {
 
     const now = await status();
     const byId = new Map(now.todos.map((todo: { todoId: string }) => [todo.todoId, todo]));
-    expect(byId.get(queued)).toMatchObject({ state: 'queued', reason: null });
-    expect(byId.get(running)).toMatchObject({ state: 'running', liveRunId: run.runId });
-    expect(byId.get(blocked)).toMatchObject({ state: 'blocked', reason: 'Waiting on Queued.' });
-    expect(byId.get(parked)).toMatchObject({ state: 'parked', reason: 'In progress has no agent.' });
+    expect(byId.get(queued)).toMatchObject({ state: 'QUEUED', reason: null });
+    expect(byId.get(running)).toMatchObject({ state: 'RUNNING', liveRunId: run.runId });
+    expect(byId.get(blocked)).toMatchObject({ state: 'BLOCKED', reason: 'Waiting on Queued.' });
+    expect(byId.get(parked)).toMatchObject({ state: 'PARKED', reason: 'In progress has no agent.' });
 
     const [project] = now.projects;
     expect(project.lanes[0]).toMatchObject({ station: true, queued: 1, running: 1, blocked: 1 });
@@ -79,12 +79,12 @@ describe('aiStatus', () => {
     expect((await runner.expectOk(QUEUE)).runnerQueue).toEqual([]);
 
     const [stuck] = (await status()).todos;
-    expect(stuck).toMatchObject({ state: 'handedBack', reason: 'It broke.', failures: 2 });
+    expect(stuck).toMatchObject({ state: 'HANDED_BACK', reason: 'It broke.', failures: 2 });
 
     await board.person.expectOk(`mutation ($id: ID!) { retryTodo(id: $id, reason: "Try the other way.") }`, {
       id: todoId,
     });
-    expect((await status()).todos[0]).toMatchObject({ state: 'queued', failures: 0 });
+    expect((await status()).todos[0]).toMatchObject({ state: 'QUEUED', failures: 0 });
     expect((await runner.expectOk(QUEUE)).runnerQueue).toEqual([
       { todoId, laneId: board.lanes[0].id, projectId: board.projectId },
     ]);
@@ -94,13 +94,13 @@ describe('aiStatus', () => {
     await setLane(board.person, board.lanes[0].id, { onSuccessLaneId: null });
     const todoId = await board.addTodo('Written');
     const claim = (await runner.expectOk(CLAIM, { todoId, laneId: board.lanes[0].id })).claimRun;
-    await runner.expectOk(FINISH, { id: claim.runId, result: { status: 'ok', output: 'Done.' } });
+    await runner.expectOk(FINISH, { id: claim.runId, result: { status: 'OK', output: 'Done.' } });
     expect((await status()).todos[0]).toMatchObject({
-      state: 'handedBack',
+      state: 'HANDED_BACK',
       reason: 'To do finished with it and has nowhere to send it.',
     });
     await board.person.expectOk(`mutation ($id: ID!) { retryTodo(id: $id) }`, { id: todoId });
-    expect((await status()).todos[0].state).toBe('queued');
+    expect((await status()).todos[0].state).toBe('QUEUED');
   });
 
   it('parks what an agent would take while auto-run is off, and lets a running todo finish', async () => {
@@ -113,12 +113,12 @@ describe('aiStatus', () => {
     expect((await runner.expectOk(QUEUE)).runnerQueue).toEqual([]);
     expect((await runner.expectOk(CLAIM, { todoId: waiting, laneId: board.lanes[0].id })).claimRun).toBeNull();
     const byId = new Map((await status()).todos.map((todo: { todoId: string }) => [todo.todoId, todo]));
-    expect(byId.get(waiting)).toMatchObject({ state: 'parked', reason: 'Auto-run is off.' });
-    expect(byId.get(running)).toMatchObject({ state: 'running', liveRunId: claim.runId });
+    expect(byId.get(waiting)).toMatchObject({ state: 'PARKED', reason: 'Auto-run is off.' });
+    expect(byId.get(running)).toMatchObject({ state: 'RUNNING', liveRunId: claim.runId });
 
     // Switching it off stopped nothing: the run goes on and its work lands.
     expect((await runner.expectOk(HEARTBEAT, { id: claim.runId })).heartbeatRun).toBe(false);
-    const run = (await runner.expectOk(FINISH, { id: claim.runId, result: { status: 'ok', output: 'Done.' } }))
+    const run = (await runner.expectOk(FINISH, { id: claim.runId, result: { status: 'OK', output: 'Done.' } }))
       .finishRun;
     expect(run.status).toBe('ok');
 

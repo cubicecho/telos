@@ -1,12 +1,10 @@
+import type { DB } from '@telos/db';
 import * as dbSchema from '@telos/db/schema';
 import { asc, eq } from 'drizzle-orm';
 import { effectiveModel, loadAgentDefaults } from './agent-defaults.ts';
 
 // The account's MCP servers an agent reaches, worked out where the secrets are:
 // the runner is handed rows it can dial, and nothing else is.
-
-// biome-ignore lint/suspicious/noExplicitAny: drizzle-orm 1.0 table/column type compat
-type AnyRow = any;
 
 /** A server as the runner reads it: `McpServerRow` in runner/src/telos.ts. */
 export interface RunnerServer {
@@ -72,7 +70,7 @@ export function runnerServer(server: dbSchema.McpServer): RunnerServer {
  * @returns The servers, and a notice for each slug that resolved to nothing.
  */
 export async function serversFor(
-  db: AnyRow,
+  db: DB,
   agent: Pick<dbSchema.Agent, 'userId' | 'name' | 'mcpServerSlugs'>,
 ): Promise<AgentServers> {
   const named = Array.isArray(agent.mcpServerSlugs)
@@ -107,7 +105,7 @@ export async function serversFor(
  * @returns The row, its servers as JSON, what to say about them, its account's
  * defaults (key included), and the model it resolves to, for the run's record.
  */
-export async function runnerAgent(db: AnyRow, agent: dbSchema.Agent) {
+export async function runnerAgent(db: DB, agent: dbSchema.Agent) {
   const { servers, notices } = await serversFor(db, agent);
   const defaults = await loadAgentDefaults(db, agent.userId);
   return {

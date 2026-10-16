@@ -1,10 +1,12 @@
 import * as dbSchema from '@telos/db/schema';
 import { eq, sql } from 'drizzle-orm';
-import { extendSchema, type GraphQLObjectType, type GraphQLSchema, parse } from 'graphql';
+import { extendSchema, type GraphQLSchema, parse } from 'graphql';
+import type { QueryResolvers } from '../../__generated__/resolvers.ts';
 import { requireAi } from '../ai-gate.ts';
+import { attachResolvers } from '../attach-resolvers.ts';
 import { resultRows } from '../blocking.ts';
-import type { Context } from '../context.ts';
-import { workStates } from '../ready.ts';
+import { type HandBack, HandBackEnum, withEnums } from '../enums.ts';
+import { type WorkTodo, workStates } from '../ready.ts';
 import { requireSession } from './auth.ts';
 
 // What an account's agents did and spent, across every project it owns: the
@@ -18,9 +20,6 @@ import { requireSession } from './auth.ts';
 // queries, which are already the account's own.
 //
 // Applied only when the instance has AI on.
-
-// biome-ignore lint/suspicious/noExplicitAny: drizzle-orm 1.0 table/column type compat
-type AnyRow = any;
 
 /** What a run whose agent was deleted is filed under. */
 export const DELETED_AGENT = 'A deleted agent';
@@ -64,8 +63,8 @@ const ACCOUNT_ACTIVITY_SDL = parse(`
     projectName: String!
     laneId: ID!
     laneName: String!
-    "gaveUp (it failed more times than the lane allows) or finished (with nowhere to send it)."
-    handedBack: String!
+    "GAVE_UP (it failed more times than the lane allows) or FINISHED (with nowhere to send it)."
+    handedBack: HandBack!
     "The error or the reviewer's reason of its last failed run, or where it finished."
     reason: String
     "Its last finished run."
@@ -128,15 +127,28 @@ export function spendLine(row: SpendRow | undefined, name: string) {
  * @param schema - The schema so far.
  * @returns The schema with the account's activity queries.
  */
-export function applyAccountActivityExtension(schema: GraphQLSchema): GraphQLSchema {
-  const extendedSchema = extendSchema(schema, ACCOUNT_ACTIVITY_SDL);
-  const queries = (extendedSchema.getType('Query') as GraphQLObjectType).getFields();
+/** A handed-back todo's work: its lane has an agent, so a name and a limit. */
+type HandedBackWork = WorkTodo & { handedBack: HandBack; laneId: string; laneName: string; maxAttempts: number };
 
-  queries.accountSpend.resolve = async (_parent: unknown, args: { since: Date | string }, context: Context) => {
+function isHandedBack(todo: WorkTodo): todo is HandedBackWork {
+  return (
+    todo.state === 'handedBack' &&
+    todo.handedBack !== null &&
+    todo.laneId !== null &&
+    todo.laneName !== null &&
+    todo.maxAttempts !== null
+  );
+}
+
+export function applyAccountActivityExtension(schema: GraphQLSchema): GraphQLSchema {
+  const extendedSchema = extendSchema(withEnums(schema, [HandBackEnum]), ACCOUNT_ACTIVITY_SDL);
+  const queries: QueryResolvers = {};
+
+  queries.accountSpend = async (_parent, args, context) => {
     // A person's, like the page it is drawn on.
     requireSession(context);
     const userId = await requireAi(context);
-    const db = context.db as AnyRow;
+    const db = context.db;
     const since = new Date(args.since);
     const window = sql`r.user_id = ${userId} AND r.started_at >= ${since.toISOString()}::timestamptz`;
 
@@ -183,12 +195,12 @@ export function applyAccountActivityExtension(schema: GraphQLSchema): GraphQLSch
     };
   };
 
-  queries.accountHandedBack.resolve = async (_parent: unknown, _args: unknown, context: Context) => {
+  queries.accountHandedBack = async (_parent, _args, context) => {
     requireSession(context);
     const userId = await requireAi(context);
     const { todos } = await workStates(context.db, userId);
     return todos
-      .filter((todo) => todo.state === 'handedBack')
+      .filter(isHandedBack)
       .sort((a, b) => (b.lastRunAt?.getTime() ?? 0) - (a.lastRunAt?.getTime() ?? 0))
       .map((todo) => ({
         todoId: todo.todoId,
@@ -205,5 +217,5 @@ export function applyAccountActivityExtension(schema: GraphQLSchema): GraphQLSch
       }));
   };
 
-  return extendedSchema;
+  return attachResolvers(extendedSchema, { Query: queries });
 }

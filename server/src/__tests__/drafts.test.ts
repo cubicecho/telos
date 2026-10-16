@@ -45,8 +45,8 @@ const CANCEL_RUN = `mutation ($id: ID!) { cancelRun(id: $id) { id status } }`;
 const DELETE_RUN = `mutation ($id: ID!) { deleteRun(id: $id) }`;
 const PROMPT = { system: 'You refine requests.', user: 'Make the export faster' };
 const EVENTS = [
-  { kind: 'notice', text: 'Token counts are estimates.' },
-  { kind: 'output', text: 'Which export?' },
+  { kind: 'NOTICE', text: 'Token counts are estimates.' },
+  { kind: 'OUTPUT', text: 'Which export?' },
 ];
 
 // biome-ignore lint/suspicious/noExplicitAny: response shape
@@ -360,7 +360,7 @@ describe('a draft’s replies as runs', () => {
 
   it('is not a lane’s run: finishRun and heartbeatRun refuse it and say what to use', async () => {
     const { runId } = await claimedDraft(board, runner);
-    const finish = await runner.expectError(FINISH_RUN, { id: runId, result: { status: 'ok', output: 'Hi' } });
+    const finish = await runner.expectError(FINISH_RUN, { id: runId, result: { status: 'OK', output: 'Hi' } });
     expect(finish.code).toBe('BAD_USER_INPUT');
     expect(finish.message).toContain('finishDraft');
     expect((await runner.expectError(HEARTBEAT, { id: runId })).code).toBe('BAD_USER_INPUT');

@@ -1,9 +1,9 @@
 import * as dbSchema from '@telos/db/schema';
 import { and, eq } from 'drizzle-orm';
-import { GraphQLError } from 'graphql';
 import type { Context } from '../context.ts';
+import { notFound } from '../errors.ts';
+import { loadAiProject, loadAiTodo } from '../owned.ts';
 import { requireAuth } from './auth.ts';
-import { loadAiProject, loadAiTodo } from './requests.ts';
 
 // What an AI caller's arguments may name. The mutations a person's screens call
 // check that a row is the caller's and no more, since a person may touch all of
@@ -17,9 +17,6 @@ import { loadAiProject, loadAiTodo } from './requests.ts';
 // to say what its arguments are. Generated writes need none of this: their rows
 // are scoped by tenancy.ts and their foreign keys by write-guards.ts. The draft
 // and request mutations check for themselves.
-
-// biome-ignore lint/suspicious/noExplicitAny: drizzle-orm 1.0 table/column type compat
-type AnyRow = any;
 
 /** What an argument names. */
 type Named = 'project' | 'todo' | 'todos' | 'lane' | 'run';
@@ -40,10 +37,6 @@ const ENTITY: Record<Named, string> = { project: 'Project', todo: 'Todo', todos:
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-function notFound(what: string): GraphQLError {
-  return new GraphQLError(`${what} not found`, { extensions: { code: 'NOT_FOUND' } });
-}
-
 /**
  * A lane on a board AI may see, or NOT_FOUND.
  *
@@ -53,7 +46,7 @@ function notFound(what: string): GraphQLError {
  * @returns Nothing.
  */
 async function assertAiLane(context: Context, userId: string, id: string): Promise<void> {
-  const [lane] = await (context.db as AnyRow)
+  const [lane] = await context.db
     .select({ id: dbSchema.lanes.id })
     .from(dbSchema.lanes)
     .innerJoin(dbSchema.projects, eq(dbSchema.projects.id, dbSchema.lanes.projectId))
@@ -73,14 +66,14 @@ async function assertAiLane(context: Context, userId: string, id: string): Promi
  * @returns Nothing.
  */
 async function assertAiRun(context: Context, userId: string, id: string): Promise<void> {
-  const [run] = await (context.db as AnyRow)
+  const [run] = await context.db
     .select({ todoId: dbSchema.runs.todoId })
     .from(dbSchema.runs)
     .where(and(eq(dbSchema.runs.id, id), eq(dbSchema.runs.userId, userId)));
   if (!run?.todoId) {
     throw notFound('Run');
   }
-  await loadAiTodo(context, userId, run.todoId).catch(() => {
+  await loadAiTodo(context.db, userId, run.todoId).catch(() => {
     throw notFound('Run');
   });
 }
@@ -100,13 +93,13 @@ async function assertSeen(context: Context, userId: string, named: Named, id: st
     throw notFound(ENTITY[named]);
   }
   if (named === 'project') {
-    await loadAiProject(context, userId, id);
+    await loadAiProject(context.db, userId, id);
   } else if (named === 'lane') {
     await assertAiLane(context, userId, id);
   } else if (named === 'run') {
     await assertAiRun(context, userId, id);
   } else {
-    await loadAiTodo(context, userId, id);
+    await loadAiTodo(context.db, userId, id);
   }
 }
 

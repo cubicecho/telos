@@ -181,7 +181,7 @@ describe('finishRun', () => {
   it('sends passing work down the success route, completing it in the done lane', async () => {
     const todoId = await board.addTodo('Write it');
     const { runId } = await claim(todoId);
-    const run = await finish(runId, { status: 'ok', output: 'Wrote it.', totalTokens: 42 });
+    const run = await finish(runId, { status: 'OK', output: 'Wrote it.', totalTokens: 42 });
     expect(run).toMatchObject({ status: 'ok', verdict: 'none', output: 'Wrote it.', totalTokens: 42 });
 
     const todo = await todoRow(todoId);
@@ -198,7 +198,7 @@ describe('finishRun', () => {
     await setLane(board.person, board.lanes[0].id, { onSuccessLaneId: null });
     const todoId = await board.addTodo('Write it');
     const { runId } = await claim(todoId);
-    await finish(runId, { status: 'ok', output: 'Done here.' });
+    await finish(runId, { status: 'OK', output: 'Done here.' });
     expect((await todoRow(todoId)).laneId).toBe(board.lanes[0].id);
     expect(await queue()).toEqual([]);
   });
@@ -207,7 +207,7 @@ describe('finishRun', () => {
     await setLane(board.person, board.lanes[0].id, { onFailureLaneId: board.lanes[1].id });
     const todoId = await board.addTodo('Review it');
     const { runId } = await claim(todoId);
-    const run = await finish(runId, { status: 'ok', output: 'FAIL: the second paragraph is missing.' });
+    const run = await finish(runId, { status: 'OK', output: 'FAIL: the second paragraph is missing.' });
     expect(run).toMatchObject({ status: 'ok', verdict: 'fail' });
     expect((await todoRow(todoId)).laneId).toBe(board.lanes[1].id);
     const [note] = await thread(todoId);
@@ -221,7 +221,7 @@ describe('finishRun', () => {
     const todoId = await board.addTodo('Write it');
     for (let attempt = 0; attempt < 2; attempt++) {
       const { runId } = await claim(todoId);
-      await finish(runId, { status: 'error', error: 'The model timed out.' });
+      await finish(runId, { status: 'ERROR', error: 'The model timed out.' });
     }
     expect(await queue()).toEqual([]);
     await board.person.expectOk(`mutation ($id: ID!, $laneId: ID!) { moveTodo(id: $id, laneId: $laneId) { id } }`, {
@@ -242,7 +242,7 @@ describe('finishRun', () => {
 
   it('reads a reply that opens with PASS as a passing verdict', async () => {
     const todoId = await board.addTodo('Review it');
-    const run = await finish((await claim(todoId)).runId, { status: 'ok', output: 'PASS: reads well.' });
+    const run = await finish((await claim(todoId)).runId, { status: 'OK', output: 'PASS: reads well.' });
     expect(run).toMatchObject({ status: 'ok', verdict: 'pass' });
     expect((await todoRow(todoId)).laneId).toBe(board.lanes[2].id);
     expect(await thread(todoId)).toEqual([expect.objectContaining({ kind: 'verdict', body: 'PASS: reads well.' })]);
@@ -253,7 +253,7 @@ describe('finishRun', () => {
     const parentId = await board.addTodo('Build the thing');
     const { runId } = await claim(parentId);
     await finish(runId, {
-      status: 'ok',
+      status: 'OK',
       output: '[...]',
       todos: [
         { title: 'Design it', acceptance: 'A sketch.' },
@@ -301,19 +301,19 @@ describe('finishRun', () => {
       );
     const pieces = [{ title: 'One piece' }, { title: 'Another' }];
     const unset = await board.addTodo('Unset');
-    await finish((await claim(unset)).runId, { status: 'ok', todos: pieces });
+    await finish((await claim(unset)).runId, { status: 'OK', todos: pieces });
     expect(await lanesOfChildren(unset)).toEqual([board.lanes[0].id, board.lanes[0].id]);
 
     await board.person.expectOk(SET_NEW_TODO_LANE, { id: board.projectId, laneId: board.lanes[2].id });
     const done = await board.addTodo('Done lane');
-    await finish((await claim(done)).runId, { status: 'ok', todos: pieces });
+    await finish((await claim(done)).runId, { status: 'OK', todos: pieces });
     expect(await lanesOfChildren(done)).toEqual([board.lanes[0].id, board.lanes[0].id]);
   });
 
   it('takes no todos from a run that failed', async () => {
     await setLane(board.person, board.lanes[0].id, { onFailureLaneId: board.lanes[1].id });
     const todoId = await board.addTodo('Review it');
-    await finish((await claim(todoId)).runId, { status: 'ok', output: 'FAIL: no.', todos: [{ title: 'Fix it' }] });
+    await finish((await claim(todoId)).runId, { status: 'OK', output: 'FAIL: no.', todos: [{ title: 'Fix it' }] });
     expect(await db.select().from(dbSchema.todos).where(eq(dbSchema.todos.parentId, todoId))).toEqual([]);
     expect((await todoRow(todoId)).laneId).toBe(board.lanes[1].id);
   });
@@ -322,7 +322,7 @@ describe('finishRun', () => {
     await setLane(board.person, board.lanes[0].id, { onSuccessLaneId: board.lanes[1].id });
     const parentId = await board.addTodo('Build the thing');
     await finish((await claim(parentId)).runId, {
-      status: 'ok',
+      status: 'OK',
       todos: [{ title: 'Design it' }, { title: 'Make it' }],
     });
     const children = await db.select().from(dbSchema.todos).where(eq(dbSchema.todos.parentId, parentId));
@@ -335,7 +335,7 @@ describe('finishRun', () => {
     const todoId = await board.addTodo('Do the thing');
     await db.update(dbSchema.todos).set({ acceptance: 'It works.' }).where(eq(dbSchema.todos.id, todoId));
     const run = await finish((await claim(todoId)).runId, {
-      status: 'ok',
+      status: 'OK',
       output: 'Narrowed it to the export.',
       refine: { title: 'Speed up the CSV export', brief: '  Stream rows instead of building one string.  ' },
     });
@@ -353,7 +353,7 @@ describe('finishRun', () => {
     await setLane(board.person, board.lanes[0].id, { onSuccessLaneId: board.lanes[1].id });
     const todoId = await board.addTodo('Do the thing');
     await finish((await claim(todoId)).runId, {
-      status: 'ok',
+      status: 'OK',
       todos: [{ title: 'Do the thing, cleanly', acceptance: 'Tests pass.', dependsOn: ['Nothing'] }],
     });
     expect(await todoRow(todoId)).toMatchObject({
@@ -369,7 +369,7 @@ describe('finishRun', () => {
     await setLane(board.person, board.lanes[0].id, { onFailureLaneId: board.lanes[1].id });
     const todoId = await board.addTodo('Do the thing');
     const run = await finish((await claim(todoId)).runId, {
-      status: 'ok',
+      status: 'OK',
       output: 'Both.',
       refine: { title: 'Something else' },
       todos: [{ title: 'One' }, { title: 'Two' }],
@@ -382,7 +382,7 @@ describe('finishRun', () => {
   it('does not hand a refined todo back to the lane that refined it', async () => {
     await setLane(board.person, board.lanes[0].id, { onSuccessLaneId: null });
     const todoId = await board.addTodo('Do the thing');
-    await finish((await claim(todoId)).runId, { status: 'ok', refine: { title: 'Do the thing well' } });
+    await finish((await claim(todoId)).runId, { status: 'OK', refine: { title: 'Do the thing well' } });
     expect((await todoRow(todoId)).laneId).toBe(board.lanes[0].id);
     expect(await queue()).toEqual([]);
   });
@@ -394,15 +394,15 @@ describe('finishRun', () => {
       id: todoId,
       laneId: board.lanes[1].id,
     });
-    await finish(runId, { status: 'ok', output: 'Wrote it.' });
+    await finish(runId, { status: 'OK', output: 'Wrote it.' });
     expect((await todoRow(todoId)).laneId).toBe(board.lanes[1].id);
   });
 
   it('refuses to finish a run twice', async () => {
     const todoId = await board.addTodo('Write it');
     const { runId } = await claim(todoId);
-    await finish(runId, { status: 'ok', output: 'Wrote it.' });
-    const error = await runner.expectError(FINISH, { id: runId, result: { status: 'ok' } });
+    await finish(runId, { status: 'OK', output: 'Wrote it.' });
+    const error = await runner.expectError(FINISH, { id: runId, result: { status: 'OK' } });
     expect(error.code).toBe('CONFLICT');
   });
 });
@@ -420,7 +420,7 @@ describe('an umbrella', () => {
     await board.person.expectOk(SET_NEW_TODO_LANE, { id: board.projectId, laneId: board.lanes[1].id });
     const umbrellaId = await board.addTodo('Build the thing');
     await finish((await claim(umbrellaId)).runId, {
-      status: 'ok',
+      status: 'OK',
       todos: [{ title: 'Design it' }, { title: 'Make it' }],
     });
     const pieces = await db.select().from(dbSchema.todos).where(eq(dbSchema.todos.parentId, umbrellaId));
@@ -450,7 +450,7 @@ describe('an umbrella', () => {
     );
     expect(aiStatus.todos.find((todo: { todoId: string }) => todo.todoId === umbrellaId)).toEqual({
       todoId: umbrellaId,
-      state: 'waiting',
+      state: 'WAITING',
       reason: '1 of 2 pieces done.',
     });
     expect(aiStatus.projects[0].lanes[0]).toEqual({ laneId: board.lanes[0].id, waiting: 1 });
@@ -593,7 +593,7 @@ describe('a lane that archives on success', () => {
     await setLane(board.person, board.lanes[0].id, ARCHIVES);
     const todoId = await board.addTodo('Write it');
     const { runId } = await claim(todoId);
-    await finish(runId, { status: 'ok', output: 'Wrote it.' });
+    await finish(runId, { status: 'OK', output: 'Wrote it.' });
 
     const todo = await todoRow(todoId);
     expect(todo.archivedAt).not.toBeNull();
@@ -613,7 +613,7 @@ describe('a lane that archives on success', () => {
     const second = await board.addTodo('Second');
     await board.person.expectOk(DEPEND, { a: second, b: first });
     const { runId } = await claim(first);
-    await finish(runId, { status: 'ok', output: 'Done.' });
+    await finish(runId, { status: 'OK', output: 'Done.' });
     expect((await queue()).map((row) => row.todoId)).toEqual([second]);
   });
 
@@ -621,8 +621,8 @@ describe('a lane that archives on success', () => {
     await setLane(board.person, board.lanes[0].id, { ...ARCHIVES, onFailureLaneId: board.lanes[1].id });
     const passes = await board.addTodo('Good');
     const fails = await board.addTodo('Bad');
-    await finish((await claim(passes)).runId, { status: 'ok', output: 'PASS: reads well.' });
-    await finish((await claim(fails)).runId, { status: 'ok', output: 'FAIL: the ending is missing.' });
+    await finish((await claim(passes)).runId, { status: 'OK', output: 'PASS: reads well.' });
+    await finish((await claim(fails)).runId, { status: 'OK', output: 'FAIL: the ending is missing.' });
 
     expect((await todoRow(passes)).archivedAt).not.toBeNull();
     const failed = await todoRow(fails);
@@ -632,7 +632,7 @@ describe('a lane that archives on success', () => {
   it('leaves a run that errored where it is', async () => {
     await setLane(board.person, board.lanes[0].id, ARCHIVES);
     const todoId = await board.addTodo('Write it');
-    await finish((await claim(todoId)).runId, { status: 'error', error: 'The model did not answer.' });
+    await finish((await claim(todoId)).runId, { status: 'ERROR', error: 'The model did not answer.' });
     expect(await todoRow(todoId)).toMatchObject({ laneId: board.lanes[0].id, archivedAt: null, completedAt: null });
   });
 
@@ -644,7 +644,7 @@ describe('a lane that archives on success', () => {
       id: todoId,
       laneId: board.lanes[1].id,
     });
-    await finish(runId, { status: 'ok', output: 'Wrote it.' });
+    await finish(runId, { status: 'OK', output: 'Wrote it.' });
     expect(await todoRow(todoId)).toMatchObject({ laneId: board.lanes[1].id, archivedAt: null, completedAt: null });
   });
 
@@ -654,7 +654,7 @@ describe('a lane that archives on success', () => {
     const blocker = await board.addTodo('First this');
     const { runId } = await claim(todoId);
     await board.person.expectOk(DEPEND, { a: todoId, b: blocker });
-    await finish(runId, { status: 'ok', output: 'Wrote it.' });
+    await finish(runId, { status: 'OK', output: 'Wrote it.' });
     expect(await todoRow(todoId)).toMatchObject({ laneId: board.lanes[0].id, archivedAt: null, completedAt: null });
   });
 
@@ -662,7 +662,7 @@ describe('a lane that archives on success', () => {
     await db.update(dbSchema.lanes).set({ isDone: false }).where(eq(dbSchema.lanes.id, board.lanes[2].id));
     await setLane(board.person, board.lanes[0].id, ARCHIVES);
     const todoId = await board.addTodo('Write it');
-    await finish((await claim(todoId)).runId, { status: 'ok', output: 'Wrote it.' });
+    await finish((await claim(todoId)).runId, { status: 'OK', output: 'Wrote it.' });
     const todo = await todoRow(todoId);
     expect(todo.laneId).toBe(board.lanes[0].id);
     expect(todo.archivedAt).not.toBeNull();
@@ -696,7 +696,7 @@ describe('stopping a run', () => {
     await board.person.expectOk(`mutation ($id: ID!) { cancelRun(id: $id) { id } }`, { id: runId });
     expect((await runner.expectOk(HEARTBEAT, { id: runId })).heartbeatRun).toBe(true);
 
-    const run = await finish(runId, { status: 'ok', output: 'Wrote it anyway.' });
+    const run = await finish(runId, { status: 'OK', output: 'Wrote it anyway.' });
     expect(run.status).toBe('stopped');
     expect((await todoRow(todoId)).laneId).toBe(board.lanes[0].id);
     expect(await thread(todoId)).toEqual([]);
@@ -706,7 +706,7 @@ describe('stopping a run', () => {
     const todoId = await board.addTodo('Write it');
     const { runId } = await claim(todoId);
     await board.person.expectOk(`mutation ($id: ID!) { cancelRun(id: $id) { id } }`, { id: runId });
-    await finish(runId, { status: 'stopped' });
+    await finish(runId, { status: 'STOPPED' });
 
     expect((await todoRow(todoId)).aiIgnored).toBe(true);
     expect((await queue()).map((ready) => ready.todoId)).not.toContain(todoId);
@@ -757,7 +757,7 @@ describe('who may do what', () => {
       toolsOff: runToolsOff(null),
     });
     expect(await actorFor({ 'x-run-token': `${token}x` })).toMatchObject({ kind: 'anonymous' });
-    await finish(runId, { status: 'ok', output: 'Wrote it.' });
+    await finish(runId, { status: 'OK', output: 'Wrote it.' });
     expect(await actorFor({ 'x-run-token': token })).toMatchObject({ kind: 'anonymous' });
   });
 
@@ -780,7 +780,7 @@ describe('who may do what', () => {
         })
       ).code,
     ).toBe('FORBIDDEN');
-    expect((await agent.expectError(FINISH, { id: runId, result: { status: 'ok' } })).code).toBe('FORBIDDEN');
+    expect((await agent.expectError(FINISH, { id: runId, result: { status: 'OK' } })).code).toBe('FORBIDDEN');
 
     const note = await agent.expectOk(
       `mutation ($id: ID!) { addTodoNote(todoId: $id, body: "Halfway.") { actorKind runId } }`,
@@ -840,10 +840,10 @@ describe('what a run shows as it goes, and leaves behind', () => {
     const todoId = await board.addTodo('Write it');
     const { runId } = await claim(todoId);
     const events = (count: number, from = 0) =>
-      Array.from({ length: count }, (_, at) => ({ kind: 'tool_call', name: 'fs__write', text: `call ${from + at}` }));
+      Array.from({ length: count }, (_, at) => ({ kind: 'TOOL_CALL', name: 'fs__write', text: `call ${from + at}` }));
 
     await runner.expectOk(HEARTBEAT, { id: runId, events: events(3) });
-    await runner.expectOk(HEARTBEAT, { id: runId, events: [{ kind: 'notice', text: 'x'.repeat(10_000) }] });
+    await runner.expectOk(HEARTBEAT, { id: runId, events: [{ kind: 'NOTICE', text: 'x'.repeat(10_000) }] });
     let [row] = await runsOf(todoId);
     expect(row.events.map((event: dbSchema.RunEvent) => event.kind)).toEqual([
       'tool_call',
@@ -853,7 +853,7 @@ describe('what a run shows as it goes, and leaves behind', () => {
     ]);
     expect(row.events[3].text).toHaveLength(4000);
 
-    await finish(runId, { status: 'ok', output: 'Done.', events: events(600, 3) });
+    await finish(runId, { status: 'OK', output: 'Done.', events: events(600, 3) });
     [row] = await runsOf(todoId);
     expect(row.events).toHaveLength(500);
     expect(row.events.at(-1)?.text).toBe('call 602');
@@ -870,15 +870,15 @@ describe('what a run shows as it goes, and leaves behind', () => {
     await runner.expectOk(HEARTBEAT, {
       id: runId,
       events: [
-        { kind: 'turn', text: '1' },
-        { kind: 'thinking', text: 'Hmm, ' },
+        { kind: 'TURN', text: '1' },
+        { kind: 'THINKING', text: 'Hmm, ' },
       ],
     });
     await runner.expectOk(HEARTBEAT, {
       id: runId,
       events: [
-        { kind: 'thinking', text: 'the plan first.' },
-        { kind: 'output', text: 'x'.repeat(20_000) },
+        { kind: 'THINKING', text: 'the plan first.' },
+        { kind: 'OUTPUT', text: 'x'.repeat(20_000) },
       ],
     });
     const [row] = await runsOf(todoId);
@@ -910,7 +910,7 @@ describe('what a run shows as it goes, and leaves behind', () => {
     });
 
     // Stopped with nothing to report, it still says what it spent.
-    await finish(runId, { status: 'stopped' });
+    await finish(runId, { status: 'STOPPED' });
     [row] = await runsOf(todoId);
     expect(row).toMatchObject({ status: 'stopped', totalTokens: 120, promptTokens: 100 });
   });
@@ -918,7 +918,7 @@ describe('what a run shows as it goes, and leaves behind', () => {
   it('takes the prompt from the finish when no heartbeat carried it', async () => {
     const todoId = await board.addTodo('Write it');
     const { runId } = await claim(todoId);
-    await finish(runId, { status: 'ok', output: 'Done.', prompt: { system: 'S', user: 'U' } });
+    await finish(runId, { status: 'OK', output: 'Done.', prompt: { system: 'S', user: 'U' } });
     const [row] = await runsOf(todoId);
     expect(row).toMatchObject({ systemPrompt: 'S', userPrompt: 'U' });
   });
@@ -928,7 +928,7 @@ describe('what a run shows as it goes, and leaves behind', () => {
     const { runId } = await claim(todoId);
     const DELETE = `mutation ($id: ID!) { deleteRun(id: $id) }`;
     expect((await board.person.expectError(DELETE, { id: runId })).code).toBe('CONFLICT');
-    await finish(runId, { status: 'ok', output: 'Done.' });
+    await finish(runId, { status: 'OK', output: 'Done.' });
 
     const stranger = await createBoard(db, 'stranger@example.com');
     expect((await stranger.person.expectError(DELETE, { id: runId })).code).toBe('NOT_FOUND');
@@ -942,7 +942,7 @@ describe('what a run shows as it goes, and leaves behind', () => {
     const todoId = await board.addTodo('Write it');
     const { runId } = await claim(todoId);
     await finish(runId, {
-      status: 'error',
+      status: 'ERROR',
       error: 'Ran out of turns.',
       artifacts: [
         { location: '/work/plan.md', source: 'declared', title: 'The plan', mediaType: 'text/markdown' },
@@ -965,7 +965,7 @@ describe('what a run shows as it goes, and leaves behind', () => {
   it('keeps nothing a stopped run made, and no one but the server writes artifacts', async () => {
     const todoId = await board.addTodo('Write it');
     const { runId } = await claim(todoId);
-    await finish(runId, { status: 'stopped', artifacts: [{ location: '/work/plan.md', source: 'declared' }] });
+    await finish(runId, { status: 'STOPPED', artifacts: [{ location: '/work/plan.md', source: 'declared' }] });
     expect(await db.select().from(dbSchema.artifacts)).toEqual([]);
 
     const mutations = await board.person.expectOk(`query { __type(name: "Mutation") { fields { name } } }`);
@@ -978,7 +978,7 @@ describe('what a run shows as it goes, and leaves behind', () => {
     const todoId = await board.addTodo('Write it');
     const { runId } = await claim(todoId);
     await finish(runId, {
-      status: 'ok',
+      status: 'OK',
       output: 'Done.',
       artifacts: [{ location: '/work/plan.md', source: 'declared' }],
     });

@@ -1,6 +1,7 @@
-import { defaultFieldResolver, GraphQLError, type GraphQLObjectType, type GraphQLSchema } from 'graphql';
+import { defaultFieldResolver, type GraphQLSchema } from 'graphql';
 import { type Context, isAiActor } from '../context.ts';
 import { DOOR_TOOLS, switchedOff, switchOwner } from '../door.ts';
+import { forbidden } from '../errors.ts';
 import { assertAiReach } from './ai-reach.ts';
 import { assertRunReach } from './run-reach.ts';
 
@@ -93,10 +94,6 @@ function refusal(name: string, args: Record<string, unknown>, context: Context):
   return switchedOff(name, args, context.actor) ? `${name} is switched off for ${switchOwner(context.actor)}.` : null;
 }
 
-function forbidden(message: string): GraphQLError {
-  return new GraphQLError(message, { extensions: { code: 'FORBIDDEN' } });
-}
-
 /**
  * Holds a key to its switches on the queries the door's tools read with. The
  * rows a query returns are tenancy's to narrow; this only says whether the key
@@ -127,7 +124,7 @@ function lockQueries(schema: GraphQLSchema): void {
 
 export function applyActorLock(schema: GraphQLSchema): GraphQLSchema {
   lockQueries(schema);
-  const mutation = schema.getMutationType() as GraphQLObjectType | null | undefined;
+  const mutation = schema.getMutationType();
   if (!mutation) return schema;
   for (const [name, field] of Object.entries(mutation.getFields())) {
     const resolve = field.resolve ?? defaultFieldResolver;

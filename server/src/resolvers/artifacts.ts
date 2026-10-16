@@ -1,9 +1,12 @@
 import * as dbSchema from '@telos/db/schema';
 import { and, eq } from 'drizzle-orm';
-import { extendSchema, GraphQLError, type GraphQLObjectType, type GraphQLSchema, parse } from 'graphql';
+import { extendSchema, type GraphQLSchema, parse } from 'graphql';
+import type { MutationResolvers } from '../../__generated__/resolvers.ts';
 import { requireAi } from '../ai-gate.ts';
-import type { Context } from '../context.ts';
-import { loadAiTodo, requireText } from './requests.ts';
+import { attachResolvers } from '../attach-resolvers.ts';
+import { badInput, forbidden } from '../errors.ts';
+import { loadAiTodo } from '../owned.ts';
+import { requireText } from './requests.ts';
 
 // Recording an artifact from outside a run. A todo's run reports what it
 // made through `finishRun`, where the runner has checked each location against
@@ -13,9 +16,6 @@ import { loadAiTodo, requireText } from './requests.ts';
 // are signed as the key that recorded them, the way a note is.
 //
 // Applied only when the instance has AI on.
-
-// biome-ignore lint/suspicious/noExplicitAny: drizzle-orm 1.0 table/column type compat
-type AnyRow = any;
 
 const ARTIFACTS_SDL = parse(`
   extend type Mutation {
@@ -36,10 +36,6 @@ const MAX_MEDIA_TYPE = 200;
 /** The scheme the runner files a run's notes under. Not a client's to claim. */
 const NOTE_LOCATION = 'telos:note/';
 
-function badInput(message: string): GraphQLError {
-  return new GraphQLError(message, { extensions: { code: 'BAD_USER_INPUT' } });
-}
-
 /**
  * `value` trimmed, or BAD_USER_INPUT when it is empty or longer than `limit`.
  *
@@ -56,29 +52,20 @@ function requireShortText(value: string, field: string, limit: number): string {
   return text;
 }
 
-interface RecordArtifactArgs {
-  todoId: string;
-  location: string;
-  label: string;
-  mediaType?: string | null;
-  sizeBytes?: number | null;
-}
-
 export function applyArtifactsExtension(schema: GraphQLSchema): GraphQLSchema {
   const extendedSchema = extendSchema(schema, ARTIFACTS_SDL);
-  const mutations = (extendedSchema.getType('Mutation') as GraphQLObjectType).getFields();
+  const mutations: MutationResolvers = {};
 
-  mutations.recordArtifact.resolve = async (_parent: unknown, args: RecordArtifactArgs, context: Context) => {
+  mutations.recordArtifact = async (_parent, args, context) => {
     const userId = await requireAi(context);
     const { actor } = context;
     if (actor.kind === 'agent') {
       // A run's artifacts are held against what its tools did, by the runner.
-      throw new GraphQLError(
+      throw forbidden(
         'A run records what it made with its own record_artifact tool, which the runner checks. This one is for work done outside a run.',
-        { extensions: { code: 'FORBIDDEN' } },
       );
     }
-    const todo = await loadAiTodo(context, userId, args.todoId);
+    const todo = await loadAiTodo(context.db, userId, args.todoId);
     const location = requireShortText(args.location, 'location', MAX_LOCATION);
     if (location.startsWith(NOTE_LOCATION)) {
       throw badInput(`A location under ${NOTE_LOCATION} is a note on the todo. Use add_todo_note to leave one.`);
@@ -94,7 +81,7 @@ export function applyArtifactsExtension(schema: GraphQLSchema): GraphQLSchema {
       actorKeyId: actor.keyId ?? null,
     };
 
-    return (context.db as AnyRow).transaction(async (tx: AnyRow) => {
+    return context.db.transaction(async (tx) => {
       // Said twice, it is one artifact: a client that retries does not list
       // the same file again.
       const [existing] = await tx
@@ -134,5 +121,5 @@ export function applyArtifactsExtension(schema: GraphQLSchema): GraphQLSchema {
     });
   };
 
-  return extendedSchema;
+  return attachResolvers(extendedSchema, { Mutation: mutations });
 }

@@ -1,9 +1,11 @@
-import * as dbSchema from '@telos/db/schema';
-import { and, eq, sql } from 'drizzle-orm';
-import { extendSchema, GraphQLError, type GraphQLObjectType, type GraphQLSchema, parse } from 'graphql';
+import type { DB } from '@telos/db';
+import { sql } from 'drizzle-orm';
+import { extendSchema, type GraphQLSchema, parse } from 'graphql';
+import type { QueryResolvers } from '../../__generated__/resolvers.ts';
 import { aiAllowed } from '../ai-gate.ts';
+import { attachResolvers } from '../attach-resolvers.ts';
 import { resultRows } from '../blocking.ts';
-import type { Context } from '../context.ts';
+import { loadOwnedProject } from '../owned.ts';
 import { failuresSinceTouched } from '../ready.ts';
 import { requireSession } from './auth.ts';
 
@@ -14,9 +16,6 @@ import { requireSession } from './auth.ts';
 //
 // Notes are everyone's, so the query is there with AI off too. What runs left
 // is read only while AI is on for the account and the project.
-
-// biome-ignore lint/suspicious/noExplicitAny: drizzle-orm 1.0 table/column type compat
-type AnyRow = any;
 
 /** A reviewer ruled against the work: it was judged. */
 export const MARK_REJECTED = 'rejected';
@@ -67,7 +66,7 @@ interface MarkRow {
  * @param runs - Whether to read what runs left, or only the notes.
  * @returns A row for each todo with something to mark.
  */
-async function readMarks(db: AnyRow, userId: string, projectId: string, runs: boolean): Promise<MarkRow[]> {
+async function readMarks(db: DB, userId: string, projectId: string, runs: boolean): Promise<MarkRow[]> {
   // A stopped run was called off, so it says nothing about the work, and a
   // running one has not ended: the last run that did is the one a card reports.
   const result = await db.execute(sql`
@@ -121,19 +120,13 @@ function lastRunMark(row: MarkRow): string | null {
  */
 export function applyCardMarksExtension(schema: GraphQLSchema, options: { ai: boolean }): GraphQLSchema {
   const extendedSchema = extendSchema(schema, CARD_MARKS_SDL);
-  const queries = (extendedSchema.getType('Query') as GraphQLObjectType).getFields();
+  const queries: QueryResolvers = {};
 
-  queries.cardMarks.resolve = async (_parent: unknown, args: { projectId: string }, context: Context) => {
+  queries.cardMarks = async (_parent, args, context) => {
     // A person's, like the board it is drawn on.
     const userId = requireSession(context);
-    const db = context.db as AnyRow;
-    const [project] = await db
-      .select({ id: dbSchema.projects.id, aiEnabled: dbSchema.projects.aiEnabled })
-      .from(dbSchema.projects)
-      .where(and(eq(dbSchema.projects.id, args.projectId), eq(dbSchema.projects.userId, userId)));
-    if (project === undefined) {
-      throw new GraphQLError('Project not found', { extensions: { code: 'NOT_FOUND' } });
-    }
+    const db = context.db;
+    const project = await loadOwnedProject(db, userId, args.projectId);
 
     const runs = options.ai && project.aiEnabled && (await aiAllowed(context));
     const rows = await readMarks(db, userId, project.id, runs);
@@ -151,5 +144,5 @@ export function applyCardMarksExtension(schema: GraphQLSchema, options: { ai: bo
     });
   };
 
-  return extendedSchema;
+  return attachResolvers(extendedSchema, { Query: queries });
 }

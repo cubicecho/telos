@@ -1,10 +1,24 @@
 import * as dbSchema from '@telos/db/schema';
 import { and, asc, desc, eq, ne, sql } from 'drizzle-orm';
-import { extendSchema, GraphQLError, type GraphQLObjectType, type GraphQLSchema, parse } from 'graphql';
+import { extendSchema, type GraphQLSchema, parse } from 'graphql';
+import type {
+  ArtifactInput,
+  MutationResolvers,
+  ProposedTodoInput,
+  QueryResolvers,
+  RefinedTodoInput,
+  RunEventInput,
+  RunPromptInput,
+  RunResultInput,
+  RunUsageInput,
+} from '../../__generated__/resolvers.ts';
 import { requireSystem } from '../ai-gate.ts';
+import { attachResolvers } from '../attach-resolvers.ts';
 import { assertNoCycle, findBlocked } from '../blocking.ts';
 import type { Actor, Context } from '../context.ts';
 import { stopDraftReply } from '../draft-runs.ts';
+import { RunEventKindEnum, RunOutcomeEnum, withEnums } from '../enums.ts';
+import { badInput, conflict, forbidden, notFound } from '../errors.ts';
 import { instanceAiOn } from '../instance.ts';
 import { findDoneLaneId, findNewTodoLaneId } from '../lanes.ts';
 import { runnerAgent } from '../mcp-servers.ts';
@@ -130,8 +144,7 @@ const RUNS_SDL = parse(`
 
   "Something that happened in a run, for the live view."
   input RunEventInput {
-    "tool_call, tool_result, hook, notice, turn, thinking or output."
-    kind: String!
+    kind: RunEventKind!
     "The tool or hook it concerns."
     name: String
     ok: Boolean
@@ -169,8 +182,7 @@ const RUNS_SDL = parse(`
 
   "What a run came to."
   input RunResultInput {
-    "ok, error or stopped."
-    status: String!
+    status: RunOutcome!
     output: String
     error: String
     toolCalls: Int
@@ -210,8 +222,6 @@ const RUNS_SDL = parse(`
   }
 `);
 
-const OUTCOMES = new Set(['ok', 'error', 'stopped']);
-
 /** The most events a run keeps: the newest, since a live view reads the end. */
 export const MAX_RUN_EVENTS = 500;
 /** The most of one event's text kept: enough to read, not a transcript. */
@@ -249,10 +259,6 @@ function verdictOf(output: string | null): 'pass' | 'fail' | 'none' {
   return PASSES.test(output) ? 'pass' : 'none';
 }
 
-function notFound(what: string): GraphQLError {
-  return new GraphQLError(`${what} not found`, { extensions: { code: 'NOT_FOUND' } });
-}
-
 /**
  * When a lease taken or renewed now runs out.
  *
@@ -275,9 +281,7 @@ async function loadRunForUpdate(tx: AnyRow, runId: string) {
   const [run] = await tx.select().from(dbSchema.runs).where(eq(dbSchema.runs.id, runId)).for('update');
   if (!run) throw notFound('Run');
   if (run.kind !== 'todo') {
-    throw new GraphQLError("That run is a draft's reply, which has no lane. Report it with finishDraft.", {
-      extensions: { code: 'BAD_USER_INPUT' },
-    });
+    throw badInput("That run is a draft's reply, which has no lane. Report it with finishDraft.");
   }
   const [todo] = await tx.select().from(dbSchema.todos).where(eq(dbSchema.todos.id, run.todoId));
   const [project] = await tx.select().from(dbSchema.projects).where(eq(dbSchema.projects.id, run.projectId));
@@ -373,7 +377,7 @@ async function writeChildren(
   tx: AnyRow,
   parent: AnyRow,
   laneId: string | null,
-  proposed: ProposedTodo[],
+  proposed: ProposedTodoInput[],
 ): Promise<AnyRow[]> {
   await tx.update(dbSchema.todos).set({ splitAt: new Date() }).where(eq(dbSchema.todos.id, parent.id));
   const start = await nextPosition(tx, parent.projectId);
@@ -414,19 +418,6 @@ async function writeChildren(
   return written;
 }
 
-interface ProposedTodo {
-  title: string;
-  brief?: string | null;
-  acceptance?: string | null;
-  dependsOn?: string[] | null;
-}
-
-interface RefinedTodo {
-  title?: string | null;
-  brief?: string | null;
-  acceptance?: string | null;
-}
-
 /** Why a run that both refined and split its todo fails: the two say different things about it. */
 const REFINED_AND_SPLIT = 'The reply both rewrote the todo and split it. A todo is either refined or split.';
 
@@ -438,7 +429,7 @@ const REFINED_AND_SPLIT = 'The reply both rewrote the todo and split it. A todo 
  * @returns The columns to set; null when it changes nothing.
  */
 function refinementOf(
-  refine: RefinedTodo | null | undefined,
+  refine: RefinedTodoInput | null | undefined,
 ): { title?: string; notes?: string; acceptance?: string } | null {
   const title = refine?.title?.trim();
   const notes = refine?.brief?.trim();
@@ -473,25 +464,6 @@ async function piecesLaneId(tx: AnyRow, todo: AnyRow, lane: AnyRow | null): Prom
     .from(dbSchema.lanes)
     .where(eq(dbSchema.lanes.id, lane.onSuccessLaneId));
   return next && !next.isDone ? next.id : intake;
-}
-
-export interface RunEventInput {
-  kind: string;
-  name?: string | null;
-  ok?: boolean | null;
-  text?: string | null;
-}
-
-interface ArtifactInput {
-  location: string;
-  source: string;
-  action?: string | null;
-  serverSlug?: string | null;
-  tool?: string | null;
-  title?: string | null;
-  description?: string | null;
-  mediaType?: string | null;
-  sizeBytes?: number | null;
 }
 
 /**
@@ -549,7 +521,11 @@ function keepEnd(text: string, limit: number): string {
  * @param usage What the runner says the run has spent.
  * @returns Columns to set.
  */
-export function reported(run: AnyRow, prompt: RunPrompt | null | undefined, usage: RunUsage | null | undefined) {
+export function reported(
+  run: AnyRow,
+  prompt: RunPromptInput | null | undefined,
+  usage: RunUsageInput | null | undefined,
+) {
   return {
     ...(prompt && run.systemPrompt == null && run.userPrompt == null
       ? { systemPrompt: prompt.system.slice(0, PROMPT_CHARS), userPrompt: prompt.user.slice(0, PROMPT_CHARS) }
@@ -563,18 +539,6 @@ export function reported(run: AnyRow, prompt: RunPrompt | null | undefined, usag
         }
       : {}),
   };
-}
-
-export interface RunPrompt {
-  system: string;
-  user: string;
-}
-
-export interface RunUsage {
-  toolCalls?: number | null;
-  promptTokens: number;
-  completionTokens: number;
-  totalTokens: number;
 }
 
 /**
@@ -615,26 +579,11 @@ function artifactRows(run: AnyRow, reported: ArtifactInput[] | null | undefined)
     }));
 }
 
-interface RunResult {
-  status: string;
-  output?: string | null;
-  error?: string | null;
-  toolCalls?: number | null;
-  promptTokens?: number | null;
-  completionTokens?: number | null;
-  totalTokens?: number | null;
-  todos?: ProposedTodo[] | null;
-  refine?: RefinedTodo | null;
-  events?: RunEventInput[] | null;
-  prompt?: RunPrompt | null;
-  artifacts?: ArtifactInput[] | null;
-}
-
 /**
  * The counters a result reports, as columns. One it leaves out keeps what the
  * heartbeats reported, so a run stopped mid-turn still says what it spent.
  */
-function spend(run: AnyRow, result: RunResult) {
+function spend(run: AnyRow, result: RunResultInput) {
   return {
     toolCalls: result.toolCalls ?? run.toolCalls ?? 0,
     promptTokens: result.promptTokens ?? run.promptTokens ?? 0,
@@ -664,14 +613,11 @@ function spend(run: AnyRow, result: RunResult) {
  * @param result What the runner reports.
  * @returns The finished run.
  */
-async function finish(context: Context, runId: string, result: RunResult): Promise<AnyRow> {
-  if (!OUTCOMES.has(result.status)) {
-    throw new GraphQLError('status must be ok, error or stopped', { extensions: { code: 'BAD_USER_INPUT' } });
-  }
+async function finish(context: Context, runId: string, result: RunResultInput): Promise<AnyRow> {
   return (context.db as AnyRow).transaction(async (tx: AnyRow) => {
     const { run, todo, lane, aiOff } = await loadRunForUpdate(tx, runId);
     if (run.status !== 'running') {
-      throw new GraphQLError('That run has already finished.', { extensions: { code: 'CONFLICT' } });
+      throw conflict('That run has already finished.');
     }
     const output = result.output?.trim() || null;
 
@@ -847,18 +793,18 @@ async function archiveOn(
 }
 
 export function applyRunsExtension(schema: GraphQLSchema): GraphQLSchema {
-  const extendedSchema = extendSchema(schema, RUNS_SDL);
-  const queries = (extendedSchema.getType('Query') as GraphQLObjectType).getFields();
-  const mutations = (extendedSchema.getType('Mutation') as GraphQLObjectType).getFields();
+  const extendedSchema = extendSchema(withEnums(schema, [RunOutcomeEnum, RunEventKindEnum]), RUNS_SDL);
+  const queries: QueryResolvers = {};
+  const mutations: MutationResolvers = {};
 
-  queries.runnerQueue.resolve = async (_parent: unknown, args: { limit?: number | null }, context: Context) => {
+  queries.runnerQueue = async (_parent, args, context) => {
     requireSystem(context);
     markRunnerSeen();
     const limit = Math.max(1, Math.min(args.limit ?? 20, 200));
     return readyTodos(context.db, {}, limit);
   };
 
-  mutations.claimRun.resolve = async (_parent: unknown, args: { todoId: string; laneId: string }, context: Context) => {
+  mutations.claimRun = async (_parent, args, context) => {
     requireSystem(context);
     try {
       return await (context.db as AnyRow).transaction(async (tx: AnyRow) => {
@@ -913,11 +859,7 @@ export function applyRunsExtension(schema: GraphQLSchema): GraphQLSchema {
     }
   };
 
-  mutations.heartbeatRun.resolve = async (
-    _parent: unknown,
-    args: { id: string; events?: RunEventInput[] | null; prompt?: RunPrompt | null; usage?: RunUsage | null },
-    context: Context,
-  ) => {
+  mutations.heartbeatRun = async (_parent, args, context) => {
     requireSystem(context);
     return (context.db as AnyRow).transaction(async (tx: AnyRow) => {
       const { run, aiOff } = await loadRunForUpdate(tx, args.id);
@@ -944,12 +886,12 @@ export function applyRunsExtension(schema: GraphQLSchema): GraphQLSchema {
     });
   };
 
-  mutations.finishRun.resolve = async (_parent: unknown, args: { id: string; result: RunResult }, context: Context) => {
+  mutations.finishRun = async (_parent, args, context) => {
     requireSystem(context);
     return finish(context, args.id, args.result);
   };
 
-  mutations.cancelRun.resolve = async (_parent: unknown, args: { id: string }, context: Context) => {
+  mutations.cancelRun = async (_parent, args, context) => {
     const userId = requireAuth(context);
     const db = context.db as AnyRow;
     const [run] = await db
@@ -991,7 +933,7 @@ export function applyRunsExtension(schema: GraphQLSchema): GraphQLSchema {
     });
   };
 
-  mutations.deleteRun.resolve = async (_parent: unknown, args: { id: string }, context: Context) => {
+  mutations.deleteRun = async (_parent, args, context) => {
     const userId = requireAuth(context);
     const db = context.db as AnyRow;
     const [run] = await db
@@ -1001,7 +943,7 @@ export function applyRunsExtension(schema: GraphQLSchema): GraphQLSchema {
     if (!run) throw notFound('Run');
     // A live run is the runner's until it ends; cancel it first.
     if (run.status === 'running') {
-      throw new GraphQLError('Stop the run before deleting it.', { extensions: { code: 'CONFLICT' } });
+      throw conflict('Stop the run before deleting it.');
     }
     await db.delete(dbSchema.runs).where(eq(dbSchema.runs.id, run.id));
     return true;
@@ -1010,10 +952,10 @@ export function applyRunsExtension(schema: GraphQLSchema): GraphQLSchema {
   // A person's, like watching a board: what was made is theirs to tidy, and
   // an agent that could remove it could hide what it did. An artifact whose
   // todo is gone is removed the same way.
-  mutations.deleteArtifact.resolve = async (_parent: unknown, args: { id: string }, context: Context) => {
+  mutations.deleteArtifact = async (_parent, args, context) => {
     const userId = requireAuth(context);
     if (context.actor.kind !== 'user') {
-      throw new GraphQLError('Only a person can remove an artifact.', { extensions: { code: 'FORBIDDEN' } });
+      throw forbidden('Only a person can remove an artifact.');
     }
     const removed = await (context.db as AnyRow)
       .delete(dbSchema.artifacts)
@@ -1023,7 +965,7 @@ export function applyRunsExtension(schema: GraphQLSchema): GraphQLSchema {
     return true;
   };
 
-  return extendedSchema;
+  return attachResolvers(extendedSchema, { Query: queries, Mutation: mutations });
 }
 
 /**

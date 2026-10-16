@@ -3,6 +3,7 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { GraphQLError } from 'graphql';
 import { describe, expect, it, vi } from 'vitest';
+import { WorkState } from '@/__generated__/graphql';
 import type { TodoSummary } from '@/components/domain/todo/types';
 import {
   AiStateDocument,
@@ -80,15 +81,15 @@ const LIVE = new Map([
   ],
 ]);
 
-function workTodo(state: string, reason: string | null, { awaitsRun = false, runRequested = false } = {}) {
+function workTodo(state: WorkState, reason: string | null, { awaitsRun = false, runRequested = false } = {}) {
   return new Map([
     ['t1', { __typename: 'StationTodo' as const, todoId: 't1', state, reason, failures: 0, awaitsRun, runRequested }],
   ]);
 }
 
-const STUCK = workTodo('handedBack', 'It broke.');
-const AWAITS_RUN = workTodo('parked', 'Auto-run is off.', { awaitsRun: true });
-const RUN_REQUESTED = workTodo('queued', null, { runRequested: true });
+const STUCK = workTodo(WorkState.HandedBack, 'It broke.');
+const AWAITS_RUN = workTodo(WorkState.Parked, 'Auto-run is off.', { awaitsRun: true });
+const RUN_REQUESTED = workTodo(WorkState.Queued, null, { runRequested: true });
 
 /** The board asks for its cards' marks whatever AI is set to; these tests have none to show. */
 const NO_MARKS = {

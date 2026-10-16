@@ -1,10 +1,20 @@
 import * as dbSchema from '@telos/db/schema';
 import { keyFor } from '@telos/runner/spec';
 import { and, eq } from 'drizzle-orm';
-import { extendSchema, GraphQLError, type GraphQLObjectType, type GraphQLSchema, parse } from 'graphql';
+import { extendSchema, type GraphQLSchema, parse } from 'graphql';
+import type {
+  AgentModel,
+  AgentResolvers,
+  McpServerResolvers,
+  MutationResolvers,
+  QueryResolvers,
+} from '../../__generated__/resolvers.ts';
 import { loadAgentDefaults } from '../agent-defaults.ts';
 import { requireAi, requireSystem } from '../ai-gate.ts';
+import { attachResolvers } from '../attach-resolvers.ts';
 import type { Context } from '../context.ts';
+import { McpProbeStatusEnum, McpSecretKindEnum, withEnums } from '../enums.ts';
+import { badInput, notFound } from '../errors.ts';
 import { askProbe, finishProbe, type McpProbe, readProbe, takeProbes } from '../mcp-probes.ts';
 import { runnerServer } from '../mcp-servers.ts';
 import { markRunnerSeen } from '../runner-seen.ts';
@@ -37,12 +47,6 @@ const AGENTS_SDL = parse(`
     envNames: [String!]!
   }
 
-  "Which of an MCP server's secrets: a header sent to its URL, or a variable in its command's environment."
-  enum McpSecretKind {
-    header
-    env
-  }
-
   "A model an endpoint offers, as its \`/models\` lists it."
   type AgentModel {
     id: String!
@@ -59,8 +63,7 @@ const AGENTS_SDL = parse(`
   "A test of an MCP server, made by the runner."
   type McpProbe {
     id: ID!
-    "pending (waiting for the runner), testing, or done."
-    status: String!
+    status: McpProbeStatus!
     ok: Boolean!
     tools: [McpProbeTool!]!
     "What the server says about itself, when it says anything."
@@ -131,15 +134,6 @@ function visibleProbe(probe: McpProbe) {
   return visible;
 }
 
-interface AgentModel {
-  id: string;
-  contextLength: number | null;
-}
-
-function badInput(message: string): GraphQLError {
-  return new GraphQLError(message, { extensions: { code: 'BAD_USER_INPUT' } });
-}
-
 /** The longest name and value a header or a variable may have. */
 const SECRET_NAME_CHARS = 200;
 const SECRET_VALUE_CHARS = 8000;
@@ -165,7 +159,7 @@ async function ownedServer(db: AnyRow, userId: string, id: string, lock = false)
     .from(dbSchema.mcpServers)
     .where(and(eq(dbSchema.mcpServers.id, id), eq(dbSchema.mcpServers.userId, userId)));
   const [row] = await (lock ? query.for('update') : query);
-  if (!row) throw new GraphQLError('MCP server not found', { extensions: { code: 'NOT_FOUND' } });
+  if (!row) throw notFound('MCP server');
   return row;
 }
 
@@ -226,17 +220,13 @@ export async function listModels(baseUrl: string, apiKey: string | null): Promis
 }
 
 export function applyAgentsExtension(schema: GraphQLSchema): GraphQLSchema {
-  const extendedSchema = extendSchema(schema, AGENTS_SDL);
-  const agent = (extendedSchema.getType('Agent') as GraphQLObjectType).getFields();
-  const mcpServer = (extendedSchema.getType('McpServer') as GraphQLObjectType).getFields();
-  const mutations = (extendedSchema.getType('Mutation') as GraphQLObjectType).getFields();
-  const queries = (extendedSchema.getType('Query') as GraphQLObjectType).getFields();
+  const extendedSchema = extendSchema(withEnums(schema, [McpSecretKindEnum, McpProbeStatusEnum]), AGENTS_SDL);
+  const agent: AgentResolvers = {};
+  const mcpServer: McpServerResolvers = {};
+  const mutations: MutationResolvers = {};
+  const queries: QueryResolvers = {};
 
-  queries.agentModels.resolve = async (
-    _parent: unknown,
-    args: { baseUrl: string; agentId?: string | null; apiKey?: string | null },
-    context: Context,
-  ) => {
+  queries.agentModels = async (_parent, args, context) => {
     // A person only: an agent or a key has no business making the server
     // fetch a URL of its choosing.
     requireSession(context);
@@ -247,7 +237,7 @@ export function applyAgentsExtension(schema: GraphQLSchema): GraphQLSchema {
         .select({ apiKey: dbSchema.agents.apiKey })
         .from(dbSchema.agents)
         .where(and(eq(dbSchema.agents.id, args.agentId), eq(dbSchema.agents.userId, userId)));
-      if (!row) throw new GraphQLError('Agent not found', { extensions: { code: 'NOT_FOUND' } });
+      if (!row) throw notFound('Agent');
       own = row.apiKey;
     }
     const typed = args.apiKey?.trim();
@@ -256,20 +246,20 @@ export function applyAgentsExtension(schema: GraphQLSchema): GraphQLSchema {
     return listModels(args.baseUrl, keyFor(args.baseUrl, own, defaults));
   };
 
-  queries.mcpProbe.resolve = async (_parent: unknown, args: { id: string }, context: Context) => {
+  queries.mcpProbe = async (_parent, args, context) => {
     requireSession(context);
     const userId = await requireAi(context);
     const probe = readProbe(args.id, userId);
     return probe ? visibleProbe(probe) : null;
   };
 
-  queries.runnerProbes.resolve = (_parent: unknown, _args: unknown, context: Context) => {
+  queries.runnerProbes = (_parent, _args, context) => {
     requireSystem(context);
     markRunnerSeen();
     return takeProbes().map(({ id, server }) => ({ id, server }));
   };
 
-  mutations.testMcpServer.resolve = async (_parent: unknown, args: { id: string }, context: Context) => {
+  mutations.testMcpServer = async (_parent, args, context) => {
     // A person only, as with the models: it has a process dial where it is told.
     requireSession(context);
     const userId = await requireAi(context);
@@ -279,19 +269,7 @@ export function applyAgentsExtension(schema: GraphQLSchema): GraphQLSchema {
     return visibleProbe(probe);
   };
 
-  mutations.finishProbe.resolve = async (
-    _parent: unknown,
-    args: {
-      id: string;
-      result: {
-        ok: boolean;
-        tools: Array<{ name: string; description: string }>;
-        instructions?: string | null;
-        error?: string | null;
-      };
-    },
-    context: Context,
-  ) => {
+  mutations.finishProbe = async (_parent, args, context) => {
     requireSystem(context);
     const { ok, tools, instructions, error } = args.result;
     const probe = finishProbe(args.id, {
@@ -327,14 +305,10 @@ export function applyAgentsExtension(schema: GraphQLSchema): GraphQLSchema {
         .where(eq(dbSchema.mcpServers.id, parent.id));
       return Object.keys(row?.secrets ?? {}).sort();
     };
-  mcpServer.headerNames.resolve = secretNames('headers');
-  mcpServer.envNames.resolve = secretNames('env');
+  mcpServer.headerNames = secretNames('headers');
+  mcpServer.envNames = secretNames('env');
 
-  mutations.setMcpServerSecret.resolve = async (
-    _parent: unknown,
-    args: { id: string; kind: 'header' | 'env'; name: string; value?: string | null },
-    context: Context,
-  ) => {
+  mutations.setMcpServerSecret = async (_parent, args, context) => {
     const userId = requireSession(context);
     const name = args.name.trim();
     const pattern = args.kind === 'header' ? HEADER_NAME : ENV_NAME;
@@ -367,7 +341,7 @@ export function applyAgentsExtension(schema: GraphQLSchema): GraphQLSchema {
   };
 
   // The generated resolvers never select an excluded column, so ask.
-  agent.hasApiKey.resolve = async (parent: { id: string }, _args: unknown, context: Context) => {
+  agent.hasApiKey = async (parent, _args, context) => {
     const [row] = await (context.db as AnyRow)
       .select({ apiKey: dbSchema.agents.apiKey })
       .from(dbSchema.agents)
@@ -375,21 +349,17 @@ export function applyAgentsExtension(schema: GraphQLSchema): GraphQLSchema {
     return !!row?.apiKey;
   };
 
-  mutations.setAgentApiKey.resolve = async (
-    _parent: unknown,
-    args: { agentId: string; apiKey?: string | null },
-    context: Context,
-  ) => {
+  mutations.setAgentApiKey = async (_parent, args, context) => {
     const userId = requireSession(context);
     const [row] = await (context.db as AnyRow)
       .update(dbSchema.agents)
       .set({ apiKey: args.apiKey?.trim() || null })
       .where(and(eq(dbSchema.agents.id, args.agentId), eq(dbSchema.agents.userId, userId)))
       .returning();
-    if (!row) throw new GraphQLError('Agent not found', { extensions: { code: 'NOT_FOUND' } });
+    if (!row) throw notFound('Agent');
     const { apiKey: _secret, ...visible } = row;
     return visible;
   };
 
-  return extendedSchema;
+  return attachResolvers(extendedSchema, { Agent: agent, McpServer: mcpServer, Mutation: mutations, Query: queries });
 }

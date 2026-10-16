@@ -78,7 +78,7 @@ function stuck(todoId: string, title: string, extra: Record<string, unknown> = {
     projectName: 'Site',
     laneId: 'l1',
     laneName: 'Doing',
-    handedBack: 'gaveUp',
+    handedBack: 'GAVE_UP',
     reason: 'The model did not answer.',
     runId: 'r1',
     attempts: 2,
@@ -118,7 +118,7 @@ describe('AccountActivity', () => {
         stuck('t1', 'Flaky'),
         stuck('t2', 'Written', {
           projectName: 'Docs',
-          handedBack: 'finished',
+          handedBack: 'FINISHED',
           reason: 'Doing finished with it and has nowhere to send it.',
         }),
       ]),

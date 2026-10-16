@@ -1,3 +1,4 @@
+import type { DB } from '@telos/db';
 import * as dbSchema from '@telos/db/schema';
 import { and, eq, sql } from 'drizzle-orm';
 
@@ -9,9 +10,6 @@ import { and, eq, sql } from 'drizzle-orm';
 //
 // Kept apart from resolvers/drafts.ts so resolvers/runs.ts can stop a draft's
 // run without the two resolver files importing each other.
-
-// biome-ignore lint/suspicious/noExplicitAny: db type varies by driver (postgres-js, PGlite)
-type AnyDb = any;
 
 /**
  * How long the runner holds a draft it is answering. There is no heartbeat:
@@ -44,7 +42,7 @@ export function draftBeingAnswered() {
  * @param draftId - The draft.
  * @returns Nothing.
  */
-export async function expireLapsedDraftRuns(db: AnyDb, draftId: string): Promise<void> {
+export async function expireLapsedDraftRuns(db: DB, draftId: string): Promise<void> {
   await db.execute(sql`
     UPDATE runs
     SET status = 'error', error = ${DRAFT_LEASE_LAPSED}, finished_at = now()
@@ -60,7 +58,7 @@ export async function expireLapsedDraftRuns(db: AnyDb, draftId: string): Promise
  * @param draftId - The draft.
  * @returns The draft as it now stands.
  */
-export async function stopDraftReply(db: AnyDb, draftId: string): Promise<dbSchema.Draft> {
+export async function stopDraftReply(db: DB, draftId: string): Promise<dbSchema.Draft> {
   const [draft] = await db
     .update(dbSchema.drafts)
     .set({ waitingSince: null })
@@ -80,7 +78,7 @@ export async function stopDraftReply(db: AnyDb, draftId: string): Promise<dbSche
  * @param draftId - The draft.
  * @returns Nothing.
  */
-export async function stopDraftRuns(db: AnyDb, draftId: string): Promise<void> {
+export async function stopDraftRuns(db: DB, draftId: string): Promise<void> {
   const now = new Date();
   await db
     .update(dbSchema.runs)

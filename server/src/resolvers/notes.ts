@@ -1,8 +1,11 @@
 import * as dbSchema from '@telos/db/schema';
 import { and, eq, isNull } from 'drizzle-orm';
-import { extendSchema, GraphQLError, type GraphQLObjectType, type GraphQLSchema, parse } from 'graphql';
+import { extendSchema, type GraphQLSchema, parse } from 'graphql';
+import type { MutationResolvers } from '../../__generated__/resolvers.ts';
 import { requireAi } from '../ai-gate.ts';
+import { attachResolvers } from '../attach-resolvers.ts';
 import { type Context, isAiActor } from '../context.ts';
+import { forbidden, notFound } from '../errors.ts';
 import { requireAuth } from './auth.ts';
 import { requireText } from './requests.ts';
 
@@ -41,14 +44,6 @@ const NOTES_SDL = parse(`
   }
 `);
 
-function notFound(): GraphQLError {
-  return new GraphQLError('Note not found', { extensions: { code: 'NOT_FOUND' } });
-}
-
-function forbidden(message: string): GraphQLError {
-  return new GraphQLError(message, { extensions: { code: 'FORBIDDEN' } });
-}
-
 /**
  * A note the caller may see, or NOT_FOUND. For a person that is any note of
  * theirs. For AI it is narrower, as in tenancy.ts: the note's todo must be one
@@ -62,7 +57,7 @@ async function loadVisibleNote(context: Context, id: string): Promise<AnyRow> {
   const ai = isAiActor(context);
   const userId = ai ? await requireAi(context) : requireAuth(context);
   const owned = and(eq(dbSchema.todoNotes.id, id), eq(dbSchema.todoNotes.userId, userId));
-  const [row] = await (context.db as AnyRow)
+  const [row] = await context.db
     .select({ note: dbSchema.todoNotes })
     .from(dbSchema.todoNotes)
     .innerJoin(dbSchema.todos, eq(dbSchema.todos.id, dbSchema.todoNotes.todoId))
@@ -78,7 +73,7 @@ async function loadVisibleNote(context: Context, id: string): Promise<AnyRow> {
         : owned,
     );
   if (!row) {
-    throw notFound();
+    throw notFound('Note');
   }
   return row.note;
 }
@@ -108,9 +103,9 @@ function assertPlainNote(note: AnyRow): void {
 
 export function applyNotesExtension(schema: GraphQLSchema): GraphQLSchema {
   const extendedSchema = extendSchema(schema, NOTES_SDL);
-  const mutations = (extendedSchema.getType('Mutation') as GraphQLObjectType).getFields();
+  const mutations: MutationResolvers = {};
 
-  mutations.editTodoNote.resolve = async (_parent: unknown, args: { id: string; body: string }, context: Context) => {
+  mutations.editTodoNote = async (_parent, args, context) => {
     const note = await loadVisibleNote(context, args.id);
     assertPlainNote(note);
     if (signedByCaller(context, note) === false) {
@@ -125,33 +120,30 @@ export function applyNotesExtension(schema: GraphQLSchema): GraphQLSchema {
     if (body === note.body) {
       return note;
     }
-    const [edited] = await (context.db as AnyRow)
+    const [edited] = await context.db
       .update(dbSchema.todoNotes)
       .set({ body, editedAt: new Date() })
       .where(eq(dbSchema.todoNotes.id, note.id))
       .returning();
     if (!edited) {
-      throw notFound();
+      throw notFound('Note');
     }
     return edited;
   };
 
-  mutations.deleteTodoNote.resolve = async (_parent: unknown, args: { id: string }, context: Context) => {
+  mutations.deleteTodoNote = async (_parent, args, context) => {
     const note = await loadVisibleNote(context, args.id);
     assertPlainNote(note);
     // The board is the person's, so they may clear any plain note off it.
     if (context.actor.kind !== 'user' && signedByCaller(context, note) === false) {
       throw forbidden('You can delete only the notes you signed.');
     }
-    const [removed] = await (context.db as AnyRow)
-      .delete(dbSchema.todoNotes)
-      .where(eq(dbSchema.todoNotes.id, note.id))
-      .returning();
+    const [removed] = await context.db.delete(dbSchema.todoNotes).where(eq(dbSchema.todoNotes.id, note.id)).returning();
     if (!removed) {
-      throw notFound();
+      throw notFound('Note');
     }
     return removed;
   };
 
-  return extendedSchema;
+  return attachResolvers(extendedSchema, { Mutation: mutations });
 }

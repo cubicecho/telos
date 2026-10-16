@@ -49,9 +49,9 @@ const STATUS = {
       aiStatus: {
         __typename: 'AiStatus',
         todos: [
-          todo('t1', 'Flaky', 'handedBack', { reason: 'It broke.', failures: 4 }),
-          todo('t2', 'Busy', 'running', { liveRunId: 'r9' }),
-          todo('t3', 'Next', 'queued'),
+          todo('t1', 'Flaky', 'HANDED_BACK', { reason: 'It broke.', failures: 4 }),
+          todo('t2', 'Busy', 'RUNNING', { liveRunId: 'r9' }),
+          todo('t3', 'Next', 'QUEUED'),
         ],
         projects: [
           {

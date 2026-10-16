@@ -52,7 +52,7 @@ async function claim(todoId: string): Promise<{ runId: string; turn: number; ope
 async function workedTodo(title = 'Write it'): Promise<string> {
   const todoId = await board.addTodo(title);
   const { runId } = await claim(todoId);
-  await runner.expectOk(FINISH, { id: runId, result: { status: 'error', error: 'model unreachable' } });
+  await runner.expectOk(FINISH, { id: runId, result: { status: 'ERROR', error: 'model unreachable' } });
   return todoId;
 }
 
@@ -74,7 +74,7 @@ describe('a todo’s session', () => {
     const todoId = await board.addTodo('Write it');
     const first = await claim(todoId);
     expect(first).toMatchObject({ turn: 0, opensSession: true });
-    await runner.expectOk(FINISH, { id: first.runId, result: { status: 'error', error: 'model unreachable' } });
+    await runner.expectOk(FINISH, { id: first.runId, result: { status: 'ERROR', error: 'model unreachable' } });
 
     expect(await claim(todoId)).toMatchObject({ turn: 1, opensSession: false });
     expect(await sessions()).toEqual([

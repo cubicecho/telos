@@ -38,7 +38,7 @@ async function runIds(): Promise<string[]> {
 describe('pruning runs', () => {
   it('takes a done todo’s runs once they are old enough', async () => {
     const todo = await board.addTodo('Done soon');
-    await work(todo, { status: 'ok', output: 'Done.' });
+    await work(todo, { status: 'OK', output: 'Done.' });
 
     expect(await pruneRuns(db, later(10))).toBe(0);
     expect(await pruneRuns(db, later(31))).toBe(1);
@@ -50,7 +50,7 @@ describe('pruning runs', () => {
 
   it('keeps a failure the lane’s agent still counts, until a person touches the todo', async () => {
     const todo = await board.addTodo('Keeps failing');
-    await work(todo, { status: 'error', error: 'It broke.' });
+    await work(todo, { status: 'ERROR', error: 'It broke.' });
 
     expect(await pruneRuns(db, later(60))).toBe(0);
     await board.person.expectOk(
@@ -63,7 +63,7 @@ describe('pruning runs', () => {
   it('never wakes a todo an agent finished with', async () => {
     await db.update(dbSchema.lanes).set({ onSuccessLaneId: null }).where(eq(dbSchema.lanes.id, board.lanes[0].id));
     const todo = await board.addTodo('Stays put');
-    await work(todo, { status: 'ok', output: 'Done here.' });
+    await work(todo, { status: 'OK', output: 'Done here.' });
 
     expect(await pruneRuns(db, later(60))).toBe(0);
     const queue = (await runner.expectOk(QUEUE)).runnerQueue.map((row: { todoId: string }) => row.todoId);
@@ -74,7 +74,7 @@ describe('pruning runs', () => {
     const todo = await board.addTodo('Busy');
     await runner.expectOk(CLAIM, { todoId: todo, laneId: board.lanes[0].id });
     const other = await createBoard(db, 'other@example.com');
-    await work(await other.addTodo('Theirs'), { status: 'ok', output: 'Done.' }, other);
+    await work(await other.addTodo('Theirs'), { status: 'OK', output: 'Done.' }, other);
 
     expect(await pruneRuns(db, later(365))).toBe(0);
     expect(await runIds()).toHaveLength(2);

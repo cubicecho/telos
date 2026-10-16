@@ -2,7 +2,12 @@ import { useMutation, useQuery } from '@apollo/client';
 import { Link } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
-import type { AccountHandedBackQuery, RunFilters, SpendLineFieldsFragment } from '@/__generated__/graphql';
+import {
+  type AccountHandedBackQuery,
+  HandBack,
+  type RunFilters,
+  type SpendLineFieldsFragment,
+} from '@/__generated__/graphql';
 import { Archive } from '@/components/app-icons';
 import { ArchivedTodoList } from '@/components/domain/todo/archived-todos';
 import { TodoFormDialog } from '@/components/domain/todo/todo-form-dialog';
@@ -96,9 +101,6 @@ export function AccountActivity({
   );
 }
 
-/** Why a lane's agent handed a todo back, as the API says it. */
-const GAVE_UP = 'gaveUp';
-
 /**
  * "2 of 1 attempts", for a todo its agent gave up on.
  *
@@ -106,7 +108,7 @@ const GAVE_UP = 'gaveUp';
  * @returns The line, or null when its agent finished with it instead.
  */
 function attemptsLine(todo: HandedBackTodo): string | null {
-  if (todo.handedBack !== GAVE_UP) {
+  if (todo.handedBack !== HandBack.GaveUp) {
     return null;
   }
   return `${todo.attempts} of ${todo.maxAttempts} ${todo.maxAttempts === 1 ? 'attempt' : 'attempts'}`;
@@ -152,7 +154,7 @@ function HandedBack({ pollMs }: { pollMs: number }) {
             contentSlot={todos.map((todo) => (
               <View key={todo.todoId} className="gap-1 rounded-lg border border-foreground/10 bg-secondary px-3 py-2.5">
                 <View className="flex-row flex-wrap items-center gap-2">
-                  {todo.handedBack === GAVE_UP ? (
+                  {todo.handedBack === HandBack.GaveUp ? (
                     <Badge variant="destructive">Gave up</Badge>
                   ) : (
                     <Badge variant="warning">Finished</Badge>

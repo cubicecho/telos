@@ -1,8 +1,10 @@
+import type { DB } from '@telos/db';
 import * as dbSchema from '@telos/db/schema';
 import { and, eq, sql } from 'drizzle-orm';
-import { GraphQLError } from 'graphql';
+import type { GraphQLError } from 'graphql';
 import { resultRows } from '../blocking.ts';
 import type { Context } from '../context.ts';
+import { badInput, forbidden, notFound } from '../errors.ts';
 import { requireAuth } from './auth.ts';
 
 // How far a run's writes go. A key is something its owner pointed at telos on
@@ -43,14 +45,8 @@ interface Run {
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-function notFound(what: string): GraphQLError {
-  return new GraphQLError(`${what} not found`, { extensions: { code: 'NOT_FOUND' } });
-}
-
 function ownTodo(what: string): GraphQLError {
-  return new GraphQLError(`A run cannot ${what} its own todo: that is decided when the run finishes.`, {
-    extensions: { code: 'FORBIDDEN' },
-  });
+  return forbidden(`A run cannot ${what} its own todo: that is decided when the run finishes.`);
 }
 
 /**
@@ -71,9 +67,7 @@ function namedId(where: unknown): string {
     byId !== null &&
     Object.keys(byId).length === 1;
   if (!exact || typeof id !== 'string') {
-    throw new GraphQLError('A run names the row it writes by id: where: { id: { eq: … } }.', {
-      extensions: { code: 'BAD_USER_INPUT' },
-    });
+    throw badInput('A run names the row it writes by id: where: { id: { eq: … } }.');
   }
   return id;
 }
@@ -89,7 +83,7 @@ async function runOf(context: Context): Promise<Run | null> {
   if (!runId) {
     return null;
   }
-  const [run] = await (context.db as AnyDb)
+  const [run] = await context.db
     .select({
       id: dbSchema.runs.id,
       userId: dbSchema.runs.userId,
@@ -112,7 +106,7 @@ async function runOf(context: Context): Promise<Run | null> {
  * @param todoId The todo.
  * @returns Whether the run may write it.
  */
-export async function inRunReach(db: AnyDb, run: Run, todoId: string): Promise<boolean> {
+export async function inRunReach(db: DB, run: Run, todoId: string): Promise<boolean> {
   if (!run.todoId || !UUID.test(todoId)) {
     return false;
   }
@@ -192,7 +186,7 @@ function assertBoard(run: Run, projectId: unknown): void {
 async function assertDraft(context: Context, run: Run, draftId: unknown): Promise<void> {
   const [draft] =
     typeof draftId === 'string' && UUID.test(draftId)
-      ? await (context.db as AnyDb)
+      ? await context.db
           .select({ projectId: dbSchema.drafts.projectId })
           .from(dbSchema.drafts)
           .where(and(eq(dbSchema.drafts.id, draftId), eq(dbSchema.drafts.userId, run.userId)))
@@ -213,7 +207,7 @@ async function assertDraft(context: Context, run: Run, draftId: unknown): Promis
 async function assertRun(context: Context, run: Run, runId: unknown): Promise<void> {
   const [named] =
     typeof runId === 'string' && UUID.test(runId)
-      ? await (context.db as AnyDb)
+      ? await context.db
           .select({ todoId: dbSchema.runs.todoId })
           .from(dbSchema.runs)
           .where(and(eq(dbSchema.runs.id, runId), eq(dbSchema.runs.userId, run.userId)))

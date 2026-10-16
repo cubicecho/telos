@@ -2,6 +2,7 @@ import * as dbSchema from '@telos/db/schema';
 import { eq } from 'drizzle-orm';
 import { GraphQLError } from 'graphql';
 import type { Context } from './context.ts';
+import { forbidden } from './errors.ts';
 import { instanceAiOn } from './instance.ts';
 import { requireAuth } from './resolvers/auth.ts';
 
@@ -39,5 +40,5 @@ export async function requireAi(ctx: Context): Promise<string> {
  */
 export function requireSystem(ctx: Context): void {
   if (ctx.actor.kind === 'system') return;
-  throw new GraphQLError('Only the runner may do this.', { extensions: { code: 'FORBIDDEN' } });
+  throw forbidden('Only the runner may do this.');
 }

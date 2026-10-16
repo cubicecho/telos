@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from '@apollo/client';
 import { useEffect, useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
-import { McpSecretKind, type McpServerFieldsFragment } from '@/__generated__/graphql';
+import { McpProbeStatus, McpSecretKind, type McpServerFieldsFragment } from '@/__generated__/graphql';
 import { useAppForm } from '@/components/app-form';
 import { ConfirmButton } from '@/components/confirm-button';
 import { DialogLayout } from '@/components/dialog-layout';
@@ -232,8 +232,8 @@ function McpServerTest({ server }: { server: ServerRow }) {
   });
   const servers = useQuery(McpServersDocument, { fetchPolicy: 'cache-only' });
   const probe = query.data?.mcpProbe;
-  const done = !probeId || probe?.status === 'done' || (query.data && !probe);
-  const finished = probeId !== null && probe?.status === 'done';
+  const done = !probeId || probe?.status === McpProbeStatus.Done || (query.data && !probe);
+  const finished = probeId !== null && probe?.status === McpProbeStatus.Done;
   const { startPolling, stopPolling } = query;
   const { refetch } = servers;
   useEffect(() => {
@@ -260,9 +260,9 @@ function McpServerTest({ server }: { server: ServerRow }) {
   if (asking.error) result = { text: describeError(asking.error), failed: true };
   else if (query.error) result = { text: describeError(query.error), failed: true };
   else if (probeId && query.data && !probe) result = { text: 'The test was forgotten; try again.', failed: true };
-  else if (probe?.status === 'done' && !probe.ok)
+  else if (probe?.status === McpProbeStatus.Done && !probe.ok)
     result = { text: probe.error ?? 'It could not be reached.', failed: true };
-  else if (probe?.status === 'done')
+  else if (probe?.status === McpProbeStatus.Done)
     result = { text: describeTools(probe.tools.map((tool) => tool.name)), failed: false };
   else if (probeId) result = { text: 'The runner is testing it…', failed: false };
   else result = describeCheck(server);

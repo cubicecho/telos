@@ -1,9 +1,13 @@
+import type { DB } from '@telos/db';
 import * as dbSchema from '@telos/db/schema';
-import { and, asc, eq, isNull } from 'drizzle-orm';
-import { extendSchema, GraphQLError, type GraphQLObjectType, type GraphQLSchema, parse } from 'graphql';
+import { and, asc, eq } from 'drizzle-orm';
+import { extendSchema, type GraphQLSchema, parse } from 'graphql';
+import type { MutationResolvers } from '../../__generated__/resolvers.ts';
+import { attachResolvers } from '../attach-resolvers.ts';
 import { assertNotBlocked } from '../blocking.ts';
-import type { Context } from '../context.ts';
+import { badInput } from '../errors.ts';
 import { syncLaneCompletion } from '../lanes.ts';
+import { loadOwnedLane, loadOwnedProject, loadOwnedTodo } from '../owned.ts';
 import { stampActor } from '../provenance.ts';
 import { requireAuth } from './auth.ts';
 
@@ -39,27 +43,7 @@ const LANES_SDL = parse(`
   }
 `);
 
-async function loadOwnedLane(db: AnyRow, userId: string, id: string): Promise<AnyRow> {
-  const rows = await db
-    .select()
-    .from(dbSchema.lanes)
-    .where(and(eq(dbSchema.lanes.id, id), eq(dbSchema.lanes.userId, userId)))
-    .limit(1);
-  if (rows.length === 0) throw new GraphQLError('Lane not found', { extensions: { code: 'NOT_FOUND' } });
-  return rows[0];
-}
-
-async function loadOwnedProject(db: AnyRow, userId: string, id: string): Promise<AnyRow> {
-  const rows = await db
-    .select()
-    .from(dbSchema.projects)
-    .where(and(eq(dbSchema.projects.id, id), eq(dbSchema.projects.userId, userId)))
-    .limit(1);
-  if (rows.length === 0) throw new GraphQLError('Project not found', { extensions: { code: 'NOT_FOUND' } });
-  return rows[0];
-}
-
-function projectLanes(db: AnyRow, projectId: string): Promise<AnyRow[]> {
+function projectLanes(db: DB, projectId: string): Promise<AnyRow[]> {
   return db
     .select()
     .from(dbSchema.lanes)
@@ -101,30 +85,19 @@ function reposition(
 
 export function applyLanesExtension(schema: GraphQLSchema): GraphQLSchema {
   const extendedSchema = extendSchema(schema, LANES_SDL);
-  const mutations = (extendedSchema.getType('Mutation') as GraphQLObjectType).getFields();
+  const mutations: MutationResolvers = {};
 
-  mutations.moveTodo.resolve = async (
-    _parent: unknown,
-    args: { id: string; laneId: string; position?: number | null; reason?: string | null },
-    context: Context,
-  ) => {
+  mutations.moveTodo = async (_parent, args, context) => {
     const userId = requireAuth(context);
-    const db = context.db as AnyRow;
+    const db = context.db;
 
-    return db.transaction(async (tx: AnyRow) => {
+    return db.transaction(async (tx) => {
       await stampActor(tx, context.actor, { reason: args.reason });
-      const [todo] = await tx
-        .select()
-        .from(dbSchema.todos)
-        .where(
-          and(eq(dbSchema.todos.id, args.id), eq(dbSchema.todos.userId, userId), isNull(dbSchema.todos.archivedAt)),
-        )
-        .limit(1);
-      if (!todo) throw new GraphQLError('Todo not found', { extensions: { code: 'NOT_FOUND' } });
+      const todo = await loadOwnedTodo(tx, userId, args.id);
 
       const lane = await loadOwnedLane(tx, userId, args.laneId);
       if (lane.projectId !== todo.projectId) {
-        throw new GraphQLError('That lane belongs to another project.', { extensions: { code: 'BAD_USER_INPUT' } });
+        throw badInput('That lane belongs to another project.');
       }
 
       // Blocked work does not move. The done lane is only the sharpest case of
@@ -169,15 +142,11 @@ export function applyLanesExtension(schema: GraphQLSchema): GraphQLSchema {
     });
   };
 
-  mutations.setDoneLane.resolve = async (
-    _parent: unknown,
-    args: { projectId: string; laneId?: string | null },
-    context: Context,
-  ) => {
+  mutations.setDoneLane = async (_parent, args, context) => {
     const userId = requireAuth(context);
-    const db = context.db as AnyRow;
+    const db = context.db;
 
-    return db.transaction(async (tx: AnyRow) => {
+    return db.transaction(async (tx) => {
       await loadOwnedProject(tx, userId, args.projectId);
       // Moving the flag moves todos (syncLaneCompletion), which is history.
       await stampActor(tx, context.actor);
@@ -193,7 +162,7 @@ export function applyLanesExtension(schema: GraphQLSchema): GraphQLSchema {
       if (args.laneId) {
         const lane = await loadOwnedLane(tx, userId, args.laneId);
         if (lane.projectId !== args.projectId) {
-          throw new GraphQLError('That lane belongs to another project.', { extensions: { code: 'BAD_USER_INPUT' } });
+          throw badInput('That lane belongs to another project.');
         }
         await tx.update(dbSchema.lanes).set({ isDone: true, updatedAt: now }).where(eq(dbSchema.lanes.id, args.laneId));
         // The same rows mean something different now, so the todos move with the
@@ -205,15 +174,11 @@ export function applyLanesExtension(schema: GraphQLSchema): GraphQLSchema {
     });
   };
 
-  mutations.reorderLanes.resolve = async (
-    _parent: unknown,
-    args: { projectId: string; laneIds: string[] },
-    context: Context,
-  ) => {
+  mutations.reorderLanes = async (_parent, args, context) => {
     const userId = requireAuth(context);
-    const db = context.db as AnyRow;
+    const db = context.db;
 
-    return db.transaction(async (tx: AnyRow) => {
+    return db.transaction(async (tx) => {
       await loadOwnedProject(tx, userId, args.projectId);
       const lanes = await projectLanes(tx, args.projectId);
       const known = new Set(lanes.map((lane: AnyRow) => lane.id as string));
@@ -221,9 +186,7 @@ export function applyLanesExtension(schema: GraphQLSchema): GraphQLSchema {
       if (distinct.size !== lanes.length || args.laneIds.some((id) => !known.has(id))) {
         // A partial list would silently leave the omitted lanes at whatever
         // position they held, which is rarely the order the client drew.
-        throw new GraphQLError('Reordering must list every lane in the project exactly once.', {
-          extensions: { code: 'BAD_USER_INPUT' },
-        });
+        throw badInput('Reordering must list every lane in the project exactly once.');
       }
       const now = new Date();
       await Promise.all(
@@ -235,5 +198,5 @@ export function applyLanesExtension(schema: GraphQLSchema): GraphQLSchema {
     });
   };
 
-  return extendedSchema;
+  return attachResolvers(extendedSchema, { Mutation: mutations });
 }

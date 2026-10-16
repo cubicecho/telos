@@ -1,8 +1,12 @@
+import type { DB } from '@telos/db';
 import * as dbSchema from '@telos/db/schema';
 import { and, inArray, sql } from 'drizzle-orm';
 import { GraphQLError } from 'graphql';
+import type { Tombstone } from '../__generated__/resolvers.ts';
 import { resultRows } from './blocking.ts';
 import { type Context, isAiActor } from './context.ts';
+import type { ChangeEntity } from './enums.ts';
+import { badInput } from './errors.ts';
 import { requireAuth } from './resolvers/auth.ts';
 import { reachable } from './tenancy.ts';
 
@@ -28,8 +32,6 @@ import { reachable } from './tenancy.ts';
 // committed, so nothing can land behind it later. A long transaction holds
 // the feed back until it ends, rather than letting the feed skip it.
 
-// biome-ignore lint/suspicious/noExplicitAny: db type varies by driver (postgres-js, PGlite)
-type AnyDb = any;
 // biome-ignore lint/suspicious/noExplicitAny: drizzle-orm 1.0 table/column type compat
 type AnyRow = any;
 
@@ -51,8 +53,6 @@ export const CURSOR_MAX_AGE_DAYS = TOMBSTONE_RETENTION_DAYS - 1;
 
 const DAY_MS = 24 * 60 * 60_000;
 const CURSOR_VERSION = 'c1';
-
-export type ChangeEntity = 'project' | 'todo' | 'dependency';
 
 /** Where a consumer has read up to. */
 export interface FeedPosition {
@@ -77,9 +77,7 @@ export function encodeCursor(position: FeedPosition, issuedAt: Date): string {
 }
 
 function badCursor(): GraphQLError {
-  return new GraphQLError('That is not a cursor this feed handed out. Start again without one.', {
-    extensions: { code: 'BAD_USER_INPUT' },
-  });
+  return badInput('That is not a cursor this feed handed out. Start again without one.');
 }
 
 /**
@@ -106,16 +104,6 @@ export function decodeCursor(cursor: string, now: Date): FeedPosition {
     );
   }
   return { xid, seq };
-}
-
-/** Something that is gone, or gone from the caller's view. */
-export interface Tombstone {
-  entity: ChangeEntity;
-  id: string;
-  projectId: string | null;
-  todoId: string | null;
-  dependsOnTodoId: string | null;
-  removedAt: Date;
 }
 
 /** One page of the feed. */
@@ -161,7 +149,7 @@ async function liveRows(context: Context, entity: ChangeEntity, ids: string[]): 
     return new Map();
   }
   const { name, table } = TABLES[entity];
-  const rows: AnyRow[] = await (context.db as AnyDb)
+  const rows: AnyRow[] = await context.db
     .select()
     .from(table)
     .where(and(inArray((table as AnyRow).id, ids), reachable(context, name, table)));
@@ -185,12 +173,12 @@ export async function readChanges(
   const userId = requireAuth(context);
   const limit = args.limit ?? DEFAULT_PAGE_SIZE;
   if (!Number.isInteger(limit) || limit < 1 || limit > MAX_PAGE_SIZE) {
-    throw new GraphQLError(`limit must be between 1 and ${MAX_PAGE_SIZE}.`, { extensions: { code: 'BAD_USER_INPUT' } });
+    throw badInput(`limit must be between 1 and ${MAX_PAGE_SIZE}.`);
   }
   const from = args.since ? decodeCursor(args.since, now) : START;
 
   const rows = resultRows<LogRow>(
-    await (context.db as AnyDb).execute(sql`
+    await context.db.execute(sql`
       SELECT entity, entity_id AS "entityId", project_id AS "projectId", todo_id AS "todoId",
         depends_on_todo_id AS "dependsOnTodoId", deleted_at AS "deletedAt", changed_at AS "changedAt",
         xid::text AS xid, seq::text AS seq
@@ -244,7 +232,7 @@ export async function readChanges(
  * @param now What time it is.
  * @returns How many went.
  */
-export async function pruneTombstones(db: AnyDb, now: Date = new Date()): Promise<number> {
+export async function pruneTombstones(db: DB, now: Date = new Date()): Promise<number> {
   const result = await db.execute(sql`
     DELETE FROM change_log
     WHERE deleted_at IS NOT NULL

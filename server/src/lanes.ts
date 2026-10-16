@@ -1,7 +1,8 @@
+import type { DB } from '@telos/db';
 import * as dbSchema from '@telos/db/schema';
 import { and, asc, eq, isNotNull, isNull, ne, sql } from 'drizzle-orm';
-import { GraphQLError } from 'graphql';
 import { assertNotBlocked, resultRows } from './blocking.ts';
+import { badInput } from './errors.ts';
 
 // The lane rules, in one place. A lane is a board column; at most one lane per
 // project may be flagged `isDone`, and that flag is what ties the board to the
@@ -15,9 +16,6 @@ import { assertNotBlocked, resultRows } from './blocking.ts';
 // biconditional, and `assertCompletionMatchesLane` re-asserts it after any
 // generated write. A project with no done lane is exempt: its board simply has
 // no column that means done, and completion lives only in the list.
-
-// biome-ignore lint/suspicious/noExplicitAny: drizzle-orm 1.0 table/column type compat
-type AnyDb = any;
 
 /** The board a new project starts with. Users rename, reorder and add to it. */
 export const DEFAULT_LANES = [
@@ -35,7 +33,7 @@ export const DEFAULT_LANES = [
  * to delete a project's last lane, it makes "every project has a board" hold
  * rather than merely usually hold.
  */
-export async function seedMissingLanes(tx: AnyDb, userId: string): Promise<void> {
+export async function seedMissingLanes(tx: DB, userId: string): Promise<void> {
   const seed = sql.join(
     // Cast explicitly: a bare parameter inside VALUES has no type for Postgres
     // to infer from, and the insert fails on the column it does not match.
@@ -66,7 +64,7 @@ export async function seedMissingLanes(tx: AnyDb, userId: string): Promise<void>
  * a mutation returns only the columns the client selected, so the rows it
  * touched are not reliably identifiable from what came back.
  */
-export async function realignLanes(tx: AnyDb, userId: string): Promise<void> {
+export async function realignLanes(tx: DB, userId: string): Promise<void> {
   await tx.execute(sql`
     UPDATE todos t
     SET lane_id = (
@@ -91,7 +89,7 @@ export async function realignLanes(tx: AnyDb, userId: string): Promise<void> {
 }
 
 /** Throws if any of the caller's projects has been left with no lanes at all. */
-export async function assertEveryProjectHasLanes(tx: AnyDb, userId: string): Promise<void> {
+export async function assertEveryProjectHasLanes(tx: DB, userId: string): Promise<void> {
   const result = await tx.execute(sql`
     SELECT 1 AS hit FROM projects p
     WHERE p.user_id = ${userId}
@@ -99,13 +97,11 @@ export async function assertEveryProjectHasLanes(tx: AnyDb, userId: string): Pro
     LIMIT 1
   `);
   if (resultRows(result).length === 0) return;
-  throw new GraphQLError('A project needs at least one lane. Add another before removing this one.', {
-    extensions: { code: 'BAD_USER_INPUT' },
-  });
+  throw badInput('A project needs at least one lane. Add another before removing this one.');
 }
 
 /** The project's done lane, or null when it has none. */
-export async function findDoneLaneId(db: AnyDb, projectId: string): Promise<string | null> {
+export async function findDoneLaneId(db: DB, projectId: string): Promise<string | null> {
   const rows: Array<{ id: string }> = await db
     .select({ id: dbSchema.lanes.id })
     .from(dbSchema.lanes)
@@ -119,7 +115,7 @@ export async function findDoneLaneId(db: AnyDb, projectId: string): Promise<stri
  * Null when the project has no such lane, which leaves the todo off the board
  * rather than parked in a column that would immediately re-complete it.
  */
-export async function findFirstOpenLaneId(db: AnyDb, projectId: string): Promise<string | null> {
+export async function findFirstOpenLaneId(db: DB, projectId: string): Promise<string | null> {
   const rows: Array<{ id: string }> = await db
     .select({ id: dbSchema.lanes.id })
     .from(dbSchema.lanes)
@@ -138,7 +134,7 @@ export async function findFirstOpenLaneId(db: AnyDb, projectId: string): Promise
  * @param projectId - The project the todos are for.
  * @returns The lane's id, or null when the project has no open lane.
  */
-export async function findNewTodoLaneId(db: AnyDb, projectId: string): Promise<string | null> {
+export async function findNewTodoLaneId(db: DB, projectId: string): Promise<string | null> {
   const rows: Array<{ id: string }> = await db
     .select({ id: dbSchema.lanes.id })
     .from(dbSchema.projects)
@@ -158,7 +154,7 @@ export async function findNewTodoLaneId(db: AnyDb, projectId: string): Promise<s
  * reliably there to inspect. It runs inside the transaction, so a violation
  * rolls the write back.
  */
-export async function assertCompletionMatchesLane(db: AnyDb, userId: string): Promise<void> {
+export async function assertCompletionMatchesLane(db: DB, userId: string): Promise<void> {
   const rows: Array<{ title: string }> = await db
     .select({ title: dbSchema.todos.title })
     .from(dbSchema.todos)
@@ -174,9 +170,8 @@ export async function assertCompletionMatchesLane(db: AnyDb, userId: string): Pr
     )
     .limit(3);
   if (rows.length === 0) return;
-  throw new GraphQLError(
+  throw badInput(
     `Lane and completion disagree for ${rows.map((row) => row.title).join(', ')}. Use moveTodo to change a todo's lane.`,
-    { extensions: { code: 'BAD_USER_INPUT' } },
   );
 }
 
@@ -189,7 +184,7 @@ export async function assertCompletionMatchesLane(db: AnyDb, userId: string): Pr
  * column that means done, and reopening finished work over a board edit would
  * destroy more than the edit asked for.
  */
-export async function syncLaneCompletion(tx: AnyDb, projectId: string, doneLaneId: string): Promise<void> {
+export async function syncLaneCompletion(tx: DB, projectId: string, doneLaneId: string): Promise<void> {
   const entering: Array<{ id: string }> = await tx
     .select({ id: dbSchema.todos.id })
     .from(dbSchema.todos)

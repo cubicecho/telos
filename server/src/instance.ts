@@ -1,11 +1,9 @@
+import type { DB } from '@telos/db';
 import * as dbSchema from '@telos/db/schema';
 import { and, eq, sql } from 'drizzle-orm';
 
 // The instance's settings row, and its admins. There is one row or none; none
 // reads as the defaults, which keep AI off.
-
-// biome-ignore lint/suspicious/noExplicitAny: db type varies by driver (postgres-js, PGlite)
-type AnyDb = any;
 
 /**
  * Whether the instance's AI switch is on. Asked afresh every time, because an
@@ -14,7 +12,7 @@ type AnyDb = any;
  * @param db The database, or a transaction.
  * @returns The switch.
  */
-export async function instanceAiOn(db: AnyDb): Promise<boolean> {
+export async function instanceAiOn(db: DB): Promise<boolean> {
   const [row] = await db
     .select({ aiEnabled: dbSchema.instanceSettings.aiEnabled })
     .from(dbSchema.instanceSettings)
@@ -28,7 +26,7 @@ export async function instanceAiOn(db: AnyDb): Promise<boolean> {
  * @param db The database, or a transaction.
  * @param enabled The new value.
  */
-export async function setInstanceAi(db: AnyDb, enabled: boolean): Promise<void> {
+export async function setInstanceAi(db: DB, enabled: boolean): Promise<void> {
   await db
     .insert(dbSchema.instanceSettings)
     .values({ aiEnabled: enabled })
@@ -45,7 +43,7 @@ export const INSTANCE_AI_ON = sql`EXISTS (SELECT 1 FROM instance_settings WHERE 
  * @param userId The user.
  * @returns Their flag.
  */
-export async function isAdmin(db: AnyDb, userId: string): Promise<boolean> {
+export async function isAdmin(db: DB, userId: string): Promise<boolean> {
   const [user] = await db
     .select({ isAdmin: dbSchema.users.isAdmin })
     .from(dbSchema.users)
@@ -60,7 +58,7 @@ export async function isAdmin(db: AnyDb, userId: string): Promise<boolean> {
  * @param db The database.
  * @param userId The account just created.
  */
-export async function claimFirstAdmin(db: AnyDb, userId: string): Promise<void> {
+export async function claimFirstAdmin(db: DB, userId: string): Promise<void> {
   await db
     .update(dbSchema.users)
     .set({ isAdmin: true })

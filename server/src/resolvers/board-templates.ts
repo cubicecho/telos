@@ -1,7 +1,10 @@
 import * as dbSchema from '@telos/db/schema';
 import { and, asc, eq, inArray } from 'drizzle-orm';
-import { extendSchema, GraphQLError, type GraphQLObjectType, type GraphQLSchema, parse } from 'graphql';
-import type { Context } from '../context.ts';
+import { extendSchema, type GraphQLSchema, parse } from 'graphql';
+import type { MutationResolvers } from '../../__generated__/resolvers.ts';
+import { attachResolvers } from '../attach-resolvers.ts';
+import { badInput, conflict, notFound } from '../errors.ts';
+import { loadOwnedProject } from '../owned.ts';
 import { requireAuth } from './auth.ts';
 
 // Board templates: a project's lanes, with their agents and routes, saved to
@@ -10,9 +13,6 @@ import { requireAuth } from './auth.ts';
 //
 // Applying replaces a board, so it is only for a project with no todos yet —
 // archived ones included, since they still sit in its lanes.
-
-// biome-ignore lint/suspicious/noExplicitAny: drizzle-orm 1.0 table/column type compat
-type AnyRow = any;
 
 type TemplateLane = dbSchema.TemplateLane;
 
@@ -28,26 +28,6 @@ const BOARD_TEMPLATES_SDL = parse(`
 /** The most lanes a template may hold. */
 const MAX_LANES = 50;
 const MAX_NAME = 100;
-
-const badInput = (message: string) => new GraphQLError(message, { extensions: { code: 'BAD_USER_INPUT' } });
-const notFound = (what: string) => new GraphQLError(`${what} not found`, { extensions: { code: 'NOT_FOUND' } });
-
-/**
- * The caller's project, or NOT_FOUND.
- *
- * @param db The database or transaction.
- * @param projectId The project.
- * @param userId Its owner, supposedly.
- * @returns The project.
- */
-async function ownedProject(db: AnyRow, projectId: string, userId: string) {
-  const [project] = await db
-    .select()
-    .from(dbSchema.projects)
-    .where(and(eq(dbSchema.projects.id, projectId), eq(dbSchema.projects.userId, userId)));
-  if (!project) throw notFound('Project');
-  return project;
-}
 
 /**
  * A template's lanes, checked, since a person may have edited them directly.
@@ -97,18 +77,14 @@ export function checkTemplateLanes(value: unknown): TemplateLane[] {
 
 export function applyBoardTemplatesExtension(schema: GraphQLSchema): GraphQLSchema {
   const extendedSchema = extendSchema(schema, BOARD_TEMPLATES_SDL);
-  const mutations = (extendedSchema.getType('Mutation') as GraphQLObjectType).getFields();
+  const mutations: MutationResolvers = {};
 
-  mutations.saveBoardTemplate.resolve = async (
-    _parent: unknown,
-    args: { projectId: string; name: string },
-    context: Context,
-  ) => {
+  mutations.saveBoardTemplate = async (_parent, args, context) => {
     const userId = requireAuth(context);
     const name = args.name.trim();
     if (!name || name.length > MAX_NAME) throw badInput(`Name the template, in ${MAX_NAME} characters or fewer.`);
-    const db = context.db as AnyRow;
-    await ownedProject(db, args.projectId, userId);
+    const db = context.db;
+    await loadOwnedProject(db, userId, args.projectId);
     const rows = await db
       .select()
       .from(dbSchema.lanes)
@@ -136,14 +112,10 @@ export function applyBoardTemplatesExtension(schema: GraphQLSchema): GraphQLSche
     return template;
   };
 
-  mutations.applyBoardTemplate.resolve = async (
-    _parent: unknown,
-    args: { projectId: string; templateId: string },
-    context: Context,
-  ) => {
+  mutations.applyBoardTemplate = async (_parent, args, context) => {
     const userId = requireAuth(context);
-    return (context.db as AnyRow).transaction(async (tx: AnyRow) => {
-      const project = await ownedProject(tx, args.projectId, userId);
+    return context.db.transaction(async (tx) => {
+      const project = await loadOwnedProject(tx, userId, args.projectId);
       const [template] = await tx
         .select()
         .from(dbSchema.boardTemplates)
@@ -157,9 +129,7 @@ export function applyBoardTemplatesExtension(schema: GraphQLSchema): GraphQLSche
         .where(eq(dbSchema.todos.projectId, project.id))
         .limit(1);
       if (todo) {
-        throw new GraphQLError('Only a board with no todos, archived ones included, can take a template.', {
-          extensions: { code: 'CONFLICT' },
-        });
+        throw conflict('Only a board with no todos, archived ones included, can take a template.');
       }
 
       // An agent the template names that is gone, or not the caller's, leaves
@@ -210,5 +180,5 @@ export function applyBoardTemplatesExtension(schema: GraphQLSchema): GraphQLSche
     });
   };
 
-  return extendedSchema;
+  return attachResolvers(extendedSchema, { Mutation: mutations });
 }

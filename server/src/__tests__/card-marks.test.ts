@@ -51,7 +51,7 @@ describe('cardMarks', () => {
     });
     await key.expectOk(ADD_NOTE, { todoId, body: 'From outside.' });
     // A work run leaves a report on the thread.
-    await runOnce(todoId, { status: 'ok', output: 'Wrote it.' });
+    await runOnce(todoId, { status: 'OK', output: 'Wrote it.' });
     const thread = await db.select().from(dbSchema.todoNotes).where(eq(dbSchema.todoNotes.todoId, todoId));
     expect(thread.map((note: { kind: string }) => note.kind).sort()).toEqual(['note', 'note', 'report']);
 
@@ -63,7 +63,7 @@ describe('cardMarks', () => {
   it('says a reviewer sent it back, with the reason and the run', async () => {
     await setLane(board.person, board.lanes[0].id, { onFailureLaneId: board.lanes[1].id });
     const todoId = await board.addTodo('Review it');
-    const runId = await runOnce(todoId, { status: 'ok', output: 'FAIL: the second paragraph is missing.' });
+    const runId = await runOnce(todoId, { status: 'OK', output: 'FAIL: the second paragraph is missing.' });
 
     const [mark] = await marks();
     expect(mark).toMatchObject({ todoId, lastRun: 'rejected', runId, attempts: 1, maxAttempts: null });
@@ -73,8 +73,8 @@ describe('cardMarks', () => {
   it('says a run errored, apart from being rejected, and how many attempts are used', async () => {
     await setLane(board.person, board.lanes[0].id, { maxAttempts: 2 });
     const todoId = await board.addTodo('Write it');
-    await runOnce(todoId, { status: 'error', error: 'The model did not answer.' });
-    const runId = await runOnce(todoId, { status: 'error', error: 'The endpoint refused.' });
+    await runOnce(todoId, { status: 'ERROR', error: 'The model did not answer.' });
+    const runId = await runOnce(todoId, { status: 'ERROR', error: 'The endpoint refused.' });
 
     expect(await marks()).toEqual([
       {
@@ -91,7 +91,7 @@ describe('cardMarks', () => {
 
   it('counts attempts as aiStatus counts failures, and forgets them when a person retries', async () => {
     const todoId = await board.addTodo('Write it');
-    await runOnce(todoId, { status: 'error', error: 'No.' });
+    await runOnce(todoId, { status: 'ERROR', error: 'No.' });
     const { todos } = (await board.person.expectOk(AI_STATUS, { projectId: board.projectId })).aiStatus;
     const [mark] = await marks();
     expect(mark.attempts).toBe(todos[0].failures);
@@ -104,12 +104,12 @@ describe('cardMarks', () => {
 
   it('drops the mark once a later run passes, and ignores a run that was called off', async () => {
     const todoId = await board.addTodo('Write it');
-    await runOnce(todoId, { status: 'error', error: 'No.' });
-    await runOnce(todoId, { status: 'stopped' });
+    await runOnce(todoId, { status: 'ERROR', error: 'No.' });
+    await runOnce(todoId, { status: 'STOPPED' });
     expect(await marks()).toMatchObject([{ todoId, lastRun: 'errored' }]);
 
     await setLane(board.person, board.lanes[0].id, { onSuccessLaneId: board.lanes[1].id });
-    await runOnce(todoId, { status: 'ok', output: 'Wrote it.' });
+    await runOnce(todoId, { status: 'OK', output: 'Wrote it.' });
     expect(await marks()).toMatchObject([{ todoId, lastRun: null, reason: null, runId: null, attempts: 1 }]);
   });
 
@@ -124,7 +124,7 @@ describe('cardMarks', () => {
   it('keeps to notes while AI is off for the project or the account', async () => {
     const todoId = await board.addTodo('Write it');
     await board.person.expectOk(NOTE, { todoId, body: 'A note.' });
-    await runOnce(todoId, { status: 'error', error: 'No.' });
+    await runOnce(todoId, { status: 'ERROR', error: 'No.' });
     expect(await marks()).toMatchObject([{ notes: 1, lastRun: 'errored', attempts: 1 }]);
 
     const notesOnly = [{ todoId, notes: 1, lastRun: null, reason: null, runId: null, attempts: 0, maxAttempts: null }];
@@ -143,7 +143,7 @@ describe('cardMarks', () => {
   it('answers with notes where the server offers no AI at all', async () => {
     const todoId = await board.addTodo('Write it');
     await board.person.expectOk(NOTE, { todoId, body: 'A note.' });
-    await runOnce(todoId, { status: 'error', error: 'No.' });
+    await runOnce(todoId, { status: 'ERROR', error: 'No.' });
     expect(await marks(createClient(db, board.userId))).toMatchObject([
       { todoId, notes: 1, lastRun: null, attempts: 0 },
     ]);

@@ -1,3 +1,4 @@
+import type { DB } from '@telos/db';
 import { sql } from 'drizzle-orm';
 import { resultRows } from './blocking.ts';
 import { pruneTombstones } from './changes.ts';
@@ -20,9 +21,6 @@ import { arrivedIn, TOUCHED } from './ready.ts';
 // A draft's replies are runs too, and readiness does not count them, so every finished
 // one past its keep goes. What the agent said stays in the draft's conversation.
 
-// biome-ignore lint/suspicious/noExplicitAny: db type varies by driver (postgres-js, PGlite)
-type AnyDb = any;
-
 /** How often the server prunes. */
 export const PRUNE_EVERY_MS = 60 * 60_000;
 
@@ -36,7 +34,7 @@ export const MAX_RETENTION_DAYS = 3650;
  * @param now What time it is.
  * @returns How many runs went.
  */
-export async function pruneRuns(db: AnyDb, now: Date = new Date()): Promise<number> {
+export async function pruneRuns(db: DB, now: Date = new Date()): Promise<number> {
   const stale = sql`u.run_retention_days IS NOT NULL
       AND r.status <> 'running'
       AND coalesce(r.finished_at, r.started_at) < ${now.toISOString()}::timestamptz - make_interval(days => u.run_retention_days)`;
@@ -82,7 +80,7 @@ export async function pruneRuns(db: AnyDb, now: Date = new Date()): Promise<numb
  * @returns Stops it.
  */
 export function startPruning(
-  db: AnyDb,
+  db: DB,
   {
     everyMs = PRUNE_EVERY_MS,
     runs = true,

@@ -1,7 +1,10 @@
-import { extendSchema, GraphQLError, type GraphQLObjectType, type GraphQLSchema, parse } from 'graphql';
+import { extendSchema, GraphQLError, type GraphQLSchema, parse } from 'graphql';
+import type { MutationResolvers, QueryResolvers } from '../../__generated__/resolvers.ts';
+import { attachResolvers } from '../attach-resolvers.ts';
 import { magicLinkUrl, requestMagicToken, signInDirectly, verifyMagicToken } from '../auth.ts';
 import { magicLinkExposed, magicLinkRequired } from '../config.ts';
 import type { Context } from '../context.ts';
+import { badInput, forbidden } from '../errors.ts';
 import { instanceAiOn } from '../instance.ts';
 import { createRateLimiter } from '../rate-limit.ts';
 
@@ -69,23 +72,22 @@ function normalizeEmail(email: string): string {
 export function requireSession(ctx: Context): string {
   const userId = requireAuth(ctx);
   if (ctx.actor.kind !== 'user') {
-    throw new GraphQLError('Only a signed-in person can do this', { extensions: { code: 'FORBIDDEN' } });
+    throw forbidden('Only a signed-in person can do this');
   }
   return userId;
 }
 
 export function applyAuthExtension(schema: GraphQLSchema, options: { ai: boolean }): GraphQLSchema {
   const extendedSchema = extendSchema(schema, AUTH_SDL);
-  const queryType = extendedSchema.getType('Query') as GraphQLObjectType;
-  queryType.getFields().authConfig.resolve = async (_parent: unknown, _args: unknown, context: Context) => ({
+  const queries: QueryResolvers = {};
+  queries.authConfig = async (_parent, _args, context) => ({
     ai: options.ai && (await instanceAiOn(context.db)),
     aiAvailable: options.ai,
   });
 
-  const mutationType = extendedSchema.getType('Mutation') as GraphQLObjectType;
-  const fields = mutationType.getFields();
+  const mutations: MutationResolvers = {};
 
-  fields.requestMagicLink.resolve = async (_parent: unknown, args: { email: string }, context: Context) => {
+  mutations.requestMagicLink = async (_parent, args, context) => {
     const email = normalizeEmail(args.email);
     if (!signInLimiter.allow(email)) {
       throw new GraphQLError('Too many sign-in attempts. Try again in a few minutes.', {
@@ -108,18 +110,16 @@ export function applyAuthExtension(schema: GraphQLSchema, options: { ai: boolean
     return { ok: true, magicLink, token: null, userId: null };
   };
 
-  fields.verifyMagicLink.resolve = async (_parent: unknown, args: { token: string }, context: Context) => {
+  mutations.verifyMagicLink = async (_parent, args, context) => {
     // Registration is open: the first verified link for an address creates its
     // account. Self-hosting is the deployment model, so whoever can reach the
     // instance is meant to have one.
     const session = await verifyMagicToken(context.auth, args.token);
     if (!session) {
-      throw new GraphQLError('Invalid or expired magic link', {
-        extensions: { code: 'BAD_USER_INPUT' },
-      });
+      throw badInput('Invalid or expired magic link');
     }
     return session;
   };
 
-  return extendedSchema;
+  return attachResolvers(extendedSchema, { Query: queries, Mutation: mutations });
 }

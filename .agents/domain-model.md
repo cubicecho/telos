@@ -227,8 +227,8 @@ the site.
   agent is switched off, it is hands off, or auto-run is off and nobody asked for a run.
 - **Handed back:** its lane's agent is done with it and it cannot move on without you:
   the agent gave up after more failed runs than the lane's max attempts, or it finished
-  and the lane has nowhere to send it. Owner: `aiStatus` `handedBack`, with `gaveUp` or
-  `finished`; the activity page's `accountHandedBack`.
+  and the lane has nowhere to send it. Owner: `aiStatus` `HANDED_BACK`, with `GAVE_UP` or
+  `FINISHED`; the activity page's `accountHandedBack`.
 
 ### What happened
 
