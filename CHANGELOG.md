@@ -1,3 +1,19 @@
+# [4.0.0](https://github.com/cubicecho/telos/compare/v3.0.0...v4.0.0) (2026-10-16)
+
+
+* refactor(server)!: hand-written API enums live in GraphQL, SCREAMING_CASE on the wire ([bb4dd5d](https://github.com/cubicecho/telos/commit/bb4dd5deff5df3ef99818958bb02d4a8154fff3a))
+* refactor(server)!: RunEventInput.kind is a RunEventKind enum ([59e4a5f](https://github.com/cubicecho/telos/commit/59e4a5fd0842d4b87958ecb874559fe066d40fea))
+
+
+### BREAKING CHANGES
+
+* a client sending run events must send SCREAMING_CASE kinds.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+* clients must send and compare the SCREAMING_CASE values.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
 # [3.0.0](https://github.com/cubicecho/telos/compare/v2.5.2...v3.0.0) (2026-10-16)
 
 
