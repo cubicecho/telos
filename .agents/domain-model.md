@@ -65,14 +65,15 @@ Checked in this order; the first that holds wins (`workStates` in `ready.ts`, th
 rules `readyTodos` filters by):
 
 1. `running`: a run holds it.
-2. `parked`: nothing will work it where it is: no lane, hands off, no agent, or the agent
+2. `waiting`: it is an umbrella; done when its pieces are.
+3. `parked`: nothing will work it where it is: no lane, hands off, no agent, or the agent
    switched off.
-3. `handedBack`: more failed runs since it was touched than the lane's `maxAttempts`
+4. `handedBack`: more failed runs since it was touched than the lane's `maxAttempts`
    (`gaveUp`), or an `ok` run in this lane since it arrived and nowhere to send it
    (`finished`, **finished here**).
-4. `blocked`: it waits on an open dependency.
-5. `parked` again: auto-run is off and nobody asked for a run.
-6. `queued`: the lane's agent will start on it when there is room.
+5. `blocked`: it waits on an open dependency.
+6. `parked` again: auto-run is off and nobody asked for a run.
+7. `queued`: the lane's agent will start on it when there is room.
 
 Done todos are counted per lane, not listed. The activity page's `accountHandedBack` and
 the sidebar count are the `handedBack` todos, by the same rule. A todo whose last run
@@ -93,8 +94,22 @@ stopped run writes nothing. `finishRun` turns the reply into one **outcome** and
 | ruling | Opens with `PASS` or `FAIL` | Success or failure route; a verdict note |
 | report | Anything else | As a pass; a report note |
 | refine | A fenced `refine` block, or a `todos` block of one | Rewrites title, brief, acceptance (what it omits stays), then as a pass |
-| split | A fenced `todos` block of two or more | Pieces filed under the todo, which waits on them where it is |
+| split | A fenced `todos` block of two or more | Pieces filed under the todo, which becomes an umbrella where it is |
 | error | The run failed, or a reply both refines and splits | Failure route; counts an attempt |
+
+### Umbrella
+
+```
+split --> umbrella --last unarchived piece completes--> done (as `system`)
+             ^                                            |
+             \---a piece reopens, or a new one is filed---/
+umbrella --unsplitTodo--> an ordinary todo
+```
+
+A split sets `todos.splitAt`. Its pieces settle it through the `todos_settle_umbrella`
+trigger, as `system`: complete, it goes to the done lane, and is archived if the lane it
+left archives on success; reopened, it goes to the first open lane. An archived umbrella
+stays archived. No agent works it, and no dependency joins it to its pieces.
 
 ### Run request
 
@@ -116,6 +131,7 @@ person says something --> waiting --agent's reply (a draft run)--> answered --..
 | Every table is scoped to its owner | `scope` in `server/src/tenancy.ts`; `tenancy.test.ts` |
 | A todo with a lane is complete if and only if the lane is the done lane | `server/src/lanes.ts`, `assertCompletionMatchesLane` |
 | At most one done lane per project; every project has a lane | `uq_lanes_project_done`; `seedMissingLanes`, last-lane delete refused |
+| An umbrella is completed only by its pieces, while it has open ones | `todos_settle_umbrella`; `assertNotBlocked`, `assertNoBlockedCompletions` |
 | A blocked todo is never completed or archived on success | `assertNotBlocked`, `assertNoBlockedCompletions`; `moveOn`, `archiveOn` in `runs.ts` |
 | A person cannot move a blocked todo to another lane; a route can, to any lane but the done lane | `moveTodo` in `server/src/resolvers/lanes.ts`; `moveOn` in `runs.ts` |
 | Dependencies have no cycles | `assertNoCycle`, the only way in being `addTodoDependency` / `setTodoDependencies` |
@@ -180,7 +196,11 @@ the site.
   open, the todo is blocked: it cannot be completed, and no agent works it.
   Owner: `server/src/blocking.ts`, `todo_dependencies`.
 - **Parent and piece:** a piece is a todo split out of a larger one, its parent, or one
-  someone filed under it. A split parent waits on its pieces. Owner: `todos.parentId`.
+  someone filed under it. Owner: `todos.parentId`.
+- **Umbrella:** a todo split into pieces. No agent works it; it completes by itself when
+  its last piece does, and reopens when a piece reopens or a new one is filed under it.
+  You cannot complete it while pieces are open; unsplit it to finish it alone.
+  Owner: `todos.splitAt`, the `todos_settle_umbrella` trigger, `unsplitTodo`.
 - **Draft:** a conversation with an agent about a rough idea, made into a todo when it is
   right. Owner: `server/src/resolvers/drafts.ts`.
 - **Archive:** putting a todo away: hidden, not gone, and it can be restored. Deleting a
@@ -201,6 +221,7 @@ the site.
 - **Queued:** its lane's agent will start on it when there is room.
   Owner: `workStates` in `server/src/ready.ts`.
 - **Running:** a run is working on it.
+- **Waiting:** it is an umbrella, and is done when its pieces are.
 - **Blocked:** it waits on an open dependency.
 - **Parked:** nothing will work on it where it is: its lane has no agent, AI or the
   agent is switched off, it is hands off, or auto-run is off and nobody asked for a run.
@@ -246,8 +267,8 @@ the site.
   Owner: `finish` in `server/src/resolvers/runs.ts`.
 - **Refine:** a reply that rewrites its todo's title, description or acceptance; what it
   leaves out stays. The todo then takes its success route. Owner: `refinementOf`.
-- **Split:** a reply that breaks its todo into two or more pieces. The todo waits where
-  it is until they are done. Owner: `finish`, `piecesLaneId`.
+- **Split:** a reply that breaks its todo into two or more pieces. The todo becomes an
+  umbrella where it is. Owner: `finish`, `piecesLaneId`.
 
 ### Internals
 
@@ -282,7 +303,7 @@ A person keeps todos in the lanes of a project. A lane with an agent works each 
 is ready in it: the runner claims it and the agent gets an assignment, with the standing
 protocol. Its reply is one outcome, a ruling, a report, a refine or a split, and only
 `finishRun` applies it to the todo, which then takes the lane's success or failure route,
-or waits where it is on its pieces. The todo's history says when it arrived in its lane,
+or becomes an umbrella that its pieces complete. The todo's history says when it arrived in its lane,
 and work since then is not repeated. People and API keys change todos directly within
 their reach; a run changes the todos it made freely, and its own todo only through its
 outcome, and AI sees nothing its owner has switched off or marked hands off.

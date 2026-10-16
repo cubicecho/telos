@@ -1,6 +1,6 @@
 import { useMutation } from '@apollo/client';
 import { useEffect, useMemo, useState } from 'react';
-import { Text } from 'react-native';
+import { Text, View } from 'react-native';
 import { useAppForm } from '@/components/app-form';
 import { DialogLayout } from '@/components/dialog-layout';
 import { RunTodoButton } from '@/components/domain/ai/run-todo-button';
@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAi } from '@/lib/ai';
 import { parseDate } from '@/lib/dates';
 import { describeError } from '@/lib/errors';
-import { UpdateTodoDocument } from '@/lib/graphql';
+import { UnsplitTodoDocument, UpdateTodoDocument } from '@/lib/graphql';
 import { TodoHistory, TodoThread } from './todo-record';
 import type { TodoSummary } from './types';
 
@@ -72,7 +72,12 @@ export function TodoFormDialog({
   const showRuns = projectAi;
   // Only what the todo itself rules out; the rest (no agent, blocked, being
   // worked) the server answers with a reason when asked.
-  const canRun = todo.completedAt == null && todo.aiIgnored === false && todo.lane != null && !todo.lane.isDone;
+  const canRun =
+    todo.completedAt == null &&
+    todo.splitAt == null &&
+    todo.aiIgnored === false &&
+    todo.lane != null &&
+    !todo.lane.isDone;
   const [updateTodo, { error }] = useMutation(UpdateTodoDocument);
   // The todo as the form holds it, and so the form's defaults as well as what
   // it resets to. Both matter: TanStack re-applies `defaultValues` whenever they
@@ -176,7 +181,8 @@ export function TodoFormDialog({
               <TabsTrigger value="history">History</TabsTrigger>
               {showRuns ? <TabsTrigger value="runs">Runs</TabsTrigger> : null}
             </TabsList>
-            <TabsContent value="details">
+            <TabsContent value="details" className="gap-4">
+              {todo.splitAt ? <SplitLine todo={todo} /> : null}
               <Form className="gap-4">
                 <form.AppField
                   name="title"
@@ -241,5 +247,34 @@ export function TodoFormDialog({
         }
       />
     </form.AppForm>
+  );
+}
+
+/**
+ * What an umbrella is waiting on, and the way out: unsplit, it is an ordinary
+ * todo again that can be worked or completed by itself.
+ */
+function SplitLine({ todo }: { todo: TodoSummary }) {
+  const [unsplit, { loading, error }] = useMutation(UnsplitTodoDocument);
+  return (
+    <View className="gap-2 rounded-lg border border-foreground/10 px-3 py-2.5">
+      <View className="flex-row flex-wrap items-center gap-2">
+        <Text className="min-w-0 flex-1 text-foreground/80 text-sm tabular-nums">
+          Split into pieces: {todo.donePieceCount} of {todo.pieceCount} done. It completes when they all are.
+        </Text>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={loading}
+          onPress={() => unsplit({ variables: { id: todo.id } }).catch(() => undefined)}
+          content="Unsplit"
+        />
+      </View>
+      {error ? (
+        <Text role="alert" className="text-sm text-negative">
+          {describeError(error)}
+        </Text>
+      ) : null}
+    </View>
   );
 }

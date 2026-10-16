@@ -8,6 +8,7 @@ import {
   RunTodoDocument,
   TodoRecordDocument,
   TodoRunsDocument,
+  UnsplitTodoDocument,
   UpdateTodoDocument,
 } from '@/lib/graphql';
 import { TodoFormDialog } from '../todo-form-dialog';
@@ -23,6 +24,9 @@ const TODO: TodoSummary = {
   dueAt: null,
   completedAt: null,
   position: 0,
+  splitAt: null,
+  pieceCount: 0,
+  donePieceCount: 0,
   isBlocked: false,
   blockedBy: [],
   dependencies: [],
@@ -96,6 +100,26 @@ function open(todo: TodoSummary, mocks: MockedResponse[], onOpenChange = vi.fn()
 }
 
 describe('TodoFormDialog', () => {
+  it('says how far a split todo has got, and unsplits it', async () => {
+    const user = userEvent.setup();
+    const unsplit = {
+      request: { query: UnsplitTodoDocument, variables: { id: TODO.id } },
+      result: vi.fn(() => ({
+        data: { unsplitTodo: { __typename: 'Todo', id: TODO.id, splitAt: null, pieceCount: 2, donePieceCount: 1 } },
+      })),
+    };
+    open({ ...TODO, splitAt: '2026-10-01T00:00:00Z', pieceCount: 2, donePieceCount: 1 }, [unsplit]);
+
+    expect(screen.getByText(/1 of 2 done/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Unsplit' }));
+    await waitFor(() => expect(unsplit.result).toHaveBeenCalled());
+  });
+
+  it('says nothing about pieces for a todo that was not split', () => {
+    open(TODO, []);
+    expect(screen.queryByRole('button', { name: 'Unsplit' })).toBeNull();
+  });
+
   it('opens showing what is stored, not a blank form', () => {
     open({ ...TODO, notes: 'The washer is perished.', dueAt: new Date(2026, 11, 1, 9).toISOString() }, []);
 

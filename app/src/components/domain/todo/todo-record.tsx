@@ -395,6 +395,7 @@ const FIELD_NAMES: Record<string, string> = {
   dueAt: 'the due date',
   parentId: 'the parent',
   aiIgnored: 'whether AI ignores it',
+  splitAt: 'whether it is split',
 };
 
 function fieldName(field: string): string {

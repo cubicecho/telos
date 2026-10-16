@@ -37,7 +37,7 @@ export const RUNNER_QUIET_SECONDS = 60;
 /** How far back "failed lately" looks. */
 const FAILURE_HOURS = 24;
 
-type State = 'handedBack' | 'running' | 'blocked' | 'queued' | 'parked' | 'done';
+type State = 'handedBack' | 'running' | 'waiting' | 'blocked' | 'queued' | 'parked' | 'done';
 type WorkTodo = AiStatusQuery['aiStatus']['todos'][number];
 
 const STATES: Array<{ value: State; label: string; blurb: string; variant: BadgeVariant }> = [
@@ -48,6 +48,12 @@ const STATES: Array<{ value: State; label: string; blurb: string; variant: Badge
     variant: 'destructive',
   },
   { value: 'running', label: 'Running', blurb: 'An agent is working these now.', variant: 'info' },
+  {
+    value: 'waiting',
+    label: 'Waiting',
+    blurb: 'These were split, and are done when their pieces are.',
+    variant: 'outline',
+  },
   { value: 'blocked', label: 'Blocked', blurb: 'These wait on something unfinished.', variant: 'outline' },
   { value: 'queued', label: 'Queued', blurb: 'An agent will start these when it has room.', variant: 'secondary' },
   { value: 'parked', label: 'Parked', blurb: 'No agent will reach these where they are.', variant: 'outline' },
@@ -62,7 +68,15 @@ export function AiStatus({ pollMs = STATUS_POLL_MS }: { pollMs?: number }) {
   const [retryTodo, retryState] = useMutation(RetryTodoDocument, { refetchQueries: [AiStatusDocument] });
 
   const counts = useMemo(() => {
-    const tally: Record<State, number> = { handedBack: 0, running: 0, blocked: 0, queued: 0, parked: 0, done: 0 };
+    const tally: Record<State, number> = {
+      handedBack: 0,
+      running: 0,
+      waiting: 0,
+      blocked: 0,
+      queued: 0,
+      parked: 0,
+      done: 0,
+    };
     for (const todo of status?.todos ?? []) tally[todo.state as State] += 1;
     for (const project of status?.projects ?? []) for (const lane of project.lanes) tally.done += lane.done;
     return tally;

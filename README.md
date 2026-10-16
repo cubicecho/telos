@@ -163,8 +163,9 @@ What an agent does is in its instructions, and every reply is read the same
 way: one that opens with FAIL sends the todo along the failure route, anything
 else passes (open with PASS to say so). A passing run can split its todo into
 new ones, which land in the lane the project sends new todos to (set in the
-project's form; the first open lane otherwise), and the todo waits on them. A
-new agent can start from one of four starters (Settings → Agents → Start from):
+project's form; the first open lane otherwise), and the todo is done when they
+all are.
+A new agent can start from one of four starters (Settings → Agents → Start from):
 a **Refiner** for drafts, a **Planner** that splits work into todos, a
 **Worker** that does it and a **Reviewer** that rules PASS or FAIL. Each comes
 with instructions and a temperature for its job; give it a base URL

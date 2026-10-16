@@ -37,6 +37,9 @@ export const TodoFieldsFragment = graphql(`
     dueAt
     completedAt
     position
+    splitAt
+    pieceCount
+    donePieceCount
     isBlocked
     blockedBy {
       id
@@ -943,6 +946,17 @@ export const CompleteTodoDocument = graphql(`
   }
 `);
 
+export const UnsplitTodoDocument = graphql(`
+  mutation UnsplitTodo($id: ID!) {
+    unsplitTodo(id: $id) {
+      id
+      splitAt
+      pieceCount
+      donePieceCount
+    }
+  }
+`);
+
 export const ReopenTodoDocument = graphql(`
   mutation ReopenTodo($id: ID!) {
     reopenTodo(id: $id) {
@@ -1138,6 +1152,7 @@ export const AiStatusDocument = graphql(`
           isDone
           handedBack
           running
+          waiting
           blocked
           queued
           parked
