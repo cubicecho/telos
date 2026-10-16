@@ -1,8 +1,9 @@
 import * as dbSchema from '@telos/db/schema';
 import { and, asc, eq, inArray } from 'drizzle-orm';
-import { extendSchema, GraphQLError, type GraphQLSchema, parse } from 'graphql';
+import { extendSchema, type GraphQLSchema, parse } from 'graphql';
 import type { MutationResolvers } from '../../__generated__/resolvers.ts';
 import { attachResolvers } from '../attach-resolvers.ts';
+import { badInput, conflict, notFound } from '../errors.ts';
 import { requireAuth } from './auth.ts';
 
 // Board templates: a project's lanes, with their agents and routes, saved to
@@ -29,9 +30,6 @@ const BOARD_TEMPLATES_SDL = parse(`
 /** The most lanes a template may hold. */
 const MAX_LANES = 50;
 const MAX_NAME = 100;
-
-const badInput = (message: string) => new GraphQLError(message, { extensions: { code: 'BAD_USER_INPUT' } });
-const notFound = (what: string) => new GraphQLError(`${what} not found`, { extensions: { code: 'NOT_FOUND' } });
 
 /**
  * The caller's project, or NOT_FOUND.
@@ -150,9 +148,7 @@ export function applyBoardTemplatesExtension(schema: GraphQLSchema): GraphQLSche
         .where(eq(dbSchema.todos.projectId, project.id))
         .limit(1);
       if (todo) {
-        throw new GraphQLError('Only a board with no todos, archived ones included, can take a template.', {
-          extensions: { code: 'CONFLICT' },
-        });
+        throw conflict('Only a board with no todos, archived ones included, can take a template.');
       }
 
       // An agent the template names that is gone, or not the caller's, leaves

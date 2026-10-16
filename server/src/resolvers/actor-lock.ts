@@ -1,6 +1,7 @@
-import { defaultFieldResolver, GraphQLError, type GraphQLSchema } from 'graphql';
+import { defaultFieldResolver, type GraphQLSchema } from 'graphql';
 import { type Context, isAiActor } from '../context.ts';
 import { DOOR_TOOLS, switchedOff, switchOwner } from '../door.ts';
+import { forbidden } from '../errors.ts';
 import { assertAiReach } from './ai-reach.ts';
 import { assertRunReach } from './run-reach.ts';
 
@@ -91,10 +92,6 @@ function refusal(name: string, args: Record<string, unknown>, context: Context):
     return `${name} is not open to AI.`;
   }
   return switchedOff(name, args, context.actor) ? `${name} is switched off for ${switchOwner(context.actor)}.` : null;
-}
-
-function forbidden(message: string): GraphQLError {
-  return new GraphQLError(message, { extensions: { code: 'FORBIDDEN' } });
 }
 
 /**

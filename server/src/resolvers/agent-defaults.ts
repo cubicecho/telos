@@ -1,10 +1,11 @@
 import * as dbSchema from '@telos/db/schema';
 import { resolveAgent } from '@telos/runner/spec';
-import { extendSchema, GraphQLError, type GraphQLSchema, parse } from 'graphql';
+import { extendSchema, type GraphQLSchema, parse } from 'graphql';
 import type { MutationResolvers, QueryResolvers } from '../../__generated__/resolvers.ts';
 import { LAYER_FIELDS, loadAgentDefaults } from '../agent-defaults.ts';
 import { requireAi } from '../ai-gate.ts';
 import { attachResolvers } from '../attach-resolvers.ts';
+import { badInput } from '../errors.ts';
 import { requireSession } from './auth.ts';
 
 // The account's agent defaults (db/src/models/agent-defaults.ts): read and set
@@ -96,8 +97,6 @@ const AGENT_DEFAULTS_SDL = parse(`
 
 type LayerField = (typeof LAYER_FIELDS)[number];
 type LayerValues = Partial<Record<LayerField, string | number | boolean | null>>;
-
-const badInput = (message: string) => new GraphQLError(message, { extensions: { code: 'BAD_USER_INPUT' } });
 
 /**
  * The defaults as a person reads them: without the key, with what they resolve to.

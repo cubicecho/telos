@@ -1,10 +1,11 @@
 import * as dbSchema from '@telos/db/schema';
 import { and, eq, isNull } from 'drizzle-orm';
-import { extendSchema, GraphQLError, type GraphQLSchema, parse } from 'graphql';
+import { extendSchema, type GraphQLSchema, parse } from 'graphql';
 import type { MutationResolvers } from '../../__generated__/resolvers.ts';
 import { requireAi } from '../ai-gate.ts';
 import { attachResolvers } from '../attach-resolvers.ts';
 import { type Context, isAiActor } from '../context.ts';
+import { forbidden, notFound } from '../errors.ts';
 import { requireAuth } from './auth.ts';
 import { requireText } from './requests.ts';
 
@@ -43,14 +44,6 @@ const NOTES_SDL = parse(`
   }
 `);
 
-function notFound(): GraphQLError {
-  return new GraphQLError('Note not found', { extensions: { code: 'NOT_FOUND' } });
-}
-
-function forbidden(message: string): GraphQLError {
-  return new GraphQLError(message, { extensions: { code: 'FORBIDDEN' } });
-}
-
 /**
  * A note the caller may see, or NOT_FOUND. For a person that is any note of
  * theirs. For AI it is narrower, as in tenancy.ts: the note's todo must be one
@@ -80,7 +73,7 @@ async function loadVisibleNote(context: Context, id: string): Promise<AnyRow> {
         : owned,
     );
   if (!row) {
-    throw notFound();
+    throw notFound('Note');
   }
   return row.note;
 }
@@ -133,7 +126,7 @@ export function applyNotesExtension(schema: GraphQLSchema): GraphQLSchema {
       .where(eq(dbSchema.todoNotes.id, note.id))
       .returning();
     if (!edited) {
-      throw notFound();
+      throw notFound('Note');
     }
     return edited;
   };
@@ -150,7 +143,7 @@ export function applyNotesExtension(schema: GraphQLSchema): GraphQLSchema {
       .where(eq(dbSchema.todoNotes.id, note.id))
       .returning();
     if (!removed) {
-      throw notFound();
+      throw notFound('Note');
     }
     return removed;
   };

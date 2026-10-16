@@ -1,11 +1,12 @@
 import * as dbSchema from '@telos/db/schema';
 import { and, eq, inArray, isNull } from 'drizzle-orm';
-import { extendSchema, GraphQLError, type GraphQLSchema, parse } from 'graphql';
+import { extendSchema, type GraphQLSchema, parse } from 'graphql';
 import type { MutationResolvers, ProjectResolvers, TodoResolvers } from '../../__generated__/resolvers.ts';
 import { attachResolvers } from '../attach-resolvers.ts';
 import { assertNoCycle, assertNotBlocked } from '../blocking.ts';
 import { appLink } from '../config.ts';
 import { type Context, isAiActor } from '../context.ts';
+import { badInput, forbidden, notFound } from '../errors.ts';
 import { findDoneLaneId, findFirstOpenLaneId } from '../lanes.ts';
 import { stampActor } from '../provenance.ts';
 import { requireAuth } from './auth.ts';
@@ -78,7 +79,7 @@ async function loadOwnedTodo(context: Context, id: string): Promise<AnyRow> {
     .where(and(eq(dbSchema.todos.id, id), eq(dbSchema.todos.userId, userId), isNull(dbSchema.todos.archivedAt)))
     .limit(1);
   if (rows.length === 0) {
-    throw new GraphQLError('Todo not found', { extensions: { code: 'NOT_FOUND' } });
+    throw notFound('Todo');
   }
   return rows[0];
 }
@@ -88,9 +89,7 @@ function assertNotCompletedBehind(todo: AnyRow, blocker: AnyRow): void {
   if (todo.completedAt != null && blocker.completedAt == null) {
     // Otherwise the todo would sit completed and blocked at once, and
     // `isBlocked` would stop meaning "cannot be completed".
-    throw new GraphQLError('Reopen this todo before making it depend on an open one.', {
-      extensions: { code: 'BAD_USER_INPUT' },
-    });
+    throw badInput('Reopen this todo before making it depend on an open one.');
   }
 }
 
@@ -121,7 +120,7 @@ async function setCompletedAt(
       .set({ completedAt, updatedAt: new Date(), ...(laneId ? { laneId } : {}) })
       .where(and(eq(dbSchema.todos.id, todo.id), eq(dbSchema.todos.userId, userId)))
       .returning();
-    if (!updated) throw new GraphQLError('Todo not found', { extensions: { code: 'NOT_FOUND' } });
+    if (!updated) throw notFound('Todo');
     return updated;
   });
 }
@@ -217,7 +216,7 @@ export function applyTodosExtension(schema: GraphQLSchema): GraphQLSchema {
     const todo = await loadOwnedTodo(context, args.id);
     const byPerson = context.actor.kind === 'user';
     if (byPerson === false) {
-      throw new GraphQLError('Only a person can unsplit a todo.', { extensions: { code: 'FORBIDDEN' } });
+      throw forbidden('Only a person can unsplit a todo.');
     }
     if (todo.splitAt == null) return todo;
     return (context.db as AnyRow).transaction(async (tx: AnyRow) => {
@@ -282,7 +281,7 @@ export function applyTodosExtension(schema: GraphQLSchema): GraphQLSchema {
     const added = [...wanted].filter((id) => kept.has(id) === false);
     for (const id of added) {
       if (id === todo.id) {
-        throw new GraphQLError('A todo cannot depend on itself.', { extensions: { code: 'BAD_USER_INPUT' } });
+        throw badInput('A todo cannot depend on itself.');
       }
       assertNotCompletedBehind(todo, await loadOwnedTodo(context, id));
     }

@@ -1,6 +1,6 @@
 import * as dbSchema from '@telos/db/schema';
 import { and, asc, desc, eq, ne, sql } from 'drizzle-orm';
-import { extendSchema, GraphQLError, type GraphQLSchema, parse } from 'graphql';
+import { extendSchema, type GraphQLSchema, parse } from 'graphql';
 import type {
   ArtifactInput,
   MutationResolvers,
@@ -18,6 +18,7 @@ import { assertNoCycle, findBlocked } from '../blocking.ts';
 import type { Actor, Context } from '../context.ts';
 import { stopDraftReply } from '../draft-runs.ts';
 import { RunOutcomeEnum, withEnums } from '../enums.ts';
+import { badInput, conflict, forbidden, notFound } from '../errors.ts';
 import { instanceAiOn } from '../instance.ts';
 import { findDoneLaneId, findNewTodoLaneId } from '../lanes.ts';
 import { runnerAgent } from '../mcp-servers.ts';
@@ -259,10 +260,6 @@ function verdictOf(output: string | null): 'pass' | 'fail' | 'none' {
   return PASSES.test(output) ? 'pass' : 'none';
 }
 
-function notFound(what: string): GraphQLError {
-  return new GraphQLError(`${what} not found`, { extensions: { code: 'NOT_FOUND' } });
-}
-
 /**
  * When a lease taken or renewed now runs out.
  *
@@ -285,9 +282,7 @@ async function loadRunForUpdate(tx: AnyRow, runId: string) {
   const [run] = await tx.select().from(dbSchema.runs).where(eq(dbSchema.runs.id, runId)).for('update');
   if (!run) throw notFound('Run');
   if (run.kind !== 'todo') {
-    throw new GraphQLError("That run is a draft's reply, which has no lane. Report it with finishDraft.", {
-      extensions: { code: 'BAD_USER_INPUT' },
-    });
+    throw badInput("That run is a draft's reply, which has no lane. Report it with finishDraft.");
   }
   const [todo] = await tx.select().from(dbSchema.todos).where(eq(dbSchema.todos.id, run.todoId));
   const [project] = await tx.select().from(dbSchema.projects).where(eq(dbSchema.projects.id, run.projectId));
@@ -623,7 +618,7 @@ async function finish(context: Context, runId: string, result: RunResultInput): 
   return (context.db as AnyRow).transaction(async (tx: AnyRow) => {
     const { run, todo, lane, aiOff } = await loadRunForUpdate(tx, runId);
     if (run.status !== 'running') {
-      throw new GraphQLError('That run has already finished.', { extensions: { code: 'CONFLICT' } });
+      throw conflict('That run has already finished.');
     }
     const output = result.output?.trim() || null;
 
@@ -949,7 +944,7 @@ export function applyRunsExtension(schema: GraphQLSchema): GraphQLSchema {
     if (!run) throw notFound('Run');
     // A live run is the runner's until it ends; cancel it first.
     if (run.status === 'running') {
-      throw new GraphQLError('Stop the run before deleting it.', { extensions: { code: 'CONFLICT' } });
+      throw conflict('Stop the run before deleting it.');
     }
     await db.delete(dbSchema.runs).where(eq(dbSchema.runs.id, run.id));
     return true;
@@ -961,7 +956,7 @@ export function applyRunsExtension(schema: GraphQLSchema): GraphQLSchema {
   mutations.deleteArtifact = async (_parent, args, context) => {
     const userId = requireAuth(context);
     if (context.actor.kind !== 'user') {
-      throw new GraphQLError('Only a person can remove an artifact.', { extensions: { code: 'FORBIDDEN' } });
+      throw forbidden('Only a person can remove an artifact.');
     }
     const removed = await (context.db as AnyRow)
       .delete(dbSchema.artifacts)

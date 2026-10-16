@@ -1,9 +1,10 @@
 import * as dbSchema from '@telos/db/schema';
 import { and, eq } from 'drizzle-orm';
-import { extendSchema, GraphQLError, type GraphQLSchema, parse } from 'graphql';
+import { extendSchema, type GraphQLSchema, parse } from 'graphql';
 import type { MutationResolvers } from '../../__generated__/resolvers.ts';
 import { requireAi } from '../ai-gate.ts';
 import { attachResolvers } from '../attach-resolvers.ts';
+import { badInput, forbidden } from '../errors.ts';
 import { loadAiTodo, requireText } from './requests.ts';
 
 // Recording an artifact from outside a run. A todo's run reports what it
@@ -37,10 +38,6 @@ const MAX_MEDIA_TYPE = 200;
 /** The scheme the runner files a run's notes under. Not a client's to claim. */
 const NOTE_LOCATION = 'telos:note/';
 
-function badInput(message: string): GraphQLError {
-  return new GraphQLError(message, { extensions: { code: 'BAD_USER_INPUT' } });
-}
-
 /**
  * `value` trimmed, or BAD_USER_INPUT when it is empty or longer than `limit`.
  *
@@ -66,9 +63,8 @@ export function applyArtifactsExtension(schema: GraphQLSchema): GraphQLSchema {
     const { actor } = context;
     if (actor.kind === 'agent') {
       // A run's artifacts are held against what its tools did, by the runner.
-      throw new GraphQLError(
+      throw forbidden(
         'A run records what it made with its own record_artifact tool, which the runner checks. This one is for work done outside a run.',
-        { extensions: { code: 'FORBIDDEN' } },
       );
     }
     const todo = await loadAiTodo(context, userId, args.todoId);

@@ -5,6 +5,7 @@ import type { Tombstone } from '../__generated__/resolvers.ts';
 import { resultRows } from './blocking.ts';
 import { type Context, isAiActor } from './context.ts';
 import type { ChangeEntity } from './enums.ts';
+import { badInput } from './errors.ts';
 import { requireAuth } from './resolvers/auth.ts';
 import { reachable } from './tenancy.ts';
 
@@ -77,9 +78,7 @@ export function encodeCursor(position: FeedPosition, issuedAt: Date): string {
 }
 
 function badCursor(): GraphQLError {
-  return new GraphQLError('That is not a cursor this feed handed out. Start again without one.', {
-    extensions: { code: 'BAD_USER_INPUT' },
-  });
+  return badInput('That is not a cursor this feed handed out. Start again without one.');
 }
 
 /**
@@ -175,7 +174,7 @@ export async function readChanges(
   const userId = requireAuth(context);
   const limit = args.limit ?? DEFAULT_PAGE_SIZE;
   if (!Number.isInteger(limit) || limit < 1 || limit > MAX_PAGE_SIZE) {
-    throw new GraphQLError(`limit must be between 1 and ${MAX_PAGE_SIZE}.`, { extensions: { code: 'BAD_USER_INPUT' } });
+    throw badInput(`limit must be between 1 and ${MAX_PAGE_SIZE}.`);
   }
   const from = args.since ? decodeCursor(args.since, now) : START;
 

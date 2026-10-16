@@ -1,7 +1,7 @@
 import * as dbSchema from '@telos/db/schema';
 import { and, asc, eq, isNotNull, isNull, ne, sql } from 'drizzle-orm';
-import { GraphQLError } from 'graphql';
 import { assertNotBlocked, resultRows } from './blocking.ts';
+import { badInput } from './errors.ts';
 
 // The lane rules, in one place. A lane is a board column; at most one lane per
 // project may be flagged `isDone`, and that flag is what ties the board to the
@@ -99,9 +99,7 @@ export async function assertEveryProjectHasLanes(tx: AnyDb, userId: string): Pro
     LIMIT 1
   `);
   if (resultRows(result).length === 0) return;
-  throw new GraphQLError('A project needs at least one lane. Add another before removing this one.', {
-    extensions: { code: 'BAD_USER_INPUT' },
-  });
+  throw badInput('A project needs at least one lane. Add another before removing this one.');
 }
 
 /** The project's done lane, or null when it has none. */
@@ -174,9 +172,8 @@ export async function assertCompletionMatchesLane(db: AnyDb, userId: string): Pr
     )
     .limit(3);
   if (rows.length === 0) return;
-  throw new GraphQLError(
+  throw badInput(
     `Lane and completion disagree for ${rows.map((row) => row.title).join(', ')}. Use moveTodo to change a todo's lane.`,
-    { extensions: { code: 'BAD_USER_INPUT' } },
   );
 }
 

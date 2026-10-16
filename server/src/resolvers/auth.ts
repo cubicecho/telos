@@ -4,6 +4,7 @@ import { attachResolvers } from '../attach-resolvers.ts';
 import { magicLinkUrl, requestMagicToken, signInDirectly, verifyMagicToken } from '../auth.ts';
 import { magicLinkExposed, magicLinkRequired } from '../config.ts';
 import type { Context } from '../context.ts';
+import { badInput, forbidden } from '../errors.ts';
 import { instanceAiOn } from '../instance.ts';
 import { createRateLimiter } from '../rate-limit.ts';
 
@@ -71,7 +72,7 @@ function normalizeEmail(email: string): string {
 export function requireSession(ctx: Context): string {
   const userId = requireAuth(ctx);
   if (ctx.actor.kind !== 'user') {
-    throw new GraphQLError('Only a signed-in person can do this', { extensions: { code: 'FORBIDDEN' } });
+    throw forbidden('Only a signed-in person can do this');
   }
   return userId;
 }
@@ -115,9 +116,7 @@ export function applyAuthExtension(schema: GraphQLSchema, options: { ai: boolean
     // instance is meant to have one.
     const session = await verifyMagicToken(context.auth, args.token);
     if (!session) {
-      throw new GraphQLError('Invalid or expired magic link', {
-        extensions: { code: 'BAD_USER_INPUT' },
-      });
+      throw badInput('Invalid or expired magic link');
     }
     return session;
   };

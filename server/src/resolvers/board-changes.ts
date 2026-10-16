@@ -1,9 +1,10 @@
 import * as dbSchema from '@telos/db/schema';
 import { and, eq } from 'drizzle-orm';
-import { extendSchema, GraphQLError, type GraphQLSchema, parse } from 'graphql';
+import { extendSchema, type GraphQLSchema, parse } from 'graphql';
 import type { SubscriptionResolvers } from '../../__generated__/resolvers.ts';
 import { attachResolvers } from '../attach-resolvers.ts';
 import { type BoardChange, boardEventsFor } from '../board-events.ts';
+import { forbidden, notFound } from '../errors.ts';
 import { requireAuth } from './auth.ts';
 
 // Live boards: `boardChanged` says a project changed, and which table, as each
@@ -41,13 +42,13 @@ export function applyBoardChangesExtension(schema: GraphQLSchema): GraphQLSchema
     subscribe: async (_parent, args, context) => {
       const userId = requireAuth(context);
       if (context.actor.kind !== 'user') {
-        throw new GraphQLError('Only a person can watch a board.', { extensions: { code: 'FORBIDDEN' } });
+        throw forbidden('Only a person can watch a board.');
       }
       const [project] = await (context.db as AnyRow)
         .select({ id: dbSchema.projects.id })
         .from(dbSchema.projects)
         .where(and(eq(dbSchema.projects.id, args.projectId), eq(dbSchema.projects.userId, userId)));
-      if (!project) throw new GraphQLError('Project not found', { extensions: { code: 'NOT_FOUND' } });
+      if (!project) throw notFound('Project');
 
       const events = boardEventsFor(context.db);
       await events.listening();

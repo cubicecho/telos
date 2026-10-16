@@ -1,8 +1,9 @@
 import * as dbSchema from '@telos/db/schema';
 import { and, eq, sql } from 'drizzle-orm';
-import { GraphQLError } from 'graphql';
+import type { GraphQLError } from 'graphql';
 import { resultRows } from '../blocking.ts';
 import type { Context } from '../context.ts';
+import { badInput, forbidden, notFound } from '../errors.ts';
 import { requireAuth } from './auth.ts';
 
 // How far a run's writes go. A key is something its owner pointed at telos on
@@ -43,14 +44,8 @@ interface Run {
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-function notFound(what: string): GraphQLError {
-  return new GraphQLError(`${what} not found`, { extensions: { code: 'NOT_FOUND' } });
-}
-
 function ownTodo(what: string): GraphQLError {
-  return new GraphQLError(`A run cannot ${what} its own todo: that is decided when the run finishes.`, {
-    extensions: { code: 'FORBIDDEN' },
-  });
+  return forbidden(`A run cannot ${what} its own todo: that is decided when the run finishes.`);
 }
 
 /**
@@ -71,9 +66,7 @@ function namedId(where: unknown): string {
     byId !== null &&
     Object.keys(byId).length === 1;
   if (!exact || typeof id !== 'string') {
-    throw new GraphQLError('A run names the row it writes by id: where: { id: { eq: … } }.', {
-      extensions: { code: 'BAD_USER_INPUT' },
-    });
+    throw badInput('A run names the row it writes by id: where: { id: { eq: … } }.');
   }
   return id;
 }

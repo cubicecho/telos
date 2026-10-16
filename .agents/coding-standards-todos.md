@@ -40,7 +40,7 @@ Nothing here is implemented until approved.
 | A3 | API change | The runner sends one standing protocol | M1 | T2 | done |
 | A6 | API change | Column enums (run status, kind, verdict; note kind; actor kind; draft role; artifact source and action) become GraphQL enums, SCREAMING_CASE on the wire | The API says which values exist; ArtifactInput and DraftTurn share the generated enums | drizzle-graphql#178 | blocked |
 | A7 | API change | `RunEventInput.kind` becomes an enum | The runner already types it closed | — | proposed |
-| R7 | Refactor [simplify] | Error helpers (`notFound`, `badInput`, `conflict`) in one module | 85 inline `new GraphQLError` across 24 files; `badInput` is already redefined locally | — | proposed |
+| R7 | Refactor [simplify] | Error helpers (`notFound`, `badInput`, `conflict`) in one module | 85 inline `new GraphQLError` across 24 files; `badInput` is already redefined locally | — | done |
 | R8 | Refactor [simplify] | One `loadOwned*` family | `loadOwnedTodo`, `loadOwnedLane`, `loadOwnedProject`, `loadAiProject`, `loadAiTodo` repeat the fetch-and-404 | R7 | proposed |
 | R9 | Refactor [types] | Attach resolvers through the generated `Resolvers` map, not `getType() as GraphQLObjectType` | 33 casts go; resolver args and parents are checked against the schema | — | done |
 | R10 | Refactor [types] | Retire `AnyRow`/`AnyDb = any` (39) for drizzle's inferred types | Row shapes are checked | drizzle 1.0 typing (unverified) | proposed |

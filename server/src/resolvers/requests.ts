@@ -1,10 +1,11 @@
 import * as dbSchema from '@telos/db/schema';
 import { and, eq, isNull, sql } from 'drizzle-orm';
-import { extendSchema, GraphQLError, type GraphQLSchema, parse } from 'graphql';
+import { extendSchema, type GraphQLSchema, parse } from 'graphql';
 import type { MutationResolvers } from '../../__generated__/resolvers.ts';
 import { requireAi } from '../ai-gate.ts';
 import { attachResolvers } from '../attach-resolvers.ts';
 import type { Context } from '../context.ts';
+import { badInput, notFound } from '../errors.ts';
 import { findNewTodoLaneId } from '../lanes.ts';
 import { stampActor } from '../provenance.ts';
 
@@ -41,10 +42,6 @@ const REQUESTS_SDL = parse(`
     addTodoNote(todoId: ID!, body: String!): TodoNote!
   }
 `);
-
-function notFound(what: string): GraphQLError {
-  return new GraphQLError(`${what} not found`, { extensions: { code: 'NOT_FOUND' } });
-}
 
 /** A project of the caller's with AI on, or NOT_FOUND. */
 export async function loadAiProject(context: Context, userId: string, projectId: string): Promise<AnyRow> {
@@ -121,7 +118,7 @@ async function insertNote(tx: AnyRow, context: Context, userId: string, todoId: 
 export function requireText(value: string, field: string): string {
   const trimmed = value.trim();
   if (!trimmed) {
-    throw new GraphQLError(`${field} cannot be empty`, { extensions: { code: 'BAD_USER_INPUT' } });
+    throw badInput(`${field} cannot be empty`);
   }
   return trimmed;
 }

@@ -1,12 +1,13 @@
 import * as dbSchema from '@telos/db/schema';
 import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm';
-import { extendSchema, GraphQLError, type GraphQLSchema, parse } from 'graphql';
+import { extendSchema, type GraphQLSchema, parse } from 'graphql';
 import type { MutationResolvers, QueryResolvers } from '../../__generated__/resolvers.ts';
 import { requireAi } from '../ai-gate.ts';
 import { attachResolvers } from '../attach-resolvers.ts';
 import { resultRows } from '../blocking.ts';
 import type { Actor } from '../context.ts';
 import { HandBackEnum, WORK_STATES, type WorkState, WorkStateEnum, withEnums } from '../enums.ts';
+import { badInput, conflict, notFound } from '../errors.ts';
 import { workStates } from '../ready.ts';
 import { runnerSeenAt } from '../runner-seen.ts';
 
@@ -106,12 +107,10 @@ async function restingTodo(db: AnyRow, userId: string, id: string): Promise<AnyR
     .from(dbSchema.todos)
     .where(and(eq(dbSchema.todos.id, id), eq(dbSchema.todos.userId, userId), isNull(dbSchema.todos.archivedAt)));
   if (todo === undefined) {
-    throw new GraphQLError('Todo not found', { extensions: { code: 'NOT_FOUND' } });
+    throw notFound('Todo');
   }
   if (todo.laneId === null) {
-    throw new GraphQLError('It is in no lane, so no agent can take it. Move it to a lane with an agent.', {
-      extensions: { code: 'BAD_USER_INPUT' },
-    });
+    throw badInput('It is in no lane, so no agent can take it. Move it to a lane with an agent.');
   }
   const [live] = await db
     .select({ id: dbSchema.runs.id })
@@ -124,7 +123,7 @@ async function restingTodo(db: AnyRow, userId: string, id: string): Promise<AnyR
       ),
     );
   if (live !== undefined) {
-    throw new GraphQLError('An agent is working it now.', { extensions: { code: 'CONFLICT' } });
+    throw conflict('An agent is working it now.');
   }
   return todo;
 }
@@ -298,7 +297,7 @@ export function applyAiStatusExtension(schema: GraphQLSchema): GraphQLSchema {
       const todo = await restingTodo(tx, userId, args.id);
       const refusal = await whyNotRunnable(tx, todo);
       if (refusal !== null) {
-        throw new GraphQLError(refusal, { extensions: { code: 'BAD_USER_INPUT' } });
+        throw badInput(refusal);
       }
       await recordNudge(tx, context.actor, todo, RUN_EVENT);
       // The history trigger reads none of this column, so asking writes the

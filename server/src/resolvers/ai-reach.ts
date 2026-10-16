@@ -1,7 +1,7 @@
 import * as dbSchema from '@telos/db/schema';
 import { and, eq } from 'drizzle-orm';
-import { GraphQLError } from 'graphql';
 import type { Context } from '../context.ts';
+import { notFound } from '../errors.ts';
 import { requireAuth } from './auth.ts';
 import { loadAiProject, loadAiTodo } from './requests.ts';
 
@@ -39,10 +39,6 @@ export const AI_REACH: Record<string, Record<string, Named>> = {
 const ENTITY: Record<Named, string> = { project: 'Project', todo: 'Todo', todos: 'Todo', lane: 'Lane', run: 'Run' };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-function notFound(what: string): GraphQLError {
-  return new GraphQLError(`${what} not found`, { extensions: { code: 'NOT_FOUND' } });
-}
 
 /**
  * A lane on a board AI may see, or NOT_FOUND.

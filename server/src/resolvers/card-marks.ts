@@ -1,10 +1,11 @@
 import * as dbSchema from '@telos/db/schema';
 import { and, eq, sql } from 'drizzle-orm';
-import { extendSchema, GraphQLError, type GraphQLSchema, parse } from 'graphql';
+import { extendSchema, type GraphQLSchema, parse } from 'graphql';
 import type { QueryResolvers } from '../../__generated__/resolvers.ts';
 import { aiAllowed } from '../ai-gate.ts';
 import { attachResolvers } from '../attach-resolvers.ts';
 import { resultRows } from '../blocking.ts';
+import { notFound } from '../errors.ts';
 import { failuresSinceTouched } from '../ready.ts';
 import { requireSession } from './auth.ts';
 
@@ -133,7 +134,7 @@ export function applyCardMarksExtension(schema: GraphQLSchema, options: { ai: bo
       .from(dbSchema.projects)
       .where(and(eq(dbSchema.projects.id, args.projectId), eq(dbSchema.projects.userId, userId)));
     if (project === undefined) {
-      throw new GraphQLError('Project not found', { extensions: { code: 'NOT_FOUND' } });
+      throw notFound('Project');
     }
 
     const runs = options.ai && project.aiEnabled && (await aiAllowed(context));

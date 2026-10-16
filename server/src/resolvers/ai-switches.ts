@@ -1,9 +1,10 @@
 import * as dbSchema from '@telos/db/schema';
 import { and, eq } from 'drizzle-orm';
-import { extendSchema, GraphQLError, type GraphQLSchema, parse } from 'graphql';
+import { extendSchema, type GraphQLSchema, parse } from 'graphql';
 import type { MutationResolvers } from '../../__generated__/resolvers.ts';
 import { requireAi } from '../ai-gate.ts';
 import { attachResolvers } from '../attach-resolvers.ts';
+import { badInput, forbidden, notFound } from '../errors.ts';
 import { isAdmin, setInstanceAi } from '../instance.ts';
 import { cancelRunsUnder, dropRunRequests } from '../ready.ts';
 import { MAX_RETENTION_DAYS } from '../retention.ts';
@@ -52,7 +53,7 @@ export function applyAiSwitchesExtension(schema: GraphQLSchema): GraphQLSchema {
   mutations.setInstanceAiEnabled = async (_parent, args, context) => {
     const userId = requireSession(context);
     if (!(await isAdmin(context.db, userId))) {
-      throw new GraphQLError('Only an admin can switch AI for the instance.', { extensions: { code: 'FORBIDDEN' } });
+      throw forbidden('Only an admin can switch AI for the instance.');
     }
     await setInstanceAi(context.db, args.enabled);
     if (!args.enabled) await cancelRunsUnder(context.db, {});
@@ -80,7 +81,7 @@ export function applyAiSwitchesExtension(schema: GraphQLSchema): GraphQLSchema {
       .set({ aiEnabled: args.enabled, updatedAt: new Date() })
       .where(and(eq(dbSchema.projects.id, args.projectId), eq(dbSchema.projects.userId, userId)))
       .returning();
-    if (!project) throw new GraphQLError('Project not found', { extensions: { code: 'NOT_FOUND' } });
+    if (!project) throw notFound('Project');
     if (!args.enabled) {
       await cancelRunsUnder(context.db, { userId, projectId: project.id });
       await dropRunRequests(context.db, { projectId: project.id });
@@ -101,7 +102,7 @@ export function applyAiSwitchesExtension(schema: GraphQLSchema): GraphQLSchema {
       .where(and(eq(dbSchema.projects.id, args.projectId), eq(dbSchema.projects.userId, userId)))
       .returning();
     if (project === undefined) {
-      throw new GraphQLError('Project not found', { extensions: { code: 'NOT_FOUND' } });
+      throw notFound('Project');
     }
     return project;
   };
@@ -110,9 +111,7 @@ export function applyAiSwitchesExtension(schema: GraphQLSchema): GraphQLSchema {
     const userId = requireSession(context);
     const days = args.days ?? null;
     if (days !== null && (days < 1 || days > MAX_RETENTION_DAYS)) {
-      throw new GraphQLError(`Keep runs for 1 to ${MAX_RETENTION_DAYS} days, or for good.`, {
-        extensions: { code: 'BAD_USER_INPUT' },
-      });
+      throw badInput(`Keep runs for 1 to ${MAX_RETENTION_DAYS} days, or for good.`);
     }
     const [user] = await (context.db as AnyRow)
       .update(dbSchema.users)

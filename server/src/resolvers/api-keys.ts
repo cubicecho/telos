@@ -1,12 +1,13 @@
 import * as dbSchema from '@telos/db/schema';
 import { and, desc, eq } from 'drizzle-orm';
-import { extendSchema, GraphQLError, type GraphQLSchema, parse } from 'graphql';
+import { extendSchema, type GraphQLSchema, parse } from 'graphql';
 import type { MutationResolvers, QueryResolvers } from '../../__generated__/resolvers.ts';
 import { requireAi } from '../ai-gate.ts';
 import { attachResolvers } from '../attach-resolvers.ts';
 import { mintApiKey } from '../auth.ts';
 import type { Context } from '../context.ts';
 import { DOOR_TOOL_NAMES, DOOR_TOOLS, NOT_FOR_RUNS, onForRuns } from '../door.ts';
+import { badInput, notFound } from '../errors.ts';
 import { requireSession } from './auth.ts';
 
 // API keys: how an MCP host reaches this server as one of its users. They are
@@ -147,10 +148,10 @@ export function applyApiKeysExtension(schema: GraphQLSchema): GraphQLSchema {
   mutation.createApiKey = async (_parent, args, ctx) => {
     const userId = await requireKeyManager(ctx);
     const name = args.name.trim();
-    if (!name) throw new GraphQLError('A key needs a name', { extensions: { code: 'BAD_USER_INPUT' } });
+    if (!name) throw badInput('A key needs a name');
     const days = args.expiresInDays;
     if (days != null && (days < 1 || days > 365)) {
-      throw new GraphQLError('expiresInDays must be 1 to 365', { extensions: { code: 'BAD_USER_INPUT' } });
+      throw badInput('expiresInDays must be 1 to 365');
     }
     const { id, key } = await mintApiKey(ctx.auth, { userId, name, expiresInDays: days });
     const [apiKey] = await ctx.db.select(KEY_COLUMNS).from(dbSchema.apikeys).where(eq(dbSchema.apikeys.id, id));
@@ -171,13 +172,11 @@ export function applyApiKeysExtension(schema: GraphQLSchema): GraphQLSchema {
     const userId = await requireKeyManager(ctx);
     const unknown = args.off.filter((name) => !DOOR_TOOL_NAMES.has(name));
     if (unknown.length > 0) {
-      throw new GraphQLError(`The MCP door has no tool ${unknown.join(', ')}.`, {
-        extensions: { code: 'BAD_USER_INPUT' },
-      });
+      throw badInput(`The MCP door has no tool ${unknown.join(', ')}.`);
     }
     const [owned] = UUID.test(args.id) ? await keysOf(ctx, userId, args.id) : [];
     if (owned === undefined) {
-      throw new GraphQLError('API key not found', { extensions: { code: 'NOT_FOUND' } });
+      throw notFound('API key');
     }
     const off = [...new Set(args.off)];
     await ctx.db

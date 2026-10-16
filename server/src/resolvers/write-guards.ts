@@ -1,10 +1,11 @@
 import * as dbSchema from '@telos/db/schema';
 import type { BuildSchemaConfig, WriteHookPayload } from '@vantreeseba/drizzle-graphql';
 import { and, eq, inArray, sql } from 'drizzle-orm';
-import { GraphQLError } from 'graphql';
+import type { GraphQLError } from 'graphql';
 import { assertNoBlockedCompletions, resultRows } from '../blocking.ts';
 import { type Context, isAiActor } from '../context.ts';
 import { DOOR_TOOL_NAMES } from '../door.ts';
+import { badInput, forbidden, notFound } from '../errors.ts';
 import { assertCompletionMatchesLane, assertEveryProjectHasLanes, realignLanes, seedMissingLanes } from '../lanes.ts';
 import { stampActor } from '../provenance.ts';
 import { cancelRunsUnder } from '../ready.ts';
@@ -101,7 +102,7 @@ async function assertForeignKeysOwned(
     if (referenced.some((id) => !ownedIds.has(id))) {
       // NOT_FOUND, not FORBIDDEN: "you may not touch this" would confirm the row
       // exists, which is itself something the caller is not entitled to know.
-      throw new GraphQLError(`${fk.entity} not found`, { extensions: { code: 'NOT_FOUND' } });
+      throw notFound(fk.entity);
     }
   }
 }
@@ -140,7 +141,7 @@ const PROJECT_SWITCHES = [
 function assertAiSwitchUntouched(args: Parameters<typeof writtenRows>[0]): void {
   for (const { key, message } of PROJECT_SWITCHES) {
     if (states(args, key)) {
-      throw new GraphQLError(message, { extensions: { code: 'BAD_USER_INPUT' } });
+      throw badInput(message);
     }
   }
 }
@@ -168,7 +169,7 @@ function holdAiProjectWrite(
   for (const row of writtenRows(args)) {
     const closed = Object.keys(row).find((key) => !AI_PROJECT_COLUMNS.has(key));
     if (closed !== undefined) {
-      throw new GraphQLError(`Only a person can set a project's ${closed}.`, { extensions: { code: 'FORBIDDEN' } });
+      throw forbidden(`Only a person can set a project's ${closed}.`);
     }
     if (operation === 'insert') {
       row.aiEnabled = true;
@@ -182,9 +183,7 @@ function holdAiProjectWrite(
  */
 function assertIgnoreFlagFromPerson(args: Parameters<typeof writtenRows>[0], context: Context): void {
   if (!states(args, 'aiIgnored') || context.actor.kind === 'user') return;
-  throw new GraphQLError('Only a person can change whether AI ignores a todo.', {
-    extensions: { code: 'FORBIDDEN' },
-  });
+  throw forbidden('Only a person can change whether AI ignores a todo.');
 }
 
 /**
@@ -193,7 +192,7 @@ function assertIgnoreFlagFromPerson(args: Parameters<typeof writtenRows>[0], con
  */
 function assertRunRequestUntouched(args: Parameters<typeof writtenRows>[0]): void {
   if (states(args, 'runRequestedAt')) {
-    throw new GraphQLError('Use runTodo to ask for a todo to be run.', { extensions: { code: 'BAD_USER_INPUT' } });
+    throw badInput('Use runTodo to ask for a todo to be run.');
   }
 }
 
@@ -203,9 +202,7 @@ function assertRunRequestUntouched(args: Parameters<typeof writtenRows>[0]): voi
  */
 function assertSplitUntouched(args: Parameters<typeof writtenRows>[0]): void {
   if (states(args, 'splitAt')) {
-    throw new GraphQLError('Use unsplitTodo to make a split todo an ordinary one again.', {
-      extensions: { code: 'BAD_USER_INPUT' },
-    });
+    throw badInput('Use unsplitTodo to make a split todo an ordinary one again.');
   }
 }
 
@@ -215,9 +212,7 @@ function assertSplitUntouched(args: Parameters<typeof writtenRows>[0]): void {
  */
 function assertPlainNotes(args: Parameters<typeof writtenRows>[0]): void {
   if (writtenRows(args).every((row) => row.kind === undefined || row.kind === 'note')) return;
-  throw new GraphQLError('Only notes of kind "note" can be written directly.', {
-    extensions: { code: 'BAD_USER_INPUT' },
-  });
+  throw badInput('Only notes of kind "note" can be written directly.');
 }
 
 /**
@@ -234,7 +229,7 @@ async function assertParentsSound(tx: AnyTable, userId: string): Promise<void> {
     `),
   );
   if (crossProject.length > 0) {
-    throw new GraphQLError("A todo's parent must be in the same project.", { extensions: { code: 'BAD_USER_INPUT' } });
+    throw badInput("A todo's parent must be in the same project.");
   }
   // The depth bound only stops the walk; any chain that long has already met a
   // repeat, since no user has that many todos stacked in one line.
@@ -251,7 +246,7 @@ async function assertParentsSound(tx: AnyTable, userId: string): Promise<void> {
     `),
   );
   if (cycles.length > 0) {
-    throw new GraphQLError('A todo cannot be its own ancestor.', { extensions: { code: 'BAD_USER_INPUT' } });
+    throw badInput('A todo cannot be its own ancestor.');
   }
 }
 
@@ -268,9 +263,7 @@ async function assertRoutesInProject(tx: AnyTable, userId: string): Promise<void
     `),
   );
   if (stray.length === 0) return;
-  throw new GraphQLError('A lane can only send todos to lanes on its own board.', {
-    extensions: { code: 'BAD_USER_INPUT' },
-  });
+  throw badInput('A lane can only send todos to lanes on its own board.');
 }
 
 /**
@@ -286,9 +279,7 @@ async function assertNewTodoLaneInProject(tx: AnyTable, userId: string): Promise
     `),
   );
   if (stray.length === 0) return;
-  throw new GraphQLError("New todos can only land in a lane on the project's own board.", {
-    extensions: { code: 'BAD_USER_INPUT' },
-  });
+  throw badInput("New todos can only land in a lane on the project's own board.");
 }
 
 /**
@@ -306,9 +297,8 @@ async function assertArchiveOnSuccessFits(tx: AnyTable, userId: string): Promise
   );
   if (rows.length === 0) return;
   const [lane] = rows;
-  throw new GraphQLError(
+  throw badInput(
     `"${lane.name}" can archive on success or have a success route to a lane, not both. Clear one of them.`,
-    { extensions: { code: 'BAD_USER_INPUT' } },
   );
 }
 
@@ -319,9 +309,7 @@ async function assertArchiveOnSuccessFits(tx: AnyTable, userId: string): Promise
  */
 function assertDoneFlagUntouched(args: Parameters<typeof writtenRows>[0]): void {
   if (!writtenRows(args).some((row) => 'isDone' in row)) return;
-  throw new GraphQLError('Use setDoneLane to choose which lane marks a todo done.', {
-    extensions: { code: 'BAD_USER_INPUT' },
-  });
+  throw badInput('Use setDoneLane to choose which lane marks a todo done.');
 }
 
 /** What a slug is made of: it is the prefix of every tool the server offers. */
@@ -392,7 +380,7 @@ async function assertServersSound(tx: AnyTable, userId: string, rows: Row[], ins
 }
 
 function badServer(message: string): GraphQLError {
-  return new GraphQLError(message, { extensions: { code: 'BAD_USER_INPUT' } });
+  return badInput(message);
 }
 
 /**
@@ -402,9 +390,7 @@ function badServer(message: string): GraphQLError {
 function assertServerListSound(rows: Row[]): void {
   for (const row of rows) {
     if ('mcpServerSlugs' in row && row.mcpServerSlugs !== null && isStrings(row.mcpServerSlugs) === false) {
-      throw new GraphQLError('mcpServerSlugs is null for every server, or a list of slugs.', {
-        extensions: { code: 'BAD_USER_INPUT' },
-      });
+      throw badInput('mcpServerSlugs is null for every server, or a list of slugs.');
     }
   }
 }

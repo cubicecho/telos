@@ -1,11 +1,12 @@
 import * as dbSchema from '@telos/db/schema';
 import { and, asc, desc, eq, isNotNull, isNull, not, sql } from 'drizzle-orm';
-import { extendSchema, GraphQLError, type GraphQLSchema, parse } from 'graphql';
+import { extendSchema, type GraphQLSchema, parse } from 'graphql';
 import type { MutationResolvers, QueryResolvers } from '../../__generated__/resolvers.ts';
 import { requireAi, requireSystem } from '../ai-gate.ts';
 import { attachResolvers } from '../attach-resolvers.ts';
 import type { Context } from '../context.ts';
 import { DRAFT_LEASE_SECONDS, draftBeingAnswered, expireLapsedDraftRuns, stopDraftReply } from '../draft-runs.ts';
+import { badInput, conflict, notFound } from '../errors.ts';
 import { instanceAiOn } from '../instance.ts';
 import { findNewTodoLaneId } from '../lanes.ts';
 import { runnerAgent } from '../mcp-servers.ts';
@@ -107,10 +108,6 @@ const MAX_TITLE = 200;
 /** The most of a failed reply's error kept, on the draft and on its run. */
 const MAX_ERROR = 2000;
 const MS_PER_SECOND = 1000;
-
-const badInput = (message: string) => new GraphQLError(message, { extensions: { code: 'BAD_USER_INPUT' } });
-const notFound = (what: string) => new GraphQLError(`${what} not found`, { extensions: { code: 'NOT_FOUND' } });
-const conflict = (message: string) => new GraphQLError(message, { extensions: { code: 'CONFLICT' } });
 
 function message(value: string): string {
   const text = value.trim();

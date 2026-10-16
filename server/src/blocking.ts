@@ -1,7 +1,7 @@
 import * as dbSchema from '@telos/db/schema';
 import { and, eq, inArray, isNotNull, isNull, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
-import { GraphQLError } from 'graphql';
+import { badInput } from './errors.ts';
 
 // The dependency rules, in one place. A todo is *blocked* while any todo it
 // depends on is still open; a blocked todo cannot be completed. Every path that
@@ -117,7 +117,7 @@ export async function assertNotBlocked(db: AnyDb, todoIds: readonly string[]): P
       .flat()
       .map((row) => String(row.title))
       .slice(0, 3);
-    throw new GraphQLError(piecesOpen(titles), { extensions: { code: 'BAD_USER_INPUT' } });
+    throw badInput(piecesOpen(titles));
   }
   const blocked = await findBlocked(db, todoIds);
   if (blocked.size === 0) return;
@@ -126,9 +126,8 @@ export async function assertNotBlocked(db: AnyDb, todoIds: readonly string[]): P
     .flat()
     .map((row) => String(row.title))
     .slice(0, 3);
-  throw new GraphQLError(
+  throw badInput(
     `This todo is blocked by ${names.length > 0 ? names.join(', ') : 'an incomplete dependency'}. Complete it first.`,
-    { extensions: { code: 'BAD_USER_INPUT' } },
   );
 }
 
@@ -161,7 +160,7 @@ export async function assertNoBlockedCompletions(db: AnyDb, userId: string): Pro
     )
     .limit(3);
   if (open.length > 0) {
-    throw new GraphQLError(piecesOpen(open.map((row) => row.piece)), { extensions: { code: 'BAD_USER_INPUT' } });
+    throw badInput(piecesOpen(open.map((row) => row.piece)));
   }
   const blockers = alias(dbSchema.todos, 'blocker_todos');
   const rows: Array<{ blocker: string }> = await db
@@ -180,9 +179,7 @@ export async function assertNoBlockedCompletions(db: AnyDb, userId: string): Pro
     )
     .limit(3);
   if (rows.length === 0) return;
-  throw new GraphQLError(`This todo is blocked by ${rows.map((row) => row.blocker).join(', ')}. Complete it first.`, {
-    extensions: { code: 'BAD_USER_INPUT' },
-  });
+  throw badInput(`This todo is blocked by ${rows.map((row) => row.blocker).join(', ')}. Complete it first.`);
 }
 
 /**
@@ -251,7 +248,7 @@ async function describeLoop(db: AnyDb, loop: readonly string[]): Promise<string>
  */
 export async function assertNoCycle(db: AnyDb, todoId: string, dependsOnTodoId: string): Promise<void> {
   if (todoId === dependsOnTodoId) {
-    throw new GraphQLError('A todo cannot depend on itself.', { extensions: { code: 'BAD_USER_INPUT' } });
+    throw badInput('A todo cannot depend on itself.');
   }
   // Written against the table's SQL name rather than the drizzle table object:
   // the recursive term joins the table to the CTE under an alias, which the
@@ -266,8 +263,6 @@ export async function assertNoCycle(db: AnyDb, todoId: string, dependsOnTodoId: 
   `);
   if (resultRows(result).length > 0) {
     const loop = await describeLoop(db, await findLoop(db, todoId, dependsOnTodoId));
-    throw new GraphQLError(`That dependency would create a cycle: ${loop}. Remove one of those first.`, {
-      extensions: { code: 'BAD_USER_INPUT' },
-    });
+    throw badInput(`That dependency would create a cycle: ${loop}. Remove one of those first.`);
   }
 }

@@ -1,7 +1,7 @@
 import * as dbSchema from '@telos/db/schema';
 import { keyFor } from '@telos/runner/spec';
 import { and, eq } from 'drizzle-orm';
-import { extendSchema, GraphQLError, type GraphQLSchema, parse } from 'graphql';
+import { extendSchema, type GraphQLSchema, parse } from 'graphql';
 import type {
   AgentModel,
   AgentResolvers,
@@ -14,6 +14,7 @@ import { requireAi, requireSystem } from '../ai-gate.ts';
 import { attachResolvers } from '../attach-resolvers.ts';
 import type { Context } from '../context.ts';
 import { McpProbeStatusEnum, McpSecretKindEnum, withEnums } from '../enums.ts';
+import { badInput, notFound } from '../errors.ts';
 import { askProbe, finishProbe, type McpProbe, readProbe, takeProbes } from '../mcp-probes.ts';
 import { runnerServer } from '../mcp-servers.ts';
 import { markRunnerSeen } from '../runner-seen.ts';
@@ -133,10 +134,6 @@ function visibleProbe(probe: McpProbe) {
   return visible;
 }
 
-function badInput(message: string): GraphQLError {
-  return new GraphQLError(message, { extensions: { code: 'BAD_USER_INPUT' } });
-}
-
 /** The longest name and value a header or a variable may have. */
 const SECRET_NAME_CHARS = 200;
 const SECRET_VALUE_CHARS = 8000;
@@ -162,7 +159,7 @@ async function ownedServer(db: AnyRow, userId: string, id: string, lock = false)
     .from(dbSchema.mcpServers)
     .where(and(eq(dbSchema.mcpServers.id, id), eq(dbSchema.mcpServers.userId, userId)));
   const [row] = await (lock ? query.for('update') : query);
-  if (!row) throw new GraphQLError('MCP server not found', { extensions: { code: 'NOT_FOUND' } });
+  if (!row) throw notFound('MCP server');
   return row;
 }
 
@@ -240,7 +237,7 @@ export function applyAgentsExtension(schema: GraphQLSchema): GraphQLSchema {
         .select({ apiKey: dbSchema.agents.apiKey })
         .from(dbSchema.agents)
         .where(and(eq(dbSchema.agents.id, args.agentId), eq(dbSchema.agents.userId, userId)));
-      if (!row) throw new GraphQLError('Agent not found', { extensions: { code: 'NOT_FOUND' } });
+      if (!row) throw notFound('Agent');
       own = row.apiKey;
     }
     const typed = args.apiKey?.trim();
@@ -359,7 +356,7 @@ export function applyAgentsExtension(schema: GraphQLSchema): GraphQLSchema {
       .set({ apiKey: args.apiKey?.trim() || null })
       .where(and(eq(dbSchema.agents.id, args.agentId), eq(dbSchema.agents.userId, userId)))
       .returning();
-    if (!row) throw new GraphQLError('Agent not found', { extensions: { code: 'NOT_FOUND' } });
+    if (!row) throw notFound('Agent');
     const { apiKey: _secret, ...visible } = row;
     return visible;
   };
