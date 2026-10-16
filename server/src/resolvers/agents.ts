@@ -2,6 +2,7 @@ import * as dbSchema from '@telos/db/schema';
 import { keyFor } from '@telos/runner/spec';
 import { and, eq } from 'drizzle-orm';
 import { extendSchema, GraphQLError, type GraphQLObjectType, type GraphQLSchema, parse } from 'graphql';
+import type { AgentModel } from '../../__generated__/resolvers.ts';
 import { loadAgentDefaults } from '../agent-defaults.ts';
 import { requireAi, requireSystem } from '../ai-gate.ts';
 import type { Context } from '../context.ts';
@@ -123,11 +124,6 @@ const cut = (text: string, chars: number) => (text.length > chars ? `${text.slic
 function visibleProbe(probe: McpProbe) {
   const { userId: _user, serverId: _serverId, server: _server, askedAt: _at, ...visible } = probe;
   return visible;
-}
-
-interface AgentModel {
-  id: string;
-  contextLength: number | null;
 }
 
 function badInput(message: string): GraphQLError {

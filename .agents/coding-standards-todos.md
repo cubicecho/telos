@@ -38,6 +38,15 @@ Nothing here is implemented until approved.
 | A1 | API change | Drop contracts, lane prompts and presets from the database | M1, M2 | T1 | done |
 | A2 | API change | The server reads every finished run the same way | M1–M3 | T1 | done |
 | A3 | API change | The runner sends one standing protocol | M1 | T2 | done |
+| A6 | API change | Column enums (run status, kind, verdict; note kind; actor kind; draft role; artifact source and action) become GraphQL enums, SCREAMING_CASE on the wire | The API says which values exist; ArtifactInput and DraftTurn share the generated enums | drizzle-graphql#178 | blocked |
+| A7 | API change | `RunEventInput.kind` becomes an enum | The runner already types it closed | — | proposed |
+| R7 | Refactor [simplify] | Error helpers (`notFound`, `badInput`, `conflict`) in one module | 85 inline `new GraphQLError` across 24 files; `badInput` is already redefined locally | — | proposed |
+| R8 | Refactor [simplify] | One `loadOwned*` family | `loadOwnedTodo`, `loadOwnedLane`, `loadOwnedProject`, `loadAiProject`, `loadAiTodo` repeat the fetch-and-404 | R7 | proposed |
+| R9 | Refactor [types] | Attach resolvers through the generated `Resolvers` map, not `getType() as GraphQLObjectType` | 33 casts go; resolver args and parents are checked against the schema | — | proposed |
+| R10 | Refactor [types] | Retire `AnyRow`/`AnyDb = any` (39) for drizzle's inferred types | Row shapes are checked | drizzle 1.0 typing (unverified) | proposed |
+| R11 | Refactor [readability] | The server's internal `LaneTally` (projectId, laneId, done) gets its own name | It shares a name with the API's `LaneTally`, a different shape | — | proposed |
+| R12 | Refactor [structure] | Group `server/src` by domain (runs, drafts, agents, board) instead of `resolvers/` vs root | A change to one area stays in one folder | — | proposed |
+| R13 | Refactor [structure] | Weigh GraphQL Yoga against Apollo Server 5 | (unverified) smaller server, built-in subscriptions | — | proposed |
 | F1 | Feature | The app sets a lane's agent with no station, preset or contract | M2, M3 | A2 | done |
 | F2 | Feature | New agents start from starter text | M4 | — | done |
 | R1 | Refactor [readability] | Retire "station" from code names | M3 | A2 | done |
@@ -304,6 +313,19 @@ Implements the glossary.
 **Files:** `runner/src/telos.ts`, `prompts.ts`, `execute.ts`; server's claim type in
 `runs.ts:91`. "Brief" stays for the todo's brief only. GraphQL type rename is part of A2's
 breaking change, so it costs no extra release.
+
+### A6, A7, R7–R13 — From the server cleanup review (2026-10-16)
+
+Raised while moving hand-written enums into GraphQL (`server/src/enums.ts`) and
+replacing hand-written API interfaces with `server/__generated__/resolvers.ts`.
+Out of that branch's scope; one line each in the summary.
+
+- **A6:** drizzle-graphql names a column enum's values by the raw value, so they would
+  be lowercase on the wire. The upstream proposal for an `enumValueNameMapper` is
+  cubicecho/drizzle-graphql#178. Until then those fields stay `String`.
+- **R9:** codegen's `typescript-resolvers` output is now imported for input and
+  output types. R9 is the next step: wire resolvers through its `Resolvers` map,
+  with mappers for parents that are DB rows.
 
 ---
 

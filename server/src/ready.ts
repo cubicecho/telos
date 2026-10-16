@@ -1,4 +1,5 @@
 import { type SQL, sql } from 'drizzle-orm';
+import type { StationTodo } from '../__generated__/resolvers.ts';
 import { resultRows } from './blocking.ts';
 import type { HandBack, WorkState } from './enums.ts';
 import { INSTANCE_AI_ON } from './instance.ts';
@@ -211,24 +212,11 @@ export async function dropRunRequests(db: AnyDb, where: { todoId: string } | { p
   await db.execute(sql`UPDATE todos SET run_requested_at = NULL WHERE run_requested_at IS NOT NULL AND ${narrow}`);
 }
 
-export interface WorkTodo {
-  todoId: string;
-  title: string;
-  projectId: string;
-  laneId: string | null;
-  state: WorkState;
-  /** Why it is where it is, when that needs saying. */
-  reason: string | null;
-  /** Why its lane's agent handed it back: null unless it is handed back. */
-  handedBack: HandBack | null;
-  /** Failed runs since a person last touched it. */
-  failures: number;
-  /** The run working it now, if one is. */
-  liveRunId: string | null;
-  /** Its lane's agent would take it, were it asked to: its project does not run by itself. */
-  awaitsRun: boolean;
-  /** A person asked for it to be run, and no run has taken it yet. */
-  runRequested: boolean;
+/**
+ * A todo and where it stands: the API's `StationTodo`, with what the pages
+ * that list them across projects also show.
+ */
+export interface WorkTodo extends Omit<StationTodo, '__typename'> {
   projectName: string;
   laneName: string | null;
   /** How many failures its lane allows. Null where no agent works the lane. */

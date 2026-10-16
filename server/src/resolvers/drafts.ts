@@ -1,6 +1,7 @@
 import * as dbSchema from '@telos/db/schema';
 import { and, asc, desc, eq, isNotNull, isNull, not, sql } from 'drizzle-orm';
 import { extendSchema, GraphQLError, type GraphQLObjectType, type GraphQLSchema, parse } from 'graphql';
+import type { MutationFinishDraftArgs } from '../../__generated__/resolvers.ts';
 import { requireAi, requireSystem } from '../ai-gate.ts';
 import type { Context } from '../context.ts';
 import { DRAFT_LEASE_SECONDS, draftBeingAnswered, expireLapsedDraftRuns, stopDraftReply } from '../draft-runs.ts';
@@ -10,7 +11,7 @@ import { runnerAgent } from '../mcp-servers.ts';
 import { stampActor } from '../provenance.ts';
 import { markRunnerSeen } from '../runner-seen.ts';
 import { loadAiProject, nextPosition } from './requests.ts';
-import { isUniqueViolation, type RunEventInput, type RunPrompt, type RunUsage, reported, withEvents } from './runs.ts';
+import { isUniqueViolation, reported, withEvents } from './runs.ts';
 
 // Drafts: talking a rough request over with an agent until its brief reads
 // right, then making a todo of it. The person's side is here — start one, say
@@ -174,18 +175,6 @@ function withAiOn(query: AnyRow) {
     .innerJoin(dbSchema.users, eq(dbSchema.users.id, dbSchema.drafts.userId));
 }
 const aiOn = () => and(eq(dbSchema.projects.aiEnabled, true), eq(dbSchema.users.aiEnabled, true));
-
-interface FinishDraftArgs {
-  id: string;
-  runId?: string | null;
-  reply?: string | null;
-  title?: string | null;
-  brief?: string | null;
-  error?: string | null;
-  prompt?: RunPrompt | null;
-  usage?: RunUsage | null;
-  events?: RunEventInput[] | null;
-}
 
 /**
  * The run an answer is reported against: the one the runner names, when it is
@@ -383,7 +372,7 @@ export function applyDraftsExtension(schema: GraphQLSchema): GraphQLSchema {
     }
   };
 
-  mutations.finishDraft.resolve = async (_parent: unknown, args: FinishDraftArgs, context: Context) => {
+  mutations.finishDraft.resolve = async (_parent: unknown, args: MutationFinishDraftArgs, context: Context) => {
     requireSystem(context);
     return (context.db as AnyRow).transaction(async (tx: AnyRow) => {
       const [draft]: dbSchema.Draft[] = await tx

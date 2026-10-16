@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import type { McpProbeTool } from '../__generated__/resolvers.ts';
 import type { McpProbeStatus } from './enums.ts';
 
 // "Test this MCP server", passed through: a person asks here, the runner dials
@@ -6,11 +7,6 @@ import type { McpProbeStatus } from './enums.ts';
 // will be reached from, so it is the one whose answer counts), and the answer
 // waits here for the person to read it. In memory: a test is a question asked
 // now, and a restart that forgets one costs a click.
-
-export interface ProbeTool {
-  name: string;
-  description: string;
-}
 
 export interface McpProbe {
   id: string;
@@ -21,7 +17,7 @@ export interface McpProbe {
   server: string;
   status: McpProbeStatus;
   ok: boolean;
-  tools: ProbeTool[];
+  tools: McpProbeTool[];
   instructions: string;
   error: string | null;
   askedAt: number;
@@ -108,7 +104,7 @@ export function takeProbes(): McpProbe[] {
  */
 export function finishProbe(
   id: string,
-  result: { ok: boolean; tools: ProbeTool[]; instructions: string; error: string | null },
+  result: { ok: boolean; tools: McpProbeTool[]; instructions: string; error: string | null },
 ): McpProbe | null {
   const probe = probes.get(id);
   if (!probe || probe.status === 'done') return null;

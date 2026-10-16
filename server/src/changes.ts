@@ -1,6 +1,7 @@
 import * as dbSchema from '@telos/db/schema';
 import { and, inArray, sql } from 'drizzle-orm';
 import { GraphQLError } from 'graphql';
+import type { Tombstone } from '../__generated__/resolvers.ts';
 import { resultRows } from './blocking.ts';
 import { type Context, isAiActor } from './context.ts';
 import type { ChangeEntity } from './enums.ts';
@@ -105,16 +106,6 @@ export function decodeCursor(cursor: string, now: Date): FeedPosition {
     );
   }
   return { xid, seq };
-}
-
-/** Something that is gone, or gone from the caller's view. */
-export interface Tombstone {
-  entity: ChangeEntity;
-  id: string;
-  projectId: string | null;
-  todoId: string | null;
-  dependsOnTodoId: string | null;
-  removedAt: Date;
 }
 
 /** One page of the feed. */

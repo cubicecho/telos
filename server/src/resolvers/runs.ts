@@ -1,11 +1,22 @@
 import * as dbSchema from '@telos/db/schema';
 import { and, asc, desc, eq, ne, sql } from 'drizzle-orm';
 import { extendSchema, GraphQLError, type GraphQLObjectType, type GraphQLSchema, parse } from 'graphql';
+import type {
+  ArtifactInput,
+  MutationFinishRunArgs,
+  MutationHeartbeatRunArgs,
+  ProposedTodoInput,
+  RefinedTodoInput,
+  RunEventInput,
+  RunPromptInput,
+  RunResultInput,
+  RunUsageInput,
+} from '../../__generated__/resolvers.ts';
 import { requireSystem } from '../ai-gate.ts';
 import { assertNoCycle, findBlocked } from '../blocking.ts';
 import type { Actor, Context } from '../context.ts';
 import { stopDraftReply } from '../draft-runs.ts';
-import { type RunOutcome, RunOutcomeEnum, withEnums } from '../enums.ts';
+import { RunOutcomeEnum, withEnums } from '../enums.ts';
 import { instanceAiOn } from '../instance.ts';
 import { findDoneLaneId, findNewTodoLaneId } from '../lanes.ts';
 import { runnerAgent } from '../mcp-servers.ts';
@@ -371,7 +382,7 @@ async function writeChildren(
   tx: AnyRow,
   parent: AnyRow,
   laneId: string | null,
-  proposed: ProposedTodo[],
+  proposed: ProposedTodoInput[],
 ): Promise<AnyRow[]> {
   await tx.update(dbSchema.todos).set({ splitAt: new Date() }).where(eq(dbSchema.todos.id, parent.id));
   const start = await nextPosition(tx, parent.projectId);
@@ -412,19 +423,6 @@ async function writeChildren(
   return written;
 }
 
-interface ProposedTodo {
-  title: string;
-  brief?: string | null;
-  acceptance?: string | null;
-  dependsOn?: string[] | null;
-}
-
-interface RefinedTodo {
-  title?: string | null;
-  brief?: string | null;
-  acceptance?: string | null;
-}
-
 /** Why a run that both refined and split its todo fails: the two say different things about it. */
 const REFINED_AND_SPLIT = 'The reply both rewrote the todo and split it. A todo is either refined or split.';
 
@@ -436,7 +434,7 @@ const REFINED_AND_SPLIT = 'The reply both rewrote the todo and split it. A todo 
  * @returns The columns to set; null when it changes nothing.
  */
 function refinementOf(
-  refine: RefinedTodo | null | undefined,
+  refine: RefinedTodoInput | null | undefined,
 ): { title?: string; notes?: string; acceptance?: string } | null {
   const title = refine?.title?.trim();
   const notes = refine?.brief?.trim();
@@ -471,25 +469,6 @@ async function piecesLaneId(tx: AnyRow, todo: AnyRow, lane: AnyRow | null): Prom
     .from(dbSchema.lanes)
     .where(eq(dbSchema.lanes.id, lane.onSuccessLaneId));
   return next && !next.isDone ? next.id : intake;
-}
-
-export interface RunEventInput {
-  kind: string;
-  name?: string | null;
-  ok?: boolean | null;
-  text?: string | null;
-}
-
-interface ArtifactInput {
-  location: string;
-  source: string;
-  action?: string | null;
-  serverSlug?: string | null;
-  tool?: string | null;
-  title?: string | null;
-  description?: string | null;
-  mediaType?: string | null;
-  sizeBytes?: number | null;
 }
 
 /**
@@ -547,7 +526,11 @@ function keepEnd(text: string, limit: number): string {
  * @param usage What the runner says the run has spent.
  * @returns Columns to set.
  */
-export function reported(run: AnyRow, prompt: RunPrompt | null | undefined, usage: RunUsage | null | undefined) {
+export function reported(
+  run: AnyRow,
+  prompt: RunPromptInput | null | undefined,
+  usage: RunUsageInput | null | undefined,
+) {
   return {
     ...(prompt && run.systemPrompt == null && run.userPrompt == null
       ? { systemPrompt: prompt.system.slice(0, PROMPT_CHARS), userPrompt: prompt.user.slice(0, PROMPT_CHARS) }
@@ -561,18 +544,6 @@ export function reported(run: AnyRow, prompt: RunPrompt | null | undefined, usag
         }
       : {}),
   };
-}
-
-export interface RunPrompt {
-  system: string;
-  user: string;
-}
-
-export interface RunUsage {
-  toolCalls?: number | null;
-  promptTokens: number;
-  completionTokens: number;
-  totalTokens: number;
 }
 
 /**
@@ -613,26 +584,11 @@ function artifactRows(run: AnyRow, reported: ArtifactInput[] | null | undefined)
     }));
 }
 
-interface RunResult {
-  status: RunOutcome;
-  output?: string | null;
-  error?: string | null;
-  toolCalls?: number | null;
-  promptTokens?: number | null;
-  completionTokens?: number | null;
-  totalTokens?: number | null;
-  todos?: ProposedTodo[] | null;
-  refine?: RefinedTodo | null;
-  events?: RunEventInput[] | null;
-  prompt?: RunPrompt | null;
-  artifacts?: ArtifactInput[] | null;
-}
-
 /**
  * The counters a result reports, as columns. One it leaves out keeps what the
  * heartbeats reported, so a run stopped mid-turn still says what it spent.
  */
-function spend(run: AnyRow, result: RunResult) {
+function spend(run: AnyRow, result: RunResultInput) {
   return {
     toolCalls: result.toolCalls ?? run.toolCalls ?? 0,
     promptTokens: result.promptTokens ?? run.promptTokens ?? 0,
@@ -662,7 +618,7 @@ function spend(run: AnyRow, result: RunResult) {
  * @param result What the runner reports.
  * @returns The finished run.
  */
-async function finish(context: Context, runId: string, result: RunResult): Promise<AnyRow> {
+async function finish(context: Context, runId: string, result: RunResultInput): Promise<AnyRow> {
   return (context.db as AnyRow).transaction(async (tx: AnyRow) => {
     const { run, todo, lane, aiOff } = await loadRunForUpdate(tx, runId);
     if (run.status !== 'running') {
@@ -908,11 +864,7 @@ export function applyRunsExtension(schema: GraphQLSchema): GraphQLSchema {
     }
   };
 
-  mutations.heartbeatRun.resolve = async (
-    _parent: unknown,
-    args: { id: string; events?: RunEventInput[] | null; prompt?: RunPrompt | null; usage?: RunUsage | null },
-    context: Context,
-  ) => {
+  mutations.heartbeatRun.resolve = async (_parent: unknown, args: MutationHeartbeatRunArgs, context: Context) => {
     requireSystem(context);
     return (context.db as AnyRow).transaction(async (tx: AnyRow) => {
       const { run, aiOff } = await loadRunForUpdate(tx, args.id);
@@ -939,7 +891,7 @@ export function applyRunsExtension(schema: GraphQLSchema): GraphQLSchema {
     });
   };
 
-  mutations.finishRun.resolve = async (_parent: unknown, args: { id: string; result: RunResult }, context: Context) => {
+  mutations.finishRun.resolve = async (_parent: unknown, args: MutationFinishRunArgs, context: Context) => {
     requireSystem(context);
     return finish(context, args.id, args.result);
   };
