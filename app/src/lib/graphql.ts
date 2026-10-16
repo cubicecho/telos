@@ -259,20 +259,22 @@ export const ApiKeysDocument = graphql(`
   }
 `);
 
+// Minting and revoking are better-auth's own endpoints. `expiresIn` is in
+// seconds, a day to a year; null never expires.
 export const CreateApiKeyDocument = graphql(`
-  mutation CreateApiKey($name: String!, $expiresInDays: Int) {
-    createApiKey(name: $name, expiresInDays: $expiresInDays) {
+  mutation CreateApiKey($name: String!, $expiresIn: Float) {
+    createApiKey(name: $name, expiresIn: $expiresIn) {
+      id
       key
-      apiKey {
-        ...ApiKeyFields
-      }
     }
   }
 `);
 
 export const DeleteApiKeyDocument = graphql(`
-  mutation DeleteApiKey($id: ID!) {
-    deleteApiKey(id: $id)
+  mutation DeleteApiKey($keyId: String!) {
+    deleteApiKey(keyId: $keyId) {
+      success
+    }
   }
 `);
 
@@ -1086,10 +1088,10 @@ export const DetachProjectLabelDocument = graphql(`
   }
 `);
 
-export const RequestMagicLinkDocument = graphql(`
-  mutation RequestMagicLink($email: String!) {
-    requestMagicLink(email: $email) {
-      ok
+export const SignInMagicLinkDocument = graphql(`
+  mutation SignInMagicLink($email: String!) {
+    signInMagicLink(email: $email) {
+      status
       magicLink
       token
       userId
@@ -1097,11 +1099,10 @@ export const RequestMagicLinkDocument = graphql(`
   }
 `);
 
-export const VerifyMagicLinkDocument = graphql(`
-  mutation VerifyMagicLink($token: String!) {
-    verifyMagicLink(token: $token) {
+export const MagicLinkVerifyDocument = graphql(`
+  mutation MagicLinkVerify($token: String!) {
+    magicLinkVerify(token: $token) {
       token
-      userId
     }
   }
 `);

@@ -13,9 +13,10 @@ import { claimFirstAdmin, instanceAiOn } from './instance.ts';
 import { readRunToken, runnerKeyMatches } from './run-tokens.ts';
 
 // Sessions, magic links and API keys, all through better-auth. The server
-// mounts none of better-auth's REST routes: the GraphQL mutations in
-// resolvers/auth.ts call `auth.api` directly, and the bearer plugin is what
-// lets a request carry its session as `Authorization: Bearer <token>`.
+// mounts none of better-auth's REST routes: resolvers/better-auth.ts serves its
+// endpoints as GraphQL fields that call `auth.api` directly, and the bearer
+// plugin is what lets a request carry its session as
+// `Authorization: Bearer <token>`.
 
 /** Sessions last as long as the hand-rolled tokens they replaced did. */
 const SESSION_SECONDS = 30 * 24 * 60 * 60;
@@ -24,9 +25,9 @@ const SESSION_SECONDS = 30 * 24 * 60 * 60;
 export const API_KEY_PREFIX = 'telos_';
 
 // One-slot mailboxes for handing a magic token back in the API response.
-// `signInMagicLink` awaits `sendMagicLink` inline, so `requestMagicLink`
+// `signInMagicLink` awaits `sendMagicLink` inline, so `captureMagicToken`
 // registers a capture id, the callback deposits the token in it, and the
-// mutation reads it back out.
+// caller reads it back out.
 const tokenCaptures = new Map<string, string>();
 
 export function createAuth(db: DB) {
@@ -51,7 +52,14 @@ export function createAuth(db: DB) {
     // Whoever signs up first runs the instance.
     databaseHooks: { user: { create: { after: async (user) => claimFirstAdmin(db, user.id) } } },
     plugins: [
-      apiKey({ enableMetadata: true, defaultPrefix: API_KEY_PREFIX }),
+      apiKey({
+        enableMetadata: true,
+        defaultPrefix: API_KEY_PREFIX,
+        requireName: true,
+        // The plugin's per-key limit (10 requests a day) would starve any real
+        // MCP client.
+        rateLimit: { enabled: false },
+      }),
       bearer(),
       magicLink({
         expiresIn: 15 * 60,
@@ -71,36 +79,29 @@ export function createAuth(db: DB) {
 
 export type Auth = ReturnType<typeof createAuth>;
 
-/** The app's verify screen, which hands the token to `verifyMagicLink`. */
+/** The app's verify screen, which hands the token to `magicLinkVerify`. */
 export function magicLinkUrl(token: string): string {
   return appLink(`/auth/verify?token=${encodeURIComponent(token)}`);
 }
 
 /**
- * Sends a magic link and returns its token. The token is only ever handed to
- * a caller that is allowed to see it (magicLinkExposed), so it is captured
- * every time and dropped by the resolver otherwise.
+ * Sends a magic link and catches its token on the way out. The token is only
+ * ever handed to a caller that is allowed to see it (magicLinkExposed), so it
+ * is captured every time and dropped by the caller otherwise.
+ *
+ * @param send Sends the link, passing `metadata` on to `signInMagicLink`.
+ * @returns What `send` returned, and the token it minted (null if none was).
  */
-export async function requestMagicToken(auth: Auth, email: string): Promise<string | null> {
+export async function captureMagicToken<T>(
+  send: (metadata: { captureId: string }) => Promise<T>,
+): Promise<{ result: T; token: string | null }> {
   const captureId = randomUUID();
   tokenCaptures.set(captureId, '');
   try {
-    await auth.api.signInMagicLink({ body: { email, metadata: { captureId } }, headers: new Headers() });
-    return tokenCaptures.get(captureId) || null;
+    const result = await send({ captureId });
+    return { result, token: tokenCaptures.get(captureId) || null };
   } finally {
     tokenCaptures.delete(captureId);
-  }
-}
-
-/** Consumes a magic token and opens a session. Null for a bad or expired token. */
-export async function verifyMagicToken(auth: Auth, token: string): Promise<{ token: string; userId: string } | null> {
-  try {
-    const result = await auth.api.magicLinkVerify({ query: { token }, headers: new Headers() });
-    return { token: result.token, userId: result.user.id };
-  } catch {
-    // A bad token is answered with a redirect to an error URL, which arrives
-    // here as a thrown response. Every failure means the same thing.
-    return null;
   }
 }
 
@@ -119,10 +120,9 @@ export async function signInDirectly(auth: Auth, email: string): Promise<{ token
 }
 
 /**
- * Mints an API key for a user. Server-side, which is what allows setting the
- * owner and turning off the plugin's per-key rate limit (10 requests a day by
- * default, which would starve any real client). Returns the plaintext key,
- * which is never stored and so exists only in this return value.
+ * Mints an API key for a user, server-side: for tests and seeding, which have
+ * no session to mint one with. Returns the plaintext key, which is never
+ * stored and so exists only in this return value.
  */
 export async function mintApiKey(
   auth: Auth,
@@ -132,7 +132,6 @@ export async function mintApiKey(
     body: {
       userId: input.userId,
       name: input.name,
-      rateLimitEnabled: false,
       ...(input.expiresInDays ? { expiresIn: input.expiresInDays * 24 * 60 * 60 } : {}),
     },
   });

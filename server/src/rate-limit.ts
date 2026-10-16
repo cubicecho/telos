@@ -2,7 +2,7 @@
  * Fixed-window counter, in process.
  *
  * Sign-in here is unauthenticated and passwordless, which makes
- * `requestMagicLink` an oracle for anyone who can reach the port: uncapped, one
+ * `signInMagicLink` an oracle for anyone who can reach the port: uncapped, one
  * prober can mint tokens for addresses at will or bury a real user in sign-in
  * mail. Per process is the right size for a single-container deployment —
  * anything larger belongs in the reverse proxy in front of it.

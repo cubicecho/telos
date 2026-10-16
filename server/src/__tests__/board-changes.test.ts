@@ -22,7 +22,14 @@ type Changes = AsyncIterableIterator<ExecutionResult>;
 
 async function watch(projectId: string, actor: Actor): Promise<Changes | ExecutionResult> {
   const { schema } = schemaFor(db, true);
-  const contextValue: Context = { db, auth: authFor(db), userId: actor.userId, actor, loaders: createLoaders(db) };
+  const contextValue: Context = {
+    db,
+    auth: authFor(db),
+    userId: actor.userId,
+    actor,
+    loaders: createLoaders(db),
+    headers: new Headers(),
+  };
   return (await subscribe({ schema, document: parse(WATCH), variableValues: { projectId }, contextValue })) as
     | Changes
     | ExecutionResult;

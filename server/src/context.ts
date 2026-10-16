@@ -44,6 +44,8 @@ export interface Context {
   userId: string | null;
   actor: Actor;
   loaders: Loaders;
+  /** The request's headers, for calls to `auth.api` that read the session from them. */
+  headers: Headers;
 }
 
 /**

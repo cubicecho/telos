@@ -12,7 +12,7 @@ import { createLoaders } from './loaders.ts';
 export function createContextFactory(db: DB, auth: Auth, options: ActorOptions) {
   return async (headers: Headers): Promise<Context> => {
     const actor = await resolveActor(auth, db, headers, options);
-    return { db, auth, userId: actor.userId, actor, loaders: createLoaders(db) };
+    return { db, auth, userId: actor.userId, actor, loaders: createLoaders(db), headers };
   };
 }
 

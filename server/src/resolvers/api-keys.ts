@@ -4,7 +4,6 @@ import { extendSchema, type GraphQLSchema, parse } from 'graphql';
 import type { MutationResolvers, QueryResolvers } from '../../__generated__/resolvers.ts';
 import { requireAi } from '../ai-gate.ts';
 import { attachResolvers } from '../attach-resolvers.ts';
-import { mintApiKey } from '../auth.ts';
 import type { Context } from '../context.ts';
 import { DOOR_TOOL_NAMES, DOOR_TOOLS, NOT_FOR_RUNS, onForRuns } from '../door.ts';
 import { badInput, notFound } from '../errors.ts';
@@ -16,10 +15,11 @@ import { requireSession } from './auth.ts';
 // with a session manages keys; a key cannot mint, list or revoke keys, nor
 // change its own switches.
 //
-// Minting goes through better-auth, which owns the hashing. Listing and
-// revoking are plain reads and deletes on the table. A key's switches, one per
-// tool of the door, are kept beside it (`api_key_tools`): every tool is on
-// until its owner turns it off, and auth.ts reads them when the key is used.
+// Minting and revoking are better-auth's own `createApiKey` and `deleteApiKey`,
+// served by resolvers/better-auth.ts behind `requireKeyManager`. Listing is a
+// plain read of the table. A key's switches, one per tool of the door, are
+// kept beside it (`api_key_tools`, gone with the key): every tool is on until
+// its owner turns it off, and auth.ts reads them when the key is used.
 
 const API_KEYS_SDL = parse(`
   "An API key, without the key: only its first characters are kept in the clear."
@@ -35,12 +35,6 @@ const API_KEYS_SDL = parse(`
     expiresAt: DateTime
     "The MCP door's tools switched off for this key. Every other tool is on."
     toolsOff: [String!]!
-  }
-
-  type CreatedApiKey {
-    apiKey: ApiKey!
-    "The key itself. Shown this once: only a hash of it is stored."
-    key: String!
   }
 
   "One tool of the MCP door, as a key's or an agent's switches list it."
@@ -63,10 +57,6 @@ const API_KEYS_SDL = parse(`
   }
 
   extend type Mutation {
-    "Mints a key for an MCP client. \`expiresInDays\` is 1 to 365; omitted, the key never expires."
-    createApiKey(name: String!, expiresInDays: Int): CreatedApiKey!
-    "Revokes a key. False when there was no such key."
-    deleteApiKey(id: ID!): Boolean!
     "Says which of the MCP door's tools are off for a key, replacing the list it had. Every tool not named is on."
     setApiKeyTools(id: ID!, off: [String!]!): ApiKey!
   }
@@ -93,7 +83,13 @@ interface KeyRow {
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-async function requireKeyManager(ctx: Context): Promise<string> {
+/**
+ * Only a person with a session and AI on manages keys.
+ *
+ * @param ctx The request.
+ * @returns The caller.
+ */
+export async function requireKeyManager(ctx: Context): Promise<string> {
   const userId = requireSession(ctx);
   await requireAi(ctx);
   return userId;
@@ -145,29 +141,6 @@ export function applyApiKeysExtension(schema: GraphQLSchema): GraphQLSchema {
   };
 
   const mutation: MutationResolvers = {};
-  mutation.createApiKey = async (_parent, args, ctx) => {
-    const userId = await requireKeyManager(ctx);
-    const name = args.name.trim();
-    if (!name) throw badInput('A key needs a name');
-    const days = args.expiresInDays;
-    if (days != null && (days < 1 || days > 365)) {
-      throw badInput('expiresInDays must be 1 to 365');
-    }
-    const { id, key } = await mintApiKey(ctx.auth, { userId, name, expiresInDays: days });
-    const [apiKey] = await ctx.db.select(KEY_COLUMNS).from(dbSchema.apikeys).where(eq(dbSchema.apikeys.id, id));
-    return { apiKey: withSwitches(apiKey, []), key };
-  };
-
-  mutation.deleteApiKey = async (_parent, args, ctx) => {
-    const userId = await requireKeyManager(ctx);
-    if (!UUID.test(args.id)) return false;
-    const deleted = await ctx.db
-      .delete(dbSchema.apikeys)
-      .where(and(eq(dbSchema.apikeys.id, args.id), eq(dbSchema.apikeys.referenceId, userId)))
-      .returning({ id: dbSchema.apikeys.id });
-    return deleted.length > 0;
-  };
-
   mutation.setApiKeyTools = async (_parent, args, ctx) => {
     const userId = await requireKeyManager(ctx);
     const unknown = args.off.filter((name) => !DOOR_TOOL_NAMES.has(name));

@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { mintApiKey, resolveActor, signInDirectly } from '../auth.ts';
 import type { Actor } from '../context.ts';
-import { authFor, createClient, createTestDb, createUser, type TestDb } from './helpers.ts';
+import { authFor, createClient, createTestDb, createUser, sessionClient, type TestDb } from './helpers.ts';
 
 // Every other server test hands the context its actor directly — helpers.ts
 // calls `graphql()` and never goes through Express — so this is where a
@@ -99,25 +99,25 @@ describe('API keys', () => {
 });
 
 describe('managing keys', () => {
-  const CREATE = `mutation ($name: String!) { createApiKey(name: $name) { key apiKey { id name start } } }`;
+  const CREATE = `mutation ($name: String!) { createApiKey(name: $name) { key id name start } }`;
   const LIST = `{ apiKeys { id name } }`;
-  const DELETE = `mutation ($id: ID!) { deleteApiKey(id: $id) }`;
+  const DELETE = `mutation ($id: String!) { deleteApiKey(keyId: $id) { success } }`;
 
   async function person(ai = true) {
     const userId = await createUser(db, `${crypto.randomUUID()}@example.com`);
     await setAi(userId, ai);
-    return { userId, client: createClient(db, userId, { ai: true }) };
+    return { userId, client: await sessionClient(db, userId, { ai: true }) };
   }
 
   it('mints, lists and revokes, and the minted key works', async () => {
     const { userId, client } = await person();
     const created = (await client.expectOk(CREATE, { name: 'Claude Code' })).createApiKey;
-    expect(created.apiKey.name).toBe('Claude Code');
-    expect(created.key.startsWith(created.apiKey.start)).toBe(true);
+    expect(created.name).toBe('Claude Code');
+    expect(created.key.startsWith(created.start)).toBe(true);
     expect((await resolve({ 'x-api-key': created.key })).userId).toBe(userId);
 
-    expect((await client.expectOk(LIST)).apiKeys).toEqual([{ id: created.apiKey.id, name: 'Claude Code' }]);
-    expect((await client.expectOk(DELETE, { id: created.apiKey.id })).deleteApiKey).toBe(true);
+    expect((await client.expectOk(LIST)).apiKeys).toEqual([{ id: created.id, name: 'Claude Code' }]);
+    expect((await client.expectOk(DELETE, { id: created.id })).deleteApiKey).toEqual({ success: true });
     expect((await resolve({ 'x-api-key': created.key })).userId).toBeNull();
   });
 
@@ -126,8 +126,18 @@ describe('managing keys', () => {
     const theirs = await person();
     const created = (await theirs.client.expectOk(CREATE, { name: 'theirs' })).createApiKey;
     expect((await mine.client.expectOk(LIST)).apiKeys).toEqual([]);
-    expect((await mine.client.expectOk(DELETE, { id: created.apiKey.id })).deleteApiKey).toBe(false);
+    expect((await mine.client.expectError(DELETE, { id: created.id })).code).toBe('NOT_FOUND');
     expect((await theirs.client.expectOk(LIST)).apiKeys).toHaveLength(1);
+  });
+
+  it('needs a name, and an expiry of a day to a year', async () => {
+    const { client } = await person();
+    expect((await client.expectError(CREATE, { name: '  ' })).code).toBe('BAD_USER_INPUT');
+    const EXPIRING = `mutation ($s: Float!) { createApiKey(name: "x", expiresIn: $s) { expiresAt } }`;
+    expect((await client.expectError(EXPIRING, { s: 60 })).code).toBe('BAD_USER_INPUT');
+    expect((await client.expectError(EXPIRING, { s: 400 * 86400 })).code).toBe('BAD_USER_INPUT');
+    const { createApiKey } = await client.expectOk(EXPIRING, { s: 7 * 86400 });
+    expect(new Date(createApiKey.expiresAt).getTime()).toBeGreaterThan(Date.now() + 6 * 86400_000);
   });
 
   it('is for people only: a key cannot mint its own successor', async () => {

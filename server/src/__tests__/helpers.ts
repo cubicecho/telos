@@ -104,6 +104,8 @@ export interface ClientOptions {
   ai?: boolean | undefined;
   /** Shared across clients of one database, so a session one opens another can see. */
   auth?: Auth | undefined;
+  /** The request's headers, for calls that hand them to better-auth (`Authorization: Bearer ...`). */
+  headers?: Headers | undefined;
 }
 
 // One better-auth instance per database: it holds no state of its own, but
@@ -139,13 +141,32 @@ export function schemaFor(db: TestDb, ai: boolean): ReturnType<typeof createSche
   return built;
 }
 
+/**
+ * A client for a person signed in with a real session, which better-auth's
+ * own fields (resolvers/better-auth.ts) read from the request's headers.
+ */
+export async function sessionClient(
+  db: TestDb,
+  userId: string,
+  options: Omit<ClientOptions, 'headers'> = {},
+): Promise<TestClient> {
+  const auth = options.auth ?? authFor(db);
+  const session = await (await auth.$context).internalAdapter.createSession(userId);
+  return createClient(db, userId, {
+    ...options,
+    auth,
+    headers: new Headers({ authorization: `Bearer ${session.token}` }),
+  });
+}
+
 export function createClient(db: TestDb, userId: string | null, options: ClientOptions = {}): TestClient {
   const { schema } = schemaFor(db, options.ai ?? false);
   const auth = options.auth ?? authFor(db);
   const actor: Actor = options.actor ?? (userId ? { kind: 'user', userId } : { kind: 'anonymous', userId: null });
 
   const run = async (query: string, variables?: Record<string, unknown>) => {
-    const contextValue: Context = { db, auth, userId: actor.userId, actor, loaders: createLoaders(db) };
+    const headers = options.headers ?? new Headers();
+    const contextValue: Context = { db, auth, userId: actor.userId, actor, loaders: createLoaders(db), headers };
     return graphql({ schema, source: query, contextValue, variableValues: variables });
   };
 

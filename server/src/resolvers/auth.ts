@@ -1,38 +1,14 @@
 import { extendSchema, GraphQLError, type GraphQLSchema, parse } from 'graphql';
-import type { MutationResolvers, QueryResolvers } from '../../__generated__/resolvers.ts';
+import type { QueryResolvers } from '../../__generated__/resolvers.ts';
 import { attachResolvers } from '../attach-resolvers.ts';
-import { magicLinkUrl, requestMagicToken, signInDirectly, verifyMagicToken } from '../auth.ts';
-import { magicLinkExposed, magicLinkRequired } from '../config.ts';
 import type { Context } from '../context.ts';
-import { badInput, forbidden } from '../errors.ts';
+import { forbidden } from '../errors.ts';
 import { instanceAiOn } from '../instance.ts';
-import { createRateLimiter } from '../rate-limit.ts';
 
-// Five sign-in attempts per address per quarter hour. requestMagicLink is
-// unauthenticated, so without this anyone who can reach the port can mint magic
-// tokens at will. Per-IP limiting belongs in the reverse proxy, which is the
-// only thing that reliably knows the client's address.
-const signInLimiter = createRateLimiter(5, 15 * 60 * 1000);
+// What this instance offers, and who a request is. Signing in is better-auth's
+// own `signInMagicLink` and `magicLinkVerify`, served by resolvers/better-auth.ts.
 
 const AUTH_SDL = parse(`
-  """
-  The outcome of a sign-in request. When the instance runs with
-  AUTH_MAGIC_LINK=false there is no link to follow, so a live session comes back
-  immediately in \`token\`/\`userId\`. When magic links are on, \`magicLink\` is
-  filled in only where exposing it is enabled.
-  """
-  type RequestMagicLinkResult {
-    ok: Boolean!
-    magicLink: String
-    token: String
-    userId: ID
-  }
-
-  type AuthPayload {
-    token: String!
-    userId: ID!
-  }
-
   "What this instance offers, readable before signing in."
   type AuthConfig {
     "Whether AI is on for the instance: offered, and switched on by an admin. Off, the app shows no AI surface."
@@ -44,11 +20,6 @@ const AUTH_SDL = parse(`
   extend type Query {
     authConfig: AuthConfig!
   }
-
-  extend type Mutation {
-    requestMagicLink(email: String!): RequestMagicLinkResult!
-    verifyMagicLink(token: String!): AuthPayload!
-  }
 `);
 
 export function requireAuth(ctx: Context): string {
@@ -58,10 +29,6 @@ export function requireAuth(ctx: Context): string {
     });
   }
   return ctx.userId;
-}
-
-function normalizeEmail(email: string): string {
-  return email.toLowerCase().trim();
 }
 
 /**
@@ -85,41 +52,5 @@ export function applyAuthExtension(schema: GraphQLSchema, options: { ai: boolean
     aiAvailable: options.ai,
   });
 
-  const mutations: MutationResolvers = {};
-
-  mutations.requestMagicLink = async (_parent, args, context) => {
-    const email = normalizeEmail(args.email);
-    if (!signInLimiter.allow(email)) {
-      throw new GraphQLError('Too many sign-in attempts. Try again in a few minutes.', {
-        extensions: { code: 'TOO_MANY_REQUESTS' },
-      });
-    }
-
-    // No-link mode: the address alone is the credential. Only ever appropriate
-    // on a private instance — see config.ts and the README's "Before you expose
-    // it".
-    if (!magicLinkRequired()) {
-      const session = await signInDirectly(context.auth, email);
-      console.log(`[auth] Magic links are off; signed ${email} in directly.`);
-      return { ok: true, magicLink: null, ...session };
-    }
-
-    // The link itself is logged by auth.ts, which is the delivery channel.
-    const token = await requestMagicToken(context.auth, email);
-    const magicLink = token && magicLinkExposed() ? magicLinkUrl(token) : null;
-    return { ok: true, magicLink, token: null, userId: null };
-  };
-
-  mutations.verifyMagicLink = async (_parent, args, context) => {
-    // Registration is open: the first verified link for an address creates its
-    // account. Self-hosting is the deployment model, so whoever can reach the
-    // instance is meant to have one.
-    const session = await verifyMagicToken(context.auth, args.token);
-    if (!session) {
-      throw badInput('Invalid or expired magic link');
-    }
-    return session;
-  };
-
-  return attachResolvers(extendedSchema, { Query: queries, Mutation: mutations });
+  return attachResolvers(extendedSchema, { Query: queries });
 }
