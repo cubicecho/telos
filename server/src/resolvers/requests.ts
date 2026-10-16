@@ -1,3 +1,4 @@
+import type { DB } from '@telos/db';
 import * as dbSchema from '@telos/db/schema';
 import { and, eq, sql } from 'drizzle-orm';
 import { extendSchema, type GraphQLSchema, parse } from 'graphql';
@@ -45,7 +46,7 @@ const REQUESTS_SDL = parse(`
 `);
 
 /** Below the lane's last card, so a new request queues behind what is there. */
-export async function nextPosition(tx: AnyRow, projectId: string, laneId: string | null): Promise<number> {
+export async function nextPosition(tx: DB, projectId: string, laneId: string | null): Promise<number> {
   const [row] = await tx
     .select({ max: sql<number | null>`max(${dbSchema.todos.position})` })
     .from(dbSchema.todos)
@@ -58,7 +59,7 @@ export async function nextPosition(tx: AnyRow, projectId: string, laneId: string
   return row?.max == null ? 0 : Number(row.max) + 1;
 }
 
-async function insertNote(tx: AnyRow, context: Context, userId: string, todoId: string, body: string): Promise<AnyRow> {
+async function insertNote(tx: DB, context: Context, userId: string, todoId: string, body: string): Promise<AnyRow> {
   const [note] = await tx
     .insert(dbSchema.todoNotes)
     .values({
@@ -101,7 +102,7 @@ export function applyRequestsExtension(schema: GraphQLSchema): GraphQLSchema {
       const parent = await loadAiTodo(context.db, userId, args.parentId);
       if (parent.projectId !== project.id) throw notFound('Parent todo');
     }
-    return (context.db as AnyRow).transaction(async (tx: AnyRow) => {
+    return context.db.transaction(async (tx) => {
       await stampActor(tx, context.actor);
       const laneId = await findNewTodoLaneId(tx, project.id);
       const [todo] = await tx
@@ -125,7 +126,7 @@ export function applyRequestsExtension(schema: GraphQLSchema): GraphQLSchema {
     const userId = await requireAi(context);
     const todo = await loadAiTodo(context.db, userId, args.id);
     const reason = args.reason?.trim() || null;
-    await (context.db as AnyRow).transaction(async (tx: AnyRow) => {
+    await context.db.transaction(async (tx) => {
       const note = reason ? await insertNote(tx, context, userId, todo.id, reason) : null;
       await stampActor(tx, context.actor, { reason, noteId: note?.id });
       await tx

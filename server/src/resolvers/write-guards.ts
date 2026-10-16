@@ -1,3 +1,4 @@
+import type { DB } from '@telos/db';
 import * as dbSchema from '@telos/db/schema';
 import type { BuildSchemaConfig, WriteHookPayload } from '@vantreeseba/drizzle-graphql';
 import { and, eq, inArray, sql } from 'drizzle-orm';
@@ -83,12 +84,7 @@ export function writtenRows(args: { values?: Row | Row[]; set?: Row; updates?: A
  * @param foreignKeys The foreign keys to check on them.
  * @returns Nothing.
  */
-async function assertForeignKeysOwned(
-  tx: AnyTable,
-  context: Context,
-  rows: Row[],
-  foreignKeys: ForeignKey[],
-): Promise<void> {
+async function assertForeignKeysOwned(tx: DB, context: Context, rows: Row[], foreignKeys: ForeignKey[]): Promise<void> {
   for (const fk of foreignKeys) {
     const referenced = [
       ...new Set(rows.map((row) => row[fk.key]).filter((id): id is string => typeof id === 'string')),
@@ -220,7 +216,7 @@ function assertPlainNotes(args: Parameters<typeof writtenRows>[0]): void {
  * around. Checked over the caller's todos after the write, for the reason the
  * completion invariant is: the rows a `where` touched are not knowable before.
  */
-async function assertParentsSound(tx: AnyTable, userId: string): Promise<void> {
+async function assertParentsSound(tx: DB, userId: string): Promise<void> {
   const crossProject = resultRows(
     await tx.execute(sql`
       SELECT 1 FROM todos child JOIN todos parent ON parent.id = child.parent_id
@@ -254,7 +250,7 @@ async function assertParentsSound(tx: AnyTable, userId: string): Promise<void> {
  * A lane's success and failure routes point within its own board. Checked over
  * the caller's lanes after the write, like the other invariants here.
  */
-async function assertRoutesInProject(tx: AnyTable, userId: string): Promise<void> {
+async function assertRoutesInProject(tx: DB, userId: string): Promise<void> {
   const stray = resultRows(
     await tx.execute(sql`
       SELECT 1 FROM lanes l JOIN lanes target ON target.id IN (l.on_success_lane_id, l.on_failure_lane_id)
@@ -270,7 +266,7 @@ async function assertRoutesInProject(tx: AnyTable, userId: string): Promise<void
  * A project's new todos land on its own board. Checked after the write, over
  * the caller's projects, as a lane's routes are.
  */
-async function assertNewTodoLaneInProject(tx: AnyTable, userId: string): Promise<void> {
+async function assertNewTodoLaneInProject(tx: DB, userId: string): Promise<void> {
   const stray = resultRows(
     await tx.execute(sql`
       SELECT 1 FROM projects p JOIN lanes l ON l.id = p.new_todo_lane_id
@@ -287,7 +283,7 @@ async function assertNewTodoLaneInProject(tx: AnyTable, userId: string): Promise
  * Checked after the write, over the caller's lanes, so the message says what to
  * change rather than which constraint fired.
  */
-async function assertArchiveOnSuccessFits(tx: AnyTable, userId: string): Promise<void> {
+async function assertArchiveOnSuccessFits(tx: DB, userId: string): Promise<void> {
   const rows = resultRows<{ name: string }>(
     await tx.execute(sql`
       SELECT l.name FROM lanes l
@@ -324,7 +320,7 @@ const isStrings = (value: unknown) => Array.isArray(value) && value.every((entry
  * Whether an MCP server as written is one the runner could use. The table's
  * constraints say the same; this says it in words a form can show.
  */
-async function assertServersSound(tx: AnyTable, userId: string, rows: Row[], inserting: boolean): Promise<void> {
+async function assertServersSound(tx: DB, userId: string, rows: Row[], inserting: boolean): Promise<void> {
   for (const row of rows) {
     const { slug, url, command } = row;
     if ('slug' in row) {

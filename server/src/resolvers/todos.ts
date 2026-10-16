@@ -93,7 +93,7 @@ async function setCompletedAt(
   reason: string | null | undefined,
 ): Promise<AnyRow> {
   const userId = requireAuth(context);
-  return (context.db as AnyRow).transaction(async (tx: AnyRow) => {
+  return context.db.transaction(async (tx) => {
     await stampActor(tx, context.actor, { reason });
     const laneId = completedAt
       ? await findDoneLaneId(tx, todo.projectId)
@@ -118,7 +118,7 @@ async function visibleToAi(context: Context, blockers: AnyRow[]): Promise<AnyRow
   const candidates = blockers.filter((row) => !row.aiIgnored);
   if (candidates.length === 0) return [];
   const projectIds = [...new Set(candidates.map((row) => String(row.projectId)))];
-  const open: Array<{ id: string }> = await (context.db as AnyRow)
+  const open: Array<{ id: string }> = await context.db
     .select({ id: dbSchema.projects.id })
     .from(dbSchema.projects)
     .where(and(inArray(dbSchema.projects.id, projectIds), eq(dbSchema.projects.aiEnabled, true)));
@@ -139,7 +139,7 @@ async function hiddenFromAi(context: Context, userId: string, ids: string[]): Pr
   if (ids.length === 0) {
     return [];
   }
-  const seen: Array<{ id: string }> = await (context.db as AnyRow)
+  const seen: Array<{ id: string }> = await context.db
     .select({ id: dbSchema.todos.id })
     .from(dbSchema.todos)
     .innerJoin(dbSchema.projects, eq(dbSchema.projects.id, dbSchema.todos.projectId))
@@ -205,7 +205,7 @@ export function applyTodosExtension(schema: GraphQLSchema): GraphQLSchema {
       throw forbidden('Only a person can unsplit a todo.');
     }
     if (todo.splitAt == null) return todo;
-    return (context.db as AnyRow).transaction(async (tx: AnyRow) => {
+    return context.db.transaction(async (tx) => {
       await stampActor(tx, context.actor, { reason: args.reason });
       const [updated] = await tx
         .update(dbSchema.todos)
@@ -226,7 +226,7 @@ export function applyTodosExtension(schema: GraphQLSchema): GraphQLSchema {
     ]);
     assertNotCompletedBehind(todo, blocker);
     await assertNoCycle(context.db, args.todoId, args.dependsOnTodoId);
-    await (context.db as AnyRow)
+    await context.db
       .insert(dbSchema.todoDependencies)
       .values({ userId, todoId: args.todoId, dependsOnTodoId: args.dependsOnTodoId })
       .onConflictDoNothing();
@@ -235,7 +235,7 @@ export function applyTodosExtension(schema: GraphQLSchema): GraphQLSchema {
 
   mutations.removeTodoDependency = async (_parent, args, context) => {
     const userId = requireAuth(context);
-    await (context.db as AnyRow)
+    await context.db
       .delete(dbSchema.todoDependencies)
       .where(
         and(
@@ -251,7 +251,7 @@ export function applyTodosExtension(schema: GraphQLSchema): GraphQLSchema {
     const userId = requireAuth(context);
     const todo = await loadOwnedTodo(context.db, userId, args.id);
     const wanted = new Set(args.dependsOn);
-    const existing: Array<{ dependsOnTodoId: string }> = await (context.db as AnyRow)
+    const existing: Array<{ dependsOnTodoId: string }> = await context.db
       .select({ dependsOnTodoId: dbSchema.todoDependencies.dependsOnTodoId })
       .from(dbSchema.todoDependencies)
       .where(and(eq(dbSchema.todoDependencies.userId, userId), eq(dbSchema.todoDependencies.todoId, todo.id)));
@@ -271,7 +271,7 @@ export function applyTodosExtension(schema: GraphQLSchema): GraphQLSchema {
       }
       assertNotCompletedBehind(todo, await loadOwnedTodo(context.db, userId, id));
     }
-    await (context.db as AnyRow).transaction(async (tx: AnyRow) => {
+    await context.db.transaction(async (tx) => {
       if (dropped.length > 0) {
         await tx
           .delete(dbSchema.todoDependencies)

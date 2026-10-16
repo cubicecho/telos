@@ -64,7 +64,7 @@ const scopeByUserId: SqlScope = (context, table) => eq(table.userId, requireAuth
 
 /** The caller's projects with AI on, as a subquery. */
 function aiProjectIds(context: Context, userId: string) {
-  return (context.db as AnyTable)
+  return context.db
     .select({ id: dbSchema.projects.id })
     .from(dbSchema.projects)
     .where(and(eq(dbSchema.projects.userId, userId), eq(dbSchema.projects.aiEnabled, true)));
@@ -72,7 +72,7 @@ function aiProjectIds(context: Context, userId: string) {
 
 /** The caller's todos AI may see, as a subquery. */
 function aiTodoIds(context: Context, userId: string) {
-  return (context.db as AnyTable)
+  return context.db
     .select({ id: dbSchema.todos.id })
     .from(dbSchema.todos)
     .where(
@@ -96,7 +96,7 @@ function aiNarrowed(narrow: (context: Context, table: AnyTable, userId: string) 
 
 /** The caller's drafts in projects with AI on, as a subquery. */
 function aiDraftIds(context: Context, userId: string) {
-  return (context.db as AnyTable)
+  return context.db
     .select({ id: dbSchema.drafts.id })
     .from(dbSchema.drafts)
     .where(and(eq(dbSchema.drafts.userId, userId), inArray(dbSchema.drafts.projectId, aiProjectIds(context, userId))));

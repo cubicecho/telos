@@ -1,3 +1,4 @@
+import type { DB } from '@telos/db';
 import * as dbSchema from '@telos/db/schema';
 import { and, asc, eq } from 'drizzle-orm';
 import { extendSchema, type GraphQLSchema, parse } from 'graphql';
@@ -42,7 +43,7 @@ const LANES_SDL = parse(`
   }
 `);
 
-function projectLanes(db: AnyRow, projectId: string): Promise<AnyRow[]> {
+function projectLanes(db: DB, projectId: string): Promise<AnyRow[]> {
   return db
     .select()
     .from(dbSchema.lanes)
@@ -88,9 +89,9 @@ export function applyLanesExtension(schema: GraphQLSchema): GraphQLSchema {
 
   mutations.moveTodo = async (_parent, args, context) => {
     const userId = requireAuth(context);
-    const db = context.db as AnyRow;
+    const db = context.db;
 
-    return db.transaction(async (tx: AnyRow) => {
+    return db.transaction(async (tx) => {
       await stampActor(tx, context.actor, { reason: args.reason });
       const todo = await loadOwnedTodo(tx, userId, args.id);
 
@@ -143,9 +144,9 @@ export function applyLanesExtension(schema: GraphQLSchema): GraphQLSchema {
 
   mutations.setDoneLane = async (_parent, args, context) => {
     const userId = requireAuth(context);
-    const db = context.db as AnyRow;
+    const db = context.db;
 
-    return db.transaction(async (tx: AnyRow) => {
+    return db.transaction(async (tx) => {
       await loadOwnedProject(tx, userId, args.projectId);
       // Moving the flag moves todos (syncLaneCompletion), which is history.
       await stampActor(tx, context.actor);
@@ -175,9 +176,9 @@ export function applyLanesExtension(schema: GraphQLSchema): GraphQLSchema {
 
   mutations.reorderLanes = async (_parent, args, context) => {
     const userId = requireAuth(context);
-    const db = context.db as AnyRow;
+    const db = context.db;
 
-    return db.transaction(async (tx: AnyRow) => {
+    return db.transaction(async (tx) => {
       await loadOwnedProject(tx, userId, args.projectId);
       const lanes = await projectLanes(tx, args.projectId);
       const known = new Set(lanes.map((lane: AnyRow) => lane.id as string));

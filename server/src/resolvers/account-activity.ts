@@ -21,9 +21,6 @@ import { requireSession } from './auth.ts';
 //
 // Applied only when the instance has AI on.
 
-// biome-ignore lint/suspicious/noExplicitAny: drizzle-orm 1.0 table/column type compat
-type AnyRow = any;
-
 /** What a run whose agent was deleted is filed under. */
 export const DELETED_AGENT = 'A deleted agent';
 
@@ -151,7 +148,7 @@ export function applyAccountActivityExtension(schema: GraphQLSchema): GraphQLSch
     // A person's, like the page it is drawn on.
     requireSession(context);
     const userId = await requireAi(context);
-    const db = context.db as AnyRow;
+    const db = context.db;
     const since = new Date(args.since);
     const window = sql`r.user_id = ${userId} AND r.started_at >= ${since.toISOString()}::timestamptz`;
 

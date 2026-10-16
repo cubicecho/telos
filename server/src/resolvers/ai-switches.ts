@@ -28,9 +28,6 @@ import { requireSession } from './auth.ts';
 // Applied only when the server offers AI (AI_ENABLED is not false). Without it
 // there is nothing to switch.
 
-// biome-ignore lint/suspicious/noExplicitAny: drizzle-orm 1.0 table/column type compat
-type AnyRow = any;
-
 const AI_SWITCHES_SDL = parse(`
   extend type Mutation {
     "Switches AI on or off for the whole instance. Admins only. Off, no account can use AI."
@@ -62,7 +59,7 @@ export function applyAiSwitchesExtension(schema: GraphQLSchema): GraphQLSchema {
 
   mutations.setAiEnabled = async (_parent, args, context) => {
     const userId = requireSession(context);
-    const [user] = await (context.db as AnyRow)
+    const [user] = await context.db
       .update(dbSchema.users)
       .set({ aiEnabled: args.enabled, updatedAt: new Date() })
       .where(eq(dbSchema.users.id, userId))
@@ -76,7 +73,7 @@ export function applyAiSwitchesExtension(schema: GraphQLSchema): GraphQLSchema {
     // for an account with AI off there is no such thing.
     const userId = requireSession(context);
     if (args.enabled) await requireAi(context);
-    const [project] = await (context.db as AnyRow)
+    const [project] = await context.db
       .update(dbSchema.projects)
       .set({ aiEnabled: args.enabled, updatedAt: new Date() })
       .where(and(eq(dbSchema.projects.id, args.projectId), eq(dbSchema.projects.userId, userId)))
@@ -96,7 +93,7 @@ export function applyAiSwitchesExtension(schema: GraphQLSchema): GraphQLSchema {
     if (args.enabled) {
       await requireAi(context);
     }
-    const [project] = await (context.db as AnyRow)
+    const [project] = await context.db
       .update(dbSchema.projects)
       .set({ autoRun: args.enabled, updatedAt: new Date() })
       .where(and(eq(dbSchema.projects.id, args.projectId), eq(dbSchema.projects.userId, userId)))
@@ -113,7 +110,7 @@ export function applyAiSwitchesExtension(schema: GraphQLSchema): GraphQLSchema {
     if (days !== null && (days < 1 || days > MAX_RETENTION_DAYS)) {
       throw badInput(`Keep runs for 1 to ${MAX_RETENTION_DAYS} days, or for good.`);
     }
-    const [user] = await (context.db as AnyRow)
+    const [user] = await context.db
       .update(dbSchema.users)
       .set({ runRetentionDays: days, updatedAt: new Date() })
       .where(eq(dbSchema.users.id, userId))

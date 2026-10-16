@@ -24,9 +24,6 @@ import { markRunnerSeen } from '../runner-seen.ts';
 //
 // Applied only when the instance has AI on.
 
-// biome-ignore lint/suspicious/noExplicitAny: drizzle-orm 1.0 table/column type compat
-type AnyRow = any;
-
 const SESSION_DELETES_SDL = parse(`
   "A deleted todo's session, which an agent's MCP servers have yet to be told is gone."
   type SessionDelete {
@@ -111,7 +108,7 @@ export function applySessionDeletesExtension(schema: GraphQLSchema): GraphQLSche
       return [];
     }
     const limit = Math.min(Math.max(args.limit ?? DEFAULT_LIMIT, 1), MAX_LIMIT);
-    return (context.db as AnyRow).transaction(async (tx: AnyRow) => {
+    return context.db.transaction(async (tx) => {
       const now = new Date();
       const owed: Array<{ session: dbSchema.TodoSession; agent: dbSchema.Agent }> = await tx
         .select({ session: dbSchema.todoSessions, agent: dbSchema.agents })
@@ -160,7 +157,7 @@ export function applySessionDeletesExtension(schema: GraphQLSchema): GraphQLSche
 
   mutations.finishSessionDelete = async (_parent, args, context) => {
     requireSystem(context);
-    return (context.db as AnyRow).transaction(async (tx: AnyRow) => {
+    return context.db.transaction(async (tx) => {
       const [session]: dbSchema.TodoSession[] = await tx
         .select()
         .from(dbSchema.todoSessions)

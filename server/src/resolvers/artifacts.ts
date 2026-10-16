@@ -17,9 +17,6 @@ import { requireText } from './requests.ts';
 //
 // Applied only when the instance has AI on.
 
-// biome-ignore lint/suspicious/noExplicitAny: drizzle-orm 1.0 table/column type compat
-type AnyRow = any;
-
 const ARTIFACTS_SDL = parse(`
   extend type Mutation {
     """
@@ -84,7 +81,7 @@ export function applyArtifactsExtension(schema: GraphQLSchema): GraphQLSchema {
       actorKeyId: actor.keyId ?? null,
     };
 
-    return (context.db as AnyRow).transaction(async (tx: AnyRow) => {
+    return context.db.transaction(async (tx) => {
       // Said twice, it is one artifact: a client that retries does not list
       // the same file again.
       const [existing] = await tx

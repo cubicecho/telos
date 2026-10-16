@@ -1,3 +1,4 @@
+import type { DB } from '@telos/db';
 import * as dbSchema from '@telos/db/schema';
 import { resolveAgent } from '@telos/runner/spec';
 import { eq } from 'drizzle-orm';
@@ -6,9 +7,6 @@ import { eq } from 'drizzle-orm';
 // layers them (runner/src/spec.ts); the server only stores them and hands them
 // over with a claim, and reads them back resolved for Settings, through the
 // same `resolveAgent`, so the form and a run never disagree about a blank.
-
-// biome-ignore lint/suspicious/noExplicitAny: drizzle-orm 1.0 table/column type compat
-type AnyDb = any;
 
 /** The settings a defaults row and an agent share, by name. */
 export const LAYER_FIELDS = [
@@ -32,7 +30,7 @@ export const LAYER_FIELDS = [
  * @param userId - Whose.
  * @returns The row.
  */
-export async function loadAgentDefaults(db: AnyDb, userId: string): Promise<dbSchema.AgentDefaults | null> {
+export async function loadAgentDefaults(db: DB, userId: string): Promise<dbSchema.AgentDefaults | null> {
   const [row] = await db.select().from(dbSchema.agentDefaults).where(eq(dbSchema.agentDefaults.userId, userId));
   return row ?? null;
 }

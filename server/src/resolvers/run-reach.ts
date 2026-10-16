@@ -1,3 +1,4 @@
+import type { DB } from '@telos/db';
 import * as dbSchema from '@telos/db/schema';
 import { and, eq, sql } from 'drizzle-orm';
 import type { GraphQLError } from 'graphql';
@@ -82,7 +83,7 @@ async function runOf(context: Context): Promise<Run | null> {
   if (!runId) {
     return null;
   }
-  const [run] = await (context.db as AnyDb)
+  const [run] = await context.db
     .select({
       id: dbSchema.runs.id,
       userId: dbSchema.runs.userId,
@@ -105,7 +106,7 @@ async function runOf(context: Context): Promise<Run | null> {
  * @param todoId The todo.
  * @returns Whether the run may write it.
  */
-export async function inRunReach(db: AnyDb, run: Run, todoId: string): Promise<boolean> {
+export async function inRunReach(db: DB, run: Run, todoId: string): Promise<boolean> {
   if (!run.todoId || !UUID.test(todoId)) {
     return false;
   }
@@ -185,7 +186,7 @@ function assertBoard(run: Run, projectId: unknown): void {
 async function assertDraft(context: Context, run: Run, draftId: unknown): Promise<void> {
   const [draft] =
     typeof draftId === 'string' && UUID.test(draftId)
-      ? await (context.db as AnyDb)
+      ? await context.db
           .select({ projectId: dbSchema.drafts.projectId })
           .from(dbSchema.drafts)
           .where(and(eq(dbSchema.drafts.id, draftId), eq(dbSchema.drafts.userId, run.userId)))
@@ -206,7 +207,7 @@ async function assertDraft(context: Context, run: Run, draftId: unknown): Promis
 async function assertRun(context: Context, run: Run, runId: unknown): Promise<void> {
   const [named] =
     typeof runId === 'string' && UUID.test(runId)
-      ? await (context.db as AnyDb)
+      ? await context.db
           .select({ todoId: dbSchema.runs.todoId })
           .from(dbSchema.runs)
           .where(and(eq(dbSchema.runs.id, runId), eq(dbSchema.runs.userId, run.userId)))

@@ -1,8 +1,6 @@
+import type { DB } from '@telos/db';
 import * as dbSchema from '@telos/db/schema';
 import { eq } from 'drizzle-orm';
-
-// biome-ignore lint/suspicious/noExplicitAny: drizzle-orm 1.0 table/column type compat
-type AnyRow = any;
 
 /**
  * Records that an agent is working a todo, which is the session its MCP hooks
@@ -15,7 +13,7 @@ type AnyRow = any;
  * @returns Whether no agent had worked the todo before: the session opens now.
  */
 export async function openSession(
-  tx: AnyRow,
+  tx: DB,
   todo: Pick<dbSchema.Todo, 'id' | 'userId'>,
   agentId: string,
 ): Promise<boolean> {

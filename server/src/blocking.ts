@@ -1,3 +1,4 @@
+import type { DB } from '@telos/db';
 import * as dbSchema from '@telos/db/schema';
 import { and, eq, inArray, isNotNull, isNull, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
@@ -14,8 +15,6 @@ import { badInput } from './errors.ts';
 // when they are done (the `todos_settle_umbrella` trigger). A person who wants
 // it finished alone unsplits it first.
 
-// biome-ignore lint/suspicious/noExplicitAny: drizzle-orm 1.0 table/column type compat
-type AnyDb = any;
 export type TodoRow = dbSchema.Todo;
 
 /** Rows a raw `execute` returned, across the postgres-js and PGlite drivers. */
@@ -29,7 +28,7 @@ export function resultRows<T>(result: unknown): T[] {
  * Of `todoIds`, the ones with at least one incomplete dependency — in one query,
  * so `Todo.isBlocked` over a list costs the same as over a single todo.
  */
-export async function findBlocked(db: AnyDb, todoIds: readonly string[]): Promise<Set<string>> {
+export async function findBlocked(db: DB, todoIds: readonly string[]): Promise<Set<string>> {
   if (todoIds.length === 0) return new Set();
   const rows: Array<{ todoId: string }> = await db
     .selectDistinct({ todoId: dbSchema.todoDependencies.todoId })
@@ -46,7 +45,7 @@ export async function findBlocked(db: AnyDb, todoIds: readonly string[]): Promis
 }
 
 /** The open todos standing in the way of each of `todoIds`, keyed by blocked id. */
-export async function findBlockers(db: AnyDb, todoIds: readonly string[]): Promise<Map<string, TodoRow[]>> {
+export async function findBlockers(db: DB, todoIds: readonly string[]): Promise<Map<string, TodoRow[]>> {
   const byTodo = new Map<string, TodoRow[]>();
   if (todoIds.length === 0) return byTodo;
   const rows: Array<{ todoId: string; blocker: TodoRow }> = await db
@@ -75,7 +74,7 @@ export async function findBlockers(db: AnyDb, todoIds: readonly string[]): Promi
  * @param todoIds - The todos to look at; those not split have no pieces.
  * @returns Each umbrella's open pieces.
  */
-export async function findOpenPieces(db: AnyDb, todoIds: readonly string[]): Promise<Map<string, TodoRow[]>> {
+export async function findOpenPieces(db: DB, todoIds: readonly string[]): Promise<Map<string, TodoRow[]>> {
   const byTodo = new Map<string, TodoRow[]>();
   if (todoIds.length === 0) return byTodo;
   const umbrellas = alias(dbSchema.todos, 'umbrella_todos');
@@ -110,7 +109,7 @@ function piecesOpen(titles: readonly string[]): string {
 }
 
 /** Throws unless every id in `todoIds` is free to be completed. */
-export async function assertNotBlocked(db: AnyDb, todoIds: readonly string[]): Promise<void> {
+export async function assertNotBlocked(db: DB, todoIds: readonly string[]): Promise<void> {
   const pieces = await findOpenPieces(db, todoIds);
   if (pieces.size > 0) {
     const titles = [...pieces.values()]
@@ -142,7 +141,7 @@ export async function assertNotBlocked(db: AnyDb, todoIds: readonly string[]): P
  * caller's rows is independent of the selection set, and it runs inside the
  * mutation's transaction, so a violation rolls the whole write back.
  */
-export async function assertNoBlockedCompletions(db: AnyDb, userId: string): Promise<void> {
+export async function assertNoBlockedCompletions(db: DB, userId: string): Promise<void> {
   const pieces = alias(dbSchema.todos, 'piece_todos');
   const open: Array<{ piece: string }> = await db
     .select({ piece: pieces.title })
@@ -194,7 +193,7 @@ export async function assertNoBlockedCompletions(db: AnyDb, userId: string): Pro
  * @param dependsOnTodoId - The todo it would wait on, which already leads back to it.
  * @returns The ids around the loop, first and last the same.
  */
-async function findLoop(db: AnyDb, todoId: string, dependsOnTodoId: string): Promise<string[]> {
+async function findLoop(db: DB, todoId: string, dependsOnTodoId: string): Promise<string[]> {
   const cameFrom = new Map<string, string | null>([[dependsOnTodoId, null]]);
   let frontier = [dependsOnTodoId];
   while (frontier.length > 0 && cameFrom.has(todoId) === false) {
@@ -224,7 +223,7 @@ async function findLoop(db: AnyDb, todoId: string, dependsOnTodoId: string): Pro
  * @param loop - The ids around the loop, first and last the same.
  * @returns The todos by title, in the order they wait on each other.
  */
-async function describeLoop(db: AnyDb, loop: readonly string[]): Promise<string> {
+async function describeLoop(db: DB, loop: readonly string[]): Promise<string> {
   const rows: Array<{ id: string; title: string }> = await db
     .select({ id: dbSchema.todos.id, title: dbSchema.todos.title })
     .from(dbSchema.todos)
@@ -246,7 +245,7 @@ async function describeLoop(db: AnyDb, loop: readonly string[]): Promise<string>
  * @param todoId - The todo that would wait.
  * @param dependsOnTodoId - The todo it would wait on.
  */
-export async function assertNoCycle(db: AnyDb, todoId: string, dependsOnTodoId: string): Promise<void> {
+export async function assertNoCycle(db: DB, todoId: string, dependsOnTodoId: string): Promise<void> {
   if (todoId === dependsOnTodoId) {
     throw badInput('A todo cannot depend on itself.');
   }

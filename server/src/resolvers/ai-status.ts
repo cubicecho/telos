@@ -1,3 +1,4 @@
+import type { DB } from '@telos/db';
 import * as dbSchema from '@telos/db/schema';
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import { extendSchema, type GraphQLSchema, parse } from 'graphql';
@@ -102,7 +103,7 @@ const RUN_EVENT = 'run' as const;
  * @param id - The todo.
  * @returns The todo's row.
  */
-async function restingTodo(db: AnyRow, userId: string, id: string): Promise<AnyRow> {
+async function restingTodo(db: DB, userId: string, id: string): Promise<AnyRow> {
   const todo = await loadOwnedTodo(db, userId, id);
   if (todo.laneId === null) {
     throw badInput('It is in no lane, so no agent can take it. Move it to a lane with an agent.');
@@ -136,7 +137,7 @@ async function restingTodo(db: AnyRow, userId: string, id: string): Promise<AnyR
  * @returns Nothing.
  */
 async function recordNudge(
-  db: AnyRow,
+  db: DB,
   actor: Actor,
   todo: AnyRow,
   kind: typeof RETRY_EVENT | typeof RUN_EVENT,
@@ -163,7 +164,7 @@ async function recordNudge(
  * @param todo - The todo's row.
  * @returns The reason, as a sentence for the person who asked.
  */
-async function whyNotRunnable(db: AnyRow, todo: AnyRow): Promise<string | null> {
+async function whyNotRunnable(db: DB, todo: AnyRow): Promise<string | null> {
   const [row] = resultRows<{
     ai_enabled: boolean;
     project_archived: boolean;
@@ -219,7 +220,7 @@ export function applyAiStatusExtension(schema: GraphQLSchema): GraphQLSchema {
 
   queries.aiStatus = async (_parent, args, context) => {
     const userId = await requireAi(context);
-    const db = context.db as AnyRow;
+    const db = context.db;
     const { todos, done } = await workStates(db, userId, args.projectId);
 
     const projects: AnyRow[] = await db
@@ -280,7 +281,7 @@ export function applyAiStatusExtension(schema: GraphQLSchema): GraphQLSchema {
 
   mutations.retryTodo = async (_parent, args, context) => {
     const userId = await requireAi(context);
-    const db = context.db as AnyRow;
+    const db = context.db;
     const todo = await restingTodo(db, userId, args.id);
     await recordNudge(db, context.actor, todo, RETRY_EVENT, args.reason);
     return true;
@@ -288,7 +289,7 @@ export function applyAiStatusExtension(schema: GraphQLSchema): GraphQLSchema {
 
   mutations.runTodo = async (_parent, args, context) => {
     const userId = await requireAi(context);
-    return (context.db as AnyRow).transaction(async (tx: AnyRow) => {
+    return context.db.transaction(async (tx) => {
       const todo = await restingTodo(tx, userId, args.id);
       const refusal = await whyNotRunnable(tx, todo);
       if (refusal !== null) {

@@ -1,3 +1,4 @@
+import type { DB } from '@telos/db';
 import { sql } from 'drizzle-orm';
 import { extendSchema, type GraphQLSchema, parse } from 'graphql';
 import type { QueryResolvers } from '../../__generated__/resolvers.ts';
@@ -11,9 +12,6 @@ import { runnerSeenAt } from '../runner-seen.ts';
 // remembered; every answer is what the tables say now.
 //
 // Applied only when the instance has AI on.
-
-// biome-ignore lint/suspicious/noExplicitAny: drizzle-orm 1.0 table/column type compat
-type AnyDb = any;
 
 const AI_SETUP_SDL = parse(`
   "What is in place for an agent to work a todo of yours. Read now, never remembered."
@@ -56,7 +54,7 @@ interface SetupRow {
  * @param userId - The account.
  * @returns The answers, apart from the runner's.
  */
-async function readSetup(db: AnyDb, userId: string): Promise<SetupRow> {
+async function readSetup(db: DB, userId: string): Promise<SetupRow> {
   const result = await db.execute(sql`
     WITH agent_projects AS (
       SELECT p.id, p.ai_enabled, p.auto_run, p.created_at

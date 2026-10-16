@@ -14,9 +14,6 @@ import { requireAuth } from './auth.ts';
 // Applying replaces a board, so it is only for a project with no todos yet —
 // archived ones included, since they still sit in its lanes.
 
-// biome-ignore lint/suspicious/noExplicitAny: drizzle-orm 1.0 table/column type compat
-type AnyRow = any;
-
 type TemplateLane = dbSchema.TemplateLane;
 
 const BOARD_TEMPLATES_SDL = parse(`
@@ -86,7 +83,7 @@ export function applyBoardTemplatesExtension(schema: GraphQLSchema): GraphQLSche
     const userId = requireAuth(context);
     const name = args.name.trim();
     if (!name || name.length > MAX_NAME) throw badInput(`Name the template, in ${MAX_NAME} characters or fewer.`);
-    const db = context.db as AnyRow;
+    const db = context.db;
     await loadOwnedProject(db, userId, args.projectId);
     const rows = await db
       .select()
@@ -117,7 +114,7 @@ export function applyBoardTemplatesExtension(schema: GraphQLSchema): GraphQLSche
 
   mutations.applyBoardTemplate = async (_parent, args, context) => {
     const userId = requireAuth(context);
-    return (context.db as AnyRow).transaction(async (tx: AnyRow) => {
+    return context.db.transaction(async (tx) => {
       const project = await loadOwnedProject(tx, userId, args.projectId);
       const [template] = await tx
         .select()

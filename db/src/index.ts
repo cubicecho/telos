@@ -1,3 +1,4 @@
+import type { PgAsyncDatabase, PgQueryResultHKT } from 'drizzle-orm/pg-core';
 import { relations } from './relations.ts';
 import * as schema from './schema.ts';
 import { requiresSsl } from './ssl.ts';
@@ -25,9 +26,13 @@ const connection: any = {
   onnotice: () => {},
 };
 
-// biome-ignore lint/suspicious/noExplicitAny: db type varies by driver at runtime; callers cast as needed
-export type DB = any;
-export const db: DB = drizzle({ connection, relations });
+/**
+ * The database, whichever driver is under it: postgres-js here, PGlite in the
+ * server's tests. Both are this. What `execute` returns still differs by
+ * driver, which `resultRows` (server/src/blocking.ts) papers over.
+ */
+export type DB = PgAsyncDatabase<PgQueryResultHKT, typeof relations>;
+export const db = drizzle({ connection, relations });
 
 export { relations, schema };
 export * from './schema.ts';

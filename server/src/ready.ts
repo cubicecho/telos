@@ -1,3 +1,4 @@
+import type { DB } from '@telos/db';
 import { type SQL, sql } from 'drizzle-orm';
 import type { StationTodo } from '../__generated__/resolvers.ts';
 import { resultRows } from './blocking.ts';
@@ -25,9 +26,6 @@ import { INSTANCE_AI_ON } from './instance.ts';
 //   - it has failed no more than `maxAttempts` times since a person last
 //     touched it, which is what stops a Doing↔Review loop spending forever
 //   - the lane has room under its WIP limit
-
-// biome-ignore lint/suspicious/noExplicitAny: db type varies by driver (postgres-js, PGlite)
-type AnyDb = any;
 
 /** How long a claim holds a todo without a heartbeat before it counts as abandoned. */
 export const LEASE_SECONDS = 120;
@@ -98,7 +96,7 @@ export function failuresSinceTouched(todoId: SQL): SQL {
  * @returns The ready todos, each with the lane that would work it.
  */
 export async function readyTodos(
-  db: AnyDb,
+  db: DB,
   filter: { todoId?: string; laneId?: string } = {},
   limit = 50,
 ): Promise<ReadyTodo[]> {
@@ -163,7 +161,7 @@ export async function readyTodos(
  * @param where Which runs to look at: one todo's, or one lane's.
  * @returns Nothing.
  */
-export async function expireLapsedRuns(db: AnyDb, where: { todoId: string; laneId: string }): Promise<void> {
+export async function expireLapsedRuns(db: DB, where: { todoId: string; laneId: string }): Promise<void> {
   await db.execute(sql`
     UPDATE runs
     SET status = 'error', error = 'The runner stopped renewing its lease.', finished_at = now()
@@ -184,7 +182,7 @@ export async function expireLapsedRuns(db: AnyDb, where: { todoId: string; laneI
  * @returns Nothing.
  */
 export async function cancelRunsUnder(
-  db: AnyDb,
+  db: DB,
   where: { userId?: string; projectId?: string; ignoredTodos?: boolean; archivedTodos?: boolean },
 ): Promise<void> {
   const narrow: SQL[] = [];
@@ -207,7 +205,7 @@ export async function cancelRunsUnder(
  * @param where - Which requests: one todo's, or every one in a project.
  * @returns Nothing.
  */
-export async function dropRunRequests(db: AnyDb, where: { todoId: string } | { projectId: string }): Promise<void> {
+export async function dropRunRequests(db: DB, where: { todoId: string } | { projectId: string }): Promise<void> {
   const narrow = 'todoId' in where ? sql`id = ${where.todoId}` : sql`project_id = ${where.projectId}`;
   await db.execute(sql`UPDATE todos SET run_requested_at = NULL WHERE run_requested_at IS NOT NULL AND ${narrow}`);
 }
@@ -258,7 +256,7 @@ export interface LaneDoneCount {
  * @returns The open todos, in board order, and the done counts.
  */
 export async function workStates(
-  db: AnyDb,
+  db: DB,
   userId: string,
   projectId?: string | null,
 ): Promise<{ todos: WorkTodo[]; done: LaneDoneCount[] }> {

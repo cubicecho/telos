@@ -1,3 +1,4 @@
+import type { DB } from '@telos/db';
 import { sql } from 'drizzle-orm';
 import { extendSchema, type GraphQLSchema, parse } from 'graphql';
 import type { QueryResolvers } from '../../__generated__/resolvers.ts';
@@ -15,9 +16,6 @@ import { requireSession } from './auth.ts';
 //
 // Notes are everyone's, so the query is there with AI off too. What runs left
 // is read only while AI is on for the account and the project.
-
-// biome-ignore lint/suspicious/noExplicitAny: drizzle-orm 1.0 table/column type compat
-type AnyRow = any;
 
 /** A reviewer ruled against the work: it was judged. */
 export const MARK_REJECTED = 'rejected';
@@ -68,7 +66,7 @@ interface MarkRow {
  * @param runs - Whether to read what runs left, or only the notes.
  * @returns A row for each todo with something to mark.
  */
-async function readMarks(db: AnyRow, userId: string, projectId: string, runs: boolean): Promise<MarkRow[]> {
+async function readMarks(db: DB, userId: string, projectId: string, runs: boolean): Promise<MarkRow[]> {
   // A stopped run was called off, so it says nothing about the work, and a
   // running one has not ended: the last run that did is the one a card reports.
   const result = await db.execute(sql`
@@ -127,7 +125,7 @@ export function applyCardMarksExtension(schema: GraphQLSchema, options: { ai: bo
   queries.cardMarks = async (_parent, args, context) => {
     // A person's, like the board it is drawn on.
     const userId = requireSession(context);
-    const db = context.db as AnyRow;
+    const db = context.db;
     const project = await loadOwnedProject(db, userId, args.projectId);
 
     const runs = options.ai && project.aiEnabled && (await aiAllowed(context));

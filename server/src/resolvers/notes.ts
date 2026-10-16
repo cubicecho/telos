@@ -57,7 +57,7 @@ async function loadVisibleNote(context: Context, id: string): Promise<AnyRow> {
   const ai = isAiActor(context);
   const userId = ai ? await requireAi(context) : requireAuth(context);
   const owned = and(eq(dbSchema.todoNotes.id, id), eq(dbSchema.todoNotes.userId, userId));
-  const [row] = await (context.db as AnyRow)
+  const [row] = await context.db
     .select({ note: dbSchema.todoNotes })
     .from(dbSchema.todoNotes)
     .innerJoin(dbSchema.todos, eq(dbSchema.todos.id, dbSchema.todoNotes.todoId))
@@ -120,7 +120,7 @@ export function applyNotesExtension(schema: GraphQLSchema): GraphQLSchema {
     if (body === note.body) {
       return note;
     }
-    const [edited] = await (context.db as AnyRow)
+    const [edited] = await context.db
       .update(dbSchema.todoNotes)
       .set({ body, editedAt: new Date() })
       .where(eq(dbSchema.todoNotes.id, note.id))
@@ -138,10 +138,7 @@ export function applyNotesExtension(schema: GraphQLSchema): GraphQLSchema {
     if (context.actor.kind !== 'user' && signedByCaller(context, note) === false) {
       throw forbidden('You can delete only the notes you signed.');
     }
-    const [removed] = await (context.db as AnyRow)
-      .delete(dbSchema.todoNotes)
-      .where(eq(dbSchema.todoNotes.id, note.id))
-      .returning();
+    const [removed] = await context.db.delete(dbSchema.todoNotes).where(eq(dbSchema.todoNotes.id, note.id)).returning();
     if (!removed) {
       throw notFound('Note');
     }

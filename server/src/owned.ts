@@ -1,3 +1,4 @@
+import type { DB } from '@telos/db';
 import * as dbSchema from '@telos/db/schema';
 import { and, eq, isNull, type SQL } from 'drizzle-orm';
 import { notFound } from './errors.ts';
@@ -6,9 +7,6 @@ import { notFound } from './errors.ts';
 // that is handed an id starts with. Someone else's row and no row at all are
 // the same answer, so an id says nothing about other accounts. The AI forms
 // narrow it to what AI may see, as tenancy.ts does for lists.
-
-// biome-ignore lint/suspicious/noExplicitAny: drizzle-orm 1.0 table/column type compat
-type AnyDb = any;
 
 type OwnedTable = typeof dbSchema.todos | typeof dbSchema.lanes | typeof dbSchema.projects;
 
@@ -24,8 +22,8 @@ type OwnedTable = typeof dbSchema.todos | typeof dbSchema.lanes | typeof dbSchem
  * @returns The row.
  */
 async function loadOwned<T extends OwnedTable>(
-  db: AnyDb,
-  table: T,
+  db: DB,
+  table: OwnedTable & T,
   what: string,
   userId: string,
   id: string,
@@ -37,31 +35,32 @@ async function loadOwned<T extends OwnedTable>(
     .where(and(eq(table.id, id), eq(table.userId, userId), ...also))
     .limit(1);
   if (!row) throw notFound(what);
-  return row;
+  // drizzle loses the row type through a generic table; it is T's row.
+  return row as T['$inferSelect'];
 }
 
 /** A project of the caller's, archived or not. */
-export function loadOwnedProject(db: AnyDb, userId: string, id: string): Promise<dbSchema.Project> {
+export function loadOwnedProject(db: DB, userId: string, id: string): Promise<dbSchema.Project> {
   return loadOwned(db, dbSchema.projects, 'Project', userId, id);
 }
 
 /** A lane of the caller's. */
-export function loadOwnedLane(db: AnyDb, userId: string, id: string): Promise<dbSchema.Lane> {
+export function loadOwnedLane(db: DB, userId: string, id: string): Promise<dbSchema.Lane> {
   return loadOwned(db, dbSchema.lanes, 'Lane', userId, id);
 }
 
 /** A todo of the caller's that is not archived. */
-export function loadOwnedTodo(db: AnyDb, userId: string, id: string): Promise<dbSchema.Todo> {
+export function loadOwnedTodo(db: DB, userId: string, id: string): Promise<dbSchema.Todo> {
   return loadOwned(db, dbSchema.todos, 'Todo', userId, id, isNull(dbSchema.todos.archivedAt));
 }
 
 /** A project of the caller's with AI on. */
-export function loadAiProject(db: AnyDb, userId: string, id: string): Promise<dbSchema.Project> {
+export function loadAiProject(db: DB, userId: string, id: string): Promise<dbSchema.Project> {
   return loadOwned(db, dbSchema.projects, 'Project', userId, id, eq(dbSchema.projects.aiEnabled, true));
 }
 
 /** A todo of the caller's that AI may see: not archived, not ignored, in a project with AI on. */
-export async function loadAiTodo(db: AnyDb, userId: string, id: string): Promise<dbSchema.Todo> {
+export async function loadAiTodo(db: DB, userId: string, id: string): Promise<dbSchema.Todo> {
   const [row] = await db
     .select({ todo: dbSchema.todos })
     .from(dbSchema.todos)

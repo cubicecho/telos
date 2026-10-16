@@ -1,3 +1,4 @@
+import type { DB } from '@telos/db';
 import { AUTH_TABLES, SERVER_TABLES } from '@telos/db/schema';
 import { buildSchema, GraphQLDateTime } from '@vantreeseba/drizzle-graphql';
 import { applyAccountActivityExtension } from './resolvers/account-activity.ts';
@@ -33,9 +34,6 @@ import { contextValues, features, scope } from './tenancy.ts';
 // Kept separate from schema.ts, which binds it to the real database, so a test
 // can build the same schema against a throwaway one.
 
-// biome-ignore lint/suspicious/noExplicitAny: db type varies by driver
-type AnyDb = any;
-
 // The return type is inferred rather than written out: `GeneratedEntities` is
 // keyed by the naming config, so spelling it here would mean restating
 // `typeNameMapper` in a second place that could disagree with the first.
@@ -61,7 +59,7 @@ const AI_LANE_COLUMNS = [
   'maxAttempts',
 ];
 
-export function createSchema(db: AnyDb, options: SchemaOptions) {
+export function createSchema(db: DB, options: SchemaOptions) {
   const { schema: drizzleSchema, entities } = buildSchema(db, {
     prefixes: {
       insert: 'create',

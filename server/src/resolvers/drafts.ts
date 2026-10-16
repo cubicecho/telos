@@ -1,3 +1,4 @@
+import type { DB } from '@telos/db';
 import * as dbSchema from '@telos/db/schema';
 import { and, asc, desc, eq, isNotNull, isNull, not, sql } from 'drizzle-orm';
 import { extendSchema, type GraphQLSchema, parse } from 'graphql';
@@ -121,7 +122,7 @@ function message(value: string): string {
 const AGENT_OFF = (name: string) => `${name} is switched off. Switch it on in Settings, or talk to another agent.`;
 
 /** The caller's agent, or NOT_FOUND; CONFLICT where it is switched off, since nothing would answer. */
-async function ownedAgent(db: AnyRow, userId: string, agentId: string) {
+async function ownedAgent(db: DB, userId: string, agentId: string) {
   const [agent] = await db
     .select({ id: dbSchema.agents.id, name: dbSchema.agents.name, enabled: dbSchema.agents.enabled })
     .from(dbSchema.agents)
@@ -141,7 +142,7 @@ async function ownedAgent(db: AnyRow, userId: string, agentId: string) {
  * @param lock Whether to lock the row, inside a transaction.
  * @returns The draft.
  */
-async function ownedDraft(context: Context, userId: string, id: string, db: AnyRow = context.db, lock = false) {
+async function ownedDraft(context: Context, userId: string, id: string, db: DB = context.db, lock = false) {
   const query = db
     .select({ draft: dbSchema.drafts })
     .from(dbSchema.drafts)
@@ -185,7 +186,7 @@ const aiOn = () => and(eq(dbSchema.projects.aiEnabled, true), eq(dbSchema.users.
  * @param runId - The run the runner named, if it named one.
  * @returns The run, or nothing when the draft has no such run.
  */
-async function replyRun(tx: AnyRow, draftId: string, runId: string | null | undefined) {
+async function replyRun(tx: DB, draftId: string, runId: string | null | undefined) {
   const mine = eq(dbSchema.runs.draftId, draftId);
   const [run] = await tx
     .select()
@@ -205,7 +206,7 @@ async function replyRun(tx: AnyRow, draftId: string, runId: string | null | unde
  * @param draft - The draft.
  * @returns Whether an answer may still land.
  */
-async function draftAiOn(tx: AnyRow, draft: dbSchema.Draft): Promise<boolean> {
+async function draftAiOn(tx: DB, draft: dbSchema.Draft): Promise<boolean> {
   if ((await instanceAiOn(tx)) === false) {
     return false;
   }
@@ -225,7 +226,7 @@ export function applyDraftsExtension(schema: GraphQLSchema): GraphQLSchema {
     const text = message(args.message);
     const project = await loadAiProject(context.db, userId, args.projectId);
     await ownedAgent(context.db, userId, args.agentId);
-    return (context.db as AnyRow).transaction(async (tx: AnyRow) => {
+    return context.db.transaction(async (tx) => {
       const [draft] = await tx
         .insert(dbSchema.drafts)
         .values({ userId, projectId: project.id, agentId: args.agentId, waitingSince: new Date() })
@@ -238,7 +239,7 @@ export function applyDraftsExtension(schema: GraphQLSchema): GraphQLSchema {
   mutations.sayToDraft = async (_parent, args, context) => {
     const userId = await requireAi(context);
     const text = message(args.message);
-    return (context.db as AnyRow).transaction(async (tx: AnyRow) => {
+    return context.db.transaction(async (tx) => {
       const draft = await ownedDraft(context, userId, args.id, tx, true);
       unmade(draft);
       if (draft.waitingSince) throw conflict('Wait for the answer, or stop it, before saying more.');
@@ -256,7 +257,7 @@ export function applyDraftsExtension(schema: GraphQLSchema): GraphQLSchema {
 
   mutations.stopDraft = async (_parent, args, context) => {
     const userId = await requireAi(context);
-    return (context.db as AnyRow).transaction(async (tx: AnyRow) => {
+    return context.db.transaction(async (tx) => {
       const draft = await ownedDraft(context, userId, args.id, tx, true);
       return stopDraftReply(tx, draft.id);
     });
@@ -264,7 +265,7 @@ export function applyDraftsExtension(schema: GraphQLSchema): GraphQLSchema {
 
   mutations.makeTodoFromDraft = async (_parent, args, context) => {
     const userId = await requireAi(context);
-    return (context.db as AnyRow).transaction(async (tx: AnyRow) => {
+    return context.db.transaction(async (tx) => {
       const draft = await ownedDraft(context, userId, args.id, tx, true);
       unmade(draft);
       const brief = (args.brief ?? draft.brief).trim();
@@ -294,7 +295,7 @@ export function applyDraftsExtension(schema: GraphQLSchema): GraphQLSchema {
   mutations.discardDraft = async (_parent, args, context) => {
     const userId = await requireAi(context);
     const draft = await ownedDraft(context, userId, args.id);
-    await (context.db as AnyRow).delete(dbSchema.drafts).where(eq(dbSchema.drafts.id, draft.id));
+    await context.db.delete(dbSchema.drafts).where(eq(dbSchema.drafts.id, draft.id));
     return true;
   };
 
@@ -303,7 +304,7 @@ export function applyDraftsExtension(schema: GraphQLSchema): GraphQLSchema {
     markRunnerSeen();
     if (!(await instanceAiOn(context.db))) return [];
     const limit = Math.max(1, Math.min(args.limit ?? 20, 200));
-    const rows = await withAiOn((context.db as AnyRow).select({ id: dbSchema.drafts.id }).from(dbSchema.drafts))
+    const rows = await withAiOn(context.db.select({ id: dbSchema.drafts.id }).from(dbSchema.drafts))
       .where(and(takeable(), aiOn()))
       .orderBy(asc(dbSchema.drafts.waitingSince))
       .limit(limit);
@@ -314,7 +315,7 @@ export function applyDraftsExtension(schema: GraphQLSchema): GraphQLSchema {
     requireSystem(context);
     if (!(await instanceAiOn(context.db))) return null;
     try {
-      return await (context.db as AnyRow).transaction(async (tx: AnyRow) => {
+      return await context.db.transaction(async (tx) => {
         const [row] = await withAiOn(
           tx.select({ draft: dbSchema.drafts, project: dbSchema.projects }).from(dbSchema.drafts),
         )
@@ -365,7 +366,7 @@ export function applyDraftsExtension(schema: GraphQLSchema): GraphQLSchema {
 
   mutations.finishDraft = async (_parent, args, context) => {
     requireSystem(context);
-    return (context.db as AnyRow).transaction(async (tx: AnyRow) => {
+    return context.db.transaction(async (tx) => {
       const [draft]: dbSchema.Draft[] = await tx
         .select()
         .from(dbSchema.drafts)

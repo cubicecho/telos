@@ -18,9 +18,6 @@ import { requireAuth } from './auth.ts';
 // are scoped by tenancy.ts and their foreign keys by write-guards.ts. The draft
 // and request mutations check for themselves.
 
-// biome-ignore lint/suspicious/noExplicitAny: drizzle-orm 1.0 table/column type compat
-type AnyRow = any;
-
 /** What an argument names. */
 type Named = 'project' | 'todo' | 'todos' | 'lane' | 'run';
 
@@ -49,7 +46,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
  * @returns Nothing.
  */
 async function assertAiLane(context: Context, userId: string, id: string): Promise<void> {
-  const [lane] = await (context.db as AnyRow)
+  const [lane] = await context.db
     .select({ id: dbSchema.lanes.id })
     .from(dbSchema.lanes)
     .innerJoin(dbSchema.projects, eq(dbSchema.projects.id, dbSchema.lanes.projectId))
@@ -69,7 +66,7 @@ async function assertAiLane(context: Context, userId: string, id: string): Promi
  * @returns Nothing.
  */
 async function assertAiRun(context: Context, userId: string, id: string): Promise<void> {
-  const [run] = await (context.db as AnyRow)
+  const [run] = await context.db
     .select({ todoId: dbSchema.runs.todoId })
     .from(dbSchema.runs)
     .where(and(eq(dbSchema.runs.id, id), eq(dbSchema.runs.userId, userId)));

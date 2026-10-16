@@ -1,3 +1,4 @@
+import type { DB } from '@telos/db';
 import * as dbSchema from '@telos/db/schema';
 import { and, inArray, sql } from 'drizzle-orm';
 import { GraphQLError } from 'graphql';
@@ -31,8 +32,6 @@ import { reachable } from './tenancy.ts';
 // committed, so nothing can land behind it later. A long transaction holds
 // the feed back until it ends, rather than letting the feed skip it.
 
-// biome-ignore lint/suspicious/noExplicitAny: db type varies by driver (postgres-js, PGlite)
-type AnyDb = any;
 // biome-ignore lint/suspicious/noExplicitAny: drizzle-orm 1.0 table/column type compat
 type AnyRow = any;
 
@@ -150,7 +149,7 @@ async function liveRows(context: Context, entity: ChangeEntity, ids: string[]): 
     return new Map();
   }
   const { name, table } = TABLES[entity];
-  const rows: AnyRow[] = await (context.db as AnyDb)
+  const rows: AnyRow[] = await context.db
     .select()
     .from(table)
     .where(and(inArray((table as AnyRow).id, ids), reachable(context, name, table)));
@@ -179,7 +178,7 @@ export async function readChanges(
   const from = args.since ? decodeCursor(args.since, now) : START;
 
   const rows = resultRows<LogRow>(
-    await (context.db as AnyDb).execute(sql`
+    await context.db.execute(sql`
       SELECT entity, entity_id AS "entityId", project_id AS "projectId", todo_id AS "todoId",
         depends_on_todo_id AS "dependsOnTodoId", deleted_at AS "deletedAt", changed_at AS "changedAt",
         xid::text AS xid, seq::text AS seq
@@ -233,7 +232,7 @@ export async function readChanges(
  * @param now What time it is.
  * @returns How many went.
  */
-export async function pruneTombstones(db: AnyDb, now: Date = new Date()): Promise<number> {
+export async function pruneTombstones(db: DB, now: Date = new Date()): Promise<number> {
   const result = await db.execute(sql`
     DELETE FROM change_log
     WHERE deleted_at IS NOT NULL

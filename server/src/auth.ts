@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { apiKey } from '@better-auth/api-key';
+import type { DB } from '@telos/db';
 import * as dbSchema from '@telos/db/schema';
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
@@ -16,9 +17,6 @@ import { readRunToken, runnerKeyMatches } from './run-tokens.ts';
 // resolvers/auth.ts call `auth.api` directly, and the bearer plugin is what
 // lets a request carry its session as `Authorization: Bearer <token>`.
 
-// biome-ignore lint/suspicious/noExplicitAny: db type varies by driver (postgres-js, PGlite)
-type AnyDb = any;
-
 /** Sessions last as long as the hand-rolled tokens they replaced did. */
 const SESSION_SECONDS = 30 * 24 * 60 * 60;
 
@@ -31,7 +29,7 @@ export const API_KEY_PREFIX = 'telos_';
 // mutation reads it back out.
 const tokenCaptures = new Map<string, string>();
 
-export function createAuth(db: AnyDb) {
+export function createAuth(db: DB) {
   return betterAuth({
     // The rc drizzle instance is keyed by relations rather than tables, so the
     // adapter cannot discover models itself: map better-auth's names onto ours.
@@ -168,7 +166,7 @@ export interface ActorOptions {
  * A credential that fails any check is anonymous rather than an error, so the
  * caller gets UNAUTHENTICATED from the first field that needs a user.
  */
-export async function resolveActor(auth: Auth, db: AnyDb, headers: Headers, options: ActorOptions): Promise<Actor> {
+export async function resolveActor(auth: Auth, db: DB, headers: Headers, options: ActorOptions): Promise<Actor> {
   const runner = headers.get('x-runner-key');
   if (runner) {
     return options.ai && runnerKeyMatches(runner, options.runnerKey) ? { kind: 'system', userId: null } : ANONYMOUS;
@@ -212,7 +210,7 @@ export async function resolveActor(auth: Auth, db: AnyDb, headers: Headers, opti
  * @param keyId The key.
  * @returns The names of the tools that are off for it.
  */
-async function keyToolsOff(db: AnyDb, keyId: string): Promise<ReadonlySet<string>> {
+async function keyToolsOff(db: DB, keyId: string): Promise<ReadonlySet<string>> {
   const [row] = await db
     .select({ off: dbSchema.apiKeyTools.off })
     .from(dbSchema.apiKeyTools)
@@ -229,7 +227,7 @@ async function keyToolsOff(db: AnyDb, keyId: string): Promise<ReadonlySet<string
  * @param runId The run a token named.
  * @returns The agent actor, or anonymous.
  */
-async function resolveRun(db: AnyDb, runId: string): Promise<Actor> {
+async function resolveRun(db: DB, runId: string): Promise<Actor> {
   const [row] = await db
     .select({ userId: dbSchema.runs.userId, toolsOff: dbSchema.agents.toolsOff })
     .from(dbSchema.runs)
