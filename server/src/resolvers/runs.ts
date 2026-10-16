@@ -16,9 +16,8 @@ import { requireSystem } from '../ai-gate.ts';
 import { attachResolvers } from '../attach-resolvers.ts';
 import { assertNoCycle, findBlocked } from '../blocking.ts';
 import type { Actor, Context } from '../context.ts';
-import { stopDraftReply } from '../draft-runs.ts';
 import { RunEventKindEnum, RunOutcomeEnum, withEnums } from '../enums.ts';
-import { badInput, conflict, forbidden, notFound } from '../errors.ts';
+import { conflict, forbidden, notFound } from '../errors.ts';
 import { instanceAiOn } from '../instance.ts';
 import { findDoneLaneId, findNewTodoLaneId } from '../lanes.ts';
 import { runnerAgent } from '../mcp-servers.ts';
@@ -213,7 +212,7 @@ const RUNS_SDL = parse(`
     heartbeatRun(id: ID!, events: [RunEventInput!], prompt: RunPromptInput, usage: RunUsageInput): Boolean!
     "Records what a run came to and moves its todo on. The runner's only."
     finishRun(id: ID!, result: RunResultInput!): Run!
-    "Asks a running run to stop, and tells AI to ignore its todo so no run starts on it again until that is switched off. The agent hears it on its next heartbeat. A draft's run stops at once, as stopDraft does."
+    "Asks a running run to stop, and tells AI to ignore its todo so no run starts on it again until that is switched off. The agent hears it on its next heartbeat."
     cancelRun(id: ID!): Run!
     "Deletes a finished run and its log. What it did to the todo, its notes and history, stays."
     deleteRun(id: ID!): Boolean!
@@ -280,9 +279,6 @@ function leaseFromNow(): Date {
 async function loadRunForUpdate(tx: AnyRow, runId: string) {
   const [run] = await tx.select().from(dbSchema.runs).where(eq(dbSchema.runs.id, runId)).for('update');
   if (!run) throw notFound('Run');
-  if (run.kind !== 'todo') {
-    throw badInput("That run is a draft's reply, which has no lane. Report it with finishDraft.");
-  }
   const [todo] = await tx.select().from(dbSchema.todos).where(eq(dbSchema.todos.id, run.todoId));
   const [project] = await tx.select().from(dbSchema.projects).where(eq(dbSchema.projects.id, run.projectId));
   const [user] = await tx
@@ -900,14 +896,6 @@ export function applyRunsExtension(schema: GraphQLSchema): GraphQLSchema {
       .where(and(eq(dbSchema.runs.id, args.id), eq(dbSchema.runs.userId, userId)));
     if (!run) throw notFound('Run');
     if (run.status !== 'running' || run.cancelRequestedAt) return run;
-    if (run.kind === 'draft') {
-      // A draft's reply has no todo to set aside: stopping it is stopDraft.
-      return db.transaction(async (tx: AnyRow) => {
-        await stopDraftReply(tx, run.draftId);
-        const [stopped] = await tx.select().from(dbSchema.runs).where(eq(dbSchema.runs.id, run.id));
-        return stopped;
-      });
-    }
     return db.transaction(async (tx: AnyRow) => {
       const [cancelled] = await tx
         .update(dbSchema.runs)

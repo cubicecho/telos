@@ -40,7 +40,6 @@ function live(over: Partial<LiveRun> = {}): LiveRun {
   return {
     __typename: 'Run',
     id: 'r1',
-    kind: 'todo',
     todoId: TODO.id,
     laneId: 'l1',
     cancelRequestedAt: null,

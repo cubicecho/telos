@@ -1,4 +1,3 @@
-import { takeDrafts } from './drafts.ts';
 import { type ExecuteOptions, execute } from './execute.ts';
 import { takeTests } from './probes.ts';
 import { takeSessionDeletes } from './session-deletes.ts';
@@ -19,7 +18,7 @@ export interface LoopOptions extends Omit<ExecuteOptions, 'signal'> {
  * Claims and starts whatever is ready, up to the free slots.
  *
  * @param options How to reach telos and how much to take on.
- * @param running What is in flight — runs by run id, drafts by `draft:<id>`. Added to here.
+ * @param running What is in flight, by run id. Added to here.
  * @param signal Stops the runs started.
  * @returns How many runs were started.
  */
@@ -69,13 +68,6 @@ export async function runLoop(options: LoopOptions, signal: AbortSignal): Promis
       );
     }
     let started = 0;
-    // Drafts first: somebody is sitting there waiting for the answer. They
-    // share the runner's slots with runs.
-    try {
-      started += await takeDrafts(options.telos, options.concurrency - running.size, running, { signal, log });
-    } catch (error) {
-      log(`[runner] asking telos for drafts failed: ${error instanceof Error ? error.message : String(error)}`);
-    }
     try {
       started += await tick(options, running, signal);
     } catch (error) {

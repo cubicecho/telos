@@ -3,7 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { GraphQLError } from 'graphql';
 import { describe, expect, it } from 'vitest';
-import { ApiKeysDocument, McpToolsDocument, SetApiKeyToolsDocument } from '@/lib/graphql';
+import { ApiKeysDocument, CreateApiKeyDocument, McpToolsDocument, SetApiKeyToolsDocument } from '@/lib/graphql';
 import { ApiKeyManager } from '../api-key-manager';
 
 const KEY = {
@@ -92,5 +92,24 @@ describe('a key’s tools', () => {
     ]);
     await user.click(screen.getByRole('button', { name: 'All on' }));
     expect(await screen.findByText('API key not found')).toBeInTheDocument();
+  });
+});
+
+describe('minting a key', () => {
+  it('names it, and shows the key once', async () => {
+    const user = userEvent.setup();
+    const mint = {
+      request: { query: CreateApiKeyDocument, variables: { name: 'Laptop', expiresIn: null } },
+      result: { data: { createApiKey: { __typename: 'AuthCreateApiKeyResult', id: 'k2', key: 'telos_secret' } } },
+    };
+    render(
+      <MockedProvider mocks={[keys, mint, keys]}>
+        <ApiKeyManager />
+      </MockedProvider>,
+    );
+    await user.click(await screen.findByRole('button', { name: 'New key' }));
+    await user.type(await screen.findByLabelText('Name'), ' Laptop ');
+    await user.click(screen.getByRole('button', { name: 'Create key' }));
+    expect(await screen.findByText('telos_secret')).toBeInTheDocument();
   });
 });

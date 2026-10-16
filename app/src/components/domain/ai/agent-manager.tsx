@@ -327,9 +327,7 @@ export function AgentFormDialog({
               {(field) => <field.InputField label="Name" autoFocus placeholder="Reviewer" />}
             </form.AppField>
             <form.AppField name="enabled">
-              {(field) => (
-                <field.SwitchField label="On" description="Off, it takes no runs and no drafts, and its lanes wait." />
-              )}
+              {(field) => <field.SwitchField label="On" description="Off, it takes no runs, and its lanes wait." />}
             </form.AppField>
 
             <FormGroupTitle title="Endpoint" description="Where it runs. Its models are listed from here." />

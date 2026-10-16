@@ -24,6 +24,9 @@ import {
 } from '@/lib/graphql';
 import { CARD_TITLE } from '@/lib/styles';
 
+/** The expiry options are in days; better-auth takes seconds. */
+const DAY_SECONDS = 24 * 60 * 60;
+
 const EXPIRY_OPTIONS = [
   { label: 'Never', value: 'never' },
   { label: '30 days', value: '30' },
@@ -58,7 +61,7 @@ export function ApiKeyManager() {
   async function confirmDelete(row: KeyRow) {
     setDeleteError(null);
     try {
-      await deleteKey({ variables: { id: row.id } });
+      await deleteKey({ variables: { keyId: row.id } });
     } catch (cause) {
       setDeleteError(describeError(cause));
     }
@@ -285,7 +288,7 @@ function CreateApiKeyDialog({ open, onOpenChange }: { open: boolean; onOpenChang
   async function mint({ name, expiry }: { name: string; expiry: string }) {
     try {
       const result = await createKey({
-        variables: { name: name.trim(), expiresInDays: expiry === 'never' ? null : Number(expiry) },
+        variables: { name: name.trim(), expiresIn: expiry === 'never' ? null : Number(expiry) * DAY_SECONDS },
       });
       setMinted(result.data?.createApiKey.key ?? null);
     } catch {

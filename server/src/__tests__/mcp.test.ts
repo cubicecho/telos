@@ -35,8 +35,6 @@ const READS = [
   'agents',
   'spend',
   'board_templates',
-  'drafts',
-  'draft',
 ];
 
 const WRITES = [
@@ -58,11 +56,6 @@ const WRITES = [
   'edit_todo_note',
   'delete_todo_note',
   'record_artifact',
-  'start_draft',
-  'say_to_draft',
-  'stop_draft',
-  'make_todo_from_draft',
-  'discard_draft',
   'save_board_template',
   'apply_board_template',
 ];
@@ -548,40 +541,6 @@ describe('the board’s agents and runs', () => {
     const client = await connect(await serve(), b.key);
     const { aiSpend } = await call(client, 'spend', { since: new Date(0).toISOString() });
     expect(aiSpend.total).toMatchObject({ runs: 0, totalTokens: 0 });
-  });
-
-  it('talks a draft over and makes a todo of it, or discards it', async () => {
-    const b = await agentBoard();
-    const client = await connect(await serve(), b.key);
-    const { startDraft } = await call(client, 'start_draft', {
-      projectId: b.projectId,
-      agentId: b.agentId,
-      message: 'Faster export?',
-    });
-    expect(startDraft.waitingSince).not.toBeNull();
-    expect((await call(client, 'drafts', { projectId: b.projectId })).drafts).toEqual([
-      expect.objectContaining({ id: startDraft.id }),
-    ]);
-    expect((await call(client, 'stop_draft', { id: startDraft.id })).stopDraft.waitingSince).toBeNull();
-    await call(client, 'say_to_draft', { id: startDraft.id, message: 'The CSV one.' });
-    await call(client, 'stop_draft', { id: startDraft.id });
-    const { draft } = await call(client, 'draft', { id: startDraft.id });
-    expect(draft.messages.length).toBeGreaterThan(1);
-
-    const { makeTodoFromDraft } = await call(client, 'make_todo_from_draft', {
-      id: startDraft.id,
-      title: 'Faster CSV export',
-      brief: 'Stream it.',
-    });
-    expect((await rowOf(makeTodoFromDraft.id)).title).toBe('Faster CSV export');
-
-    const { startDraft: second } = await call(client, 'start_draft', {
-      projectId: b.projectId,
-      agentId: b.agentId,
-      message: 'Never mind',
-    });
-    await call(client, 'stop_draft', { id: second.id });
-    expect(await call(client, 'discard_draft', { id: second.id })).toEqual({ discardDraft: true });
   });
 
   it('saves a board as a template and gives a new board one', async () => {

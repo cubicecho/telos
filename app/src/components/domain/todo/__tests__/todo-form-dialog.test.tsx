@@ -388,7 +388,6 @@ describe('TodoFormDialog', () => {
             id: TODO.id,
             thread: [note('n0', 'Starting.'), note('n1', 'Findings')],
             history: [],
-            draft: null,
             project: { __typename: 'Project', id: 'p1', aiEnabled: true, lanes: [] },
           },
         },

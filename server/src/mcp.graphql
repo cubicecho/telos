@@ -3,8 +3,8 @@
 # comment above a variable describes that argument.
 #
 # The surface is for working a board as well as handing work to it: reading
-# what is on it and what its agents did, making projects and todos, talking a
-# draft over, moving a todo, sending it round again, stopping a run. What it
+# what is on it and what its agents did, making projects and todos, moving a
+# todo, sending it round again, stopping a run. What it
 # leaves out is what decides how far AI reaches, which stays a person's: keys
 # and secrets, agents and their MCP servers, the AI switches, deleting a
 # project, and changing many rows at once.
@@ -324,7 +324,7 @@ query artifacts(
 }
 
 # The agents this account has and the lanes each works, in the projects open
-# to AI. An agent id is what `start_draft` needs. Nothing secret about an
+# to AI. Nothing secret about an
 # agent is here: not its key, its endpoint, its prompt or its MCP servers.
 query agents {
   agentRoster {
@@ -341,8 +341,8 @@ query agents {
   }
 }
 
-# What runs have spent since a moment, in the projects open to AI: runs,
-# draft replies and tokens, in total, by project and by agent.
+# What runs have spent since a moment, in the projects open to AI: runs
+# and tokens, in total, by project and by agent.
 query spend(
   # Count runs that started at or after this, e.g. 2026-01-01T00:00:00Z.
   $since: DateTime!
@@ -351,7 +351,6 @@ query spend(
     since
     total {
       runs
-      draftReplies
       promptTokens
       completionTokens
       totalTokens
@@ -360,7 +359,6 @@ query spend(
       id
       name
       runs
-      draftReplies
       promptTokens
       completionTokens
       totalTokens
@@ -369,7 +367,6 @@ query spend(
       id
       name
       runs
-      draftReplies
       promptTokens
       completionTokens
       totalTokens
@@ -385,52 +382,6 @@ query boardTemplates {
     name
     lanes
     updatedAt
-  }
-}
-
-# The drafts in one project, newest first. A draft is a request being talked
-# over with an agent before it becomes a todo.
-query drafts(
-  # From `projects`.
-  $projectId: UUID!
-) {
-  drafts(where: { projectId: { eq: $projectId } }, orderBy: { updatedAt: { direction: desc, priority: 1 } }) {
-    id
-    agentId
-    title
-    waitingSince
-    error
-    todoId
-    createdAt
-    updatedAt
-  }
-}
-
-# One draft in full: the title and brief as the agent last left them, the
-# conversation so far, and whether an answer is still awaited
-# (`waitingSince`) or failed (`error`). Read this after `start_draft` or
-# `say_to_draft` until `waitingSince` is null.
-query draft(
-  # A draft id, from `drafts` or `start_draft`.
-  $id: UUID!
-) {
-  draft(where: { id: { eq: $id } }) {
-    id
-    projectId
-    agentId
-    title
-    brief
-    waitingSince
-    error
-    todoId
-    createdAt
-    updatedAt
-    messages(orderBy: { createdAt: { direction: asc, priority: 1 } }) {
-      id
-      role
-      content
-      createdAt
-    }
   }
 }
 
@@ -634,8 +585,7 @@ mutation runTodo(
 
 # Stops a run that is working a todo. The agent is told to stop at its next
 # step, and the todo is set aside from AI so no agent picks it straight
-# back up: it leaves your view too, until its owner lets AI at it again. A
-# draft's reply is stopped with `stop_draft`.
+# back up: it leaves your view too, until its owner lets AI at it again.
 mutation stopRun(
   # A run id, from `runs`.
   $id: ID!
@@ -769,75 +719,6 @@ mutation recordArtifact(
     action
     createdAt
   }
-}
-
-# Starts talking a request over with one of the account's agents, before it
-# is a todo. The agent answers in its own time: read the answer with `draft`.
-mutation startDraft(
-  # From `projects`.
-  $projectId: ID!
-  # The agent to talk it over with, from `agents`.
-  $agentId: ID!
-  # What is wanted, as roughly as you have it.
-  $message: String!
-) {
-  startDraft(projectId: $projectId, agentId: $agentId, message: $message) {
-    id
-    waitingSince
-    createdAt
-  }
-}
-
-# Says something more in a draft. Refused while the agent is still
-# answering: wait, or `stop_draft`.
-mutation sayToDraft(
-  # The draft.
-  $id: ID!
-  # What to say.
-  $message: String!
-) {
-  sayToDraft(id: $id, message: $message) {
-    id
-    waitingSince
-  }
-}
-
-# Stops waiting for the agent's answer in a draft, so more can be said. An
-# answer that arrives later is dropped.
-mutation stopDraft(
-  # The draft.
-  $id: ID!
-) {
-  stopDraft(id: $id) {
-    id
-    waitingSince
-  }
-}
-
-# Makes a todo of a draft, in the lane its project sends new todos to, with the title
-# and brief the agent arrived at unless you give others.
-mutation makeTodoFromDraft(
-  # The draft.
-  $id: ID!
-  # A title to use in place of the draft's.
-  $title: String
-  # A brief to use in place of the draft's.
-  $brief: String
-) {
-  makeTodoFromDraft(id: $id, title: $title, brief: $brief) {
-    id
-    title
-    laneId
-    createdAt
-  }
-}
-
-# Deletes a draft and its conversation. A todo it became stays.
-mutation discardDraft(
-  # The draft.
-  $id: ID!
-) {
-  discardDraft(id: $id)
 }
 
 # Saves a project's lanes and their agents and routes as a template,

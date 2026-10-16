@@ -36,8 +36,6 @@ const config: CodegenConfig = {
           Todo: '@telos/db/schema#Todo',
           Artifact: '@telos/db/schema#Artifact',
           Label: '@telos/db/schema#Label',
-          Draft: '@telos/db/schema#Draft',
-          DraftMessage: '@telos/db/schema#DraftMessage',
           TodoNote: '@telos/db/schema#TodoNote',
         },
         mapperTypeSuffix: 'Row',

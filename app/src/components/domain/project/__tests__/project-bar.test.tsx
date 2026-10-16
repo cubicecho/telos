@@ -19,11 +19,9 @@ function aiState(on: boolean) {
 
 const ACTIVITY: ProjectActivity = {
   live: new Map(),
-  drafting: [],
   stuck: new Map(),
   waiting: new Map(),
   spent: { __typename: 'RunAggregate', count: 3, sum: { __typename: 'RunSumAggregate', totalTokens: 1200 } },
-  draftSpent: undefined,
   loading: false,
 } as unknown as ProjectActivity;
 

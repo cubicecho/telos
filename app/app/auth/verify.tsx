@@ -7,12 +7,12 @@ import { CircleAlert } from '@/components/ui/icons';
 import { Spinner } from '@/components/ui/spinner';
 import { setToken } from '@/lib/auth';
 import { describeError } from '@/lib/errors';
-import { VerifyMagicLinkDocument } from '@/lib/graphql';
+import { MagicLinkVerifyDocument } from '@/lib/graphql';
 
 export default function VerifyScreen() {
   const router = useRouter();
   const { token } = useLocalSearchParams<{ token?: string }>();
-  const [verifyMagicLink, { error }] = useMutation(VerifyMagicLinkDocument);
+  const [magicLinkVerify, { error }] = useMutation(MagicLinkVerifyDocument);
   // Strict mode and route re-renders both run effects more than once; a magic
   // token is meant to be spent exactly once.
   const started = useRef(false);
@@ -20,16 +20,16 @@ export default function VerifyScreen() {
   useEffect(() => {
     if (started.current || !token) return;
     started.current = true;
-    verifyMagicLink({ variables: { token } })
+    magicLinkVerify({ variables: { token } })
       .then(({ data }) => {
-        if (!data?.verifyMagicLink) return;
-        setToken(data.verifyMagicLink.token);
+        if (!data?.magicLinkVerify) return;
+        setToken(data.magicLinkVerify.token);
         router.replace('/');
       })
       .catch(() => {
         // Rendered from `error` below.
       });
-  }, [token, verifyMagicLink, router]);
+  }, [token, magicLinkVerify, router]);
 
   return (
     <View className="min-h-full flex-1 items-center justify-center bg-background px-4">

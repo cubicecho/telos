@@ -3,8 +3,8 @@ import { AGENT_STARTERS, draftFromStarter } from '../agent-starters';
 import { fromAgentDraft, toAgentDraft } from '../agents';
 
 describe('agent starters', () => {
-  it('are the four kanban_server came with', () => {
-    expect(AGENT_STARTERS.map((starter) => starter.name)).toEqual(['Refiner', 'Planner', 'Worker', 'Reviewer']);
+  it('are the planner, worker and reviewer kanban_server came with', () => {
+    expect(AGENT_STARTERS.map((starter) => starter.name)).toEqual(['Planner', 'Worker', 'Reviewer']);
   });
 
   it('leave the endpoint and the model blank, to be given or inherited', () => {

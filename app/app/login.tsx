@@ -9,13 +9,13 @@ import { Form } from '@/components/ui/form';
 import { CircleCheck } from '@/components/ui/icons';
 import { setToken } from '@/lib/auth';
 import { describeError } from '@/lib/errors';
-import { RequestMagicLinkDocument } from '@/lib/graphql';
+import { SignInMagicLinkDocument } from '@/lib/graphql';
 
 export default function LoginScreen() {
   const router = useRouter();
   const [magicLink, setMagicLink] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
-  const [requestMagicLink, { error }] = useMutation(RequestMagicLinkDocument);
+  const [signInMagicLink, { error }] = useMutation(SignInMagicLinkDocument);
 
   const form = useAppForm({
     defaultValues: { email: '' },
@@ -26,8 +26,8 @@ export default function LoginScreen() {
     setSent(false);
     setMagicLink(null);
     try {
-      const { data } = await requestMagicLink({ variables: { email } });
-      const result = data?.requestMagicLink;
+      const { data } = await signInMagicLink({ variables: { email } });
+      const result = data?.signInMagicLink;
       if (!result) return;
       // With AUTH_MAGIC_LINK=false the server hands back a live session instead of
       // a link, so the client keeps one code path and stores whatever it gets.

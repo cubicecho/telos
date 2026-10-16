@@ -32,7 +32,7 @@ export interface LayerDraft {
 export interface AgentDraft extends LayerDraft {
   name: string;
   systemPrompt: string;
-  /** Off, it takes no runs and no drafts. */
+  /** Off, it takes no runs. */
   enabled: boolean;
   /**
    * The slugs of the account's MCP servers it may reach: null is every one,

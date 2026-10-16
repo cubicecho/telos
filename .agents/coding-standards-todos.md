@@ -26,7 +26,7 @@ Nothing here is implemented until approved.
 | M7 | Model change | A refine may also set its todo's dependencies | A planner can say what its todo waits on, still only through `finishRun` | — | approved |
 | M8 | Model change | One blocked rule: a blocked todo moves between open lanes, never into the done lane | A person and a route follow the same rule | — | approved |
 | M9 | Model change | `attention` becomes **handed back**, one rule everywhere | One name for "its agent is done with it and it cannot move on without you" | — | done |
-| M10 | Model change | Starters are **agent templates**; the Refiner template goes | A template is what people call starting text; refining is the Planner's job | — | approved |
+| M10 | Model change | Starters are **agent templates**; the Refiner template goes | A template is what people call starting text; refining is the Planner's job | — | approved (the Refiner went with A8) |
 | A4 | API change | A todo's `notes` column and every `brief` become **description** | "Notes" is the thread; "brief" is a second word for the same field | — | approved |
 | R5 | Refactor [readability] | Retire "assignment": a run is handed its todo, with context | One word for the thing being worked | — | approved |
 | A5 | API change | `submitRequest` becomes `fileTodo`; `cancelRequest` becomes `markHandsOff` | "Request" names no thing: one makes a todo in the new-todo lane, the other marks one hands off | — | approved |
@@ -38,14 +38,15 @@ Nothing here is implemented until approved.
 | A1 | API change | Drop contracts, lane prompts and presets from the database | M1, M2 | T1 | done |
 | A2 | API change | The server reads every finished run the same way | M1–M3 | T1 | done |
 | A3 | API change | The runner sends one standing protocol | M1 | T2 | done |
-| A6 | API change | Column enums (run status, kind, verdict; note kind; actor kind; draft role; artifact source and action) become GraphQL enums, SCREAMING_CASE on the wire | The API says which values exist; ArtifactInput and DraftTurn share the generated enums | drizzle-graphql#178 | blocked |
+| A6 | API change | Column enums (run status, verdict; note kind; actor kind; artifact source and action) become GraphQL enums, SCREAMING_CASE on the wire | The API says which values exist; ArtifactInput shares the generated enums | drizzle-graphql#178 | blocked |
 | A7 | API change | `RunEventInput.kind` becomes an enum | The runner already types it closed | — | done |
+| A8 | API change | Drafts go, for now: their tables, their runs, `runs.kind`, the draft tools and the Refiner starter | A todo is filed, then planned; talking it over first was a second way in that few used | — | done |
 | R7 | Refactor [simplify] | Error helpers (`notFound`, `badInput`, `conflict`) in one module | 85 inline `new GraphQLError` across 24 files; `badInput` is already redefined locally | — | done |
 | R8 | Refactor [simplify] | One `loadOwned*` family | `loadOwnedTodo`, `loadOwnedLane`, `loadOwnedProject`, `loadAiProject`, `loadAiTodo` repeat the fetch-and-404 | R7 | done |
 | R9 | Refactor [types] | Attach resolvers through the generated `Resolvers` map, not `getType() as GraphQLObjectType` | 33 casts go; resolver args and parents are checked against the schema | — | done |
 | R10 | Refactor [types] | Retire `AnyRow`/`AnyDb = any` (39) for drizzle's inferred types | Row shapes are checked | — | partly done: `DB` is `PgAsyncDatabase` and 31 files use it (222 → 86 `any` uses). Left: row-typed `AnyRow` params, and 6 files where the real types object — nullable ids into `eq` (runs.ts), nullable `parentId` (loaders.ts, ai-reads.ts), loose config values (agent-defaults.ts, agents.ts), `$client` on the abstract `DB` (board-events.ts) |
 | R11 | Refactor [readability] | The server's internal `LaneTally` (projectId, laneId, done) gets its own name | It shares a name with the API's `LaneTally`, a different shape | — | done |
-| R12 | Refactor [structure] | Group `server/src` by domain (runs, drafts, agents, board) instead of `resolvers/` vs root | A change to one area stays in one folder | — | proposed |
+| R12 | Refactor [structure] | Group `server/src` by domain (runs, agents, board) instead of `resolvers/` vs root | A change to one area stays in one folder | — | proposed |
 | R13 | Refactor [structure] | Weigh GraphQL Yoga against Apollo Server 5 | (unverified) smaller server, built-in subscriptions | — | proposed |
 | F1 | Feature | The app sets a lane's agent with no station, preset or contract | M2, M3 | A2 | done |
 | F2 | Feature | New agents start from starter text | M4 | — | done |
@@ -54,7 +55,7 @@ Nothing here is implemented until approved.
 | R3 | Refactor [readability] | The runner's `Brief` becomes `Assignment` | "Brief" means only the todo's brief | — | done |
 | D1 | Docs | AGENTS.md and README.md describe the agent model | Docs match code | R1 | done |
 | D2 | Docs | AGENTS.md links the domain model's glossary instead of defining the same terms in its rules | One definition per term | — | open |
-| R4 | Refactor [readability] · low value | "Request" means four things; rename three | Glossary | A5 | open (A5 takes the AI actor's; run request, draft's rough request and the form's group remain) |
+| R4 | Refactor [readability] · low value | "Request" means four things; rename three | Glossary | A5 | open (A5 takes the AI actor's; A8 took the draft's; run request and the form's group remain) |
 
 Status is `open`, `proposed`, `approved`, `declined` or `done`.
 
@@ -314,7 +315,7 @@ Implements the glossary.
 `runs.ts:91`. "Brief" stays for the todo's brief only. GraphQL type rename is part of A2's
 breaking change, so it costs no extra release.
 
-### A6, A7, R7–R13 — From the server cleanup review (2026-10-16)
+### A6–A8, R7–R13 — From the server cleanup review (2026-10-16)
 
 Raised while moving hand-written enums into GraphQL (`server/src/enums.ts`) and
 replacing hand-written API interfaces with `server/__generated__/resolvers.ts`.
@@ -323,6 +324,9 @@ Out of that branch's scope; one line each in the summary.
 - **A6:** drizzle-graphql names a column enum's values by the raw value, so they would
   be lowercase on the wire. The upstream proposal for an `enumValueNameMapper` is
   cubicecho/drizzle-graphql#178. Until then those fields stay `String`.
+- **A8:** a migration (`db/drizzle/20261016201228_drop_drafts`) deletes every draft's
+  runs and drops `drafts`, `draft_messages`, `runs.kind` and `runs.draft_id`; a run's
+  `todo_id` is not null. Nothing is kept. To bring drafts back is to build them again.
 - **R9:** codegen's `typescript-resolvers` output is now imported for input and
   output types. R9 is the next step: wire resolvers through its `Resolvers` map,
   with mappers for parents that are DB rows.

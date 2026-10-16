@@ -189,7 +189,7 @@ and answers NOT_FOUND for what AI cannot see. What it writes:
 `resolvers/actor-lock.ts` wraps every mutation and refuses AI all but
 `AI_MUTATIONS` — projects (create and rename, nothing else:
 `holdAiProjectWrite`), todos (create, edit, move, retry, run, stop a run,
-dependencies, archive, restore, delete), notes, artifacts, drafts and board
+dependencies, archive, restore, delete), notes, artifacts and board
 templates. Still a person's: the AI switches, auto-run, agents and their keys
 and MCP servers, API keys, lanes and their agents, the project's new-todo lane, bulk mutations, and archiving
 or deleting a project. A new mutation is closed to AI until it is added there.
@@ -223,9 +223,9 @@ ideas, one name each:
   `onSuccessLaneId`/`onFailureLaneId` are its success and failure routes,
   `wipLimit` how many it works at once, `maxAttempts` how many failures it
   takes before leaving the todo for a person.
-- **Run** — one agent working one todo (or answering a draft). It ends in
-  success or failure, with a report, and may rewrite (refine) or split its todo.
-- **Draft**, **board template** — as below.
+- **Run** — one agent working one todo. It ends in success or failure, with
+  a report, and may rewrite (refine) or split its todo.
+- **Board template** — as below.
 
 There is no lane prompt and no per-lane contract: what a lane asks for is its
 agent's instructions, and every reply is read the same way (`verdictOf` in
@@ -236,7 +236,7 @@ A passing run may refine its todo with a fenced `refine` block (`title`,
 before the todo passes on. Or it may split it with a fenced `todos` block of
 two or more: the pieces land in the project's new-todo lane
 (`projects.newTodoLaneId`, else its first open lane, `findNewTodoLaneId` in
-`lanes.ts`, also used by requests and finished drafts), and the todo becomes an
+`lanes.ts`, also used by requests), and the todo becomes an
 umbrella (`todos.split_at`), which stays where it is. A todo split *in* the new-todo lane sends its pieces on down
 that lane's success route instead, unless that is the done lane, so they are
 not planned twice (`piecesLaneId`). A one-item `todos` block is read as a
@@ -317,8 +317,8 @@ the model a run records. The default key is write-only, as an agent's is
 (`setAgentDefaultsApiKey`, `hasApiKey`), and goes through `resolveApiKey`: an
 agent with a base URL of its own never gets the key entered for another, and
 the runner's own environment key is never used. An agent with `enabled` off
-is not queued (`readyTodos`), its drafts are not claimed, `startDraft` and
-`sayToDraft` refuse it, and `aiStatus` parks its lanes' todos saying so.
+is not queued (`readyTodos`), and `aiStatus` parks its lanes' todos saying
+so.
 
 **The runner never imports the server or the database.** Everything it knows
 comes from `runnerQueue` and `claimRun`, and everything it does goes back
@@ -384,8 +384,7 @@ the session in `todo_sessions` (one row per todo and agent, a server-only
 table) and says whether this run opens it (`opensSession`, true when no agent
 had worked the todo; asked of the sessions and not of `turn`, because
 retention prunes runs). That run fires `sessionStart` ahead of `beforeTurn`,
-and every run fires `afterTurn` and `sessionEnd`. A draft's reply runs no
-hooks.
+and every run fires `afterTurn` and `sessionEnd`.
 
 **A deleted todo owes its agents' servers a `sessionDelete`, and the delete
 never waits for it.** `todo_sessions.todo_id` has no foreign key: the
@@ -403,33 +402,13 @@ is never fired, because a run does not compact its transcript: a hook bound to
 it is kept and the runner says so in a notice on each run and on a test of the
 server.
 
-**A draft's reply is a run, and no todo's.** `runs.kind` is `todo` or `draft`,
-and `ck_runs_owner` holds each to its shape: a todo's run has `todo_id`, a draft's
-has `draft_id`, never both. `claimDraft` starts the run
-and `finishDraft` closes it with the prompt, usage and events `finishRun`
-takes; `finishRun` and `heartbeatRun` refuse a draft's run. The lease and the
-stop are the run's (`server/src/draft-runs.ts`): a draft is being answered
-while it has a running run whose lease has not lapsed, `stopDraft` and
-`cancelRun` both stop that run at once, and a reply that lands on a run no
-longer running records its spend and nothing else. The runner cannot read the
-endpoint's token counts through `askJson`, so it estimates them and says so in
-a notice on the run. Whatever reads runs to decide something about a todo must
-leave these out, by `kind = 'todo'` or because it joins through `todo_id` or
-`lane_id`, which they lack: `readyTodos`, `failuresSinceTouched`,
-`workStates`, `cardMarks`, `aiStatus`, `claimRun`'s `turn` and `aiSetup`'s
-`has_run`. Where runs are listed or added up (a project's runs, its spend,
-retention) they count, and the app marks them as drafts. The runs stay with
-the draft: a todo made from one reaches them through `todo.draft`, and
-discarding the draft deletes them. An API key or an agent sees none of them,
-as it sees no draft.
-
 **The account's activity page adds two queries and no table.** `/activity`
 (`account-activity.tsx`) lists runs, artifacts and archived todos with the
 generated queries and no project filter, which are already the account's own,
 and reuses the project's rows (`RunRow`, `ArtifactRow`, `ArchivedTodoList`,
 `RunDialog`). What those cannot say is in `resolvers/account-activity.ts`,
 both a person's (`requireSession`) and behind `requireAi`: `accountSpend` adds
-up a window's runs by project and by agent, drafts' replies included, over
+up a window's runs by project and by agent, over
 every project the account owns, and returns `keptSince` when run retention is
 shorter than the window; `accountHandedBack` is the todos in `workStates`'s
 `handedBack` state, the latest run first, so the page and the sidebar count

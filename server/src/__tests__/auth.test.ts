@@ -4,8 +4,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { resolveActor } from '../auth.ts';
 import { authFor, createClient, createTestDb, createUser, type TestClient, type TestDb } from './helpers.ts';
 
-const REQUEST = `mutation ($email: String!) { requestMagicLink(email: $email) { ok magicLink token userId } }`;
-const VERIFY = `mutation ($token: String!) { verifyMagicLink(token: $token) { token userId } }`;
+const REQUEST = `mutation ($email: String!) { signInMagicLink(email: $email) { status magicLink token userId } }`;
+const VERIFY = `mutation ($token: String!) { magicLinkVerify(token: $token) { token user { id } } }`;
 
 let db: TestDb;
 let anonymous: TestClient;
@@ -30,7 +30,7 @@ afterEach(() => {
 /** Requests a link and pulls the token back out of it, as the app's verify screen does. */
 async function magicToken(email: string): Promise<string> {
   const data = await anonymous.expectOk(REQUEST, { email });
-  const link = new URL(data.requestMagicLink.magicLink);
+  const link = new URL(data.signInMagicLink.magicLink);
   const token = link.searchParams.get('token');
   if (!token) throw new Error(`no token in ${link}`);
   return token;
@@ -42,28 +42,28 @@ async function whoIs(token: string): Promise<string | null> {
   return (await resolveActor(authFor(db), db, headers, { ai: false })).userId;
 }
 
-describe('requestMagicLink', () => {
+describe('signInMagicLink', () => {
   it('returns a link and no session when magic links are on', async () => {
     const data = await anonymous.expectOk(REQUEST, { email: nextEmail() });
-    expect(data.requestMagicLink.ok).toBe(true);
-    expect(data.requestMagicLink.token).toBeNull();
-    expect(data.requestMagicLink.magicLink).toContain('/auth/verify?token=');
+    expect(data.signInMagicLink.status).toBe(true);
+    expect(data.signInMagicLink.token).toBeNull();
+    expect(data.signInMagicLink.magicLink).toContain('/auth/verify?token=');
   });
 
   it('withholds the link when exposing it is off', async () => {
     process.env.EXPOSE_MAGIC_LINK = 'false';
     process.env.NODE_ENV = 'production';
     const data = await anonymous.expectOk(REQUEST, { email: nextEmail() });
-    expect(data.requestMagicLink.ok).toBe(true);
-    expect(data.requestMagicLink.magicLink).toBeNull();
+    expect(data.signInMagicLink.status).toBe(true);
+    expect(data.signInMagicLink.magicLink).toBeNull();
   });
 
   it('signs straight in when magic links are off', async () => {
     process.env.AUTH_MAGIC_LINK = 'false';
     const data = await anonymous.expectOk(REQUEST, { email: nextEmail() });
-    expect(data.requestMagicLink.magicLink).toBeNull();
-    expect(data.requestMagicLink.userId).toBeTruthy();
-    expect(await whoIs(data.requestMagicLink.token)).toBe(data.requestMagicLink.userId);
+    expect(data.signInMagicLink.magicLink).toBeNull();
+    expect(data.signInMagicLink.userId).toBeTruthy();
+    expect(await whoIs(data.signInMagicLink.token)).toBe(data.signInMagicLink.userId);
   });
 
   it('rate-limits repeated attempts for one address', async () => {
@@ -76,17 +76,17 @@ describe('requestMagicLink', () => {
   });
 });
 
-describe('verifyMagicLink', () => {
+describe('magicLinkVerify', () => {
   it('opens a session the next request is signed in with', async () => {
     const data = await anonymous.expectOk(VERIFY, { token: await magicToken(nextEmail()) });
-    expect(await whoIs(data.verifyMagicLink.token)).toBe(data.verifyMagicLink.userId);
+    expect(await whoIs(data.magicLinkVerify.token)).toBe(data.magicLinkVerify.user.id);
   });
 
   it('creates the account on first use and reuses it on the second', async () => {
     const email = nextEmail();
     const first = await anonymous.expectOk(VERIFY, { token: await magicToken(email) });
     const second = await anonymous.expectOk(VERIFY, { token: await magicToken(email) });
-    expect(first.verifyMagicLink.userId).toBe(second.verifyMagicLink.userId);
+    expect(first.magicLinkVerify.user.id).toBe(second.magicLinkVerify.user.id);
   });
 
   it('signs an existing account in as itself, keeping its id', async () => {
@@ -95,14 +95,14 @@ describe('verifyMagicLink', () => {
     const email = nextEmail();
     const existing = await createUser(db, email);
     const data = await anonymous.expectOk(VERIFY, { token: await magicToken(email) });
-    expect(data.verifyMagicLink.userId).toBe(existing);
+    expect(data.magicLinkVerify.user.id).toBe(existing);
   });
 
   it('treats addresses case-insensitively', async () => {
     const email = nextEmail();
     const lower = await anonymous.expectOk(VERIFY, { token: await magicToken(email) });
     const upper = await anonymous.expectOk(VERIFY, { token: await magicToken(email.toUpperCase()) });
-    expect(upper.verifyMagicLink.userId).toBe(lower.verifyMagicLink.userId);
+    expect(upper.magicLinkVerify.user.id).toBe(lower.magicLinkVerify.user.id);
   });
 
   it('works once', async () => {
@@ -121,7 +121,7 @@ describe('verifyMagicLink', () => {
 
   it('marks the address verified', async () => {
     const data = await anonymous.expectOk(VERIFY, { token: await magicToken(nextEmail()) });
-    const [user] = await db.select().from(dbSchema.users).where(eq(dbSchema.users.id, data.verifyMagicLink.userId));
+    const [user] = await db.select().from(dbSchema.users).where(eq(dbSchema.users.id, data.magicLinkVerify.user.id));
     expect(user.emailVerified).toBe(true);
   });
 });

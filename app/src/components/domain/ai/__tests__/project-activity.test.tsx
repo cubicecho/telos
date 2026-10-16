@@ -7,11 +7,11 @@ import { ProjectActivityLine, useProjectActivity } from '../project-activity';
 
 const AGENT = { __typename: 'Agent', id: 'a1', name: 'Planner' };
 
-function liveRun(id: string, kind: string, todoId: string | null) {
-  return { __typename: 'Run', id, kind, todoId, laneId: todoId ? 'l1' : null, cancelRequestedAt: null, agent: AGENT };
+function liveRun(id: string, todoId: string) {
+  return { __typename: 'Run', id, todoId, laneId: 'l1', cancelRequestedAt: null, agent: AGENT };
 }
 
-function activity(live: unknown[], drafts: { count: number; totalTokens: number }) {
+function activity(live: unknown[]) {
   return {
     request: { query: ProjectActivityDocument },
     variableMatcher: () => true,
@@ -23,11 +23,6 @@ function activity(live: unknown[], drafts: { count: number; totalTokens: number 
           __typename: 'RunAggregate',
           count: 12,
           sum: { __typename: 'RunSumAggregate', promptTokens: 30000, completionTokens: 1200, totalTokens: 31200 },
-        },
-        draftSpent: {
-          __typename: 'RunAggregate',
-          count: drafts.count,
-          sum: drafts.count > 0 ? { __typename: 'RunSumAggregate', totalTokens: drafts.totalTokens } : null,
         },
       },
     },
@@ -46,25 +41,19 @@ function Page() {
 }
 
 describe('useProjectActivity', () => {
-  it('counts a draft’s reply as running and in the spend, as a draft’s, and marks no todo with it', async () => {
+  it('counts the runs under way and marks the todos they work', async () => {
     render(
-      <MockedProvider
-        mocks={[activity([liveRun('r1', 'todo', 't1'), liveRun('r2', 'draft', null)], { count: 4, totalTokens: 900 })]}
-      >
+      <MockedProvider mocks={[activity([liveRun('r1', 't1'), liveRun('r2', 't2')])]}>
         <Page />
       </MockedProvider>,
     );
-    expect(
-      await screen.findByText(
-        '2 running, 1 draft reply · 12 runs and 31,200 tokens in 30 days, 4 draft replies among them',
-      ),
-    ).toBeInTheDocument();
-    expect(screen.getByText('Marked: t1')).toBeInTheDocument();
+    expect(await screen.findByText('2 running · 12 runs and 31,200 tokens in 30 days')).toBeInTheDocument();
+    expect(screen.getByText('Marked: t1, t2')).toBeInTheDocument();
   });
 
-  it('says nothing of drafts when there were none', async () => {
+  it('says when nothing is running', async () => {
     render(
-      <MockedProvider mocks={[activity([], { count: 0, totalTokens: 0 })]}>
+      <MockedProvider mocks={[activity([])]}>
         <Page />
       </MockedProvider>,
     );

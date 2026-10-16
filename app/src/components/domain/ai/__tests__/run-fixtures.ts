@@ -6,7 +6,6 @@ export function run(id: string, status: string, extra: Record<string, unknown> =
   return {
     __typename: 'Run',
     id,
-    kind: 'todo',
     status,
     verdict: 'none',
     error: null,
@@ -21,21 +20,8 @@ export function run(id: string, status: string, extra: Record<string, unknown> =
     agent: { __typename: 'Agent', id: 'a1', name: 'Reviewer' },
     lane: { __typename: 'Lane', id: 'l1', name: 'Review' },
     todo: { __typename: 'Todo', id: 't1', title: 'Write it' },
-    draft: null,
     ...extra,
   };
-}
-
-/** An agent's reply in a draft, as a run: no todo or lane. */
-export function draftRun(id: string, status: string, extra: Record<string, unknown> = {}) {
-  return run(id, status, {
-    kind: 'draft',
-    agent: { __typename: 'Agent', id: 'a2', name: 'Planner' },
-    lane: null,
-    todo: null,
-    draft: { __typename: 'Draft', id: 'd1', title: 'Faster export' },
-    ...extra,
-  });
 }
 
 /** A run with everything an open row asks for: its log, prompts and output. */

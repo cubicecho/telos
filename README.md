@@ -139,25 +139,23 @@ every level:
 With AI on there are two doors in. **`/mcp`** is for your own agents (Claude
 Code and the like): with an API key from Settings they can read the board and
 what happened on it (lanes, runs and their logs, history, notes, blockers,
-spend, artifacts, drafts, templates, and the agents without their keys), and
+spend, artifacts, templates, and the agents without their keys), and
 work it: make and rename projects, add, edit, move, retry, run, stop, archive,
-restore and delete todos, set what they wait on, talk a todo over in a draft,
-write notes, record what they made for a todo (`record_artifact`: where it is
+restore and delete todos, set what they wait on, write notes, record what they made for a todo (`record_artifact`: where it is
 and what to call it), and save or apply a board template. Each key has a switch
 per tool in Settings, all on until you turn one off; a tool that is off is
 neither offered to the key nor allowed to it, so a read-only key is one with
 its writing tools off. The AI switches, agents, keys, lanes and their agents, bulk
 changes and deleting a project stay yours. Nothing checks what a client
 records, so the board lists it as unverified, signed with the key that said it. **The runner** is telos's own
-worker. Four ideas make it up:
+worker. Three ideas make it up:
 
 - an **agent** is a model and its instructions;
 - a **lane** is a column; give it an agent (its menu, **Agent…**) and each
   ready todo there becomes a run, which on success or failure follows the
   lane's success or failure route;
 - a **run** ends in success or failure, with a report and, if the agent chose,
-  new todos;
-- a **draft** is a request talked over before it is a todo.
+  new todos.
 
 What an agent does is in its instructions, and every reply is read the same
 way: one that opens with FAIL sends the todo along the failure route, anything
@@ -165,9 +163,8 @@ else passes (open with PASS to say so). A passing run can split its todo into
 new ones, which land in the lane the project sends new todos to (set in the
 project's form; the first open lane otherwise), and the todo is done when they
 all are.
-A new agent can start from one of four starters (Settings → Agents → Start from):
-a **Refiner** for drafts, a **Planner** that splits work into todos, a
-**Worker** that does it and a **Reviewer** that rules PASS or FAIL. Each comes
+A new agent can start from one of three starters (Settings → Agents → Start from):
+a **Planner** that splits work into todos, a **Worker** that does it and a **Reviewer** that rules PASS or FAIL. Each comes
 with instructions and a temperature for its job; give it a base URL
 and a model, or leave those to your agent defaults. An agent's form, like the
 defaults', starts at its endpoint: type the base URL (and a key, if it wants
@@ -199,15 +196,6 @@ gives up with a line in the server's log. `beforeCompact` never fires, since a
 run does not compact its transcript, and a run says so when a hook is bound to
 it.
 
-Before a request is a todo you can **talk it over** with an agent: it asks what
-it needs to and writes the title and brief as you go. Each of its replies is a
-run like a todo's, with the agent, the model, what it was told, what it said
-and what it spent, so a reply that failed can be opened and read. They are
-listed in the draft and among the project's runs, marked as drafts, and counted
-in its spend; a todo made from a draft shows them at the top of its history. A
-reply's token counts are estimated from the text, and the run says so.
-Discarding a draft deletes its runs with it.
-
 The runner is part of the server: it starts with it and signs itself in, so
 there is nothing to set up. Until AI is on it only checks, every few seconds,
 whether there is anything to do.
@@ -234,8 +222,8 @@ project you own. At the top is what needs you: each todo that is out of
 attempts or whose last run errored, with its project, the reason, and a way to
 send it round again. Under it is what the last 30 days cost in tokens, by
 project and by agent; when your run retention is shorter than that, it says
-which day the figures start on. Then three lists, newest first: runs (a
-draft's replies among them, marked), artifacts with the todo and project each
+which day the figures start on. Then three lists, newest first: runs,
+artifacts with the todo and project each
 came from, and archived todos with restore. A run opens as it does in its
 project. The page is not there while AI is off.
 

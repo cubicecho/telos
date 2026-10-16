@@ -67,12 +67,11 @@ description: Configuration, the AI switches, agents, lanes and runs, the MCP doo
     </ol>
 
     <h2 id="runner">Agents, lanes and runs</h2>
-    <p>The runner is telos's own worker, part of the server, with nothing to set up. Four ideas make it up:</p>
+    <p>The runner is telos's own worker, part of the server, with nothing to set up. Three ideas make it up:</p>
     <ul>
       <li>an <strong>agent</strong> is a model and its instructions;</li>
       <li>a <strong>lane</strong> is a column; give it an agent and each ready todo there becomes a run, which follows the lane's success or failure route;</li>
-      <li>a <strong>run</strong> ends in success or failure, with a report and, if the agent chose, new todos;</li>
-      <li>a <strong>draft</strong> is a request talked over with an agent before it is a todo.</li>
+      <li>a <strong>run</strong> ends in success or failure, with a report and, if the agent chose, new todos.</li>
     </ul>
     <p>
       Every reply is read the same way: one that opens with <code>FAIL</code>
@@ -91,9 +90,8 @@ description: Configuration, the AI switches, agents, lanes and runs, the MCP doo
     </p>
 
     <h2 id="starters">Starters</h2>
-    <p>A new agent can start from one of four (Settings → Agents → Start from), each with instructions and a temperature for its job:</p>
+    <p>A new agent can start from one of three (Settings → Agents → Start from), each with instructions and a temperature for its job:</p>
     <ul>
-      <li><strong>Refiner</strong>: talks a draft over and writes its title and brief.</li>
       <li><strong>Planner</strong>: splits work into todos.</li>
       <li><strong>Worker</strong>: does it.</li>
       <li><strong>Reviewer</strong>: rules PASS or FAIL.</li>

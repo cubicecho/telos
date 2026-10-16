@@ -106,7 +106,7 @@ export async function readyTodos(
   const result = await db.execute(sql`
     WITH live AS (
       SELECT lane_id, count(*)::int AS n FROM runs
-      WHERE kind = 'todo' AND status = 'running' AND lease_expires_at > now()
+      WHERE status = 'running' AND lease_expires_at > now()
       GROUP BY lane_id
     ),
     candidates AS (
@@ -172,9 +172,7 @@ export async function expireLapsedRuns(db: DB, where: { todoId: string; laneId: 
 
 /**
  * Asks every running run under a switch to stop. The runner hears it on its
- * next heartbeat, and the run's token stops resolving at once. An account's or
- * a project's switch reaches a draft's reply too, which is dropped when it
- * arrives (resolvers/drafts.ts).
+ * next heartbeat, and the run's token stops resolving at once.
  *
  * @param db The database or transaction.
  * @param where Whose runs: everyone's (no user, for the instance switch), a user's, a

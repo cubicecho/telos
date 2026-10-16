@@ -214,7 +214,7 @@ export function ProjectFormDialog({
                 {(field) => (
                   <field.SelectField
                     label="New todos land in"
-                    description="A request, a finished draft, and the todos an agent splits one into."
+                    description="A request, and the todos an agent splits one into."
                     options={[
                       { label: 'The first open lane', value: FIRST_OPEN_LANE },
                       ...openLanes.map((lane) => ({ label: lane.name, value: lane.id })),

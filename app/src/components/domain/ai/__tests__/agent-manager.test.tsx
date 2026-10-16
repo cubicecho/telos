@@ -235,7 +235,6 @@ describe('AgentManager', () => {
     expect(await screen.findByText('No agents yet.')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'From a template' }));
     expect((await screen.findAllByRole('menuitem')).map((item) => item.textContent)).toEqual([
-      'Refiner',
       'Planner',
       'Worker',
       'Reviewer',
@@ -250,16 +249,6 @@ describe('AgentManager', () => {
     await user.click(screen.getByRole('button', { name: 'Create agent' }));
 
     await waitFor(() => expect(create).toHaveBeenCalled());
-  });
-
-  it('starts a Refiner reaching no servers, since a draft has no use for tools', async () => {
-    const user = userEvent.setup();
-    manager([agents([]), servers([SERVER]), tools]);
-
-    await user.click(await screen.findByRole('button', { name: 'From a template' }));
-    await user.click(await screen.findByRole('menuitem', { name: /Refiner/ }));
-
-    expect(await screen.findByRole('checkbox', { name: 'Every server' })).not.toBeChecked();
   });
 
   it('says what a blank field inherits, and warns while it would have no model', async () => {

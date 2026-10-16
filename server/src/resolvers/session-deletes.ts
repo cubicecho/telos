@@ -12,8 +12,8 @@ import { markRunnerSeen } from '../runner-seen.ts';
 // their hooks file things under, so a memory server that is never told keeps
 // what it filed for good. A delete happens here and the servers are reached
 // only from the runner, so the delete leaves a mark (`todo_sessions.deleted_at`,
-// set by a trigger) and the runner comes for it, as it comes for MCP tests and
-// drafts: it takes what is owed, fires `sessionDelete`, and reports back.
+// set by a trigger) and the runner comes for it, as it comes for MCP tests: it
+// takes what is owed, fires `sessionDelete`, and reports back.
 //
 // The delete itself never waits on any of this, and nothing here can undo it.
 // A server that cannot be told is tried a few times and then given up on.

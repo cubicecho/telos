@@ -13,7 +13,7 @@ function envDisabled(value: string | undefined): boolean {
 /**
  * Whether signing in requires following a magic link at all.
  *
- * With `AUTH_MAGIC_LINK=false`, `requestMagicLink` hands back a live session for
+ * With `AUTH_MAGIC_LINK=false`, `signInMagicLink` hands back a live session for
  * whatever address it is given: there is no second factor and no link to follow.
  * That is a deliberate convenience for a self-hosted instance on a private
  * network. Anyone who can reach the port can then sign in as anyone, so it must

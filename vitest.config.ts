@@ -49,6 +49,7 @@ export default defineConfig({
             'db/**/*.test.ts',
             'server/**/*.test.ts',
             'runner/**/*.test.ts',
+            'better-auth-graphql/**/*.test.ts',
             'scripts/**/*.test.ts',
             'app/src/lib/**/*.test.ts',
           ],

@@ -6,7 +6,7 @@ import { assertAiReach } from './ai-reach.ts';
 import { assertRunReach } from './run-reach.ts';
 
 // What AI may write. An MCP client or an agent can work the board: make a
-// project, talk a draft over, add todos and move them, send one round again,
+// project, add todos and move them, send one round again,
 // stop a run, record what it made. What stays a person's is everything that
 // decides how far AI reaches: the AI switches, keys and secrets, agents and
 // their MCP servers, deleting a project, and changing many rows at once.
@@ -51,11 +51,6 @@ export const AI_MUTATIONS = new Set([
   'retryTodo',
   'runTodo',
   'cancelRun',
-  'startDraft',
-  'sayToDraft',
-  'stopDraft',
-  'makeTodoFromDraft',
-  'discardDraft',
   'saveBoardTemplate',
   'applyBoardTemplate',
 ]);
@@ -70,8 +65,6 @@ export const RUNNER_MUTATIONS = new Set([
   'heartbeatRun',
   'finishRun',
   'finishProbe',
-  'claimDraft',
-  'finishDraft',
   'takeSessionDeletes',
   'finishSessionDelete',
 ]);

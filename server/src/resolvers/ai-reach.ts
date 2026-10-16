@@ -15,8 +15,8 @@ import { requireAuth } from './auth.ts';
 // Stated here as a table rather than in each resolver, so the resolvers stay
 // the person's and a mutation opened to AI later (actor-lock.ts) has one place
 // to say what its arguments are. Generated writes need none of this: their rows
-// are scoped by tenancy.ts and their foreign keys by write-guards.ts. The draft
-// and request mutations check for themselves.
+// are scoped by tenancy.ts and their foreign keys by write-guards.ts. The request
+// mutations check for themselves.
 
 /** What an argument names. */
 type Named = 'project' | 'todo' | 'todos' | 'lane' | 'run';
@@ -57,8 +57,7 @@ async function assertAiLane(context: Context, userId: string, id: string): Promi
 }
 
 /**
- * A run of a todo AI may see, or NOT_FOUND. A draft's reply has no todo, and
- * is stopped through its draft.
+ * A run of a todo AI may see, or NOT_FOUND.
  *
  * @param context The request.
  * @param userId The caller.

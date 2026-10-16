@@ -126,8 +126,8 @@ export async function findFirstOpenLaneId(db: DB, projectId: string): Promise<st
 }
 
 /**
- * Where a project's new todos land: a submitted request, a finished draft, the
- * todos a run proposes. That is the lane the project names, unless it names
+ * Where a project's new todos land: a submitted request, or the todos a run
+ * proposes. That is the lane the project names, unless it names
  * none or the done lane, when it is the first open lane.
  *
  * @param db - The database or transaction to read with.

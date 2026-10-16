@@ -111,7 +111,7 @@ export function toolsCalling(field: string, args: Record<string, unknown>): stri
  * is on as well. Adding work is off: a run that would break its todo up says so
  * in its reply, as a split, which makes the pieces its todo's. What adds to the
  * board, changes work already on it, or reaches past it (projects, requests,
- * drafts, templates), a person turns on for an agent that should have it.
+ * templates), a person turns on for an agent that should have it.
  */
 export const RUN_DEFAULT_WRITES: ReadonlySet<string> = new Set([
   'set_todo_dependencies',

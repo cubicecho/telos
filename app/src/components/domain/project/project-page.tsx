@@ -2,11 +2,9 @@ import { useMutation } from '@apollo/client';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Text, View } from 'react-native';
-import { MessageSquare } from '@/components/app-icons';
 import { DescriptionList, PropertyRow } from '@/components/description-list';
 import { AiSetupChecklist } from '@/components/domain/ai/ai-setup-checklist';
 import type { ProjectActivity } from '@/components/domain/ai/project-activity';
-import { DraftDialog } from '@/components/domain/draft/draft-dialog';
 import { LabelBadge, type LabelSummary } from '@/components/domain/label/label-badge';
 import { LabelPicker } from '@/components/domain/label/label-picker';
 import { SaveTemplateDialog } from '@/components/domain/template/save-template-dialog';
@@ -16,7 +14,6 @@ import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Copy, Ellipsis, Pencil, Trash2 } from '@/components/ui/icons';
 import { Menu, MenuContent, MenuItem, MenuTrigger } from '@/components/ui/menu';
-import { useAi } from '@/lib/ai';
 import { describeError } from '@/lib/errors';
 import {
   AttachProjectLabelDocument,
@@ -66,10 +63,7 @@ export function ProjectPage({
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [savingTemplate, setSavingTemplate] = useState(false);
-  const [drafting, setDrafting] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
-  const ai = useAi();
-  const canDraft = ai.on && project.aiEnabled;
   const [notice, setNotice] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
@@ -152,16 +146,6 @@ export function ProjectPage({
                       />
                     </MenuTrigger>
                     <MenuContent align="end" className="w-56" aria-label="Project actions">
-                      {canDraft ? (
-                        <MenuItem
-                          label="Talk a request over"
-                          iconSlot={<MessageSquare className="h-3.5 w-3.5" />}
-                          onSelect={() => {
-                            setNotice(null);
-                            setDrafting(true);
-                          }}
-                        />
-                      ) : null}
                       <MenuItem
                         label="Save lanes as a template"
                         iconSlot={<Copy className="h-3.5 w-3.5" />}
@@ -242,14 +226,6 @@ export function ProjectPage({
         projectName={project.name}
         onSaved={(name) => setNotice(`Saved its lanes as the template “${name}”.`)}
       />
-      {canDraft ? (
-        <DraftDialog
-          open={drafting}
-          onOpenChange={setDrafting}
-          projectId={project.id}
-          onMade={(title) => setNotice(`Made the todo “${title}”.`)}
-        />
-      ) : null}
     </>
   );
 }
