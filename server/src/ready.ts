@@ -226,7 +226,8 @@ export interface WorkTodo extends Omit<StationTodo, '__typename'> {
   lastRunAt: Date | null;
 }
 
-export interface LaneTally {
+/** How many of a lane's todos are done: aiStatus adds them to its `LaneTally`. */
+export interface LaneDoneCount {
   projectId: string;
   laneId: string;
   done: number;
@@ -260,7 +261,7 @@ export async function workStates(
   db: AnyDb,
   userId: string,
   projectId?: string | null,
-): Promise<{ todos: WorkTodo[]; done: LaneTally[] }> {
+): Promise<{ todos: WorkTodo[]; done: LaneDoneCount[] }> {
   const project = projectId ? sql`AND p.id = ${projectId}` : sql``;
   const open = resultRows<{
     todo_id: string;

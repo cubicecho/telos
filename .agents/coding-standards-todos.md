@@ -44,7 +44,7 @@ Nothing here is implemented until approved.
 | R8 | Refactor [simplify] | One `loadOwned*` family | `loadOwnedTodo`, `loadOwnedLane`, `loadOwnedProject`, `loadAiProject`, `loadAiTodo` repeat the fetch-and-404 | R7 | done |
 | R9 | Refactor [types] | Attach resolvers through the generated `Resolvers` map, not `getType() as GraphQLObjectType` | 33 casts go; resolver args and parents are checked against the schema | — | done |
 | R10 | Refactor [types] | Retire `AnyRow`/`AnyDb = any` (39) for drizzle's inferred types | Row shapes are checked | drizzle 1.0 typing (unverified) | proposed |
-| R11 | Refactor [readability] | The server's internal `LaneTally` (projectId, laneId, done) gets its own name | It shares a name with the API's `LaneTally`, a different shape | — | proposed |
+| R11 | Refactor [readability] | The server's internal `LaneTally` (projectId, laneId, done) gets its own name | It shares a name with the API's `LaneTally`, a different shape | — | done |
 | R12 | Refactor [structure] | Group `server/src` by domain (runs, drafts, agents, board) instead of `resolvers/` vs root | A change to one area stays in one folder | — | proposed |
 | R13 | Refactor [structure] | Weigh GraphQL Yoga against Apollo Server 5 | (unverified) smaller server, built-in subscriptions | — | proposed |
 | F1 | Feature | The app sets a lane's agent with no station, preset or contract | M2, M3 | A2 | done |
