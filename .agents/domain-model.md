@@ -3,8 +3,10 @@
 What telos is made of: its concepts, who may change them, and what always holds. This file
 describes the code **as it is on this branch**. Proposed changes are `M` items in
 `.agents/coding-standards-todos.md` and in the pull request that makes them; the commit
-that makes one true writes it in here. Use these terms in code, tests, docs and reviews.
-AGENTS.md says how each rule is built; this file says what the things are.
+that makes one true writes it in here. The one exception is an approved rename: the
+glossary uses the new word at once, and says what the code still calls it. Use these terms
+in code, tests, docs and reviews. AGENTS.md says how each rule is built; this file says
+what the things are. The glossary is also published as the site's glossary page.
 
 ## Purpose
 
@@ -126,78 +128,151 @@ person says something --> waiting --agent's reply (a draft run)--> answered --..
 
 ## Glossary
 
+The words to use for telos, in code, docs and the app. The site's glossary page is built
+from this section, so each entry is written for someone using telos: the definition, up
+to `Owner:`, reads without code, and what follows `Owner:` says where it lives in the code.
+An approved rename may lead the code; its `Owner:` then gives the code's current name and
+the item that renames it. **Internals** are for people working on telos and are left off
+the site.
+
 ### Places
 
-- **Account (user):** owns everything below it; has an AI switch and agent defaults.
-  Owner: `users`.
-- **Instance:** one telos deployment; has the instance AI switch, flipped by an admin.
+- **Instance:** one telos installation. Its admin can switch AI off for everyone on it.
   Owner: `server/src/instance.ts`.
-- **Project:** holds lanes and todos; has an AI switch, **auto-run**, a
-  description and context sent to every run, and a new-todo lane. Owner: `projects`.
-- **Lane:** a column of a project. It may have an agent, routes, a WIP limit and max
-  attempts. Owner: `server/src/lanes.ts`.
-- **Done lane:** the one lane per project where todos are complete.
-- **New-todo lane:** where requests, drafts made into todos and split pieces land:
-  `projects.newTodoLaneId`, else the first open lane (`findNewTodoLaneId`). Pieces of a
-  todo split *in* this lane go on down its success route instead, unless that is the done
-  lane (`piecesLaneId`).
-- **Route:** where a todo goes when its run passes (**success route**, or archive on
-  success) or fails (**failure route**). With no route it stays.
-- **Board template:** a saved set of lanes for starting a project.
+- **Account:** you, and everything you own. It has its own AI switch and the agent
+  defaults new agents start from. Owner: `users`.
+- **Project:** a set of lanes and the todos in them. It has its own AI switch, auto-run,
+  a description and context every agent working in it is given, and a new-todo lane.
+  Owner: `projects`.
+- **Lane:** a column in a project. A lane can have an agent that works the todos in it,
+  routes that say where they go next, a WIP limit and max attempts.
+  Owner: `server/src/lanes.ts`.
+- **Done lane:** the one lane in a project where todos are complete. Moving a todo into
+  it completes the todo, and moving it out reopens it. Owner: `lanes.isDone`.
+- **New-todo lane:** where a todo lands when nobody says where: one an agent or MCP
+  client filed, a draft made into a todo, and the pieces of a split. If none is set, the
+  first open lane. Pieces of a todo split in this lane skip it and go on down its success
+  route, unless that is the done lane. Owner: `projects.newTodoLaneId`,
+  `findNewTodoLaneId`, `piecesLaneId`.
+- **Route:** where a todo goes when its lane's agent is done with it: the success route
+  after a pass, the failure route after a fail. A lane can archive todos on success
+  instead. With no route, the todo stays where it is. Owner: `lanes.onSuccessLaneId`,
+  `lanes.onFailureLaneId`, `lanes.archiveOnSuccess`.
+- **WIP limit:** how many todos a lane's agent works at once. Owner: `lanes.wipLimit`.
+- **Max attempts:** how many failed runs a lane's agent gets at a todo before it hands
+  it back. Owner: `lanes.maxAttempts`.
+- **Auto-run:** when it is on, the lanes' agents start on ready todos by themselves; when
+  it is off, a todo runs only when someone asks for a run. Owner: `projects.autoRun`.
+- **Board template:** a saved set of lanes to start a project with.
+  Owner: `board_templates`.
 
 ### Work
 
-- **Todo:** one piece of work: title, **brief** (the `notes` column), **acceptance** (what
-  done means, and what an agent is judged against), due date, position. Owner: `todos`.
-- **Dependency (blocker):** "this todo waits on that one". Owner: `server/src/blocking.ts`.
-- **Parent / piece:** `parentId`: the todo a piece was split out of, or that someone filed
-  it under. A split parent depends on its pieces.
-- **Request:** a todo an AI actor filed for a person (`submitRequest`), withdrawable with
-  `cancelRequest`. The word also means other things in the code: a run request
-  (`runRequestedAt`), a draft's "rough request", the agent form's "Requests" group.
-- **Draft:** a conversation with an agent that becomes a todo (`makeTodoFromDraft`).
-  Owner: `server/src/resolvers/drafts.ts`.
-- **Archive:** put away, not gone: what `deleteTodo` does. Hidden from reads, restorable;
-  only `deleteTodo(hard: true)` removes the row (`archivedAt`).
-- **Hands off:** `aiIgnored`. No agent reads or works the todo; only a person sets it.
-- **Label:** a coloured tag on a todo or a project.
+- **Todo:** one piece of work: a title, a description, acceptance, a due date and labels.
+  Owner: `todos`.
+- **Description:** what to do, and why. Owner: `todos.notes`, `brief` in the API and the
+  runner (renamed by A4).
+- **Acceptance:** what done means. An agent's work is judged against it.
+  Owner: `todos.acceptance`.
+- **Dependency (blocker):** "this todo waits on that one". While a todo it waits on is
+  open, the todo is blocked: it cannot be completed, and no agent works it.
+  Owner: `server/src/blocking.ts`, `todo_dependencies`.
+- **Parent and piece:** a piece is a todo split out of a larger one, its parent, or one
+  someone filed under it. A split parent waits on its pieces. Owner: `todos.parentId`.
+- **Draft:** a conversation with an agent about a rough idea, made into a todo when it is
+  right. Owner: `server/src/resolvers/drafts.ts`.
+- **Archive:** putting a todo away: hidden, not gone, and it can be restored. Deleting a
+  todo archives it, unless you delete it for good. Owner: `todos.archivedAt`,
+  `deleteTodo`, `restoreTodo`.
+- **Hands off:** a todo no agent may read or work, nor anything under it. A person sets
+  it; an agent or MCP client can set it too, with a reason, to give a todo back to you.
+  Owner: `todos.aiIgnored`; `cancelRequest` (renamed `markHandsOff` by A5).
+- **Label:** a coloured tag on a todo or a project. Owner: `labels`.
+- **Run request:** asking for one run of a todo now. It waits like any other run: it does
+  not get round an AI switch that is off, a blocker or the lane's WIP limit.
+  Owner: `todos.runRequestedAt`, `runTodo`.
+- **Retry:** giving a lane's agent another go at a todo it handed back; its failed runs
+  stop counting. Owner: `retryTodo`.
+
+### What agents make of a todo
+
+- **Queued:** its lane's agent will start on it when there is room.
+  Owner: `workStates` in `server/src/ready.ts`.
+- **Running:** a run is working on it.
+- **Blocked:** it waits on an open dependency.
+- **Parked:** nothing will work on it where it is: its lane has no agent, AI or the
+  agent is switched off, it is hands off, or auto-run is off and nobody asked for a run.
+- **Handed back:** its lane's agent is done with it and it cannot move on without you:
+  the agent gave up after more failed runs than the lane's max attempts, or it finished
+  and the lane has nowhere to send it. Owner: `aiStatus` `attention`, and the activity
+  page's `accountAttention`, a different rule (both become this by M9).
 
 ### What happened
 
-- **Thread:** a todo's notes, each a **note** (a person's or an agent's), a **report**
-  (what a run said it did) or a **verdict** (a PASS or FAIL). Owner: `todo_notes`.
-- **History event:** see the todo's lifecycle. Owner: the `todos_history` trigger.
-- **Arrival, touched:** see the todo's lifecycle. Owner: `server/src/ready.ts`.
-- **Attempt:** a failed run since the todo was last touched. At `maxAttempts` it is left
-  for a person.
-- **Artifact:** a file or link a run (`declared`, `detected`) or an MCP client (`client`)
-  recorded making. Outlives its todo. Owner: `artifacts`.
-- **Change feed:** `changes(since:)`, what changed in a project since a cursor. Owner:
-  `server/src/changes.ts`.
+- **Thread:** a todo's notes, reports and verdicts, oldest first. Owner: `todo_notes`.
+- **Note:** something a person or an agent wrote on a todo's thread.
+- **Report:** what a run said it did. Never changed afterwards.
+- **Verdict:** a run's PASS or FAIL, with its reasons. Never changed afterwards.
+- **History:** every change to a todo: what changed, who changed it and why.
+  Owner: the `todos_history` trigger, `todo_events`.
+- **Attempt:** a failed run since a person last changed the todo, retried it or asked
+  for a run. Owner: `failuresSinceTouched` in `server/src/ready.ts`.
+- **Artifact:** a file or link a run or an MCP client recorded making. It outlives its
+  todo. Owner: `artifacts`.
 
 ### Agents and runs
 
-- **Agent:** a model, its instructions, its MCP servers and tool switches; a blank field
-  inherits the account's **agent defaults**. It has no idea of lanes. Owner: `agents`,
-  `server/src/agent-defaults.ts`.
-- **Starter:** starting text for a new agent: Refiner, Planner, Worker, Reviewer
-  (`app/src/lib/agent-starters.ts`).
-- **MCP server:** an account's tool server; an agent names which it reaches by slug.
-  Owner: `server/src/mcp-servers.ts`.
-- **Runner:** works ready todos and drafts over HTTP as `system`. Owner: `runner/`.
-- **Ready:** a todo the runner would take now (`readyTodos`). Owner: `server/src/ready.ts`.
-- **Claim, lease, heartbeat:** taking a ready todo, holding it for a time, renewing that.
-- **Run:** one agent working one todo (`kind = 'todo'`) or answering a draft
-  (`kind = 'draft'`). Owner: `server/src/resolvers/runs.ts`.
-- **Run token, run reach:** what a run's `/mcp` calls may touch (see Actors).
-- **Assignment:** what a run is handed: project text, the todo, its last report, why it
-  came back, its thread (`assignmentFor`).
-- **Standing protocol:** how every reply is read, sent after the agent's instructions
-  (`STANDING_SYSTEM` in `runner/src/prompts.ts`).
-- **Outcome:** what a reply amounts to; see the run's lifecycle. Owner: `finish` in
-  `server/src/resolvers/runs.ts`.
-- **Session:** a todo as an agent's MCP hooks see it, one per agent per todo; a run is a
-  turn of it. Owner: `todo_sessions`.
+- **AI switches:** the instance's, the account's, the project's and each agent's. Every
+  one above an agent must be on for it to run. Owner: `ai-gate.ts`, `readyTodos`.
+- **Agent:** a model with instructions, the MCP servers it may use and the tools it may
+  call. A setting left blank uses the account's agent defaults. An agent knows nothing
+  of lanes: a lane is given an agent. Owner: `agents`, `server/src/agent-defaults.ts`.
+- **Agent template:** starting text for a new agent: Planner, Worker or Reviewer.
+  Owner: `app/src/lib/agent-starters.ts` (renamed, and Refiner dropped, by M10).
+- **MCP server:** a tool server added to an account; each agent names the ones it may
+  use. Owner: `server/src/mcp-servers.ts`.
+- **MCP client:** an assistant connected to telos with an API key, working in the
+  projects and todos AI may see. Owner: `/mcp`, `server/src/door.ts`.
+- **Runner:** the program that starts runs: it takes ready todos and drafts and runs
+  their agents. Owner: `runner/`.
+- **Run:** one go by an agent at a todo, ending in a reply, or its reply to a draft.
+  Owner: `runs`, `server/src/resolvers/runs.ts`.
+- **Reply format:** the rules every run's reply is read by, sent after the agent's own
+  instructions. Owner: `STANDING_SYSTEM` in `runner/src/prompts.ts` (renamed by R6).
+- **Outcome:** what a reply comes to: a verdict, a report, a refine or a split. A run
+  that fails or breaks the reply format is an error, and counts as an attempt.
+  Owner: `finish` in `server/src/resolvers/runs.ts`.
+- **Refine:** a reply that rewrites its todo's title, description or acceptance; what it
+  leaves out stays. The todo then takes its success route. Owner: `refinementOf`.
+- **Split:** a reply that breaks its todo into two or more pieces. The todo waits where
+  it is until they are done. Owner: `finish`, `piecesLaneId`.
+
+### Internals
+
+- **Actor:** who is making a change: a person (`user`), an API key, a run (`agent`), the
+  runner (`system`) or nobody. Owner: `Actor` in `server/src/context.ts`.
+- **AI actor:** an API key or a run. Owner: `isAiActor` in `server/src/context.ts`.
+- **Ready:** a todo the runner would take now. Owner: `readyTodos` in
+  `server/src/ready.ts`.
+- **Arrival:** the latest change, other than an edit, that put a todo in its lane, or its
+  creation. Work since arrival counts. Owner: `arrivedIn` in `server/src/ready.ts`.
+- **Touched:** a person's change, a retry or a run request; it resets attempts. Owner:
+  `TOUCHED` in `server/src/ready.ts`.
+- **Finished here:** an `ok` run in the todo's lane since it arrived, with nowhere to
+  send it. Owner: `finished_here` in `workStates`.
+- **Claim, lease, heartbeat:** the runner taking a ready todo, holding it for a time, and
+  renewing that. Owner: `server/src/resolvers/runs.ts`.
+- **Run token, run reach:** what a run's `/mcp` calls may touch: notes on its own todo,
+  and the todos under it and those its runs made. Owner: `run-reach.ts`.
+- **What a run is handed:** its todo, with the project's text, its last report, why it
+  came back and its thread. Owner: `assignmentFor`, the runner's `Assignment` (the word
+  retired by R5).
+- **Session:** a todo as an agent's MCP hooks see it, one per agent per todo; its runs
+  are turns of it. Owner: `todo_sessions`.
+- **Change feed:** what changed in a project since a cursor. Owner: `changes(since:)`,
+  `server/src/changes.ts`.
+- **Request:** still three things in the code: a run request (`runRequestedAt`), a
+  draft's rough request, and the agent form's Requests group. Owner: R4.
 
 ## Explain test
 

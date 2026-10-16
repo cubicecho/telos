@@ -119,7 +119,7 @@ describe('DraftDialog', () => {
     expect(await screen.findByText('How big are the files?')).toBeInTheDocument();
     const title = screen.getByLabelText('Title');
     expect(title).toHaveValue('Faster export');
-    expect(screen.getByLabelText('Brief')).toHaveValue('Speed up the CSV export.');
+    expect(screen.getByLabelText('Description')).toHaveValue('Speed up the CSV export.');
 
     await user.clear(title);
     await user.type(title, 'Faster CSV export');

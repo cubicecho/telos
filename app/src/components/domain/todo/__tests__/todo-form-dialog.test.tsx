@@ -100,7 +100,7 @@ describe('TodoFormDialog', () => {
     open({ ...TODO, notes: 'The washer is perished.', dueAt: new Date(2026, 11, 1, 9).toISOString() }, []);
 
     expect(screen.getByLabelText('Title')).toHaveValue('Replace the tap');
-    expect(screen.getByLabelText('Notes')).toHaveValue('The washer is perished.');
+    expect(screen.getByLabelText('Description')).toHaveValue('The washer is perished.');
     // The local day, as the badge on the row shows it.
     expect(dueTrigger('December 1st, 2026')).toBeInTheDocument();
   });
@@ -121,7 +121,7 @@ describe('TodoFormDialog', () => {
 
     await user.clear(screen.getByLabelText('Title'));
     await user.type(screen.getByLabelText('Title'), 'Replace the kitchen tap');
-    await user.type(screen.getByLabelText('Notes'), 'Bring the big wrench.');
+    await user.type(screen.getByLabelText('Description'), 'Bring the big wrench.');
     await user.click(dueTrigger('No due date'));
     await user.click(await screen.findByRole('button', { name: new RegExp(format(picked, 'MMMM do, yyyy')) }));
     expect(dueTrigger(format(picked, 'PPP'))).toBeInTheDocument();

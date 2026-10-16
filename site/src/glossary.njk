@@ -1,0 +1,40 @@
+---
+layout: base.njk
+title: Glossary
+permalink: /glossary/
+description: The words telos uses, from projects and lanes to runs and what agents make of a todo.
+---
+<div class="docs-layout">
+  <aside class="toc">
+    <p class="toc-title">On this page</p>
+    <nav>
+      {% for group in glossary %}
+      <a href="#{{ group.id }}">{{ group.title }}</a>
+      {% endfor %}
+    </nav>
+    <p class="toc-foot"><a href="{{ '/docs/' | url }}">Docs</a></p>
+  </aside>
+
+  <article class="docs-body">
+    <h1>Glossary</h1>
+    <p class="lede">
+      The words telos uses, and what each one means. They are the same words
+      the app, the API and the code use.
+    </p>
+
+    {% for group in glossary %}
+    <h2 id="{{ group.id }}">{{ group.title }}</h2>
+    <dl class="glossary">
+      {% for entry in group.entries %}
+      <div class="glossary-entry" id="{{ entry.id }}">
+        <dt>
+          <a href="#{{ entry.id }}">{{ entry.term }}</a>
+          {% if entry.aliases.length %}<span class="glossary-alias">also {{ entry.aliases | join(', ') }}</span>{% endif %}
+        </dt>
+        <dd>{{ entry.html | safe }}</dd>
+      </div>
+      {% endfor %}
+    </dl>
+    {% endfor %}
+  </article>
+</div>

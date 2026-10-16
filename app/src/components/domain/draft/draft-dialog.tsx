@@ -28,13 +28,13 @@ export const DRAFT_POLL_MS = 1500;
 /**
  * Talking a request over with an agent before it becomes a todo. The person
  * says what they want; the runner hands it to the agent, which asks what it
- * needs to and keeps a title and brief up to date as it goes. Either side can
+ * needs to and keeps a title and description up to date as it goes. Either side can
  * edit those, and "Make a todo" puts them in the project's first open lane.
  *
  * Turns alternate: while the agent is thinking there is nothing to send, only
  * Stop, which gives the turn back and drops whatever answer comes late.
  *
- * Each reply is a run, listed under the brief and opened as a todo's runs are:
+ * Each reply is a run, listed under the description and opened as a todo's runs are:
  * what the agent was told, what it said and spent, and why a reply failed.
  */
 export function DraftDialog({
@@ -64,7 +64,7 @@ export function DraftDialog({
       onOpenChange={onOpenChange}
       size="lg"
       title="Talk a request over"
-      description="Say what you want. The agent asks what it needs to and writes it up as a todo's brief."
+      description="Say what you want. The agent asks what it needs to and writes it up as a todo's description."
       contentSlot={
         draftId ? (
           <DraftTalk
@@ -203,7 +203,7 @@ function DraftTalk({
     return () => stopPolling();
   }, [waiting, pollMs, startPolling, stopPolling]);
 
-  // The agent rewrites the title and brief as it goes; an edit here holds until
+  // The agent rewrites the title and description as it goes; an edit here holds until
   // it next does.
   const [title, setTitle] = useState('');
   const [brief, setBrief] = useState('');
@@ -299,8 +299,14 @@ function DraftTalk({
 
       <View className="gap-2 border-foreground/10 border-t pt-4">
         <Label htmlFor="draft-title">Title</Label>
-        <Input id="draft-title" value={title} onChangeText={setTitle} maxLength={200} placeholder="From the brief" />
-        <Label htmlFor="draft-brief">Brief</Label>
+        <Input
+          id="draft-title"
+          value={title}
+          onChangeText={setTitle}
+          maxLength={200}
+          placeholder="From the description"
+        />
+        <Label htmlFor="draft-brief">Description</Label>
         <Textarea
           id="draft-brief"
           value={brief}
