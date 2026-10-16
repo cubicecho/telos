@@ -32,7 +32,7 @@ import {
   AccountSpendDocument,
   RetryTodoDocument,
 } from '@/lib/graphql';
-import { draftReplies, SPEND_DAYS, spendSince } from './project-activity';
+import { SPEND_DAYS, spendSince } from './project-activity';
 import { RUN_FILTERS, RUNS_PAGE, RUNS_POLL_MS, type RunFilter } from './project-runs';
 import { RunDialog } from './run-dialog';
 import { RunRow } from './run-row';
@@ -205,14 +205,13 @@ function HandedBack({ pollMs }: { pollMs: number }) {
 }
 
 /**
- * "12 runs, 2 draft replies", for a spend line.
+ * "12 runs", for a spend line.
  *
  * @param line - The line.
- * @returns Its counts.
+ * @returns Its count.
  */
 function runsLine(line: SpendLineFieldsFragment): string {
-  const runs = `${line.runs.toLocaleString()} ${line.runs === 1 ? 'run' : 'runs'}`;
-  return line.draftReplies > 0 ? `${runs}, ${draftReplies(line.draftReplies)}` : runs;
+  return `${line.runs.toLocaleString()} ${line.runs === 1 ? 'run' : 'runs'}`;
 }
 
 /** What the runs of the window spent, in all, by project and by agent. */
@@ -237,11 +236,7 @@ function AccountSpend({ pollMs }: { pollMs: number }) {
               className="min-w-40 flex-1"
               label="Runs"
               value={(total?.runs ?? 0).toLocaleString()}
-              hint={
-                total && total.draftReplies > 0
-                  ? `in ${SPEND_DAYS} days, ${draftReplies(total.draftReplies)}`
-                  : `in ${SPEND_DAYS} days`
-              }
+              hint={`in ${SPEND_DAYS} days`}
               loading={!spend}
             />
             <StatTile
@@ -258,9 +253,6 @@ function AccountSpend({ pollMs }: { pollMs: number }) {
             <Text className="text-foreground/60 text-sm">
               {`Runs are kept for ${spend.retentionDays} ${spend.retentionDays === 1 ? 'day' : 'days'}, so these figures start on ${formatTimestamp(spend.keptSince)}, not ${SPEND_DAYS} days back.`}
             </Text>
-          ) : null}
-          {total && total.draftReplies > 0 ? (
-            <Text className="text-foreground/60 text-sm">A draft reply’s tokens are an estimate.</Text>
           ) : null}
           {spend && spend.total.runs > 0 ? (
             <View className="flex-row flex-wrap gap-6">
@@ -310,7 +302,7 @@ function SpendList({
   );
 }
 
-/** Every project's runs, newest first, a draft's replies among them. */
+/** Every project's runs, newest first. */
 function AccountRuns({ pollMs }: { pollMs: number }) {
   const [filter, setFilter] = useState<RunFilter>('all');
   const [limit, setLimit] = useState(RUNS_PAGE);

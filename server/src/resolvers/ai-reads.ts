@@ -12,7 +12,7 @@ import { DELETED_AGENT, SPEND_SUMS, type SpendRow, spendLine } from './account-a
 // The roster: an agent's row holds its key, its endpoint, its prompt and its
 // MCP servers with their headers and environment, so the table is closed to AI
 // whole (tenancy.ts). This is what a caller needs of it and no more: who the
-// agents are, to start a draft with one, and which lanes each works.
+// agents are, and which lanes each works.
 //
 // Spend: `accountSpend` is a person's and covers every project they own. This
 // is the same sum over the projects AI may see.
@@ -37,7 +37,7 @@ const AI_READS_SDL = parse(`
     name: String!
     "The model it runs: its own, else your default. Empty when neither names one."
     model: String!
-    "Whether it is switched on. One switched off takes no runs and no drafts."
+    "Whether it is switched on. One switched off takes no runs."
     enabled: Boolean!
     "Whether a key is stored for it. The key itself is never read back."
     hasApiKey: Boolean!

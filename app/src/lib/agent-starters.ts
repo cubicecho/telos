@@ -1,16 +1,16 @@
 import { type AgentDraft, toAgentDraft } from './agents';
 
-// The four agents kanban_server came with (refiner, planner, worker,
-// reviewer), as starting text for a new agent. An agent's instructions are all
+// Three of the agents kanban_server came with (planner, worker, reviewer), as
+// starting text for a new agent. An agent's instructions are all
 // it is told about its job: how its reply is read (PASS or FAIL, a report, a
 // `todos` block) is the runner's standing protocol and is sent whatever the
-// agent says (runner/src/prompts.ts, runner/src/drafts.ts). What a starter
+// agent says (runner/src/prompts.ts). What a starter
 // leaves out is left blank, inheriting the agent defaults: above all the
 // endpoint and the model, which are the only things someone has to add.
 
 export interface AgentStarter {
   /** Its key. */
-  id: 'refiner' | 'planner' | 'worker' | 'reviewer';
+  id: 'planner' | 'worker' | 'reviewer';
   name: string;
   /** What it is for, as its new agent's dialog says it. */
   description: string;
@@ -19,19 +19,6 @@ export interface AgentStarter {
 }
 
 export const AGENT_STARTERS: readonly AgentStarter[] = [
-  {
-    id: 'refiner',
-    name: 'Refiner',
-    description: 'Talks a rough request into a todo, in a draft.',
-    draft: {
-      systemPrompt: `You are patient and plain-spoken. You would rather ask one good question than guess, and
-rather assume the obvious than ask about it. You keep the person's own words for things, and you
-never promise what the work will find.`,
-      temperature: '0.7',
-      // A draft is a conversation, answered in JSON: there is nothing for tools to do.
-      mcpServerSlugs: [],
-    },
-  },
   {
     id: 'planner',
     name: 'Planner',

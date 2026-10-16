@@ -24,7 +24,7 @@ const AI_SETUP_SDL = parse(`
     stationProjectIds: [ID!]!
     "AI is on for a project that has a lane with an agent."
     projectAi: Boolean!
-    "There is something to work: an open todo in a lane with an agent in such a project, or a draft, or a run already made."
+    "There is something to work: an open todo in a lane with an agent in such a project, or a run already made."
     request: Boolean!
     "Work may start: such a project runs by itself, or a todo was asked for with runTodo, or a run was already made."
     started: Boolean!
@@ -63,7 +63,7 @@ async function readSetup(db: DB, userId: string): Promise<SetupRow> {
         AND EXISTS (SELECT 1 FROM lanes l WHERE l.project_id = p.id AND l.agent_id IS NOT NULL)
     ),
     has_run AS (
-      SELECT EXISTS (SELECT 1 FROM runs r WHERE r.user_id = ${userId} AND r.kind = 'todo') AS yes
+      SELECT EXISTS (SELECT 1 FROM runs r WHERE r.user_id = ${userId}) AS yes
     )
     SELECT
       EXISTS (SELECT 1 FROM agents a WHERE a.user_id = ${userId} AND a.enabled) AS agent,
@@ -74,7 +74,6 @@ async function readSetup(db: DB, userId: string): Promise<SetupRow> {
       EXISTS (SELECT 1 FROM agent_projects s WHERE s.ai_enabled) AS project_ai,
       (
         (SELECT yes FROM has_run)
-        OR EXISTS (SELECT 1 FROM drafts d WHERE d.user_id = ${userId})
         OR EXISTS (
           SELECT 1 FROM todos t
           JOIN agent_projects s ON s.id = t.project_id AND s.ai_enabled

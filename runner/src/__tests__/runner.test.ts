@@ -15,12 +15,11 @@ import { authFor, createTestDb, schemaFor, type TestDb } from '../../../server/s
 import { toHeaders } from '../../../server/src/auth.ts';
 import { mountMcp } from '../../../server/src/mcp.ts';
 import { createContextFactory } from '../../../server/src/request-context.ts';
-import { answerDraft, ESTIMATED_NOTICE, takeDrafts } from '../drafts.ts';
 import { startRunner } from '../embed.ts';
 import { type LoopOptions, tick } from '../loop.ts';
 import { takeTests } from '../probes.ts';
 import { takeSessionDeletes } from '../session-deletes.ts';
-import { createTelos, type DraftClaim } from '../telos.ts';
+import { createTelos } from '../telos.ts';
 
 // The runner end to end: a real telos over HTTP (GraphQL for the runner, /mcp
 // for the agent), and a scripted OpenAI-compatible endpoint standing in for the
@@ -127,7 +126,7 @@ async function serveTelos(): Promise<string> {
 
 /**
  * A chat-completions endpoint that answers whatever `llm.script` says:
- * streamed, as a run asks, or whole, as a draft's single call does.
+ * streamed, as a run asks, or whole, for a call that does not stream.
  *
  * @returns Its base URL.
  */
@@ -708,167 +707,5 @@ describe('the runner inside the server', () => {
     } finally {
       await runner.stop();
     }
-  });
-});
-
-describe('drafts', () => {
-  const START = `mutation ($projectId: ID!, $agentId: ID!, $message: String!) {
-    startDraft(projectId: $projectId, agentId: $agentId, message: $message) { id }
-  }`;
-  const READ = `query ($id: UUID!) {
-    draft(where: { id: { eq: $id } }) { title brief error waitingSince messages(orderBy: { createdAt: { direction: asc, priority: 1 } }) { role content } }
-  }`;
-
-  /** The runs a draft's replies left, oldest first. */
-  async function runsOf(draftId: string) {
-    return db.select().from(dbSchema.runs).where(eq(dbSchema.runs.draftId, draftId)).orderBy(dbSchema.runs.startedAt);
-  }
-
-  async function answerAll(): Promise<number> {
-    const running = new Map<string, Promise<unknown>>();
-    const taken = await takeDrafts(createTelos({ telosUrl, runnerKey: RUNNER_KEY }), 2, running, { log: () => {} });
-    await Promise.all(running.values());
-    return taken;
-  }
-
-  it('has the agent answer the conversation and rewrite the brief', async () => {
-    const seen: Array<{ role: string; content: unknown }> = [];
-    llm.script = (messages) => {
-      seen.push(...messages);
-      return {
-        content: JSON.stringify({ reply: 'Which export, CSV?', title: 'Faster export', brief: 'Speed up the export.' }),
-      };
-    };
-    const id = (
-      await board.person.expectOk(START, {
-        projectId: board.projectId,
-        agentId: board.agentId,
-        message: 'Export is slow',
-      })
-    ).startDraft.id;
-    expect(await answerAll()).toBe(1);
-
-    const draft = (await board.person.expectOk(READ, { id })).draft;
-    expect(draft).toMatchObject({
-      title: 'Faster export',
-      brief: 'Speed up the export.',
-      waitingSince: null,
-      error: null,
-    });
-    expect(draft.messages).toEqual([
-      { role: 'user', content: 'Export is slow' },
-      { role: 'assistant', content: 'Which export, CSV?' },
-    ]);
-    expect(String(seen[0].content)).toContain('turn a rough request into a todo');
-    expect(String(seen[0].content)).toContain('A test board.');
-    expect(String(seen[1].content)).toContain('Them: Export is slow');
-    // Nothing is left waiting.
-    expect(await answerAll()).toBe(0);
-
-    // The reply is a run: who answered, what it was told, what it said and spent.
-    const [run, ...others] = await runsOf(id);
-    expect(others).toEqual([]);
-    expect(run).toMatchObject({
-      kind: 'draft',
-      status: 'ok',
-      todoId: null,
-      agentId: board.agentId,
-      model: 'tiny',
-      output: 'Which export, CSV?',
-      error: null,
-      toolCalls: 0,
-    });
-    // The call adds how to answer after what the runner told it.
-    expect(run.systemPrompt).toContain('A test board.');
-    expect(String(seen[0].content).startsWith(String(run.systemPrompt))).toBe(true);
-    expect(run.userPrompt).toBe(String(seen[1].content));
-    expect(run.promptTokens).toBeGreaterThan(0);
-    expect(run.completionTokens).toBeGreaterThan(0);
-    expect(run.totalTokens).toBe(run.promptTokens + run.completionTokens);
-    expect(run.finishedAt).not.toBeNull();
-    expect(run.events.map((event: { kind: string; text?: string | null }) => [event.kind, event.text])).toEqual([
-      ['notice', ESTIMATED_NOTICE],
-      ['output', 'Which export, CSV?'],
-    ]);
-  });
-
-  it('reports a model that cannot answer as the draft’s error', async () => {
-    llm.script = () => ({ content: 'no json here' });
-    const id = (
-      await board.person.expectOk(START, { projectId: board.projectId, agentId: board.agentId, message: 'Hello' })
-    ).startDraft.id;
-    await answerAll();
-    const draft = (await board.person.expectOk(READ, { id })).draft;
-    expect(draft.error).toMatch(/shape asked for/);
-    expect(draft.waitingSince).toBeNull();
-    expect(draft.messages).toHaveLength(1);
-
-    // The failed reply can be read: it is a run with the error and the prompt.
-    const [run] = await runsOf(id);
-    expect(run).toMatchObject({ kind: 'draft', status: 'error', output: null });
-    expect(run.error).toMatch(/shape asked for/);
-    expect(run.userPrompt).toContain('Them: Hello');
-    expect(run.promptTokens).toBeGreaterThan(0);
-  });
-
-  it('reports an endpoint that cannot be reached with what was asked, and nothing received', async () => {
-    llm.script = () => ({ fail: 400 });
-    const id = (
-      await board.person.expectOk(START, { projectId: board.projectId, agentId: board.agentId, message: 'Hello' })
-    ).startDraft.id;
-    await answerAll();
-    const [run] = await runsOf(id);
-    expect(run).toMatchObject({ kind: 'draft', status: 'error', completionTokens: 0 });
-    expect(run.totalTokens).toBe(run.promptTokens);
-    expect((await board.person.expectOk(READ, { id })).draft.error).toBe(run.error);
-  });
-
-  it('answers with the prompt, an estimate of the spend, and what the call noticed', async () => {
-    const claim: DraftClaim = {
-      draftId: 'draft',
-      runId: 'run',
-      agent: {
-        id: 'agent',
-        name: 'Worker',
-        baseUrl: 'http://llm.test/v1',
-        model: 'tiny',
-        apiKey: null,
-        systemPrompt: 'Be brief.',
-        temperature: null,
-        maxTokens: null,
-        contextLength: null,
-        maxToolIterations: 1,
-        toolDiscovery: false,
-        toolSelectModel: null,
-        reasoningEffort: null,
-        requestTimeoutSeconds: null,
-        maxRetries: null,
-        mcpServers: '[]',
-        mcpNotices: [],
-        defaults: null,
-      },
-      projectName: 'P',
-      projectDescription: null,
-      projectContext: null,
-      title: '',
-      brief: '',
-      messages: [{ role: 'user', content: 'Export is slow' }],
-    };
-    const answer = await answerDraft(claim, {
-      ask: async (_config, _model, _system, _user, _schema, options) => {
-        options?.onNotice?.('Fell back to plain JSON.');
-        return { reply: 'Which export?', title: 'Faster export', brief: 'Speed up the export.' } as never;
-      },
-    });
-    expect(answer).toMatchObject({ reply: 'Which export?', title: 'Faster export', brief: 'Speed up the export.' });
-    expect(answer.prompt.system).toContain('Be brief.');
-    expect(answer.prompt.user).toContain('Them: Export is slow');
-    expect(answer.usage.totalTokens).toBe(answer.usage.promptTokens + answer.usage.completionTokens);
-    expect(answer.usage.completionTokens).toBeGreaterThan(0);
-    expect(answer.events).toEqual([
-      { kind: 'notice', text: ESTIMATED_NOTICE },
-      { kind: 'notice', text: 'Fell back to plain JSON.' },
-      { kind: 'output', text: 'Which export?' },
-    ]);
   });
 });

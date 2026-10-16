@@ -32,10 +32,7 @@ const ACCOUNT_ACTIVITY_SDL = parse(`
     "The project or the agent. Null for runs whose agent was deleted."
     id: ID
     name: String!
-    "Every run, a draft's replies among them."
     runs: Int!
-    "How many of them were replies in drafts."
-    draftReplies: Int!
     promptTokens: Float!
     completionTokens: Float!
     totalTokens: Float!
@@ -87,7 +84,6 @@ export interface SpendRow {
   id: string | null;
   name: string | null;
   runs: number;
-  draft_replies: number;
   prompt_tokens: string | number;
   completion_tokens: string | number;
   total_tokens: string | number;
@@ -96,7 +92,6 @@ export interface SpendRow {
 /** The columns every spend row has, over runs named `r`. */
 export const SPEND_SUMS = sql`
   count(*)::int AS runs,
-  count(*) FILTER (WHERE r.kind = 'draft')::int AS draft_replies,
   coalesce(sum(r.prompt_tokens), 0) AS prompt_tokens,
   coalesce(sum(r.completion_tokens), 0) AS completion_tokens,
   coalesce(sum(r.total_tokens), 0) AS total_tokens
@@ -114,7 +109,6 @@ export function spendLine(row: SpendRow | undefined, name: string) {
     id: row?.id ?? null,
     name: row?.name ?? name,
     runs: Number(row?.runs ?? 0),
-    draftReplies: Number(row?.draft_replies ?? 0),
     promptTokens: Number(row?.prompt_tokens ?? 0),
     completionTokens: Number(row?.completion_tokens ?? 0),
     totalTokens: Number(row?.total_tokens ?? 0),

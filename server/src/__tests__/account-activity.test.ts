@@ -2,18 +2,7 @@ import * as dbSchema from '@telos/db/schema';
 import { eq } from 'drizzle-orm';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { DELETED_AGENT } from '../resolvers/account-activity.ts';
-import {
-  answeredDraft,
-  type Board,
-  CLAIM,
-  claimedDraft,
-  createBoard,
-  DRAFT_USAGE,
-  FINISH,
-  runnerClient,
-  SET_AUTO_RUN,
-  setLane,
-} from './board.ts';
+import { type Board, CLAIM, createBoard, FINISH, runnerClient, SET_AUTO_RUN, setLane } from './board.ts';
 import { createClient, createTestDb, type TestClient, type TestDb } from './helpers.ts';
 
 // An account's activity across its projects: what its runs spent, by project
@@ -25,7 +14,7 @@ let runner: TestClient;
 
 const DAY = 24 * 60 * 60_000;
 const KEY_ID = '00000000-0000-0000-0000-000000000000';
-const LINE = 'id name runs draftReplies promptTokens completionTokens totalTokens';
+const LINE = 'id name runs promptTokens completionTokens totalTokens';
 const SPEND = `query ($since: DateTime!) {
   accountSpend(since: $since) {
     since keptSince retentionDays
@@ -40,7 +29,7 @@ const HANDED_BACK = `query {
   }
 }`;
 const ACCOUNT_LISTS = `query {
-  runs(orderBy: { startedAt: { direction: desc, priority: 1 } }) { id kind project { id name } todo { id title } }
+  runs(orderBy: { startedAt: { direction: desc, priority: 1 } }) { id project { id name } todo { id title } }
   artifacts(orderBy: { createdAt: { direction: desc, priority: 1 } }) { id location project { id name } todo { id title } }
   todos(deleted: ONLY, orderBy: { archivedAt: { direction: desc, priority: 1 } }) { id title project { id name } }
 }`;
@@ -120,7 +109,6 @@ describe('accountSpend', () => {
       id: null,
       name: 'Every project',
       runs: 0,
-      draftReplies: 0,
       promptTokens: 0,
       completionTokens: 0,
       totalTokens: 0,
@@ -138,7 +126,7 @@ describe('accountSpend', () => {
     await runOnce(await second.addTodo('And this'), { status: 'ERROR', error: 'No.', totalTokens: 3 });
 
     const read = await spend();
-    expect(read.total).toMatchObject({ runs: 3, draftReplies: 0, promptTokens: 85, completionTokens: 22 });
+    expect(read.total).toMatchObject({ runs: 3, promptTokens: 85, completionTokens: 22 });
     expect(read.total.totalTokens).toBe(110);
     expect(read.byProject).toMatchObject([
       { id: second.projectId, name: 'Q', runs: 2, totalTokens: 103 },
@@ -148,16 +136,6 @@ describe('accountSpend', () => {
       { id: second.agentId, name: 'Reviewer', runs: 2, totalTokens: 103 },
       { id: board.agentId, name: 'Worker', runs: 1, totalTokens: 7 },
     ]);
-  });
-
-  it('counts a draft’s replies with the rest, and says how many they were', async () => {
-    await runOnce(await board.addTodo('Write it'), { status: 'OK', output: 'Wrote it.', totalTokens: 7 });
-    await answeredDraft(board, runner);
-
-    const read = await spend();
-    expect(read.total).toMatchObject({ runs: 2, draftReplies: 1, totalTokens: 7 + DRAFT_USAGE.totalTokens });
-    expect(read.byProject).toMatchObject([{ id: board.projectId, runs: 2, draftReplies: 1 }]);
-    expect(read.byAgent).toMatchObject([{ id: board.agentId, runs: 2, draftReplies: 1 }]);
   });
 
   it('leaves out runs from before the window', async () => {
@@ -317,13 +295,6 @@ describe('accountHandedBack', () => {
     expect((await handedBack()).map((row) => row.todoId)).toEqual([kept]);
   });
 
-  it('never lists a draft: a failed reply is not a todo waiting on anyone', async () => {
-    await board.addTodo('Plain');
-    await answeredDraft(board, runner, { error: 'model unreachable' });
-    await claimedDraft(board, runner);
-    expect(await handedBack()).toEqual([]);
-  });
-
   it('leaves out what nobody is waiting on: archived, done, ignored, or in a project with AI off', async () => {
     const archived = await board.addTodo('Archived');
     const done = await board.addTodo('Done');
@@ -377,11 +348,6 @@ describe('the account’s lists', () => {
       .update(dbSchema.runs)
       .set({ startedAt: new Date(Date.now() + 60_000) })
       .where(eq(dbSchema.runs.id, otherRun));
-    const { runId: draftRun } = await answeredDraft(board, runner);
-    await db
-      .update(dbSchema.runs)
-      .set({ startedAt: new Date(Date.now() + 120_000) })
-      .where(eq(dbSchema.runs.id, draftRun));
     await board.person.expectOk(`mutation ($id: UUID!) { deleteTodo(where: { id: { eq: $id } }) { id } }`, {
       id: other,
     });
@@ -391,17 +357,14 @@ describe('the account’s lists', () => {
 
     const read = await board.person.expectOk(ACCOUNT_LISTS);
     expect(read.runs).toEqual([
-      { id: draftRun, kind: 'draft', project: { id: board.projectId, name: 'P' }, todo: null },
       // An archived todo is still what its run was about.
       {
         id: otherRun,
-        kind: 'todo',
         project: { id: second.projectId, name: 'Q' },
         todo: { id: other, title: 'Review it' },
       },
       {
         id: firstRun,
-        kind: 'todo',
         project: { id: board.projectId, name: 'P' },
         todo: { id: first, title: 'Write it' },
       },

@@ -15,7 +15,7 @@ import {
 import ActivityScreen from '../../../../../app/(app)/activity';
 import { AccountActivity, type AccountView } from '../account-activity';
 import { RUNS_PAGE } from '../project-runs';
-import { aiStateMock, draftRun, run } from './run-fixtures';
+import { aiStateMock, run } from './run-fixtures';
 
 const params = vi.hoisted(() => ({ view: undefined as string | undefined }));
 
@@ -35,7 +35,6 @@ function line(id: string | null, name: string, runs: number, totalTokens: number
     id,
     name,
     runs,
-    draftReplies: 0,
     promptTokens: 0,
     completionTokens: 0,
     totalTokens,
@@ -56,12 +55,11 @@ function spend(extra: Record<string, unknown> = {}): MockedResponse {
           keptSince: null,
           retentionDays: null,
           total: line(null, 'Every project', 14, 41_200, {
-            draftReplies: 2,
             promptTokens: 40_000,
             completionTokens: 1200,
           }),
-          byProject: [line('p1', 'Site', 10, 40_000, { draftReplies: 2 }), line('p2', 'Docs', 4, 1200)],
-          byAgent: [line('a1', 'Reviewer', 13, 41_000, { draftReplies: 2 }), line(null, 'A deleted agent', 1, 200)],
+          byProject: [line('p1', 'Site', 10, 40_000), line('p2', 'Docs', 4, 1200)],
+          byAgent: [line('a1', 'Reviewer', 13, 41_000), line(null, 'A deleted agent', 1, 200)],
           ...extra,
         },
       },
@@ -156,18 +154,17 @@ describe('AccountActivity', () => {
     expect(await screen.findByText(/An agent is working it now\./)).toBeInTheDocument();
   });
 
-  it('shows what was spent, by project and by agent, drafts among it', async () => {
+  it('shows what was spent, by project and by agent', async () => {
     show([handedBack([]), spend(), NO_RUNS]);
 
     expect(await screen.findByText('41,200')).toBeInTheDocument();
-    expect(screen.getByText('in 30 days, 2 draft replies')).toBeInTheDocument();
+    expect(screen.getByText('in 30 days')).toBeInTheDocument();
     expect(screen.getByText('40,000 in, 1,200 out')).toBeInTheDocument();
-    expect(screen.getByText('A draft reply’s tokens are an estimate.')).toBeInTheDocument();
     expect(screen.queryByText(/Runs are kept for/)).not.toBeInTheDocument();
 
     const [site, docs] = within(screen.getByRole('list', { name: 'By project' })).getAllByRole('listitem');
     expect(within(site).getByText('Site')).toBeInTheDocument();
-    expect(within(site).getByText('10 runs, 2 draft replies')).toBeInTheDocument();
+    expect(within(site).getByText('10 runs')).toBeInTheDocument();
     expect(within(site).getByText('40,000 tokens')).toBeInTheDocument();
     expect(within(docs).getByText('4 runs')).toBeInTheDocument();
 
@@ -184,22 +181,19 @@ describe('AccountActivity', () => {
     ).toBeInTheDocument();
   });
 
-  it('lists every project’s runs with the project named, a draft’s reply marked, and filters by status', async () => {
+  it('lists every project’s runs with the project named, and filters by status', async () => {
     const user = userEvent.setup();
     const failed = run('r1', 'error', { todo: { __typename: 'Todo', id: 't2', title: 'Fix it' }, project: DOCS });
     show([
       handedBack([]),
       spend(),
-      runs(null, [draftRun('r3', 'ok', { project: SITE }), run('r2', 'running', { project: SITE }), failed]),
+      runs(null, [run('r2', 'running', { project: SITE }), failed]),
       runs('error', [failed]),
     ]);
 
-    const [reply, work, fix] = within(await screen.findByRole('list', { name: 'Runs' })).getAllByRole('listitem');
-    expect(within(reply).getByText('Faster export — Draft reply · Planner')).toBeInTheDocument();
-    expect(within(reply).getByText('Draft')).toBeInTheDocument();
-    expect(within(reply).getByText(/^Site · /)).toBeInTheDocument();
+    const [work, fix] = within(await screen.findByRole('list', { name: 'Runs' })).getAllByRole('listitem');
     expect(within(work).getByText('Write it — Review · Reviewer')).toBeInTheDocument();
-    expect(within(work).queryByText('Draft')).not.toBeInTheDocument();
+    expect(within(work).getByText(/^Site · /)).toBeInTheDocument();
     expect(within(fix).getByText(/^Docs · /)).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Failed' }));

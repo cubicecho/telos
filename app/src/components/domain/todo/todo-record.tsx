@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Platform, Text, View } from 'react-native';
 import type { RunSummaryFieldsFragment, TodoNoteFieldsFragment } from '@/__generated__/graphql';
 import { RunDialog } from '@/components/domain/ai/run-dialog';
-import { DRAFT_RUN, describeRun, RunStatusBadge } from '@/components/domain/ai/run-log';
+import { describeRun, RunStatusBadge } from '@/components/domain/ai/run-log';
 import { List } from '@/components/list';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -303,20 +303,15 @@ type Entry =
 
 /**
  * What happened to a todo, in order. With `runs`, each time an agent worked
- * it is a line of its own among the moves it caused. A todo made from a draft
- * says so, and while its project's AI is on the replies of that draft come
- * first: they are the draft's runs still, shown here so the talk can be read.
+ * it is a line of its own among the moves it caused.
  */
 export function TodoHistory({ todoId, runs = [] }: { todoId: string; runs?: readonly RunSummaryFieldsFragment[] }) {
-  const ai = useAi();
   const record = useTodoRecord(todoId);
   const events = record.data?.todo?.history ?? [];
   const projectAi = record.data?.todo?.project?.aiEnabled === true;
-  const draft = record.data?.todo?.draft;
-  const replies = ai.on && projectAi ? (draft?.runs ?? []) : [];
   const entries: Entry[] = [
     ...events.map((event) => ({ at: event.at, event })),
-    ...[...replies, ...runs].map((run) => ({ at: run.startedAt, run })),
+    ...runs.map((run) => ({ at: run.startedAt, run })),
   ].sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
   const lanes = new Map((record.data?.todo?.project?.lanes ?? []).map((lane) => [lane.id, lane.name]));
   const laneName = (id: string | null | undefined) => (id ? (lanes.get(id) ?? 'a deleted lane') : 'no lane');
@@ -324,7 +319,7 @@ export function TodoHistory({ todoId, runs = [] }: { todoId: string; runs?: read
   function describe(event: HistoryEvent): string {
     switch (event.kind) {
       case 'create':
-        return draft ? 'Created from a draft' : 'Created';
+        return 'Created';
       case 'complete':
         return 'Completed';
       case 'reopen':
@@ -361,10 +356,7 @@ export function TodoHistory({ todoId, runs = [] }: { todoId: string; runs?: read
             <View key={run.id} className="gap-0.5 border-foreground/40 border-l-2 pl-3">
               <View className="flex-row items-center gap-2">
                 <Text className="text-foreground text-sm">
-                  {run.agent?.name ?? 'A deleted agent'}{' '}
-                  {run.kind === DRAFT_RUN
-                    ? 'replied in the draft it was made from'
-                    : `worked it in ${run.lane?.name ?? 'a deleted lane'}`}
+                  {run.agent?.name ?? 'A deleted agent'} worked it in {run.lane?.name ?? 'a deleted lane'}
                 </Text>
                 <RunStatusBadge status={run.status} />
               </View>

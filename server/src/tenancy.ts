@@ -42,8 +42,6 @@ export const USER_OWNED_TABLES = [
   'runs',
   'artifacts',
   'boardTemplates',
-  'drafts',
-  'draftMessages',
 ] as const;
 
 /** Every table drizzle-graphql will generate fields for. */
@@ -94,24 +92,12 @@ function aiNarrowed(narrow: (context: Context, table: AnyTable, userId: string) 
   };
 }
 
-/** The caller's drafts in projects with AI on, as a subquery. */
-function aiDraftIds(context: Context, userId: string) {
-  return context.db
-    .select({ id: dbSchema.drafts.id })
-    .from(dbSchema.drafts)
-    .where(and(eq(dbSchema.drafts.userId, userId), inArray(dbSchema.drafts.projectId, aiProjectIds(context, userId))));
-}
-
 const AI_SCOPES: Partial<Record<OwnedTable, SqlScope>> = {
   // An agent's row holds its key and its MCP servers' secrets. The AI side
   // reads the roster instead (`agentRoster`, resolvers/ai-reads.ts), which
   // carries neither.
   agents: aiNarrowed(() => sql`false`),
   mcpServers: aiNarrowed(() => sql`false`),
-  // A draft is open to AI where its project is, as the draft mutations are.
-  drafts: aiNarrowed((context, table, userId) => inArray(table.projectId, aiProjectIds(context, userId))),
-  draftMessages: aiNarrowed((context, table, userId) => inArray(table.draftId, aiDraftIds(context, userId))),
-  // By todo, so a draft's runs, which have none, stay a person's to read.
   runs: aiNarrowed((context, table, userId) => inArray(table.todoId, aiTodoIds(context, userId))),
   // By todo as well, so one whose todo was deleted is a person's to see.
   artifacts: aiNarrowed((context, table, userId) => inArray(table.todoId, aiTodoIds(context, userId))),
@@ -195,18 +181,8 @@ export const contextValues: NonNullable<BuildSchemaConfig['contextValues']> = {
  * `artifacts` are what a finished run reports (`finishRun`) or a client says it
  * made (`recordArtifact`), each stamped with where it came from; a person may
  * take one off the board (`deleteArtifact`), and nothing else.
- * `drafts` and their messages are a conversation (resolvers/drafts.ts): someone
- * says something and the runner answers, and neither is edited after.
  */
-const WRITES_RESERVED = new Set<string>([
-  'users',
-  'todoDependencies',
-  'todoEvents',
-  'runs',
-  'artifacts',
-  'drafts',
-  'draftMessages',
-]);
+const WRITES_RESERVED = new Set<string>(['users', 'todoDependencies', 'todoEvents', 'runs', 'artifacts']);
 
 /**
  * Tables generated CRUD may add to and nothing more. Rewriting a note or taking

@@ -25,8 +25,8 @@ export const projects = pgTable(
     // todos are worked only when a person asks (runTodo). Means nothing while
     // aiEnabled is off. Set through setProjectAutoRun, as aiEnabled is.
     autoRun: boolean('auto_run').notNull().default(false),
-    // Where new todos land: a submitted request, a finished draft, or the todos
-    // a run proposes. Unset, or a done lane, and they land in the first open
+    // Where new todos land: a submitted request, or the todos a run proposes.
+    // Unset, or a done lane, and they land in the first open
     // lane (findNewTodoLaneId).
     newTodoLaneId: uuid('new_todo_lane_id').references((): AnyPgColumn => lanes.id, { onDelete: 'set null' }),
     archivedAt: timestamp('archived_at', { withTimezone: true }),

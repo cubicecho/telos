@@ -3,7 +3,7 @@ import type { AddressInfo } from 'node:net';
 import * as dbSchema from '@telos/db/schema';
 import { eq } from 'drizzle-orm';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { type Board, CLAIM_DRAFT, createBoard, QUEUE, runnerClient, START_DRAFT } from './board.ts';
+import { type Board, createBoard, QUEUE, runnerClient } from './board.ts';
 import { createClient, createTestDb, type TestClient, type TestDb } from './helpers.ts';
 
 // What an account's agents inherit: set in Settings, handed to the runner with
@@ -199,23 +199,12 @@ describe('an agent over its defaults', () => {
 });
 
 describe('an agent switched off', () => {
-  it('takes no runs and no drafts', async () => {
-    const draftId = (
-      await board.person.expectOk(START_DRAFT, { projectId: board.projectId, agentId: board.agentId, message: 'Hi' })
-    ).startDraft.id;
+  it('takes no runs', async () => {
     await board.addTodo('Waits');
     expect((await runner.expectOk(QUEUE)).runnerQueue).toHaveLength(1);
 
     await board.person.expectOk(UPDATE_AGENT, { id: board.agentId, set: { enabled: false } });
     expect((await runner.expectOk(QUEUE)).runnerQueue).toEqual([]);
-    expect((await runner.expectOk(CLAIM_DRAFT, { id: draftId })).claimDraft).toBeNull();
-    const refused = await board.person.expectError(START_DRAFT, {
-      projectId: board.projectId,
-      agentId: board.agentId,
-      message: 'Again',
-    });
-    expect(refused).toMatchObject({ code: 'CONFLICT' });
-    expect(refused.message).toMatch(/Worker is switched off/);
     expect((await board.person.expectOk(`query { agentRoster { enabled } }`)).agentRoster).toEqual([
       { enabled: false },
     ]);

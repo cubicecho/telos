@@ -17,9 +17,6 @@ import { arrivedIn, TOUCHED } from './ready.ts';
 //
 // What a run did stays: its notes and history keep their `runId`, pointing at
 // a run that is gone, and its artifacts keep their files.
-//
-// A draft's replies are runs too, and readiness does not count them, so every finished
-// one past its keep goes. What the agent said stays in the draft's conversation.
 
 /** How often the server prunes. */
 export const PRUNE_EVERY_MS = 60 * 60_000;
@@ -38,17 +35,10 @@ export async function pruneRuns(db: DB, now: Date = new Date()): Promise<number>
   const stale = sql`u.run_retention_days IS NOT NULL
       AND r.status <> 'running'
       AND coalesce(r.finished_at, r.started_at) < ${now.toISOString()}::timestamptz - make_interval(days => u.run_retention_days)`;
-  const drafts = await db.execute(sql`
-    DELETE FROM runs r
-    USING users u
-    WHERE u.id = r.user_id AND r.kind = 'draft'
-      AND ${stale}
-    RETURNING r.id
-  `);
   const result = await db.execute(sql`
     DELETE FROM runs r
     USING users u, todos t
-    WHERE u.id = r.user_id AND t.id = r.todo_id AND r.kind = 'todo'
+    WHERE u.id = r.user_id AND t.id = r.todo_id
       AND ${stale}
       AND (
         t.completed_at IS NOT NULL
@@ -65,7 +55,7 @@ export async function pruneRuns(db: DB, now: Date = new Date()): Promise<number>
       )
     RETURNING r.id
   `);
-  return resultRows(result).length + resultRows(drafts).length;
+  return resultRows(result).length;
 }
 
 /**

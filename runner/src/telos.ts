@@ -168,30 +168,6 @@ export interface SessionDelete {
   mcpServers: string;
 }
 
-/** A draft the runner has taken to answer. */
-export interface DraftClaim {
-  draftId: string;
-  /** The run this answer is recorded as. */
-  runId: string;
-  agent: ClaimedAgent;
-  projectName: string;
-  projectDescription: string | null;
-  projectContext: string | null;
-  title: string;
-  brief: string;
-  messages: Array<{ role: 'user' | 'assistant'; content: string }>;
-}
-
-/** What the agent made of a draft: its reply and the title and brief now, or why it could not. */
-export type DraftAnswer = ({ reply: string; title: string; brief: string } | { error: string }) & DraftSpend;
-
-/** What a draft's answer is recorded with, on its run: said or failed alike. */
-export interface DraftSpend {
-  prompt: RunPrompt;
-  usage: RunUsage;
-  events: RunEvent[];
-}
-
 /** The runner's calls into telos. An interface so a test can stand in for it. */
 export interface Telos {
   queue(limit?: number): Promise<ReadyTodo[]>;
@@ -202,11 +178,6 @@ export interface Telos {
   /** MCP server tests waiting to be made, now taken. */
   probes(): Promise<RunnerProbe[]>;
   finishProbe(id: string, result: ProbeResult): Promise<void>;
-  /** Drafts waiting on an answer. */
-  drafts(limit?: number): Promise<string[]>;
-  claimDraft(id: string): Promise<DraftClaim | null>;
-  /** Reports a draft's answer against the run `claimDraft` started. */
-  finishDraft(id: string, runId: string, answer: DraftAnswer): Promise<void>;
   /** Deleted todos whose sessions' servers are still to be told, now taken. */
   sessionDeletes(limit?: number): Promise<SessionDelete[]>;
   /** With `error`, the servers could not be told. */
@@ -214,7 +185,7 @@ export interface Telos {
 }
 
 const QUEUE = `query ($limit: Int) { runnerQueue(limit: $limit) { todoId laneId projectId } }`;
-/** What the runner reads of an agent, for a run or a draft. */
+/** What the runner reads of an agent, for a run. */
 const AGENT_FIELDS = `
   id name baseUrl model apiKey systemPrompt temperature maxTokens contextLength
   maxToolIterations toolDiscovery toolSelectModel reasoningEffort requestTimeoutSeconds maxRetries mcpServers mcpNotices
@@ -238,23 +209,6 @@ const HEARTBEAT = `mutation ($id: ID!, $events: [RunEventInput!], $prompt: RunPr
 }`;
 const PROBES = `query { runnerProbes { id server } }`;
 const FINISH_PROBE = `mutation ($id: ID!, $result: ProbeResultInput!) { finishProbe(id: $id, result: $result) }`;
-const DRAFTS = `query ($limit: Int) { runnerDrafts(limit: $limit) }`;
-const CLAIM_DRAFT = `mutation ($id: ID!) {
-  claimDraft(id: $id) {
-    draftId runId projectName projectDescription projectContext title brief
-    agent { ${AGENT_FIELDS} }
-    messages { role content }
-  }
-}`;
-const FINISH_DRAFT = `mutation (
-  $id: ID!, $runId: ID, $reply: String, $title: String, $brief: String, $error: String,
-  $prompt: RunPromptInput, $usage: RunUsageInput, $events: [RunEventInput!]
-) {
-  finishDraft(
-    id: $id, runId: $runId, reply: $reply, title: $title, brief: $brief, error: $error,
-    prompt: $prompt, usage: $usage, events: $events
-  )
-}`;
 const SESSION_DELETES = `mutation ($limit: Int) { takeSessionDeletes(limit: $limit) { id todoId agentName mcpServers } }`;
 const FINISH_SESSION_DELETE = `mutation ($id: ID!, $error: String) { finishSessionDelete(id: $id, error: $error) }`;
 /**
@@ -340,11 +294,6 @@ export function createTelos(options: { telosUrl: string; runnerKey: string; fetc
     probes: async () => (await request<{ runnerProbes: RunnerProbe[] }>(PROBES, {})).runnerProbes,
     finishProbe: async (id, result) => {
       await request(FINISH_PROBE, { id, result });
-    },
-    drafts: async (limit = 20) => (await request<{ runnerDrafts: string[] }>(DRAFTS, { limit })).runnerDrafts,
-    claimDraft: async (id) => (await request<{ claimDraft: DraftClaim | null }>(CLAIM_DRAFT, { id })).claimDraft,
-    finishDraft: async (id, runId, answer) => {
-      await request(FINISH_DRAFT, { id, runId, ...answer, events: wireEvents(answer.events) });
     },
     sessionDeletes: async (limit = 5) =>
       (await request<{ takeSessionDeletes: SessionDelete[] }>(SESSION_DELETES, { limit })).takeSessionDeletes,

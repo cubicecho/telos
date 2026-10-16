@@ -15,7 +15,7 @@ import { requireAuth } from './auth.ts';
 //   (and theirs), for anything that changes a todo or its thread. A retry is
 //   the same work, so it may pick up what the last attempt split off;
 // - its own board, for anything that adds to a board or changes it: a todo, a
-//   request, a draft, the project's text, a template made of it.
+//   request, the project's text, a template made of it.
 //
 // It may not edit, move, finish, archive, delete, retry, re-run or set aside
 // its own todo, stop its own run, or change what its own todo waits on: what
@@ -176,27 +176,6 @@ function assertBoard(run: Run, projectId: unknown): void {
 }
 
 /**
- * A draft on the run's own board, or NOT_FOUND.
- *
- * @param context The request.
- * @param run The run.
- * @param draftId The draft.
- * @returns Nothing.
- */
-async function assertDraft(context: Context, run: Run, draftId: unknown): Promise<void> {
-  const [draft] =
-    typeof draftId === 'string' && UUID.test(draftId)
-      ? await context.db
-          .select({ projectId: dbSchema.drafts.projectId })
-          .from(dbSchema.drafts)
-          .where(and(eq(dbSchema.drafts.id, draftId), eq(dbSchema.drafts.userId, run.userId)))
-      : [];
-  if (draft?.projectId !== run.projectId) {
-    throw notFound('Draft');
-  }
-}
-
-/**
  * A run of a todo the run may write, and not the run's own todo, or NOT_FOUND.
  *
  * @param context The request.
@@ -253,11 +232,6 @@ const RUN_REACH: Record<string, (context: Context, run: Run, args: Args) => Prom
   // Its own board, and nothing past it.
   updateProject: async (_context, run, args) => assertBoard(run, namedId(args.where)),
   saveBoardTemplate: async (_context, run, args) => assertBoard(run, args.projectId),
-  startDraft: async (_context, run, args) => assertBoard(run, args.projectId),
-  sayToDraft: (context, run, args) => assertDraft(context, run, args.id),
-  stopDraft: (context, run, args) => assertDraft(context, run, args.id),
-  makeTodoFromDraft: (context, run, args) => assertDraft(context, run, args.id),
-  discardDraft: (context, run, args) => assertDraft(context, run, args.id),
 };
 
 /** The mutations held to a run's reach. */

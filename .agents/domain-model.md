@@ -18,7 +18,6 @@ todos in the lanes they are given, through the same API a person or an MCP clien
 ```
 person / API key → todo in a lane → (lane has an agent, todo is ready) → claim → run
   → agent replies → finishRun applies the outcome → todo moves on a route, or stays
-person → draft ⇄ agent → todo
 ```
 
 The runner knows only the server's HTTP API; the server never knows how a runner works.
@@ -32,7 +31,7 @@ they go next.
 | `user` | A signed-in person | A session on `/graphql` | Everything they own, including every switch, agent, key, lane and MCP server |
 | `apiKey` | An MCP client acting for a person | `/mcp` (or `/graphql`) with an API key | `AI_MUTATIONS` on projects and todos AI can see, less the tools its owner switched off (`door.ts`) |
 | `agent` | A run, while it is live | `/mcp` with the run token | Notes on its own todo; the todos under it and those its todo's runs made, in its own project (`run-reach.ts`). Its own todo only through its reply's outcome, which `finishRun` applies: a refine rewrites title, brief and acceptance. Never its own todo's lane, completion or dependencies directly |
-| `system` | The runner, or the server itself | `x-runner-key` | `RUNNER_MUTATIONS` only: claim, heartbeat and finish a run or a draft's reply |
+| `system` | The runner, or the server itself | `x-runner-key` | `RUNNER_MUTATIONS` only: claim, heartbeat and finish a run |
 | `anonymous` | Nobody signed in | — | Sign-in only |
 
 `apiKey` and `agent` are the **AI actors** (`isAiActor`): they see only projects with AI on
@@ -117,13 +116,6 @@ stays archived. No agent works it, and no dependency joins it to its pieces.
 hands off clears it. It asks for one run where the todo stands and gets round nothing:
 not the AI switches, a blocker or the WIP limit.
 
-### Draft
-
-```
-person says something --> waiting --agent's reply (a draft run)--> answered --...--> made into a todo
-                                                                          \--> discarded
-```
-
 ## Invariants
 
 | Invariant | Enforced by |
@@ -135,7 +127,7 @@ person says something --> waiting --agent's reply (a draft run)--> answered --..
 | A blocked todo is never completed or archived on success | `assertNotBlocked`, `assertNoBlockedCompletions`; `moveOn`, `archiveOn` in `runs.ts` |
 | A person cannot move a blocked todo to another lane; a route can, to any lane but the done lane | `moveTodo` in `server/src/resolvers/lanes.ts`; `moveOn` in `runs.ts` |
 | Dependencies have no cycles | `assertNoCycle`, the only way in being `addTodoDependency` / `setTodoDependencies` |
-| One running run per todo, and per draft | `uq_runs_todo_running`, `uq_runs_draft_running` |
+| One running run per todo | `uq_runs_todo_running` |
 | Only `finishRun` changes a run's own todo | `server/src/resolvers/run-reach.ts` |
 | A todo is refined or split, never both | `finish` in `server/src/resolvers/runs.ts` |
 | A lane archives on success or has a success route, not both | `assertArchiveOnSuccessFits` |
@@ -168,7 +160,7 @@ the site.
 - **Done lane:** the one lane in a project where todos are complete. Moving a todo into
   it completes the todo, and moving it out reopens it. Owner: `lanes.isDone`.
 - **New-todo lane:** where a todo lands when nobody says where: one an agent or MCP
-  client filed, a draft made into a todo, and the pieces of a split. If none is set, the
+  client filed, and the pieces of a split. If none is set, the
   first open lane. Pieces of a todo split in this lane skip it and go on down its success
   route, unless that is the done lane. Owner: `projects.newTodoLaneId`,
   `findNewTodoLaneId`, `piecesLaneId`.
@@ -201,8 +193,6 @@ the site.
   its last piece does, and reopens when a piece reopens or a new one is filed under it.
   You cannot complete it while pieces are open; unsplit it to finish it alone.
   Owner: `todos.splitAt`, the `todos_settle_umbrella` trigger, `unsplitTodo`.
-- **Draft:** a conversation with an agent about a rough idea, made into a todo when it is
-  right. Owner: `server/src/resolvers/drafts.ts`.
 - **Archive:** putting a todo away: hidden, not gone, and it can be restored. Deleting a
   todo archives it, unless you delete it for good. Owner: `todos.archivedAt`,
   `deleteTodo`, `restoreTodo`.
@@ -251,14 +241,14 @@ the site.
   call. A setting left blank uses the account's agent defaults. An agent knows nothing
   of lanes: a lane is given an agent. Owner: `agents`, `server/src/agent-defaults.ts`.
 - **Agent template:** starting text for a new agent: Planner, Worker or Reviewer.
-  Owner: `app/src/lib/agent-starters.ts` (renamed, and Refiner dropped, by M10).
+  Owner: `app/src/lib/agent-starters.ts` (renamed by M10).
 - **MCP server:** a tool server added to an account; each agent names the ones it may
   use. Owner: `server/src/mcp-servers.ts`.
 - **MCP client:** an assistant connected to telos with an API key, working in the
   projects and todos AI may see. Owner: `/mcp`, `server/src/door.ts`.
-- **Runner:** the program that starts runs: it takes ready todos and drafts and runs
+- **Runner:** the program that starts runs: it takes ready todos and runs
   their agents. Owner: `runner/`.
-- **Run:** one go by an agent at a todo, ending in a reply, or its reply to a draft.
+- **Run:** one go by an agent at a todo, ending in a reply.
   Owner: `runs`, `server/src/resolvers/runs.ts`.
 - **Reply format:** the rules every run's reply is read by, sent after the agent's own
   instructions. Owner: `STANDING_SYSTEM` in `runner/src/prompts.ts` (renamed by R6).
@@ -294,8 +284,8 @@ the site.
   are turns of it. Owner: `todo_sessions`.
 - **Change feed:** what changed in a project since a cursor. Owner: `changes(since:)`,
   `server/src/changes.ts`.
-- **Request:** still three things in the code: a run request (`runRequestedAt`), a
-  draft's rough request, and the agent form's Requests group. Owner: R4.
+- **Request:** still two things in the code: a run request (`runRequestedAt`) and the
+  agent form's Requests group. Owner: R4.
 
 ## Explain test
 

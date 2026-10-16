@@ -54,14 +54,12 @@ then. That is queued, not stuck.
 
 You can read the board and what happened on it: \`projects\`, \`lanes\`, \`todos\`,
 \`request\`, \`todo_notes\`, \`todo_history\`, \`blockers\`, \`runs\`, \`run_events\`,
-\`artifacts\`, \`agents\`, \`spend\`, \`board_templates\`, \`drafts\` and \`draft\`. To keep a
+\`artifacts\`, \`agents\`, \`spend\` and \`board_templates\`. To keep a
 copy of the board in step, read \`changes\` from the cursor it handed you last time.
 
 You can work it too. Make and rename projects (\`create_project\`, \`update_project\`).
-Hand work over (\`submit_request\`, or \`create_todo\` for a lane you choose), talk it
-over with an agent first (\`start_draft\`, \`say_to_draft\`, \`stop_draft\`,
-\`make_todo_from_draft\`, \`discard_draft\`), and change what a todo says
-(\`update_todo\`). Move a todo (\`move_todo\`; into the done lane completes it), make it
+Hand work over (\`submit_request\`, or \`create_todo\` for a lane you choose), and
+change what a todo says (\`update_todo\`). Move a todo (\`move_todo\`; into the done lane completes it), make it
 wait on others (\`set_todo_dependencies\`), send it round its lane's agent again
 (\`retry_todo\`), ask for it to be worked now (\`run_todo\`), stop a run (\`stop_run\`),
 archive or restore it (\`archive_todo\`, \`restore_todo\`) or delete it for good
