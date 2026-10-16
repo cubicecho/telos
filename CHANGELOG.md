@@ -1,3 +1,27 @@
+# [3.0.0](https://github.com/cubicecho/telos/compare/v2.5.2...v3.0.0) (2026-10-16)
+
+
+* feat!: one rule for handed back, on the board, the sidebar and the activity page ([6252383](https://github.com/cubicecho/telos/commit/6252383d773e6d4734fe15f91af53996ae16b80b))
+
+
+### Bug Fixes
+
+* **app:** use the glossary's words: description, handed back, agent template ([afb45c6](https://github.com/cubicecho/telos/commit/afb45c60ecdc942986d83d4133bc0ea17b4fa2e2))
+
+
+### Features
+
+* a split todo is an umbrella its pieces complete ([6b7bb52](https://github.com/cubicecho/telos/commit/6b7bb521335554c6da554ac4d534b52a174e90a7))
+
+
+### BREAKING CHANGES
+
+* aiStatus's state "attention" is now "handedBack", and
+StationTodo gains handedBack ("gaveUp" or "finished"). LaneTally.attention is
+now handedBack. accountAttention is now accountHandedBack, returning
+HandedBackTodo, with handedBack in place of outOfAttempts and errored; its
+lane and maxAttempts are never null.
+
 ## [2.5.2](https://github.com/cubicecho/telos/compare/v2.5.1...v2.5.2) (2026-10-15)
 
 
