@@ -27,7 +27,7 @@ beforeEach(async () => {
 const STATUS = `query ($projectId: ID) {
   aiStatus(projectId: $projectId) {
     todos { todoId title laneId state reason failures liveRunId }
-    projects { projectId name lanes { laneId name station isDone attention running blocked queued parked done } }
+    projects { projectId name lanes { laneId name station isDone handedBack running blocked queued parked done } }
     runnerSeenAt
   }
 }`;
@@ -79,7 +79,7 @@ describe('aiStatus', () => {
     expect((await runner.expectOk(QUEUE)).runnerQueue).toEqual([]);
 
     const [stuck] = (await status()).todos;
-    expect(stuck).toMatchObject({ state: 'attention', reason: 'It broke.', failures: 2 });
+    expect(stuck).toMatchObject({ state: 'handedBack', reason: 'It broke.', failures: 2 });
 
     await board.person.expectOk(`mutation ($id: ID!) { retryTodo(id: $id, reason: "Try the other way.") }`, {
       id: todoId,
@@ -96,7 +96,7 @@ describe('aiStatus', () => {
     const claim = (await runner.expectOk(CLAIM, { todoId, laneId: board.lanes[0].id })).claimRun;
     await runner.expectOk(FINISH, { id: claim.runId, result: { status: 'ok', output: 'Done.' } });
     expect((await status()).todos[0]).toMatchObject({
-      state: 'attention',
+      state: 'handedBack',
       reason: 'To do finished with it and has nowhere to send it.',
     });
     await board.person.expectOk(`mutation ($id: ID!) { retryTodo(id: $id) }`, { id: todoId });

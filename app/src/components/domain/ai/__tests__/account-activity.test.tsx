@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   AccountArchivedTodosDocument,
   AccountArtifactsDocument,
-  AccountAttentionDocument,
+  AccountHandedBackDocument,
   AccountRunsDocument,
   AccountSpendDocument,
   RestoreTodoDocument,
@@ -71,25 +71,24 @@ function spend(extra: Record<string, unknown> = {}): MockedResponse {
 
 function stuck(todoId: string, title: string, extra: Record<string, unknown> = {}) {
   return {
-    __typename: 'AttentionTodo',
+    __typename: 'HandedBackTodo',
     todoId,
     title,
     projectId: 'p1',
     projectName: 'Site',
     laneId: 'l1',
     laneName: 'Doing',
-    outOfAttempts: false,
-    errored: true,
+    handedBack: 'gaveUp',
     reason: 'The model did not answer.',
     runId: 'r1',
-    attempts: 1,
-    maxAttempts: 3,
+    attempts: 2,
+    maxAttempts: 1,
     ...extra,
   };
 }
 
-function attention(rows: unknown[]): MockedResponse {
-  return { request: { query: AccountAttentionDocument }, result: { data: { accountAttention: rows } } };
+function handedBack(rows: unknown[]): MockedResponse {
+  return { request: { query: AccountHandedBackDocument }, result: { data: { accountHandedBack: rows } } };
 }
 
 function runs(status: string | null, rows: unknown[]): MockedResponse {
@@ -115,31 +114,27 @@ describe('AccountActivity', () => {
     const user = userEvent.setup();
     const retried = vi.fn(() => ({ data: { retryTodo: true } }));
     show([
-      attention([
+      handedBack([
         stuck('t1', 'Flaky'),
-        stuck('t2', 'Sent back', {
+        stuck('t2', 'Written', {
           projectName: 'Docs',
-          outOfAttempts: true,
-          errored: false,
-          reason: 'FAIL: the second paragraph is missing.',
-          attempts: 2,
-          maxAttempts: 1,
+          handedBack: 'finished',
+          reason: 'Doing finished with it and has nowhere to send it.',
         }),
       ]),
       { request: { query: RetryTodoDocument, variables: { id: 't1' } }, result: retried },
-      attention([]),
+      handedBack([]),
       spend(),
       NO_RUNS,
     ]);
 
-    const list = await screen.findByRole('list', { name: 'Needs attention' });
-    const [flaky, sentBack] = within(list).getAllByRole('listitem');
-    expect(within(flaky).getByText('Errored')).toBeInTheDocument();
-    expect(within(flaky).getByText('Site · Doing · 1 of 3 attempts')).toBeInTheDocument();
+    const list = await screen.findByRole('list', { name: 'Handed back' });
+    const [flaky, written] = within(list).getAllByRole('listitem');
+    expect(within(flaky).getByText('Gave up')).toBeInTheDocument();
+    expect(within(flaky).getByText('Site · Doing · 2 of 1 attempt')).toBeInTheDocument();
     expect(within(flaky).getByText('The model did not answer.')).toBeInTheDocument();
-    expect(within(sentBack).getByText('Out of attempts')).toBeInTheDocument();
-    expect(within(sentBack).queryByText('Errored')).not.toBeInTheDocument();
-    expect(within(sentBack).getByText('Docs · Doing · 2 of 1 attempt')).toBeInTheDocument();
+    expect(within(written).getByText('Finished')).toBeInTheDocument();
+    expect(within(written).getByText('Docs · Doing')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Send “Flaky” round again' }));
     await vi.waitFor(() => expect(retried).toHaveBeenCalled());
@@ -149,7 +144,7 @@ describe('AccountActivity', () => {
   it('says why a retry did not happen', async () => {
     const user = userEvent.setup();
     show([
-      attention([stuck('t1', 'Flaky')]),
+      handedBack([stuck('t1', 'Flaky')]),
       {
         request: { query: RetryTodoDocument, variables: { id: 't1' } },
         result: { errors: [new GraphQLError('An agent is working it now.')] },
@@ -162,7 +157,7 @@ describe('AccountActivity', () => {
   });
 
   it('shows what was spent, by project and by agent, drafts among it', async () => {
-    show([attention([]), spend(), NO_RUNS]);
+    show([handedBack([]), spend(), NO_RUNS]);
 
     expect(await screen.findByText('41,200')).toBeInTheDocument();
     expect(screen.getByText('in 30 days, 2 draft replies')).toBeInTheDocument();
@@ -183,7 +178,7 @@ describe('AccountActivity', () => {
   });
 
   it('says where the figures start once retention has trimmed the window', async () => {
-    show([attention([]), spend({ keptSince: '2026-09-25T10:00:00.000Z', retentionDays: 7 }), NO_RUNS]);
+    show([handedBack([]), spend({ keptSince: '2026-09-25T10:00:00.000Z', retentionDays: 7 }), NO_RUNS]);
     expect(
       await screen.findByText(/Runs are kept for 7 days, so these figures start on .+, not 30 days back\./),
     ).toBeInTheDocument();
@@ -193,7 +188,7 @@ describe('AccountActivity', () => {
     const user = userEvent.setup();
     const failed = run('r1', 'error', { todo: { __typename: 'Todo', id: 't2', title: 'Fix it' }, project: DOCS });
     show([
-      attention([]),
+      handedBack([]),
       spend(),
       runs(null, [draftRun('r3', 'ok', { project: SITE }), run('r2', 'running', { project: SITE }), failed]),
       runs('error', [failed]),
@@ -235,7 +230,7 @@ describe('AccountActivity', () => {
     };
     show(
       [
-        attention([]),
+        handedBack([]),
         spend(),
         {
           request: { query: AccountArtifactsDocument, variables: { limit: RUNS_PAGE, offset: 0 } },
@@ -263,7 +258,7 @@ describe('AccountActivity', () => {
     });
     show(
       [
-        attention([]),
+        handedBack([]),
         spend(),
         archived([
           {
@@ -293,7 +288,7 @@ describe('AccountActivity', () => {
   it('asks for another view through its caller', async () => {
     const user = userEvent.setup();
     const onViewChange = vi.fn();
-    show([attention([]), spend(), NO_RUNS], 'runs', onViewChange);
+    show([handedBack([]), spend(), NO_RUNS], 'runs', onViewChange);
     await user.click(await screen.findByRole('tab', { name: 'Artifacts' }));
     expect(onViewChange).toHaveBeenCalledWith('artifacts');
   });
@@ -302,7 +297,7 @@ describe('AccountActivity', () => {
 describe('the activity page', () => {
   it('draws the account’s activity while AI is on', async () => {
     render(
-      <MockedProvider mocks={[aiStateMock(true, true), attention([]), spend(), NO_RUNS]}>
+      <MockedProvider mocks={[aiStateMock(true, true), handedBack([]), spend(), NO_RUNS]}>
         <ActivityScreen />
       </MockedProvider>,
     );
@@ -320,6 +315,6 @@ describe('the activity page', () => {
       </MockedProvider>,
     );
     expect(await screen.findByText('Redirected to /')).toBeInTheDocument();
-    expect(screen.queryByText('Needs attention')).not.toBeInTheDocument();
+    expect(screen.queryByText('Handed back')).not.toBeInTheDocument();
   });
 });

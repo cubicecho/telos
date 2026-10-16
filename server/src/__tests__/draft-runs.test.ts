@@ -35,7 +35,7 @@ const MARKS = `query ($projectId: ID!) { cardMarks(projectId: $projectId) { todo
 const STATUS = `query ($projectId: ID) {
   aiStatus(projectId: $projectId) {
     todos { todoId state failures liveRunId }
-    projects { lanes { laneId attention running queued } }
+    projects { lanes { laneId handedBack running queued } }
   }
 }`;
 const PROJECT_RUNS = `query ($projectId: UUID!) {
@@ -82,7 +82,7 @@ describe('a draft’s runs and the lanes’ agents', () => {
 
     const status = (await board.person.expectOk(STATUS, { projectId: board.projectId })).aiStatus;
     expect(status.todos).toEqual([{ todoId, state: 'queued', failures: 0, liveRunId: null }]);
-    expect(status.projects[0].lanes[0]).toMatchObject({ attention: 0, running: 0, queued: 1 });
+    expect(status.projects[0].lanes[0]).toMatchObject({ handedBack: 0, running: 0, queued: 1 });
   });
 
   it('shows nothing running in a lane while only a draft is being answered', async () => {

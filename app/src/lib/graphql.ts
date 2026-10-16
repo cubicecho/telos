@@ -1136,7 +1136,7 @@ export const AiStatusDocument = graphql(`
           name
           station
           isDone
-          attention
+          handedBack
           running
           blocked
           queued
@@ -1184,8 +1184,8 @@ export const CardMarksDocument = graphql(`
 `);
 
 /** Just how many todos need a person, for the sidebar. */
-export const AiAttentionDocument = graphql(`
-  query AiAttention {
+export const AiHandedBackDocument = graphql(`
+  query AiHandedBack {
     aiStatus {
       todos {
         todoId
@@ -1320,18 +1320,17 @@ export const AccountSpendDocument = graphql(`
   }
 `);
 
-/** The todos, across projects, that are out of attempts or whose last run errored. */
-export const AccountAttentionDocument = graphql(`
-  query AccountAttention {
-    accountAttention {
+/** The todos, across projects, that their lanes' agents handed back. */
+export const AccountHandedBackDocument = graphql(`
+  query AccountHandedBack {
+    accountHandedBack {
       todoId
       title
       projectId
       projectName
       laneId
       laneName
-      outOfAttempts
-      errored
+      handedBack
       reason
       runId
       attempts

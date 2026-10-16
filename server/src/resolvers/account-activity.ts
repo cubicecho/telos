@@ -4,14 +4,15 @@ import { extendSchema, type GraphQLObjectType, type GraphQLSchema, parse } from 
 import { requireAi } from '../ai-gate.ts';
 import { resultRows } from '../blocking.ts';
 import type { Context } from '../context.ts';
-import { failuresSinceTouched, TOUCHED } from '../ready.ts';
+import { workStates } from '../ready.ts';
 import { requireSession } from './auth.ts';
 
 // What an account's agents did and spent, across every project it owns: the
 // two things the generated lists cannot say. Spend is the runs of a window
 // added up by project and by agent, with where the window really starts when
-// retention has trimmed it. Attention is the todos an agent gave up on or
-// whose last run never finished.
+// retention has trimmed it. Handed back is the todos a lane's agent gave up on
+// or finished with and has nowhere to send: aiStatus's handedBack state, across
+// every AI project.
 //
 // The runs, artifacts and archived todos themselves come from the generated
 // queries, which are already the account's own.
@@ -55,33 +56,31 @@ const ACCOUNT_ACTIVITY_SDL = parse(`
     byAgent: [SpendLine!]!
   }
 
-  "A todo waiting on a person because of how its runs went."
-  type AttentionTodo {
+  "A todo its lane's agent handed back: it gave up on it, or finished with it and has nowhere to send it."
+  type HandedBackTodo {
     todoId: ID!
     title: String!
     projectId: ID!
     projectName: String!
-    laneId: ID
-    laneName: String
-    "Its lane's agent has used every attempt the lane allows."
-    outOfAttempts: Boolean!
-    "Its last finished run never finished its work."
-    errored: Boolean!
-    "The error, or the reviewer's reason, of its last failed run."
+    laneId: ID!
+    laneName: String!
+    "gaveUp (it failed more times than the lane allows) or finished (with nowhere to send it)."
+    handedBack: String!
+    "The error or the reviewer's reason of its last failed run, or where it finished."
     reason: String
     "Its last finished run."
     runId: ID
     "Failed runs since a person last touched it, as aiStatus counts them."
     attempts: Int!
-    "How many its lane allows. Null in a lane with no agent."
-    maxAttempts: Int
+    "How many its lane allows."
+    maxAttempts: Int!
   }
 
   extend type Query {
     "What your runs spent since a moment, across every project, by project and by agent."
     accountSpend(since: DateTime!): AccountSpend!
-    "Your open todos, across your AI projects, that are out of attempts or whose last run errored."
-    accountAttention: [AttentionTodo!]!
+    "Your todos, across your AI projects, that their lanes' agents handed back: the latest run first."
+    accountHandedBack: [HandedBackTodo!]!
   }
 `);
 
@@ -93,20 +92,6 @@ export interface SpendRow {
   prompt_tokens: string | number;
   completion_tokens: string | number;
   total_tokens: string | number;
-}
-
-interface AttentionRow {
-  todo_id: string;
-  title: string;
-  project_id: string;
-  project_name: string;
-  lane_id: string | null;
-  lane_name: string | null;
-  run_id: string | null;
-  errored: boolean;
-  reason: string | null;
-  attempts: number;
-  max_attempts: number | null;
 }
 
 /** The columns every spend row has, over runs named `r`. */
@@ -138,7 +123,7 @@ export function spendLine(row: SpendRow | undefined, name: string) {
 }
 
 /**
- * Adds `accountSpend` and `accountAttention` to the schema.
+ * Adds `accountSpend` and `accountHandedBack` to the schema.
  *
  * @param schema - The schema so far.
  * @returns The schema with the account's activity queries.
@@ -198,62 +183,26 @@ export function applyAccountActivityExtension(schema: GraphQLSchema): GraphQLSch
     };
   };
 
-  queries.accountAttention.resolve = async (_parent: unknown, _args: unknown, context: Context) => {
+  queries.accountHandedBack.resolve = async (_parent: unknown, _args: unknown, context: Context) => {
     requireSession(context);
     const userId = await requireAi(context);
-    const db = context.db as AnyRow;
-    // The open todos `aiStatus` reads, less the ones AI is told to leave and
-    // the ones an agent is on now. Runs are found by todo, so a draft's
-    // replies are never among them. An error counts until a person touches the
-    // todo, as an attempt does: a retry takes it off the list.
-    const rows = resultRows<AttentionRow>(
-      await db.execute(sql`
-        SELECT a.* FROM (
-          SELECT
-            t.id AS todo_id, t.title, p.id AS project_id, p.name AS project_name,
-            l.id AS lane_id, l.name AS lane_name,
-            last.id AS run_id, last.started_at AS last_started_at,
-            coalesce(last.status = 'error' AND last.started_at > coalesce(
-              (SELECT max(e.at) FROM todo_events e WHERE e.todo_id = t.id AND ${TOUCHED}),
-              '-infinity'::timestamptz
-            ), false) AS errored,
-            CASE WHEN last.status = 'error' OR last.verdict = 'fail' THEN coalesce(last.error, last.output) END AS reason,
-            ${failuresSinceTouched(sql`t.id`)} AS attempts,
-            CASE WHEN l.agent_id IS NOT NULL THEN l.max_attempts END AS max_attempts
-          FROM todos t
-          JOIN projects p ON p.id = t.project_id
-          LEFT JOIN lanes l ON l.id = t.lane_id
-          LEFT JOIN LATERAL (
-            SELECT r.id, r.status, r.verdict, r.error, r.output, r.started_at FROM runs r
-            WHERE r.todo_id = t.id AND r.status IN ('ok', 'error')
-            ORDER BY r.started_at DESC LIMIT 1
-          ) last ON true
-          WHERE t.user_id = ${userId} AND p.ai_enabled AND p.archived_at IS NULL
-            AND t.completed_at IS NULL AND t.archived_at IS NULL AND NOT t.ai_ignored
-            AND NOT coalesce(l.is_done, false)
-            AND NOT EXISTS (
-              SELECT 1 FROM runs r
-              WHERE r.todo_id = t.id AND r.status = 'running' AND r.lease_expires_at > now()
-            )
-        ) a
-        WHERE a.errored OR (a.max_attempts IS NOT NULL AND a.attempts > a.max_attempts)
-        ORDER BY a.last_started_at DESC NULLS LAST, a.title
-      `),
-    );
-    return rows.map((row) => ({
-      todoId: row.todo_id,
-      title: row.title,
-      projectId: row.project_id,
-      projectName: row.project_name,
-      laneId: row.lane_id,
-      laneName: row.lane_name,
-      outOfAttempts: row.max_attempts !== null && Number(row.attempts) > row.max_attempts,
-      errored: row.errored,
-      reason: row.reason?.trim() || null,
-      runId: row.run_id,
-      attempts: Number(row.attempts),
-      maxAttempts: row.max_attempts,
-    }));
+    const { todos } = await workStates(context.db, userId);
+    return todos
+      .filter((todo) => todo.state === 'handedBack')
+      .sort((a, b) => (b.lastRunAt?.getTime() ?? 0) - (a.lastRunAt?.getTime() ?? 0))
+      .map((todo) => ({
+        todoId: todo.todoId,
+        title: todo.title,
+        projectId: todo.projectId,
+        projectName: todo.projectName,
+        laneId: todo.laneId,
+        laneName: todo.laneName,
+        handedBack: todo.handedBack,
+        reason: todo.reason,
+        runId: todo.lastRunId,
+        attempts: todo.failures,
+        maxAttempts: todo.maxAttempts,
+      }));
   };
 
   return extendedSchema;

@@ -209,7 +209,10 @@ export async function dropRunRequests(db: AnyDb, where: { todoId: string } | { p
 }
 
 /** Where a todo stands with its lane's agent, for a person reading the board. */
-export type WorkState = 'attention' | 'running' | 'blocked' | 'queued' | 'parked' | 'done';
+export type WorkState = 'handedBack' | 'running' | 'blocked' | 'queued' | 'parked' | 'done';
+
+/** Why a lane's agent handed a todo back. */
+export type HandBack = 'gaveUp' | 'finished';
 
 export interface WorkTodo {
   todoId: string;
@@ -219,6 +222,8 @@ export interface WorkTodo {
   state: WorkState;
   /** Why it is where it is, when that needs saying. */
   reason: string | null;
+  /** Why its lane's agent handed it back: null unless it is handed back. */
+  handedBack: HandBack | null;
   /** Failed runs since a person last touched it. */
   failures: number;
   /** The run working it now, if one is. */
@@ -227,6 +232,13 @@ export interface WorkTodo {
   awaitsRun: boolean;
   /** A person asked for it to be run, and no run has taken it yet. */
   runRequested: boolean;
+  projectName: string;
+  laneName: string | null;
+  /** How many failures its lane allows. Null where no agent works the lane. */
+  maxAttempts: number | null;
+  /** Its last finished run. */
+  lastRunId: string | null;
+  lastRunAt: Date | null;
 }
 
 export interface LaneTally {
@@ -242,8 +254,8 @@ export interface LaneTally {
  *   - running: a run holds it now
  *   - parked: no agent will ever pick it up where it is (no lane, no agent
  *     or one switched off, AI told to ignore it)
- *   - attention: its lane's agent gave up on it (more failures than the lane allows)
- *     or finished with it and has nowhere to send it
+ *   - handedBack: its lane's agent gave up on it (more failures than the lane
+ *     allows) or finished with it and has nowhere to send it
  *   - blocked: it waits on something unfinished
  *   - queued: its lane's agent will start on it when there is room
  *
@@ -268,6 +280,7 @@ export async function workStates(
     todo_id: string;
     title: string;
     project_id: string;
+    project_name: string;
     lane_id: string | null;
     lane_name: string | null;
     has_agent: boolean;
@@ -282,11 +295,13 @@ export async function workStates(
     last_failure: string | null;
     blockers: string | null;
     live_run_id: string | null;
+    last_run_id: string | null;
+    last_run_at: Date | string | null;
   }>(
     await db.execute(sql`
       WITH base AS (
         SELECT
-          t.id, t.title, t.project_id, t.lane_id, t.ai_ignored, t.position, t.created_at, p.auto_run,
+          t.id, t.title, t.project_id, p.name AS project_name, t.lane_id, t.ai_ignored, t.position, t.created_at, p.auto_run,
           t.run_requested_at IS NOT NULL AS run_requested,
           l.name AS lane_name, l.position AS lane_position, l.agent_id IS NOT NULL AS has_agent,
           a.name AS agent_name, coalesce(a.enabled, true) AS agent_enabled,
@@ -301,7 +316,7 @@ export async function workStates(
           ${project}
       )
       SELECT
-        b.id AS todo_id, b.title, b.project_id, b.lane_id, b.lane_name,
+        b.id AS todo_id, b.title, b.project_id, b.project_name, b.lane_id, b.lane_name,
         coalesce(b.has_agent, false) AS has_agent, b.agent_name, b.agent_enabled, b.ai_ignored, b.auto_run, b.run_requested,
         b.max_attempts,
         ${failuresSinceTouched(sql`b.id`)} AS failures,
@@ -323,14 +338,20 @@ export async function workStates(
           SELECT r.id FROM runs r
           WHERE r.todo_id = b.id AND r.status = 'running' AND r.lease_expires_at > now()
           ORDER BY r.started_at DESC LIMIT 1
-        ) AS live_run_id
+        ) AS live_run_id,
+        last.id AS last_run_id, last.started_at AS last_run_at
       FROM base b
+      LEFT JOIN LATERAL (
+        SELECT r.id, r.started_at FROM runs r
+        WHERE r.todo_id = b.id AND r.status IN ('ok', 'error')
+        ORDER BY r.started_at DESC LIMIT 1
+      ) last ON true
       ORDER BY b.project_id, b.lane_position NULLS LAST, b.position, b.created_at
     `),
   );
 
   const todos = open.map((row): WorkTodo => {
-    const [state, reason] = judge(row);
+    const [state, reason, handedBack = null] = judge(row);
     return {
       todoId: row.todo_id,
       title: row.title,
@@ -338,10 +359,16 @@ export async function workStates(
       laneId: row.lane_id,
       state,
       reason,
+      handedBack,
       failures: Number(row.failures),
       liveRunId: row.live_run_id,
       awaitsRun: state === 'parked' && reason === AUTO_RUN_OFF,
       runRequested: row.run_requested,
+      projectName: row.project_name,
+      laneName: row.lane_name,
+      maxAttempts: row.has_agent ? row.max_attempts : null,
+      lastRunId: row.last_run_id,
+      lastRunAt: row.last_run_at === null ? null : new Date(row.last_run_at),
     };
   });
 
@@ -379,16 +406,18 @@ function judge(row: {
   last_failure: string | null;
   blockers: string | null;
   live_run_id: string | null;
-}): [WorkState, string | null] {
+}): [WorkState, string | null, HandBack?] {
   if (row.live_run_id) return ['running', null];
   if (!row.lane_id) return ['parked', 'It is in no lane.'];
   if (row.ai_ignored) return ['parked', 'AI is told to ignore it.'];
   if (!row.has_agent) return ['parked', `${row.lane_name} has no agent.`];
   if (!row.agent_enabled) return ['parked', `${row.agent_name}, who works ${row.lane_name}, is switched off.`];
   if (Number(row.failures) > (row.max_attempts ?? 0)) {
-    return ['attention', row.last_failure?.trim() || `It failed ${row.failures} times.`];
+    return ['handedBack', row.last_failure?.trim() || `It failed ${row.failures} times.`, 'gaveUp'];
   }
-  if (row.finished_here) return ['attention', `${row.lane_name} finished with it and has nowhere to send it.`];
+  if (row.finished_here) {
+    return ['handedBack', `${row.lane_name} finished with it and has nowhere to send it.`, 'finished'];
+  }
   if (row.blockers) return ['blocked', `Waiting on ${row.blockers}.`];
   if (row.auto_run === false && row.run_requested === false) {
     return ['parked', AUTO_RUN_OFF];

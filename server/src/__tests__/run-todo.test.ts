@@ -116,7 +116,7 @@ describe('runTodo', () => {
 
     const again = await claim(failed);
     await runner.expectOk(FINISH, { id: again?.runId, result: { status: 'ok', output: 'Done.' } });
-    expect((await stateOf(failed)).state).toBe('attention');
+    expect((await stateOf(failed)).state).toBe('handedBack');
     await board.person.expectOk(RUN, { id: failed });
     expect((await stateOf(failed)).state).toBe('queued');
     expect(await claim(failed)).not.toBeNull();
