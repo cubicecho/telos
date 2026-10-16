@@ -1,8 +1,9 @@
 import * as dbSchema from '@telos/db/schema';
 import { and, asc, desc, eq, isNotNull, isNull, not, sql } from 'drizzle-orm';
-import { extendSchema, GraphQLError, type GraphQLObjectType, type GraphQLSchema, parse } from 'graphql';
-import type { MutationFinishDraftArgs } from '../../__generated__/resolvers.ts';
+import { extendSchema, GraphQLError, type GraphQLSchema, parse } from 'graphql';
+import type { MutationResolvers, QueryResolvers } from '../../__generated__/resolvers.ts';
 import { requireAi, requireSystem } from '../ai-gate.ts';
+import { attachResolvers } from '../attach-resolvers.ts';
 import type { Context } from '../context.ts';
 import { DRAFT_LEASE_SECONDS, draftBeingAnswered, expireLapsedDraftRuns, stopDraftReply } from '../draft-runs.ts';
 import { instanceAiOn } from '../instance.ts';
@@ -218,14 +219,10 @@ async function draftAiOn(tx: AnyRow, draft: dbSchema.Draft): Promise<boolean> {
 
 export function applyDraftsExtension(schema: GraphQLSchema): GraphQLSchema {
   const extendedSchema = extendSchema(schema, DRAFTS_SDL);
-  const queries = (extendedSchema.getType('Query') as GraphQLObjectType).getFields();
-  const mutations = (extendedSchema.getType('Mutation') as GraphQLObjectType).getFields();
+  const queries: QueryResolvers = {};
+  const mutations: MutationResolvers = {};
 
-  mutations.startDraft.resolve = async (
-    _parent: unknown,
-    args: { projectId: string; agentId: string; message: string },
-    context: Context,
-  ) => {
+  mutations.startDraft = async (_parent, args, context) => {
     const userId = await requireAi(context);
     const text = message(args.message);
     const project = await loadAiProject(context, userId, args.projectId);
@@ -240,7 +237,7 @@ export function applyDraftsExtension(schema: GraphQLSchema): GraphQLSchema {
     });
   };
 
-  mutations.sayToDraft.resolve = async (_parent: unknown, args: { id: string; message: string }, context: Context) => {
+  mutations.sayToDraft = async (_parent, args, context) => {
     const userId = await requireAi(context);
     const text = message(args.message);
     return (context.db as AnyRow).transaction(async (tx: AnyRow) => {
@@ -259,7 +256,7 @@ export function applyDraftsExtension(schema: GraphQLSchema): GraphQLSchema {
     });
   };
 
-  mutations.stopDraft.resolve = async (_parent: unknown, args: { id: string }, context: Context) => {
+  mutations.stopDraft = async (_parent, args, context) => {
     const userId = await requireAi(context);
     return (context.db as AnyRow).transaction(async (tx: AnyRow) => {
       const draft = await ownedDraft(context, userId, args.id, tx, true);
@@ -267,11 +264,7 @@ export function applyDraftsExtension(schema: GraphQLSchema): GraphQLSchema {
     });
   };
 
-  mutations.makeTodoFromDraft.resolve = async (
-    _parent: unknown,
-    args: { id: string; title?: string | null; brief?: string | null },
-    context: Context,
-  ) => {
+  mutations.makeTodoFromDraft = async (_parent, args, context) => {
     const userId = await requireAi(context);
     return (context.db as AnyRow).transaction(async (tx: AnyRow) => {
       const draft = await ownedDraft(context, userId, args.id, tx, true);
@@ -300,14 +293,14 @@ export function applyDraftsExtension(schema: GraphQLSchema): GraphQLSchema {
     });
   };
 
-  mutations.discardDraft.resolve = async (_parent: unknown, args: { id: string }, context: Context) => {
+  mutations.discardDraft = async (_parent, args, context) => {
     const userId = await requireAi(context);
     const draft = await ownedDraft(context, userId, args.id);
     await (context.db as AnyRow).delete(dbSchema.drafts).where(eq(dbSchema.drafts.id, draft.id));
     return true;
   };
 
-  queries.runnerDrafts.resolve = async (_parent: unknown, args: { limit?: number | null }, context: Context) => {
+  queries.runnerDrafts = async (_parent, args, context) => {
     requireSystem(context);
     markRunnerSeen();
     if (!(await instanceAiOn(context.db))) return [];
@@ -319,7 +312,7 @@ export function applyDraftsExtension(schema: GraphQLSchema): GraphQLSchema {
     return rows.map((row: { id: string }) => row.id);
   };
 
-  mutations.claimDraft.resolve = async (_parent: unknown, args: { id: string }, context: Context) => {
+  mutations.claimDraft = async (_parent, args, context) => {
     requireSystem(context);
     if (!(await instanceAiOn(context.db))) return null;
     try {
@@ -372,7 +365,7 @@ export function applyDraftsExtension(schema: GraphQLSchema): GraphQLSchema {
     }
   };
 
-  mutations.finishDraft.resolve = async (_parent: unknown, args: MutationFinishDraftArgs, context: Context) => {
+  mutations.finishDraft = async (_parent, args, context) => {
     requireSystem(context);
     return (context.db as AnyRow).transaction(async (tx: AnyRow) => {
       const [draft]: dbSchema.Draft[] = await tx
@@ -445,5 +438,5 @@ export function applyDraftsExtension(schema: GraphQLSchema): GraphQLSchema {
     });
   };
 
-  return extendedSchema;
+  return attachResolvers(extendedSchema, { Query: queries, Mutation: mutations });
 }

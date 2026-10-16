@@ -16,7 +16,7 @@ import { GraphQLError } from 'graphql';
 
 // biome-ignore lint/suspicious/noExplicitAny: drizzle-orm 1.0 table/column type compat
 type AnyDb = any;
-export type TodoRow = Record<string, unknown> & { id: string };
+export type TodoRow = dbSchema.Todo;
 
 /** Rows a raw `execute` returned, across the postgres-js and PGlite drivers. */
 export function resultRows<T>(result: unknown): T[] {

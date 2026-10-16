@@ -1,8 +1,9 @@
 import { sql } from 'drizzle-orm';
-import { extendSchema, type GraphQLObjectType, type GraphQLSchema, parse } from 'graphql';
+import { extendSchema, type GraphQLSchema, parse } from 'graphql';
+import type { QueryResolvers } from '../../__generated__/resolvers.ts';
 import { requireAi } from '../ai-gate.ts';
+import { attachResolvers } from '../attach-resolvers.ts';
 import { resultRows } from '../blocking.ts';
-import type { Context } from '../context.ts';
 import { runnerSeenAt } from '../runner-seen.ts';
 
 // What still stands between an account and its first run, once AI is on for
@@ -105,9 +106,9 @@ async function readSetup(db: AnyDb, userId: string): Promise<SetupRow> {
  */
 export function applyAiSetupExtension(schema: GraphQLSchema): GraphQLSchema {
   const extendedSchema = extendSchema(schema, AI_SETUP_SDL);
-  const queries = (extendedSchema.getType('Query') as GraphQLObjectType).getFields();
+  const queries: QueryResolvers = {};
 
-  queries.aiSetup.resolve = async (_parent: unknown, _args: unknown, context: Context) => {
+  queries.aiSetup = async (_parent, _args, context) => {
     const userId = await requireAi(context);
     const row = await readSetup(context.db, userId);
     return {
@@ -121,5 +122,5 @@ export function applyAiSetupExtension(schema: GraphQLSchema): GraphQLSchema {
     };
   };
 
-  return extendedSchema;
+  return attachResolvers(extendedSchema, { Query: queries });
 }

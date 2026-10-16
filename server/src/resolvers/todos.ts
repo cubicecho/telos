@@ -1,6 +1,8 @@
 import * as dbSchema from '@telos/db/schema';
 import { and, eq, inArray, isNull } from 'drizzle-orm';
-import { extendSchema, GraphQLError, type GraphQLObjectType, type GraphQLSchema, parse } from 'graphql';
+import { extendSchema, GraphQLError, type GraphQLSchema, parse } from 'graphql';
+import type { MutationResolvers, ProjectResolvers, TodoResolvers } from '../../__generated__/resolvers.ts';
+import { attachResolvers } from '../attach-resolvers.ts';
 import { assertNoCycle, assertNotBlocked } from '../blocking.ts';
 import { appLink } from '../config.ts';
 import { type Context, isAiActor } from '../context.ts';
@@ -175,46 +177,43 @@ async function hiddenFromAi(context: Context, userId: string, ids: string[]): Pr
 export function applyTodosExtension(schema: GraphQLSchema): GraphQLSchema {
   const extendedSchema = extendSchema(schema, TODOS_SDL);
 
-  const todoFields = (extendedSchema.getType('Todo') as GraphQLObjectType).getFields();
-  todoFields.isBlocked.resolve = (parent: AnyRow, _args: unknown, context: Context) =>
-    context.loaders.blocked.load(String(parent.id));
-  todoFields.blockedBy.resolve = async (parent: AnyRow, _args: unknown, context: Context) => {
+  const todoFields: TodoResolvers = {};
+  todoFields.isBlocked = (parent, _args, context) => context.loaders.blocked.load(String(parent.id));
+  todoFields.blockedBy = async (parent, _args, context) => {
     const blockers = await context.loaders.blockers.load(String(parent.id));
     return isAiActor(context) ? visibleToAi(context, blockers) : blockers;
   };
-  todoFields.url.resolve = (parent: AnyRow) => appLink(`/todos/${parent.id}`);
-  todoFields.pieceCount.resolve = async (parent: AnyRow, _args: unknown, context: Context) =>
+  todoFields.url = (parent) => appLink(`/todos/${parent.id}`);
+  todoFields.pieceCount = async (parent, _args, context) =>
     (await context.loaders.pieceCounts.load(String(parent.id))).total;
-  todoFields.donePieceCount.resolve = async (parent: AnyRow, _args: unknown, context: Context) => {
+  todoFields.donePieceCount = async (parent, _args, context) => {
     const pieces = await context.loaders.pieceCounts.load(String(parent.id));
     return pieces.total - pieces.open;
   };
 
-  const projectFields = (extendedSchema.getType('Project') as GraphQLObjectType).getFields();
-  projectFields.todoCount.resolve = async (parent: AnyRow, _args: unknown, context: Context) =>
+  const projectFields: ProjectResolvers = {};
+  projectFields.todoCount = async (parent, _args, context) =>
     (await context.loaders.todoCounts.load(String(parent.id))).total;
-  projectFields.openTodoCount.resolve = async (parent: AnyRow, _args: unknown, context: Context) =>
+  projectFields.openTodoCount = async (parent, _args, context) =>
     (await context.loaders.todoCounts.load(String(parent.id))).open;
-  projectFields.url.resolve = (parent: AnyRow) => appLink(`/projects/${parent.id}`);
+  projectFields.url = (parent) => appLink(`/projects/${parent.id}`);
 
-  const mutations = (extendedSchema.getType('Mutation') as GraphQLObjectType).getFields();
+  const mutations: MutationResolvers = {};
 
-  type TransitionArgs = { id: string; reason?: string | null };
-
-  mutations.completeTodo.resolve = async (_parent: unknown, args: TransitionArgs, context: Context) => {
+  mutations.completeTodo = async (_parent, args, context) => {
     const todo = await loadOwnedTodo(context, args.id);
     if (todo.completedAt != null) return todo;
     await assertNotBlocked(context.db, [args.id]);
     return setCompletedAt(context, todo, new Date(), args.reason);
   };
 
-  mutations.reopenTodo.resolve = async (_parent: unknown, args: TransitionArgs, context: Context) => {
+  mutations.reopenTodo = async (_parent, args, context) => {
     const todo = await loadOwnedTodo(context, args.id);
     if (todo.completedAt == null) return todo;
     return setCompletedAt(context, todo, null, args.reason);
   };
 
-  mutations.unsplitTodo.resolve = async (_parent: unknown, args: TransitionArgs, context: Context) => {
+  mutations.unsplitTodo = async (_parent, args, context) => {
     const todo = await loadOwnedTodo(context, args.id);
     const byPerson = context.actor.kind === 'user';
     if (byPerson === false) {
@@ -232,11 +231,7 @@ export function applyTodosExtension(schema: GraphQLSchema): GraphQLSchema {
     });
   };
 
-  mutations.addTodoDependency.resolve = async (
-    _parent: unknown,
-    args: { todoId: string; dependsOnTodoId: string },
-    context: Context,
-  ) => {
+  mutations.addTodoDependency = async (_parent, args, context) => {
     const userId = requireAuth(context);
     // Both ends must be the caller's — otherwise the edge would leak whether a
     // stranger's todo exists, and later report it as a blocker.
@@ -253,11 +248,7 @@ export function applyTodosExtension(schema: GraphQLSchema): GraphQLSchema {
     return loadOwnedTodo(context, args.todoId);
   };
 
-  mutations.removeTodoDependency.resolve = async (
-    _parent: unknown,
-    args: { todoId: string; dependsOnTodoId: string },
-    context: Context,
-  ) => {
+  mutations.removeTodoDependency = async (_parent, args, context) => {
     const userId = requireAuth(context);
     await (context.db as AnyRow)
       .delete(dbSchema.todoDependencies)
@@ -271,11 +262,7 @@ export function applyTodosExtension(schema: GraphQLSchema): GraphQLSchema {
     return loadOwnedTodo(context, args.todoId);
   };
 
-  mutations.setTodoDependencies.resolve = async (
-    _parent: unknown,
-    args: { id: string; dependsOn: string[] },
-    context: Context,
-  ) => {
+  mutations.setTodoDependencies = async (_parent, args, context) => {
     const userId = requireAuth(context);
     const todo = await loadOwnedTodo(context, args.id);
     const wanted = new Set(args.dependsOn);
@@ -324,5 +311,5 @@ export function applyTodosExtension(schema: GraphQLSchema): GraphQLSchema {
     return loadOwnedTodo(context, todo.id);
   };
 
-  return extendedSchema;
+  return attachResolvers(extendedSchema, { Todo: todoFields, Project: projectFields, Mutation: mutations });
 }

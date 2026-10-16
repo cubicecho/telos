@@ -1,9 +1,11 @@
 import * as dbSchema from '@telos/db/schema';
 import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm';
-import { extendSchema, GraphQLError, type GraphQLObjectType, type GraphQLSchema, parse } from 'graphql';
+import { extendSchema, GraphQLError, type GraphQLSchema, parse } from 'graphql';
+import type { MutationResolvers, QueryResolvers } from '../../__generated__/resolvers.ts';
 import { requireAi } from '../ai-gate.ts';
+import { attachResolvers } from '../attach-resolvers.ts';
 import { resultRows } from '../blocking.ts';
-import type { Actor, Context } from '../context.ts';
+import type { Actor } from '../context.ts';
 import { HandBackEnum, WORK_STATES, type WorkState, WorkStateEnum, withEnums } from '../enums.ts';
 import { workStates } from '../ready.ts';
 import { runnerSeenAt } from '../runner-seen.ts';
@@ -218,10 +220,10 @@ async function whyNotRunnable(db: AnyRow, todo: AnyRow): Promise<string | null> 
 
 export function applyAiStatusExtension(schema: GraphQLSchema): GraphQLSchema {
   const extendedSchema = extendSchema(withEnums(schema, [WorkStateEnum, HandBackEnum]), AI_STATUS_SDL);
-  const queries = (extendedSchema.getType('Query') as GraphQLObjectType).getFields();
-  const mutations = (extendedSchema.getType('Mutation') as GraphQLObjectType).getFields();
+  const queries: QueryResolvers = {};
+  const mutations: MutationResolvers = {};
 
-  queries.aiStatus.resolve = async (_parent: unknown, args: { projectId?: string | null }, context: Context) => {
+  queries.aiStatus = async (_parent, args, context) => {
     const userId = await requireAi(context);
     const db = context.db as AnyRow;
     const { todos, done } = await workStates(db, userId, args.projectId);
@@ -252,12 +254,8 @@ export function applyAiStatusExtension(schema: GraphQLSchema): GraphQLSchema {
             )
             .orderBy(asc(dbSchema.lanes.position));
 
-    const tallies = new Map<string, Record<WorkState, number>>(
-      lanes.map((lane) => [
-        lane.id,
-        Object.fromEntries(WORK_STATES.map((state) => [state, 0])) as Record<WorkState, number>,
-      ]),
-    );
+    const noTally = () => Object.fromEntries(WORK_STATES.map((state) => [state, 0])) as Record<WorkState, number>;
+    const tallies = new Map<string, Record<WorkState, number>>(lanes.map((lane) => [lane.id, noTally()]));
     for (const todo of todos) {
       const tally = todo.laneId ? tallies.get(todo.laneId) : undefined;
       if (tally) tally[todo.state] += 1;
@@ -279,18 +277,14 @@ export function applyAiStatusExtension(schema: GraphQLSchema): GraphQLSchema {
             name: lane.name,
             station: lane.agentId != null,
             isDone: lane.isDone,
-            ...tallies.get(lane.id),
+            ...(tallies.get(lane.id) ?? noTally()),
           })),
       })),
       runnerSeenAt: runnerSeenAt(),
     };
   };
 
-  mutations.retryTodo.resolve = async (
-    _parent: unknown,
-    args: { id: string; reason?: string | null },
-    context: Context,
-  ) => {
+  mutations.retryTodo = async (_parent, args, context) => {
     const userId = await requireAi(context);
     const db = context.db as AnyRow;
     const todo = await restingTodo(db, userId, args.id);
@@ -298,7 +292,7 @@ export function applyAiStatusExtension(schema: GraphQLSchema): GraphQLSchema {
     return true;
   };
 
-  mutations.runTodo.resolve = async (_parent: unknown, args: { id: string }, context: Context) => {
+  mutations.runTodo = async (_parent, args, context) => {
     const userId = await requireAi(context);
     return (context.db as AnyRow).transaction(async (tx: AnyRow) => {
       const todo = await restingTodo(tx, userId, args.id);
@@ -318,5 +312,5 @@ export function applyAiStatusExtension(schema: GraphQLSchema): GraphQLSchema {
     });
   };
 
-  return extendedSchema;
+  return attachResolvers(extendedSchema, { Query: queries, Mutation: mutations });
 }

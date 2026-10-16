@@ -1,4 +1,4 @@
-import { defaultFieldResolver, GraphQLError, type GraphQLObjectType, type GraphQLSchema } from 'graphql';
+import { defaultFieldResolver, GraphQLError, type GraphQLSchema } from 'graphql';
 import { type Context, isAiActor } from '../context.ts';
 import { DOOR_TOOLS, switchedOff, switchOwner } from '../door.ts';
 import { assertAiReach } from './ai-reach.ts';
@@ -127,7 +127,7 @@ function lockQueries(schema: GraphQLSchema): void {
 
 export function applyActorLock(schema: GraphQLSchema): GraphQLSchema {
   lockQueries(schema);
-  const mutation = schema.getMutationType() as GraphQLObjectType | null | undefined;
+  const mutation = schema.getMutationType();
   if (!mutation) return schema;
   for (const [name, field] of Object.entries(mutation.getFields())) {
     const resolve = field.resolve ?? defaultFieldResolver;

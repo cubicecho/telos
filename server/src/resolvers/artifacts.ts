@@ -1,9 +1,9 @@
 import * as dbSchema from '@telos/db/schema';
 import { and, eq } from 'drizzle-orm';
-import { extendSchema, GraphQLError, type GraphQLObjectType, type GraphQLSchema, parse } from 'graphql';
-import type { MutationRecordArtifactArgs } from '../../__generated__/resolvers.ts';
+import { extendSchema, GraphQLError, type GraphQLSchema, parse } from 'graphql';
+import type { MutationResolvers } from '../../__generated__/resolvers.ts';
 import { requireAi } from '../ai-gate.ts';
-import type { Context } from '../context.ts';
+import { attachResolvers } from '../attach-resolvers.ts';
 import { loadAiTodo, requireText } from './requests.ts';
 
 // Recording an artifact from outside a run. A todo's run reports what it
@@ -59,9 +59,9 @@ function requireShortText(value: string, field: string, limit: number): string {
 
 export function applyArtifactsExtension(schema: GraphQLSchema): GraphQLSchema {
   const extendedSchema = extendSchema(schema, ARTIFACTS_SDL);
-  const mutations = (extendedSchema.getType('Mutation') as GraphQLObjectType).getFields();
+  const mutations: MutationResolvers = {};
 
-  mutations.recordArtifact.resolve = async (_parent: unknown, args: MutationRecordArtifactArgs, context: Context) => {
+  mutations.recordArtifact = async (_parent, args, context) => {
     const userId = await requireAi(context);
     const { actor } = context;
     if (actor.kind === 'agent') {
@@ -127,5 +127,5 @@ export function applyArtifactsExtension(schema: GraphQLSchema): GraphQLSchema {
     });
   };
 
-  return extendedSchema;
+  return attachResolvers(extendedSchema, { Mutation: mutations });
 }

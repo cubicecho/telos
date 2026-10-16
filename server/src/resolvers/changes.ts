@@ -1,6 +1,6 @@
-import { extendSchema, type GraphQLObjectType, type GraphQLSchema, parse } from 'graphql';
+import { extendSchema, type GraphQLSchema, parse } from 'graphql';
+import { attachResolvers } from '../attach-resolvers.ts';
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, readChanges, TOMBSTONE_RETENTION_DAYS } from '../changes.ts';
-import type { Context } from '../context.ts';
 import { ChangeEntityEnum, withEnums } from '../enums.ts';
 
 // `changes(since:)`: the change feed (changes.ts) as a query. A read, so it is
@@ -51,11 +51,7 @@ const CHANGES_SDL = parse(`
 
 export function applyChangesExtension(schema: GraphQLSchema): GraphQLSchema {
   const extendedSchema = extendSchema(withEnums(schema, [ChangeEntityEnum]), CHANGES_SDL);
-  const query = extendedSchema.getType('Query') as GraphQLObjectType;
-  query.getFields().changes.resolve = (
-    _parent: unknown,
-    args: { since?: string | null; limit?: number | null },
-    context: Context,
-  ) => readChanges(context, args);
-  return extendedSchema;
+  return attachResolvers(extendedSchema, {
+    Query: { changes: (_parent, args, context) => readChanges(context, args) },
+  });
 }

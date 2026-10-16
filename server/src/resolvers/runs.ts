@@ -1,11 +1,11 @@
 import * as dbSchema from '@telos/db/schema';
 import { and, asc, desc, eq, ne, sql } from 'drizzle-orm';
-import { extendSchema, GraphQLError, type GraphQLObjectType, type GraphQLSchema, parse } from 'graphql';
+import { extendSchema, GraphQLError, type GraphQLSchema, parse } from 'graphql';
 import type {
   ArtifactInput,
-  MutationFinishRunArgs,
-  MutationHeartbeatRunArgs,
+  MutationResolvers,
   ProposedTodoInput,
+  QueryResolvers,
   RefinedTodoInput,
   RunEventInput,
   RunPromptInput,
@@ -13,6 +13,7 @@ import type {
   RunUsageInput,
 } from '../../__generated__/resolvers.ts';
 import { requireSystem } from '../ai-gate.ts';
+import { attachResolvers } from '../attach-resolvers.ts';
 import { assertNoCycle, findBlocked } from '../blocking.ts';
 import type { Actor, Context } from '../context.ts';
 import { stopDraftReply } from '../draft-runs.ts';
@@ -799,17 +800,17 @@ async function archiveOn(
 
 export function applyRunsExtension(schema: GraphQLSchema): GraphQLSchema {
   const extendedSchema = extendSchema(withEnums(schema, [RunOutcomeEnum]), RUNS_SDL);
-  const queries = (extendedSchema.getType('Query') as GraphQLObjectType).getFields();
-  const mutations = (extendedSchema.getType('Mutation') as GraphQLObjectType).getFields();
+  const queries: QueryResolvers = {};
+  const mutations: MutationResolvers = {};
 
-  queries.runnerQueue.resolve = async (_parent: unknown, args: { limit?: number | null }, context: Context) => {
+  queries.runnerQueue = async (_parent, args, context) => {
     requireSystem(context);
     markRunnerSeen();
     const limit = Math.max(1, Math.min(args.limit ?? 20, 200));
     return readyTodos(context.db, {}, limit);
   };
 
-  mutations.claimRun.resolve = async (_parent: unknown, args: { todoId: string; laneId: string }, context: Context) => {
+  mutations.claimRun = async (_parent, args, context) => {
     requireSystem(context);
     try {
       return await (context.db as AnyRow).transaction(async (tx: AnyRow) => {
@@ -864,7 +865,7 @@ export function applyRunsExtension(schema: GraphQLSchema): GraphQLSchema {
     }
   };
 
-  mutations.heartbeatRun.resolve = async (_parent: unknown, args: MutationHeartbeatRunArgs, context: Context) => {
+  mutations.heartbeatRun = async (_parent, args, context) => {
     requireSystem(context);
     return (context.db as AnyRow).transaction(async (tx: AnyRow) => {
       const { run, aiOff } = await loadRunForUpdate(tx, args.id);
@@ -891,12 +892,12 @@ export function applyRunsExtension(schema: GraphQLSchema): GraphQLSchema {
     });
   };
 
-  mutations.finishRun.resolve = async (_parent: unknown, args: MutationFinishRunArgs, context: Context) => {
+  mutations.finishRun = async (_parent, args, context) => {
     requireSystem(context);
     return finish(context, args.id, args.result);
   };
 
-  mutations.cancelRun.resolve = async (_parent: unknown, args: { id: string }, context: Context) => {
+  mutations.cancelRun = async (_parent, args, context) => {
     const userId = requireAuth(context);
     const db = context.db as AnyRow;
     const [run] = await db
@@ -938,7 +939,7 @@ export function applyRunsExtension(schema: GraphQLSchema): GraphQLSchema {
     });
   };
 
-  mutations.deleteRun.resolve = async (_parent: unknown, args: { id: string }, context: Context) => {
+  mutations.deleteRun = async (_parent, args, context) => {
     const userId = requireAuth(context);
     const db = context.db as AnyRow;
     const [run] = await db
@@ -957,7 +958,7 @@ export function applyRunsExtension(schema: GraphQLSchema): GraphQLSchema {
   // A person's, like watching a board: what was made is theirs to tidy, and
   // an agent that could remove it could hide what it did. An artifact whose
   // todo is gone is removed the same way.
-  mutations.deleteArtifact.resolve = async (_parent: unknown, args: { id: string }, context: Context) => {
+  mutations.deleteArtifact = async (_parent, args, context) => {
     const userId = requireAuth(context);
     if (context.actor.kind !== 'user') {
       throw new GraphQLError('Only a person can remove an artifact.', { extensions: { code: 'FORBIDDEN' } });
@@ -970,7 +971,7 @@ export function applyRunsExtension(schema: GraphQLSchema): GraphQLSchema {
     return true;
   };
 
-  return extendedSchema;
+  return attachResolvers(extendedSchema, { Query: queries, Mutation: mutations });
 }
 
 /**

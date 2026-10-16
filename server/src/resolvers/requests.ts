@@ -1,7 +1,9 @@
 import * as dbSchema from '@telos/db/schema';
 import { and, eq, isNull, sql } from 'drizzle-orm';
-import { extendSchema, GraphQLError, type GraphQLObjectType, type GraphQLSchema, parse } from 'graphql';
+import { extendSchema, GraphQLError, type GraphQLSchema, parse } from 'graphql';
+import type { MutationResolvers } from '../../__generated__/resolvers.ts';
 import { requireAi } from '../ai-gate.ts';
+import { attachResolvers } from '../attach-resolvers.ts';
 import type { Context } from '../context.ts';
 import { findNewTodoLaneId } from '../lanes.ts';
 import { stampActor } from '../provenance.ts';
@@ -126,19 +128,9 @@ export function requireText(value: string, field: string): string {
 
 export function applyRequestsExtension(schema: GraphQLSchema): GraphQLSchema {
   const extendedSchema = extendSchema(schema, REQUESTS_SDL);
-  const mutations = (extendedSchema.getType('Mutation') as GraphQLObjectType).getFields();
+  const mutations: MutationResolvers = {};
 
-  mutations.submitRequest.resolve = async (
-    _parent: unknown,
-    args: {
-      projectId: string;
-      title: string;
-      brief?: string | null;
-      acceptance?: string | null;
-      parentId?: string | null;
-    },
-    context: Context,
-  ) => {
+  mutations.submitRequest = async (_parent, args, context) => {
     const userId = await requireAi(context);
     const title = requireText(args.title, 'title');
     const project = await loadAiProject(context, userId, args.projectId);
@@ -166,11 +158,7 @@ export function applyRequestsExtension(schema: GraphQLSchema): GraphQLSchema {
     });
   };
 
-  mutations.cancelRequest.resolve = async (
-    _parent: unknown,
-    args: { id: string; reason?: string | null },
-    context: Context,
-  ) => {
+  mutations.cancelRequest = async (_parent, args, context) => {
     const userId = await requireAi(context);
     const todo = await loadAiTodo(context, userId, args.id);
     const reason = args.reason?.trim() || null;
@@ -185,16 +173,12 @@ export function applyRequestsExtension(schema: GraphQLSchema): GraphQLSchema {
     return true;
   };
 
-  mutations.addTodoNote.resolve = async (
-    _parent: unknown,
-    args: { todoId: string; body: string },
-    context: Context,
-  ) => {
+  mutations.addTodoNote = async (_parent, args, context) => {
     const userId = await requireAi(context);
     const body = requireText(args.body, 'body');
     const todo = await loadAiTodo(context, userId, args.todoId);
     return insertNote(context.db, context, userId, todo.id, body);
   };
 
-  return extendedSchema;
+  return attachResolvers(extendedSchema, { Mutation: mutations });
 }

@@ -1,7 +1,8 @@
 import * as dbSchema from '@telos/db/schema';
 import { and, asc, eq, inArray } from 'drizzle-orm';
-import { extendSchema, GraphQLError, type GraphQLObjectType, type GraphQLSchema, parse } from 'graphql';
-import type { Context } from '../context.ts';
+import { extendSchema, GraphQLError, type GraphQLSchema, parse } from 'graphql';
+import type { MutationResolvers } from '../../__generated__/resolvers.ts';
+import { attachResolvers } from '../attach-resolvers.ts';
 import { requireAuth } from './auth.ts';
 
 // Board templates: a project's lanes, with their agents and routes, saved to
@@ -97,13 +98,9 @@ export function checkTemplateLanes(value: unknown): TemplateLane[] {
 
 export function applyBoardTemplatesExtension(schema: GraphQLSchema): GraphQLSchema {
   const extendedSchema = extendSchema(schema, BOARD_TEMPLATES_SDL);
-  const mutations = (extendedSchema.getType('Mutation') as GraphQLObjectType).getFields();
+  const mutations: MutationResolvers = {};
 
-  mutations.saveBoardTemplate.resolve = async (
-    _parent: unknown,
-    args: { projectId: string; name: string },
-    context: Context,
-  ) => {
+  mutations.saveBoardTemplate = async (_parent, args, context) => {
     const userId = requireAuth(context);
     const name = args.name.trim();
     if (!name || name.length > MAX_NAME) throw badInput(`Name the template, in ${MAX_NAME} characters or fewer.`);
@@ -136,11 +133,7 @@ export function applyBoardTemplatesExtension(schema: GraphQLSchema): GraphQLSche
     return template;
   };
 
-  mutations.applyBoardTemplate.resolve = async (
-    _parent: unknown,
-    args: { projectId: string; templateId: string },
-    context: Context,
-  ) => {
+  mutations.applyBoardTemplate = async (_parent, args, context) => {
     const userId = requireAuth(context);
     return (context.db as AnyRow).transaction(async (tx: AnyRow) => {
       const project = await ownedProject(tx, args.projectId, userId);
@@ -210,5 +203,5 @@ export function applyBoardTemplatesExtension(schema: GraphQLSchema): GraphQLSche
     });
   };
 
-  return extendedSchema;
+  return attachResolvers(extendedSchema, { Mutation: mutations });
 }

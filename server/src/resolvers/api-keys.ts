@@ -1,7 +1,9 @@
 import * as dbSchema from '@telos/db/schema';
 import { and, desc, eq } from 'drizzle-orm';
-import { extendSchema, GraphQLError, type GraphQLObjectType, type GraphQLSchema, parse } from 'graphql';
+import { extendSchema, GraphQLError, type GraphQLSchema, parse } from 'graphql';
+import type { MutationResolvers, QueryResolvers } from '../../__generated__/resolvers.ts';
 import { requireAi } from '../ai-gate.ts';
+import { attachResolvers } from '../attach-resolvers.ts';
 import { mintApiKey } from '../auth.ts';
 import type { Context } from '../context.ts';
 import { DOOR_TOOL_NAMES, DOOR_TOOLS, NOT_FOR_RUNS, onForRuns } from '../door.ts';
@@ -130,23 +132,19 @@ async function keysOf(ctx: Context, userId: string, id?: string) {
 export function applyApiKeysExtension(schema: GraphQLSchema): GraphQLSchema {
   const extended = extendSchema(schema, API_KEYS_SDL);
 
-  const query = (extended.getType('Query') as GraphQLObjectType).getFields();
-  query.apiKeys.resolve = async (_parent: unknown, _args: unknown, ctx: Context) => {
+  const query: QueryResolvers = {};
+  query.apiKeys = async (_parent, _args, ctx) => {
     const userId = await requireKeyManager(ctx);
     return keysOf(ctx, userId);
   };
 
-  query.mcpTools.resolve = async (_parent: unknown, _args: unknown, ctx: Context) => {
+  query.mcpTools = async (_parent, _args, ctx) => {
     await requireKeyManager(ctx);
     return DOOR_TOOLS.map((tool) => ({ ...tool, forRuns: !NOT_FOR_RUNS.has(tool.name), runDefault: onForRuns(tool) }));
   };
 
-  const mutation = (extended.getType('Mutation') as GraphQLObjectType).getFields();
-  mutation.createApiKey.resolve = async (
-    _parent: unknown,
-    args: { name: string; expiresInDays?: number | null },
-    ctx: Context,
-  ) => {
+  const mutation: MutationResolvers = {};
+  mutation.createApiKey = async (_parent, args, ctx) => {
     const userId = await requireKeyManager(ctx);
     const name = args.name.trim();
     if (!name) throw new GraphQLError('A key needs a name', { extensions: { code: 'BAD_USER_INPUT' } });
@@ -159,7 +157,7 @@ export function applyApiKeysExtension(schema: GraphQLSchema): GraphQLSchema {
     return { apiKey: withSwitches(apiKey, []), key };
   };
 
-  mutation.deleteApiKey.resolve = async (_parent: unknown, args: { id: string }, ctx: Context) => {
+  mutation.deleteApiKey = async (_parent, args, ctx) => {
     const userId = await requireKeyManager(ctx);
     if (!UUID.test(args.id)) return false;
     const deleted = await ctx.db
@@ -169,7 +167,7 @@ export function applyApiKeysExtension(schema: GraphQLSchema): GraphQLSchema {
     return deleted.length > 0;
   };
 
-  mutation.setApiKeyTools.resolve = async (_parent: unknown, args: { id: string; off: string[] }, ctx: Context) => {
+  mutation.setApiKeyTools = async (_parent, args, ctx) => {
     const userId = await requireKeyManager(ctx);
     const unknown = args.off.filter((name) => !DOOR_TOOL_NAMES.has(name));
     if (unknown.length > 0) {
@@ -189,5 +187,5 @@ export function applyApiKeysExtension(schema: GraphQLSchema): GraphQLSchema {
     return withSwitches(owned, off);
   };
 
-  return extended;
+  return attachResolvers(extended, { Query: query, Mutation: mutation });
 }

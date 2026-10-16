@@ -1,9 +1,10 @@
 import * as dbSchema from '@telos/db/schema';
 import { and, asc, eq, isNull, sql } from 'drizzle-orm';
-import { extendSchema, type GraphQLObjectType, type GraphQLSchema, parse } from 'graphql';
+import { extendSchema, type GraphQLSchema, parse } from 'graphql';
+import type { QueryResolvers } from '../../__generated__/resolvers.ts';
 import { requireAi } from '../ai-gate.ts';
+import { attachResolvers } from '../attach-resolvers.ts';
 import { resultRows } from '../blocking.ts';
-import type { Context } from '../context.ts';
 import { DELETED_AGENT, SPEND_SUMS, type SpendRow, spendLine } from './account-activity.ts';
 
 // Two things the AI side reads that the generated lists cannot give it.
@@ -78,9 +79,9 @@ interface AgentLaneRow {
  */
 export function applyAiReadsExtension(schema: GraphQLSchema): GraphQLSchema {
   const extendedSchema = extendSchema(schema, AI_READS_SDL);
-  const queries = (extendedSchema.getType('Query') as GraphQLObjectType).getFields();
+  const queries: QueryResolvers = {};
 
-  queries.agentRoster.resolve = async (_parent: unknown, _args: unknown, context: Context) => {
+  queries.agentRoster = async (_parent, _args, context) => {
     const userId = await requireAi(context);
     const db = context.db as AnyRow;
     // Named columns, never the row: the key and the servers stay where they are.
@@ -121,7 +122,7 @@ export function applyAiReadsExtension(schema: GraphQLSchema): GraphQLSchema {
     }));
   };
 
-  queries.aiSpend.resolve = async (_parent: unknown, args: { since: Date | string }, context: Context) => {
+  queries.aiSpend = async (_parent, args, context) => {
     const userId = await requireAi(context);
     const db = context.db as AnyRow;
     const since = new Date(args.since);
@@ -157,5 +158,5 @@ export function applyAiReadsExtension(schema: GraphQLSchema): GraphQLSchema {
     };
   };
 
-  return extendedSchema;
+  return attachResolvers(extendedSchema, { Query: queries });
 }

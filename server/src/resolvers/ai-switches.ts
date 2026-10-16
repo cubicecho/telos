@@ -1,8 +1,9 @@
 import * as dbSchema from '@telos/db/schema';
 import { and, eq } from 'drizzle-orm';
-import { extendSchema, GraphQLError, type GraphQLObjectType, type GraphQLSchema, parse } from 'graphql';
+import { extendSchema, GraphQLError, type GraphQLSchema, parse } from 'graphql';
+import type { MutationResolvers } from '../../__generated__/resolvers.ts';
 import { requireAi } from '../ai-gate.ts';
-import type { Context } from '../context.ts';
+import { attachResolvers } from '../attach-resolvers.ts';
 import { isAdmin, setInstanceAi } from '../instance.ts';
 import { cancelRunsUnder, dropRunRequests } from '../ready.ts';
 import { MAX_RETENTION_DAYS } from '../retention.ts';
@@ -46,9 +47,9 @@ const AI_SWITCHES_SDL = parse(`
 
 export function applyAiSwitchesExtension(schema: GraphQLSchema): GraphQLSchema {
   const extendedSchema = extendSchema(schema, AI_SWITCHES_SDL);
-  const mutations = (extendedSchema.getType('Mutation') as GraphQLObjectType).getFields();
+  const mutations: MutationResolvers = {};
 
-  mutations.setInstanceAiEnabled.resolve = async (_parent: unknown, args: { enabled: boolean }, context: Context) => {
+  mutations.setInstanceAiEnabled = async (_parent, args, context) => {
     const userId = requireSession(context);
     if (!(await isAdmin(context.db, userId))) {
       throw new GraphQLError('Only an admin can switch AI for the instance.', { extensions: { code: 'FORBIDDEN' } });
@@ -58,7 +59,7 @@ export function applyAiSwitchesExtension(schema: GraphQLSchema): GraphQLSchema {
     return { ai: args.enabled, aiAvailable: true };
   };
 
-  mutations.setAiEnabled.resolve = async (_parent: unknown, args: { enabled: boolean }, context: Context) => {
+  mutations.setAiEnabled = async (_parent, args, context) => {
     const userId = requireSession(context);
     const [user] = await (context.db as AnyRow)
       .update(dbSchema.users)
@@ -69,11 +70,7 @@ export function applyAiSwitchesExtension(schema: GraphQLSchema): GraphQLSchema {
     return user;
   };
 
-  mutations.setProjectAiEnabled.resolve = async (
-    _parent: unknown,
-    args: { projectId: string; enabled: boolean },
-    context: Context,
-  ) => {
+  mutations.setProjectAiEnabled = async (_parent, args, context) => {
     // Closing a project is always allowed; opening one is an AI action, and
     // for an account with AI off there is no such thing.
     const userId = requireSession(context);
@@ -91,11 +88,7 @@ export function applyAiSwitchesExtension(schema: GraphQLSchema): GraphQLSchema {
     return project;
   };
 
-  mutations.setProjectAutoRun.resolve = async (
-    _parent: unknown,
-    args: { projectId: string; enabled: boolean },
-    context: Context,
-  ) => {
+  mutations.setProjectAutoRun = async (_parent, args, context) => {
     // Off is always allowed and stops nothing: what is running finishes, and
     // nothing new starts. On is an AI action, like opening the project.
     const userId = requireSession(context);
@@ -113,7 +106,7 @@ export function applyAiSwitchesExtension(schema: GraphQLSchema): GraphQLSchema {
     return project;
   };
 
-  mutations.setRunRetention.resolve = async (_parent: unknown, args: { days?: number | null }, context: Context) => {
+  mutations.setRunRetention = async (_parent, args, context) => {
     const userId = requireSession(context);
     const days = args.days ?? null;
     if (days !== null && (days < 1 || days > MAX_RETENTION_DAYS)) {
@@ -129,5 +122,5 @@ export function applyAiSwitchesExtension(schema: GraphQLSchema): GraphQLSchema {
     return user;
   };
 
-  return extendedSchema;
+  return attachResolvers(extendedSchema, { Mutation: mutations });
 }

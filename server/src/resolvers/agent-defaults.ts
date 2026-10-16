@@ -1,9 +1,10 @@
 import * as dbSchema from '@telos/db/schema';
 import { resolveAgent } from '@telos/runner/spec';
-import { extendSchema, GraphQLError, type GraphQLObjectType, type GraphQLSchema, parse } from 'graphql';
+import { extendSchema, GraphQLError, type GraphQLSchema, parse } from 'graphql';
+import type { MutationResolvers, QueryResolvers } from '../../__generated__/resolvers.ts';
 import { LAYER_FIELDS, loadAgentDefaults } from '../agent-defaults.ts';
 import { requireAi } from '../ai-gate.ts';
-import type { Context } from '../context.ts';
+import { attachResolvers } from '../attach-resolvers.ts';
 import { requireSession } from './auth.ts';
 
 // The account's agent defaults (db/src/models/agent-defaults.ts): read and set
@@ -106,7 +107,9 @@ const badInput = (message: string) => new GraphQLError(message, { extensions: { 
  * @returns The `AgentDefaults` value.
  */
 function visible(userId: string, row: dbSchema.AgentDefaults | null) {
-  const own = Object.fromEntries(LAYER_FIELDS.map((field) => [field, row?.[field] ?? null]));
+  const own = Object.fromEntries(LAYER_FIELDS.map((field) => [field, row?.[field] ?? null])) as {
+    [F in LayerField]: dbSchema.AgentDefaults[F] | null;
+  };
   return { id: userId, ...own, hasApiKey: !!row?.apiKey, resolved: settings(row), builtIn: settings(null) };
 }
 
@@ -165,16 +168,16 @@ function columns(values: LayerValues): Record<LayerField, string | number | bool
  */
 export function applyAgentDefaultsExtension(schema: GraphQLSchema): GraphQLSchema {
   const extendedSchema = extendSchema(schema, AGENT_DEFAULTS_SDL);
-  const queries = (extendedSchema.getType('Query') as GraphQLObjectType).getFields();
-  const mutations = (extendedSchema.getType('Mutation') as GraphQLObjectType).getFields();
+  const queries: QueryResolvers = {};
+  const mutations: MutationResolvers = {};
 
-  queries.agentDefaults.resolve = async (_parent: unknown, _args: unknown, context: Context) => {
+  queries.agentDefaults = async (_parent, _args, context) => {
     requireSession(context);
     const userId = await requireAi(context);
     return visible(userId, await loadAgentDefaults(context.db, userId));
   };
 
-  mutations.setAgentDefaults.resolve = async (_parent: unknown, args: { values: LayerValues }, context: Context) => {
+  mutations.setAgentDefaults = async (_parent, args, context) => {
     requireSession(context);
     const userId = await requireAi(context);
     const set = columns(args.values);
@@ -186,11 +189,7 @@ export function applyAgentDefaultsExtension(schema: GraphQLSchema): GraphQLSchem
     return visible(userId, row);
   };
 
-  mutations.setAgentDefaultsApiKey.resolve = async (
-    _parent: unknown,
-    args: { apiKey?: string | null },
-    context: Context,
-  ) => {
+  mutations.setAgentDefaultsApiKey = async (_parent, args, context) => {
     requireSession(context);
     const userId = await requireAi(context);
     const apiKey = args.apiKey?.trim() || null;
@@ -202,5 +201,5 @@ export function applyAgentDefaultsExtension(schema: GraphQLSchema): GraphQLSchem
     return visible(userId, row);
   };
 
-  return extendedSchema;
+  return attachResolvers(extendedSchema, { Query: queries, Mutation: mutations });
 }

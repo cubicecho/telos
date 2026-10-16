@@ -1,7 +1,9 @@
 import * as dbSchema from '@telos/db/schema';
 import { and, eq, isNull } from 'drizzle-orm';
-import { extendSchema, GraphQLError, type GraphQLObjectType, type GraphQLSchema, parse } from 'graphql';
+import { extendSchema, GraphQLError, type GraphQLSchema, parse } from 'graphql';
+import type { MutationResolvers } from '../../__generated__/resolvers.ts';
 import { requireAi } from '../ai-gate.ts';
+import { attachResolvers } from '../attach-resolvers.ts';
 import { type Context, isAiActor } from '../context.ts';
 import { requireAuth } from './auth.ts';
 import { requireText } from './requests.ts';
@@ -108,9 +110,9 @@ function assertPlainNote(note: AnyRow): void {
 
 export function applyNotesExtension(schema: GraphQLSchema): GraphQLSchema {
   const extendedSchema = extendSchema(schema, NOTES_SDL);
-  const mutations = (extendedSchema.getType('Mutation') as GraphQLObjectType).getFields();
+  const mutations: MutationResolvers = {};
 
-  mutations.editTodoNote.resolve = async (_parent: unknown, args: { id: string; body: string }, context: Context) => {
+  mutations.editTodoNote = async (_parent, args, context) => {
     const note = await loadVisibleNote(context, args.id);
     assertPlainNote(note);
     if (signedByCaller(context, note) === false) {
@@ -136,7 +138,7 @@ export function applyNotesExtension(schema: GraphQLSchema): GraphQLSchema {
     return edited;
   };
 
-  mutations.deleteTodoNote.resolve = async (_parent: unknown, args: { id: string }, context: Context) => {
+  mutations.deleteTodoNote = async (_parent, args, context) => {
     const note = await loadVisibleNote(context, args.id);
     assertPlainNote(note);
     // The board is the person's, so they may clear any plain note off it.
@@ -153,5 +155,5 @@ export function applyNotesExtension(schema: GraphQLSchema): GraphQLSchema {
     return removed;
   };
 
-  return extendedSchema;
+  return attachResolvers(extendedSchema, { Mutation: mutations });
 }

@@ -1,9 +1,10 @@
 import * as dbSchema from '@telos/db/schema';
 import { and, eq, sql } from 'drizzle-orm';
-import { extendSchema, GraphQLError, type GraphQLObjectType, type GraphQLSchema, parse } from 'graphql';
+import { extendSchema, GraphQLError, type GraphQLSchema, parse } from 'graphql';
+import type { QueryResolvers } from '../../__generated__/resolvers.ts';
 import { aiAllowed } from '../ai-gate.ts';
+import { attachResolvers } from '../attach-resolvers.ts';
 import { resultRows } from '../blocking.ts';
-import type { Context } from '../context.ts';
 import { failuresSinceTouched } from '../ready.ts';
 import { requireSession } from './auth.ts';
 
@@ -121,9 +122,9 @@ function lastRunMark(row: MarkRow): string | null {
  */
 export function applyCardMarksExtension(schema: GraphQLSchema, options: { ai: boolean }): GraphQLSchema {
   const extendedSchema = extendSchema(schema, CARD_MARKS_SDL);
-  const queries = (extendedSchema.getType('Query') as GraphQLObjectType).getFields();
+  const queries: QueryResolvers = {};
 
-  queries.cardMarks.resolve = async (_parent: unknown, args: { projectId: string }, context: Context) => {
+  queries.cardMarks = async (_parent, args, context) => {
     // A person's, like the board it is drawn on.
     const userId = requireSession(context);
     const db = context.db as AnyRow;
@@ -151,5 +152,5 @@ export function applyCardMarksExtension(schema: GraphQLSchema, options: { ai: bo
     });
   };
 
-  return extendedSchema;
+  return attachResolvers(extendedSchema, { Query: queries });
 }

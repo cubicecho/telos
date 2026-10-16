@@ -1,8 +1,9 @@
 import * as dbSchema from '@telos/db/schema';
 import { and, asc, eq, isNull } from 'drizzle-orm';
-import { extendSchema, GraphQLError, type GraphQLObjectType, type GraphQLSchema, parse } from 'graphql';
+import { extendSchema, GraphQLError, type GraphQLSchema, parse } from 'graphql';
+import type { MutationResolvers } from '../../__generated__/resolvers.ts';
+import { attachResolvers } from '../attach-resolvers.ts';
 import { assertNotBlocked } from '../blocking.ts';
-import type { Context } from '../context.ts';
 import { syncLaneCompletion } from '../lanes.ts';
 import { stampActor } from '../provenance.ts';
 import { requireAuth } from './auth.ts';
@@ -101,13 +102,9 @@ function reposition(
 
 export function applyLanesExtension(schema: GraphQLSchema): GraphQLSchema {
   const extendedSchema = extendSchema(schema, LANES_SDL);
-  const mutations = (extendedSchema.getType('Mutation') as GraphQLObjectType).getFields();
+  const mutations: MutationResolvers = {};
 
-  mutations.moveTodo.resolve = async (
-    _parent: unknown,
-    args: { id: string; laneId: string; position?: number | null; reason?: string | null },
-    context: Context,
-  ) => {
+  mutations.moveTodo = async (_parent, args, context) => {
     const userId = requireAuth(context);
     const db = context.db as AnyRow;
 
@@ -169,11 +166,7 @@ export function applyLanesExtension(schema: GraphQLSchema): GraphQLSchema {
     });
   };
 
-  mutations.setDoneLane.resolve = async (
-    _parent: unknown,
-    args: { projectId: string; laneId?: string | null },
-    context: Context,
-  ) => {
+  mutations.setDoneLane = async (_parent, args, context) => {
     const userId = requireAuth(context);
     const db = context.db as AnyRow;
 
@@ -205,11 +198,7 @@ export function applyLanesExtension(schema: GraphQLSchema): GraphQLSchema {
     });
   };
 
-  mutations.reorderLanes.resolve = async (
-    _parent: unknown,
-    args: { projectId: string; laneIds: string[] },
-    context: Context,
-  ) => {
+  mutations.reorderLanes = async (_parent, args, context) => {
     const userId = requireAuth(context);
     const db = context.db as AnyRow;
 
@@ -235,5 +224,5 @@ export function applyLanesExtension(schema: GraphQLSchema): GraphQLSchema {
     });
   };
 
-  return extendedSchema;
+  return attachResolvers(extendedSchema, { Mutation: mutations });
 }

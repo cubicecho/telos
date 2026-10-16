@@ -1,8 +1,9 @@
 import * as dbSchema from '@telos/db/schema';
 import { and, asc, eq, isNotNull, isNull, lte, or } from 'drizzle-orm';
-import { extendSchema, type GraphQLObjectType, type GraphQLSchema, parse } from 'graphql';
+import { extendSchema, type GraphQLSchema, parse } from 'graphql';
+import type { MutationResolvers } from '../../__generated__/resolvers.ts';
 import { requireSystem } from '../ai-gate.ts';
-import type { Context } from '../context.ts';
+import { attachResolvers } from '../attach-resolvers.ts';
 import { instanceAiOn } from '../instance.ts';
 import { serversFor } from '../mcp-servers.ts';
 import { markRunnerSeen } from '../runner-seen.ts';
@@ -101,13 +102,9 @@ function warnDropped(session: dbSchema.TodoSession, reason: string | null): void
  */
 export function applySessionDeletesExtension(schema: GraphQLSchema): GraphQLSchema {
   const extendedSchema = extendSchema(schema, SESSION_DELETES_SDL);
-  const mutations = (extendedSchema.getType('Mutation') as GraphQLObjectType).getFields();
+  const mutations: MutationResolvers = {};
 
-  mutations.takeSessionDeletes.resolve = async (
-    _parent: unknown,
-    args: { limit?: number | null },
-    context: Context,
-  ) => {
+  mutations.takeSessionDeletes = async (_parent, args, context) => {
     requireSystem(context);
     markRunnerSeen();
     if ((await instanceAiOn(context.db)) === false) {
@@ -161,11 +158,7 @@ export function applySessionDeletesExtension(schema: GraphQLSchema): GraphQLSche
     });
   };
 
-  mutations.finishSessionDelete.resolve = async (
-    _parent: unknown,
-    args: { id: string; error?: string | null },
-    context: Context,
-  ) => {
+  mutations.finishSessionDelete = async (_parent, args, context) => {
     requireSystem(context);
     return (context.db as AnyRow).transaction(async (tx: AnyRow) => {
       const [session]: dbSchema.TodoSession[] = await tx
@@ -193,5 +186,5 @@ export function applySessionDeletesExtension(schema: GraphQLSchema): GraphQLSche
     });
   };
 
-  return extendedSchema;
+  return attachResolvers(extendedSchema, { Mutation: mutations });
 }

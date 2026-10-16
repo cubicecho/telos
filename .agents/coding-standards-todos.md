@@ -42,7 +42,7 @@ Nothing here is implemented until approved.
 | A7 | API change | `RunEventInput.kind` becomes an enum | The runner already types it closed | — | proposed |
 | R7 | Refactor [simplify] | Error helpers (`notFound`, `badInput`, `conflict`) in one module | 85 inline `new GraphQLError` across 24 files; `badInput` is already redefined locally | — | proposed |
 | R8 | Refactor [simplify] | One `loadOwned*` family | `loadOwnedTodo`, `loadOwnedLane`, `loadOwnedProject`, `loadAiProject`, `loadAiTodo` repeat the fetch-and-404 | R7 | proposed |
-| R9 | Refactor [types] | Attach resolvers through the generated `Resolvers` map, not `getType() as GraphQLObjectType` | 33 casts go; resolver args and parents are checked against the schema | — | proposed |
+| R9 | Refactor [types] | Attach resolvers through the generated `Resolvers` map, not `getType() as GraphQLObjectType` | 33 casts go; resolver args and parents are checked against the schema | — | done |
 | R10 | Refactor [types] | Retire `AnyRow`/`AnyDb = any` (39) for drizzle's inferred types | Row shapes are checked | drizzle 1.0 typing (unverified) | proposed |
 | R11 | Refactor [readability] | The server's internal `LaneTally` (projectId, laneId, done) gets its own name | It shares a name with the API's `LaneTally`, a different shape | — | proposed |
 | R12 | Refactor [structure] | Group `server/src` by domain (runs, drafts, agents, board) instead of `resolvers/` vs root | A change to one area stays in one folder | — | proposed |
