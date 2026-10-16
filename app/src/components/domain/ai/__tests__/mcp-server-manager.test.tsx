@@ -218,14 +218,14 @@ describe('McpServerManager', () => {
       {
         request: {
           query: SetMcpServerSecretDocument,
-          variables: { id: 's1', kind: 'header', name: 'Authorization', value: 'Bearer abc' },
+          variables: { id: 's1', kind: 'HEADER', name: 'Authorization', value: 'Bearer abc' },
         },
         result: set,
       },
       {
         request: {
           query: SetMcpServerSecretDocument,
-          variables: { id: 's1', kind: 'header', name: 'Authorization', value: null },
+          variables: { id: 's1', kind: 'HEADER', name: 'Authorization', value: null },
         },
         result: remove,
       },
@@ -253,7 +253,7 @@ describe('McpServerManager', () => {
     const probe = (fields: object) => ({
       __typename: 'McpProbe',
       id: 'p1',
-      status: 'done',
+      status: 'DONE',
       ok: true,
       tools: [],
       error: null,

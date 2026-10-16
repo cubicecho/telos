@@ -360,7 +360,7 @@ describe('a draft’s replies as runs', () => {
 
   it('is not a lane’s run: finishRun and heartbeatRun refuse it and say what to use', async () => {
     const { runId } = await claimedDraft(board, runner);
-    const finish = await runner.expectError(FINISH_RUN, { id: runId, result: { status: 'ok', output: 'Hi' } });
+    const finish = await runner.expectError(FINISH_RUN, { id: runId, result: { status: 'OK', output: 'Hi' } });
     expect(finish.code).toBe('BAD_USER_INPUT');
     expect(finish.message).toContain('finishDraft');
     expect((await runner.expectError(HEARTBEAT, { id: runId })).code).toBe('BAD_USER_INPUT');

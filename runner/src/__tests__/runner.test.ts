@@ -587,7 +587,7 @@ describe('testing an MCP server', () => {
   it('lists what a server offers', async () => {
     const tools = await serveTools('');
     expect(await testOf({ id: 'desk', url: tools.url })).toEqual({
-      status: 'done',
+      status: 'DONE',
       ok: true,
       tools: [{ name: 'write_file' }, { name: 'recall' }],
       error: null,
@@ -596,7 +596,7 @@ describe('testing an MCP server', () => {
 
   it('says why a server could not be reached', async () => {
     const probe = await testOf({ id: 'gone', url: 'http://127.0.0.1:9/mcp' });
-    expect(probe).toMatchObject({ status: 'done', ok: false, tools: [] });
+    expect(probe).toMatchObject({ status: 'DONE', ok: false, tools: [] });
     expect(probe.error).toBeTruthy();
   });
 

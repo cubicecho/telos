@@ -320,7 +320,8 @@ export function createTelos(options: { telosUrl: string; runnerKey: string; fetc
         })
       ).heartbeatRun,
     finish: async (runId, result) => {
-      await request(FINISH, { id: runId, result });
+      // `RunOutcome` is SCREAMING_CASE on the wire; the runner and its hooks say `ok`.
+      await request(FINISH, { id: runId, result: { ...result, status: result.status.toUpperCase() } });
     },
     probes: async () => (await request<{ runnerProbes: RunnerProbe[] }>(PROBES, {})).runnerProbes,
     finishProbe: async (id, result) => {

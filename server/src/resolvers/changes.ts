@@ -1,6 +1,7 @@
 import { extendSchema, type GraphQLObjectType, type GraphQLSchema, parse } from 'graphql';
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, readChanges, TOMBSTONE_RETENTION_DAYS } from '../changes.ts';
 import type { Context } from '../context.ts';
+import { ChangeEntityEnum, withEnums } from '../enums.ts';
 
 // `changes(since:)`: the change feed (changes.ts) as a query. A read, so it is
 // open to whoever can read the rows it names — a person, an API key on /graphql
@@ -8,12 +9,6 @@ import type { Context } from '../context.ts';
 // Applied with AI off too: syncing a copy of your todos is not an AI feature.
 
 const CHANGES_SDL = parse(`
-  enum ChangeEntity {
-    PROJECT
-    TODO
-    DEPENDENCY
-  }
-
   """
   Something the feed no longer has for you: deleted, or for an API key or a run,
   out of its view. Drop your copy. A dependency's says which edge it was.
@@ -54,17 +49,13 @@ const CHANGES_SDL = parse(`
   }
 `);
 
-const ENTITY_ENUM: Record<string, string> = { project: 'PROJECT', todo: 'TODO', dependency: 'DEPENDENCY' };
-
 export function applyChangesExtension(schema: GraphQLSchema): GraphQLSchema {
-  const extendedSchema = extendSchema(schema, CHANGES_SDL);
+  const extendedSchema = extendSchema(withEnums(schema, [ChangeEntityEnum]), CHANGES_SDL);
   const query = extendedSchema.getType('Query') as GraphQLObjectType;
   query.getFields().changes.resolve = (
     _parent: unknown,
     args: { since?: string | null; limit?: number | null },
     context: Context,
   ) => readChanges(context, args);
-  const tombstone = extendedSchema.getType('Tombstone') as GraphQLObjectType;
-  tombstone.getFields().entity.resolve = (parent: { entity: string }) => ENTITY_ENUM[parent.entity];
   return extendedSchema;
 }

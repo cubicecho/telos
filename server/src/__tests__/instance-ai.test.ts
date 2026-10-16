@@ -117,7 +117,7 @@ describe('an instance with its switch off', () => {
     expect(run.cancelRequestedAt).not.toBeNull();
 
     // Once the runner reports it stopped, switching back on opens the queue again.
-    await runner.expectOk(FINISH, { id: runId, result: { status: 'ok', output: 'Done anyway.' } });
+    await runner.expectOk(FINISH, { id: runId, result: { status: 'OK', output: 'Done anyway.' } });
     await admin.expectOk(SET_INSTANCE, { enabled: true });
     expect((await runner.expectOk(QUEUE)).runnerQueue).toHaveLength(1);
   });

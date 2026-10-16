@@ -2,7 +2,7 @@ import { useMutation, useQuery } from '@apollo/client';
 import { Link } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
-import type { AiStatusQuery } from '@/__generated__/graphql';
+import { type AiStatusQuery, WorkState } from '@/__generated__/graphql';
 import { EmptyState } from '@/components/empty-state';
 import { List } from '@/components/list';
 import { Section } from '@/components/section';
@@ -37,38 +37,68 @@ export const RUNNER_QUIET_SECONDS = 60;
 /** How far back "failed lately" looks. */
 const FAILURE_HOURS = 24;
 
-type State = 'handedBack' | 'running' | 'waiting' | 'blocked' | 'queued' | 'parked' | 'done';
+/** A state's count field on `LaneTally`. */
+type Tally = 'handedBack' | 'running' | 'waiting' | 'blocked' | 'queued' | 'parked' | 'done';
 type WorkTodo = AiStatusQuery['aiStatus']['todos'][number];
 
-const STATES: Array<{ value: State; label: string; blurb: string; variant: BadgeVariant }> = [
+const STATES: Array<{ state: WorkState; tally: Tally; label: string; blurb: string; variant: BadgeVariant }> = [
   {
-    value: 'handedBack',
+    state: WorkState.HandedBack,
+    tally: 'handedBack',
     label: 'Handed back',
     blurb: 'An agent gave up on these, or finished and has nowhere to send them.',
     variant: 'destructive',
   },
-  { value: 'running', label: 'Running', blurb: 'An agent is working these now.', variant: 'info' },
   {
-    value: 'waiting',
+    state: WorkState.Running,
+    tally: 'running',
+    label: 'Running',
+    blurb: 'An agent is working these now.',
+    variant: 'info',
+  },
+  {
+    state: WorkState.Waiting,
+    tally: 'waiting',
     label: 'Waiting',
     blurb: 'These were split, and are done when their pieces are.',
     variant: 'outline',
   },
-  { value: 'blocked', label: 'Blocked', blurb: 'These wait on something unfinished.', variant: 'outline' },
-  { value: 'queued', label: 'Queued', blurb: 'An agent will start these when it has room.', variant: 'secondary' },
-  { value: 'parked', label: 'Parked', blurb: 'No agent will reach these where they are.', variant: 'outline' },
-  { value: 'done', label: 'Done', blurb: 'Finished.', variant: 'positive' },
+  {
+    state: WorkState.Blocked,
+    tally: 'blocked',
+    label: 'Blocked',
+    blurb: 'These wait on something unfinished.',
+    variant: 'outline',
+  },
+  {
+    state: WorkState.Queued,
+    tally: 'queued',
+    label: 'Queued',
+    blurb: 'An agent will start these when it has room.',
+    variant: 'secondary',
+  },
+  {
+    state: WorkState.Parked,
+    tally: 'parked',
+    label: 'Parked',
+    blurb: 'No agent will reach these where they are.',
+    variant: 'outline',
+  },
+  { state: WorkState.Done, tally: 'done', label: 'Done', blurb: 'Finished.', variant: 'positive' },
 ];
 
+/** Which `LaneTally` field counts each state. */
+const TALLY_OF = Object.fromEntries(STATES.map((entry) => [entry.state, entry.tally])) as Record<WorkState, Tally>;
+
 export function AiStatus({ pollMs = STATUS_POLL_MS }: { pollMs?: number }) {
-  const [focus, setFocus] = useState<State>('handedBack');
+  const [focus, setFocus] = useState<WorkState>(WorkState.HandedBack);
   const [watching, setWatching] = useState<string | null>(null);
   const query = useQuery(AiStatusDocument, { pollInterval: pollMs, fetchPolicy: 'cache-and-network' });
   const status = query.data?.aiStatus;
   const [retryTodo, retryState] = useMutation(RetryTodoDocument, { refetchQueries: [AiStatusDocument] });
 
   const counts = useMemo(() => {
-    const tally: Record<State, number> = {
+    const tally: Record<Tally, number> = {
       handedBack: 0,
       running: 0,
       waiting: 0,
@@ -77,7 +107,7 @@ export function AiStatus({ pollMs = STATUS_POLL_MS }: { pollMs?: number }) {
       parked: 0,
       done: 0,
     };
-    for (const todo of status?.todos ?? []) tally[todo.state as State] += 1;
+    for (const todo of status?.todos ?? []) tally[TALLY_OF[todo.state]] += 1;
     for (const project of status?.projects ?? []) for (const lane of project.lanes) tally.done += lane.done;
     return tally;
   }, [status]);
@@ -86,7 +116,7 @@ export function AiStatus({ pollMs = STATUS_POLL_MS }: { pollMs?: number }) {
     [status],
   );
   const shown = (status?.todos ?? []).filter((todo) => todo.state === focus);
-  const focused = STATES.find((state) => state.value === focus) ?? STATES[0];
+  const focused = STATES.find((state) => state.state === focus) ?? STATES[0];
 
   function where(todo: WorkTodo): string {
     const project = projects.get(todo.projectId);
@@ -101,16 +131,16 @@ export function AiStatus({ pollMs = STATUS_POLL_MS }: { pollMs?: number }) {
       <View className="flex-row flex-wrap gap-3">
         {STATES.map((state) => (
           <StatTile
-            key={state.value}
+            key={state.state}
             className="min-w-32 flex-1"
             label={state.label}
-            value={counts[state.value].toLocaleString()}
+            value={counts[state.tally].toLocaleString()}
             loading={!status}
-            onPress={state.value === 'done' ? undefined : () => setFocus(state.value)}
-            selected={focus === state.value}
-            valueClassName={state.value === 'handedBack' && counts.handedBack > 0 ? 'text-negative' : undefined}
+            onPress={state.state === WorkState.Done ? undefined : () => setFocus(state.state)}
+            selected={focus === state.state}
+            valueClassName={state.state === WorkState.HandedBack && counts.handedBack > 0 ? 'text-negative' : undefined}
             // Only work in progress pulses: "needs you" is waiting, and its red count says so.
-            iconSlot={state.value === 'running' && counts.running > 0 ? <LiveDot /> : undefined}
+            iconSlot={state.state === WorkState.Running && counts.running > 0 ? <LiveDot /> : undefined}
           />
         ))}
       </View>
@@ -125,7 +155,7 @@ export function AiStatus({ pollMs = STATUS_POLL_MS }: { pollMs?: number }) {
               what="where things stand"
               count={shown.length}
               emptySlot={
-                focus === 'handedBack' ? (
+                focus === WorkState.HandedBack ? (
                   <EmptyState
                     iconSlot={<CircleCheck />}
                     title="Nothing is waiting on you."
@@ -148,7 +178,7 @@ export function AiStatus({ pollMs = STATUS_POLL_MS }: { pollMs?: number }) {
                   <View className="flex-row items-center gap-2">
                     <Badge variant={focused.variant}>{focused.label}</Badge>
                     <Text className="min-w-0 flex-1 font-medium text-foreground text-sm">{todo.title}</Text>
-                    {todo.state === 'handedBack' ? (
+                    {todo.state === WorkState.HandedBack ? (
                       <Button
                         variant="outline"
                         size="sm"
@@ -186,7 +216,10 @@ export function AiStatus({ pollMs = STATUS_POLL_MS }: { pollMs?: number }) {
                     <Text
                       selectable
                       numberOfLines={3}
-                      className={cn('text-sm', todo.state === 'handedBack' ? 'text-warning' : 'text-foreground/60')}
+                      className={cn(
+                        'text-sm',
+                        todo.state === WorkState.HandedBack ? 'text-warning' : 'text-foreground/60',
+                      )}
                     >
                       {todo.reason}
                     </Text>
@@ -223,16 +256,16 @@ export function AiStatus({ pollMs = STATUS_POLL_MS }: { pollMs?: number }) {
                           {lane.station ? 'agent' : lane.isDone ? 'done lane' : 'resting place'}
                         </Text>
                         <Text className="flex-1 text-right text-foreground/60 text-xs">
-                          {STATES.filter((state) => lane[state.value] > 0).map((state, index) => (
+                          {STATES.filter((state) => lane[state.tally] > 0).map((state, index) => (
                             <Text
-                              key={state.value}
-                              className={state.value === 'handedBack' ? 'text-negative' : undefined}
+                              key={state.state}
+                              className={state.state === WorkState.HandedBack ? 'text-negative' : undefined}
                             >
                               {index > 0 ? ' · ' : ''}
-                              {lane[state.value]} {state.label.toLowerCase()}
+                              {lane[state.tally]} {state.label.toLowerCase()}
                             </Text>
                           ))}
-                          {STATES.every((state) => lane[state.value] === 0) ? 'empty' : null}
+                          {STATES.every((state) => lane[state.tally] === 0) ? 'empty' : null}
                         </Text>
                       </View>
                     ))}
@@ -312,5 +345,5 @@ export function useHandedBackCount(): number {
     pollInterval: ai.on ? HANDED_BACK_POLL_MS : 0,
     fetchPolicy: 'cache-and-network',
   });
-  return (query.data?.aiStatus.todos ?? []).filter((todo) => todo.state === 'handedBack').length;
+  return (query.data?.aiStatus.todos ?? []).filter((todo) => todo.state === WorkState.HandedBack).length;
 }

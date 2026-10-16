@@ -64,7 +64,7 @@ async function runnerCycle(): Promise<void> {
     const claimed = (await runner.expectOk(CLAIM, { todoId, laneId })).claimRun;
     if (!claimed) continue;
     await runner.expectOk(HEARTBEAT, { id: claimed.runId });
-    await runner.expectOk(FINISH, { id: claimed.runId, result: { status: 'ok', output: 'Did it.' } });
+    await runner.expectOk(FINISH, { id: claimed.runId, result: { status: 'OK', output: 'Did it.' } });
   }
 }
 
@@ -106,7 +106,7 @@ describe('a person with AI off', () => {
     const before = await snapshot(off.userId);
 
     expect((await runner.expectOk(HEARTBEAT, { id: runId })).heartbeatRun).toBe(true);
-    await runner.expectOk(FINISH, { id: runId, result: { status: 'ok', output: 'Did it anyway.' } });
+    await runner.expectOk(FINISH, { id: runId, result: { status: 'OK', output: 'Did it anyway.' } });
 
     const after = await snapshot(off.userId);
     expect({ ...after, runs: [] }).toEqual({ ...before, runs: [] });

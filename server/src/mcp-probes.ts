@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import type { McpProbeStatus } from './enums.ts';
 
 // "Test this MCP server", passed through: a person asks here, the runner dials
 // it (the server never imports agent code, and the runner is where the tools
@@ -18,7 +19,7 @@ export interface McpProbe {
   serverId: string;
   /** The server row, as JSON, as the runner reads an agent's. */
   server: string;
-  status: 'pending' | 'testing' | 'done';
+  status: McpProbeStatus;
   ok: boolean;
   tools: ProbeTool[];
   instructions: string;

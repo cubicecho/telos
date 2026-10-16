@@ -132,10 +132,10 @@ describe('accountSpend', () => {
   it('adds up every project’s runs, by project and by agent, the most spent first', async () => {
     const second = await secondProject();
     const first = await board.addTodo('Write it');
-    await runOnce(first, { status: 'ok', output: 'Wrote it.', promptTokens: 5, completionTokens: 2, totalTokens: 7 });
+    await runOnce(first, { status: 'OK', output: 'Wrote it.', promptTokens: 5, completionTokens: 2, totalTokens: 7 });
     const other = await second.addTodo('Review it');
-    await runOnce(other, { status: 'ok', output: 'Fine.', promptTokens: 80, completionTokens: 20, totalTokens: 100 });
-    await runOnce(await second.addTodo('And this'), { status: 'error', error: 'No.', totalTokens: 3 });
+    await runOnce(other, { status: 'OK', output: 'Fine.', promptTokens: 80, completionTokens: 20, totalTokens: 100 });
+    await runOnce(await second.addTodo('And this'), { status: 'ERROR', error: 'No.', totalTokens: 3 });
 
     const read = await spend();
     expect(read.total).toMatchObject({ runs: 3, draftReplies: 0, promptTokens: 85, completionTokens: 22 });
@@ -151,7 +151,7 @@ describe('accountSpend', () => {
   });
 
   it('counts a draft’s replies with the rest, and says how many they were', async () => {
-    await runOnce(await board.addTodo('Write it'), { status: 'ok', output: 'Wrote it.', totalTokens: 7 });
+    await runOnce(await board.addTodo('Write it'), { status: 'OK', output: 'Wrote it.', totalTokens: 7 });
     await answeredDraft(board, runner);
 
     const read = await spend();
@@ -161,19 +161,19 @@ describe('accountSpend', () => {
   });
 
   it('leaves out runs from before the window', async () => {
-    const runId = await runOnce(await board.addTodo('Old'), { status: 'ok', output: 'Done.', totalTokens: 9 });
+    const runId = await runOnce(await board.addTodo('Old'), { status: 'OK', output: 'Done.', totalTokens: 9 });
     await db
       .update(dbSchema.runs)
       .set({ startedAt: new Date(Date.now() - 40 * DAY) })
       .where(eq(dbSchema.runs.id, runId));
-    await runOnce(await board.addTodo('New'), { status: 'ok', output: 'Done.', totalTokens: 4 });
+    await runOnce(await board.addTodo('New'), { status: 'OK', output: 'Done.', totalTokens: 4 });
 
     expect((await spend(ago(30))).total).toMatchObject({ runs: 1, totalTokens: 4 });
     expect((await spend(ago(60))).total).toMatchObject({ runs: 2, totalTokens: 13 });
   });
 
   it('files the runs of a deleted agent under a line of their own', async () => {
-    await runOnce(await board.addTodo('Write it'), { status: 'ok', output: 'Wrote it.', totalTokens: 7 });
+    await runOnce(await board.addTodo('Write it'), { status: 'OK', output: 'Wrote it.', totalTokens: 7 });
     await setLane(board.person, board.lanes[0].id, { agentId: null });
     await db.delete(dbSchema.agents).where(eq(dbSchema.agents.id, board.agentId));
 
@@ -196,8 +196,8 @@ describe('accountSpend', () => {
 
   it('is the account’s own: another account’s runs are not in it', async () => {
     const other = await createBoard(db, 'other@example.com');
-    await runOnce(await other.addTodo('Theirs'), { status: 'ok', output: 'Done.', totalTokens: 50 });
-    await runOnce(await board.addTodo('Mine'), { status: 'ok', output: 'Done.', totalTokens: 4 });
+    await runOnce(await other.addTodo('Theirs'), { status: 'OK', output: 'Done.', totalTokens: 50 });
+    await runOnce(await board.addTodo('Mine'), { status: 'OK', output: 'Done.', totalTokens: 4 });
 
     const read = await spend();
     expect(read.total).toMatchObject({ runs: 1, totalTokens: 4 });
@@ -227,20 +227,20 @@ describe('accountHandedBack', () => {
   });
 
   it('lists nothing while every run passed', async () => {
-    await runOnce(await board.addTodo('Write it'), { status: 'ok', output: 'Wrote it.' });
+    await runOnce(await board.addTodo('Write it'), { status: 'OK', output: 'Wrote it.' });
     await board.addTodo('Untouched');
     expect(await handedBack()).toEqual([]);
   });
 
   it('lists nothing for a todo that failed with attempts left: its agent tries again', async () => {
     await setLane(board.person, board.lanes[0].id, { maxAttempts: 1 });
-    await runOnce(await board.addTodo('Write it'), { status: 'error', error: 'The model did not answer.' });
+    await runOnce(await board.addTodo('Write it'), { status: 'ERROR', error: 'The model did not answer.' });
     expect(await handedBack()).toEqual([]);
   });
 
   it('lists a todo its agent gave up on, with the error, the run and where it is', async () => {
     const todoId = await board.addTodo('Write it');
-    const runId = await runOnce(todoId, { status: 'error', error: 'The model did not answer.' });
+    const runId = await runOnce(todoId, { status: 'ERROR', error: 'The model did not answer.' });
 
     expect(await handedBack()).toEqual([
       {
@@ -250,7 +250,7 @@ describe('accountHandedBack', () => {
         projectName: 'P',
         laneId: board.lanes[0].id,
         laneName: board.lanes[0].name,
-        handedBack: 'gaveUp',
+        handedBack: 'GAVE_UP',
         reason: 'The model did not answer.',
         runId,
         attempts: 1,
@@ -268,22 +268,22 @@ describe('accountHandedBack', () => {
       onFailureLaneId: board.lanes[0].id,
     });
     const todoId = await board.addTodo('Write it');
-    await runOnce(todoId, { status: 'ok', output: 'Wrote it.' });
+    await runOnce(todoId, { status: 'OK', output: 'Wrote it.' });
     expect(await handedBack()).toEqual([]);
 
-    const runId = await runOnce(todoId, { status: 'ok', output: 'FAIL: the second paragraph is missing.' });
+    const runId = await runOnce(todoId, { status: 'OK', output: 'FAIL: the second paragraph is missing.' });
     const [row] = await handedBack();
-    expect(row).toMatchObject({ todoId, laneId: board.lanes[0].id, handedBack: 'gaveUp', runId, attempts: 1 });
+    expect(row).toMatchObject({ todoId, laneId: board.lanes[0].id, handedBack: 'GAVE_UP', runId, attempts: 1 });
     expect(row.reason).toContain('the second paragraph is missing');
   });
 
   it('lists a todo its agent finished with and has nowhere to send', async () => {
     await setLane(board.person, board.lanes[0].id, { onSuccessLaneId: null });
     const todoId = await board.addTodo('Write it');
-    const runId = await runOnce(todoId, { status: 'ok', output: 'Wrote it.' });
+    const runId = await runOnce(todoId, { status: 'OK', output: 'Wrote it.' });
 
     expect(await handedBack()).toMatchObject([
-      { todoId, handedBack: 'finished', reason: 'To do finished with it and has nowhere to send it.', runId },
+      { todoId, handedBack: 'FINISHED', reason: 'To do finished with it and has nowhere to send it.', runId },
     ]);
   });
 
@@ -292,9 +292,9 @@ describe('accountHandedBack', () => {
     const secondLane = (await db.select().from(dbSchema.lanes).where(eq(dbSchema.lanes.agentId, second.agentId)))[0];
     await giveUpAtOnce(board.person, secondLane.id);
     const first = await board.addTodo('Write it');
-    await runOnce(first, { status: 'error', error: 'No.' });
+    await runOnce(first, { status: 'ERROR', error: 'No.' });
     const other = await second.addTodo('Review it');
-    const runId = await runOnce(other, { status: 'error', error: 'Nor this.' });
+    const runId = await runOnce(other, { status: 'ERROR', error: 'Nor this.' });
     await db
       .update(dbSchema.runs)
       .set({ startedAt: new Date(Date.now() + 60_000) })
@@ -308,9 +308,9 @@ describe('accountHandedBack', () => {
 
   it('drops a todo once a person sends it round again', async () => {
     const kept = await board.addTodo('Kept');
-    await runOnce(kept, { status: 'error', error: 'No.' });
+    await runOnce(kept, { status: 'ERROR', error: 'No.' });
     const retried = await board.addTodo('Retried');
-    await runOnce(retried, { status: 'error', error: 'No.' });
+    await runOnce(retried, { status: 'ERROR', error: 'No.' });
     expect(await handedBack()).toHaveLength(2);
 
     await board.person.expectOk(`mutation ($id: ID!) { retryTodo(id: $id) }`, { id: retried });
@@ -329,7 +329,7 @@ describe('accountHandedBack', () => {
     const done = await board.addTodo('Done');
     const ignored = await board.addTodo('Ignored');
     for (const todoId of [archived, done, ignored]) {
-      await runOnce(todoId, { status: 'error', error: 'No.' });
+      await runOnce(todoId, { status: 'ERROR', error: 'No.' });
     }
     expect(await handedBack()).toHaveLength(3);
 
@@ -348,7 +348,7 @@ describe('accountHandedBack', () => {
   it('is the account’s own, and a person’s', async () => {
     const other = await createBoard(db, 'other@example.com');
     await giveUpAtOnce(other.person, other.lanes[0].id);
-    await runOnce(await other.addTodo('Theirs'), { status: 'error', error: 'No.' });
+    await runOnce(await other.addTodo('Theirs'), { status: 'ERROR', error: 'No.' });
     expect(await handedBack()).toEqual([]);
     expect(await handedBack(other.person)).toHaveLength(1);
 
@@ -367,12 +367,12 @@ describe('the account’s lists', () => {
     const second = await secondProject();
     const first = await board.addTodo('Write it');
     const firstRun = await runOnce(first, {
-      status: 'ok',
+      status: 'OK',
       output: 'Wrote it.',
       artifacts: [{ location: 'https://files.test/report.md', source: 'declared', title: 'Report' }],
     });
     const other = await second.addTodo('Review it');
-    const otherRun = await runOnce(other, { status: 'ok', output: 'Fine.' });
+    const otherRun = await runOnce(other, { status: 'OK', output: 'Fine.' });
     await db
       .update(dbSchema.runs)
       .set({ startedAt: new Date(Date.now() + 60_000) })
@@ -387,7 +387,7 @@ describe('the account’s lists', () => {
     });
 
     const theirs = await createBoard(db, 'other@example.com');
-    await runOnce(await theirs.addTodo('Theirs'), { status: 'ok', output: 'Done.' });
+    await runOnce(await theirs.addTodo('Theirs'), { status: 'OK', output: 'Done.' });
 
     const read = await board.person.expectOk(ACCOUNT_LISTS);
     expect(read.runs).toEqual([

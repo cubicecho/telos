@@ -4,6 +4,7 @@ import { extendSchema, type GraphQLObjectType, type GraphQLSchema, parse } from 
 import { requireAi } from '../ai-gate.ts';
 import { resultRows } from '../blocking.ts';
 import type { Context } from '../context.ts';
+import { HandBackEnum, withEnums } from '../enums.ts';
 import { workStates } from '../ready.ts';
 import { requireSession } from './auth.ts';
 
@@ -65,7 +66,7 @@ const ACCOUNT_ACTIVITY_SDL = parse(`
     laneId: ID!
     laneName: String!
     "gaveUp (it failed more times than the lane allows) or finished (with nowhere to send it)."
-    handedBack: String!
+    handedBack: HandBack!
     "The error or the reviewer's reason of its last failed run, or where it finished."
     reason: String
     "Its last finished run."
@@ -129,7 +130,7 @@ export function spendLine(row: SpendRow | undefined, name: string) {
  * @returns The schema with the account's activity queries.
  */
 export function applyAccountActivityExtension(schema: GraphQLSchema): GraphQLSchema {
-  const extendedSchema = extendSchema(schema, ACCOUNT_ACTIVITY_SDL);
+  const extendedSchema = extendSchema(withEnums(schema, [HandBackEnum]), ACCOUNT_ACTIVITY_SDL);
   const queries = (extendedSchema.getType('Query') as GraphQLObjectType).getFields();
 
   queries.accountSpend.resolve = async (_parent: unknown, args: { since: Date | string }, context: Context) => {

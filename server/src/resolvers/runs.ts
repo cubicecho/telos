@@ -5,6 +5,7 @@ import { requireSystem } from '../ai-gate.ts';
 import { assertNoCycle, findBlocked } from '../blocking.ts';
 import type { Actor, Context } from '../context.ts';
 import { stopDraftReply } from '../draft-runs.ts';
+import { type RunOutcome, RunOutcomeEnum, withEnums } from '../enums.ts';
 import { instanceAiOn } from '../instance.ts';
 import { findDoneLaneId, findNewTodoLaneId } from '../lanes.ts';
 import { runnerAgent } from '../mcp-servers.ts';
@@ -169,8 +170,7 @@ const RUNS_SDL = parse(`
 
   "What a run came to."
   input RunResultInput {
-    "ok, error or stopped."
-    status: String!
+    status: RunOutcome!
     output: String
     error: String
     toolCalls: Int
@@ -209,8 +209,6 @@ const RUNS_SDL = parse(`
     deleteArtifact(id: ID!): Boolean!
   }
 `);
-
-const OUTCOMES = new Set(['ok', 'error', 'stopped']);
 
 /** The most events a run keeps: the newest, since a live view reads the end. */
 export const MAX_RUN_EVENTS = 500;
@@ -616,7 +614,7 @@ function artifactRows(run: AnyRow, reported: ArtifactInput[] | null | undefined)
 }
 
 interface RunResult {
-  status: string;
+  status: RunOutcome;
   output?: string | null;
   error?: string | null;
   toolCalls?: number | null;
@@ -665,9 +663,6 @@ function spend(run: AnyRow, result: RunResult) {
  * @returns The finished run.
  */
 async function finish(context: Context, runId: string, result: RunResult): Promise<AnyRow> {
-  if (!OUTCOMES.has(result.status)) {
-    throw new GraphQLError('status must be ok, error or stopped', { extensions: { code: 'BAD_USER_INPUT' } });
-  }
   return (context.db as AnyRow).transaction(async (tx: AnyRow) => {
     const { run, todo, lane, aiOff } = await loadRunForUpdate(tx, runId);
     if (run.status !== 'running') {
@@ -847,7 +842,7 @@ async function archiveOn(
 }
 
 export function applyRunsExtension(schema: GraphQLSchema): GraphQLSchema {
-  const extendedSchema = extendSchema(schema, RUNS_SDL);
+  const extendedSchema = extendSchema(withEnums(schema, [RunOutcomeEnum]), RUNS_SDL);
   const queries = (extendedSchema.getType('Query') as GraphQLObjectType).getFields();
   const mutations = (extendedSchema.getType('Mutation') as GraphQLObjectType).getFields();
 

@@ -41,20 +41,20 @@ let serverId: string;
 describe('testing an MCP server', () => {
   it('goes to the runner and comes back with the tools', async () => {
     const asked = (await board.person.expectOk(TEST, { id: serverId })).testMcpServer;
-    expect(asked.status).toBe('pending');
+    expect(asked.status).toBe('PENDING');
 
     const taken = (await runner.expectOk(TAKE)).runnerProbes;
     expect(taken).toEqual([{ id: asked.id, server: SERVER }]);
     // Taken once: the next ask finds nothing.
     expect((await runner.expectOk(TAKE)).runnerProbes).toEqual([]);
-    expect((await board.person.expectOk(READ, { id: asked.id })).mcpProbe.status).toBe('testing');
+    expect((await board.person.expectOk(READ, { id: asked.id })).mcpProbe.status).toBe('TESTING');
 
     await runner.expectOk(FINISH, {
       id: asked.id,
       result: { ok: true, tools: [{ name: 'search', description: 'Finds things.' }], instructions: 'Search first.' },
     });
     expect((await board.person.expectOk(READ, { id: asked.id })).mcpProbe).toEqual({
-      status: 'done',
+      status: 'DONE',
       ok: true,
       tools: [{ name: 'search', description: 'Finds things.' }],
       instructions: 'Search first.',
@@ -77,7 +77,7 @@ describe('testing an MCP server', () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(Date.now() + PROBE_PICKUP_MS + 1000);
     expect((await board.person.expectOk(READ, { id })).mcpProbe).toMatchObject({
-      status: 'done',
+      status: 'DONE',
       ok: false,
       error: expect.stringMatching(/No runner/),
     });
@@ -87,7 +87,7 @@ describe('testing an MCP server', () => {
     const SECRET = `mutation ($id: ID!, $kind: McpSecretKind!, $name: String!, $value: String) {
       setMcpServerSecret(id: $id, kind: $kind, name: $name, value: $value) { headerNames envNames }
     }`;
-    await board.person.expectOk(SECRET, { id: serverId, kind: 'header', name: 'Authorization', value: 'Bearer s3' });
+    await board.person.expectOk(SECRET, { id: serverId, kind: 'HEADER', name: 'Authorization', value: 'Bearer s3' });
     await board.person.expectOk(TEST, { id: serverId });
     const [taken] = (await runner.expectOk(TAKE)).runnerProbes;
     expect(JSON.parse(taken.server).headers).toEqual({ Authorization: 'Bearer s3' });

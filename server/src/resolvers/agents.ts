@@ -5,6 +5,7 @@ import { extendSchema, GraphQLError, type GraphQLObjectType, type GraphQLSchema,
 import { loadAgentDefaults } from '../agent-defaults.ts';
 import { requireAi, requireSystem } from '../ai-gate.ts';
 import type { Context } from '../context.ts';
+import { McpProbeStatusEnum, type McpSecretKind, McpSecretKindEnum, withEnums } from '../enums.ts';
 import { askProbe, finishProbe, type McpProbe, readProbe, takeProbes } from '../mcp-probes.ts';
 import { runnerServer } from '../mcp-servers.ts';
 import { markRunnerSeen } from '../runner-seen.ts';
@@ -37,12 +38,6 @@ const AGENTS_SDL = parse(`
     envNames: [String!]!
   }
 
-  "Which of an MCP server's secrets: a header sent to its URL, or a variable in its command's environment."
-  enum McpSecretKind {
-    header
-    env
-  }
-
   "A model an endpoint offers, as its \`/models\` lists it."
   type AgentModel {
     id: String!
@@ -59,8 +54,7 @@ const AGENTS_SDL = parse(`
   "A test of an MCP server, made by the runner."
   type McpProbe {
     id: ID!
-    "pending (waiting for the runner), testing, or done."
-    status: String!
+    status: McpProbeStatus!
     ok: Boolean!
     tools: [McpProbeTool!]!
     "What the server says about itself, when it says anything."
@@ -226,7 +220,7 @@ export async function listModels(baseUrl: string, apiKey: string | null): Promis
 }
 
 export function applyAgentsExtension(schema: GraphQLSchema): GraphQLSchema {
-  const extendedSchema = extendSchema(schema, AGENTS_SDL);
+  const extendedSchema = extendSchema(withEnums(schema, [McpSecretKindEnum, McpProbeStatusEnum]), AGENTS_SDL);
   const agent = (extendedSchema.getType('Agent') as GraphQLObjectType).getFields();
   const mcpServer = (extendedSchema.getType('McpServer') as GraphQLObjectType).getFields();
   const mutations = (extendedSchema.getType('Mutation') as GraphQLObjectType).getFields();
@@ -332,7 +326,7 @@ export function applyAgentsExtension(schema: GraphQLSchema): GraphQLSchema {
 
   mutations.setMcpServerSecret.resolve = async (
     _parent: unknown,
-    args: { id: string; kind: 'header' | 'env'; name: string; value?: string | null },
+    args: { id: string; kind: McpSecretKind; name: string; value?: string | null },
     context: Context,
   ) => {
     const userId = requireSession(context);

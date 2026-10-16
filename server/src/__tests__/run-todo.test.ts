@@ -58,7 +58,7 @@ describe('runTodo', () => {
     const other = await board.addTodo('Other');
     expect(await queued()).toEqual([]);
     expect(await stateOf(asked)).toMatchObject({
-      state: 'parked',
+      state: 'PARKED',
       reason: 'Auto-run is off.',
       awaitsRun: true,
       runRequested: false,
@@ -67,15 +67,15 @@ describe('runTodo', () => {
     const todo = (await board.person.expectOk(RUN, { id: asked })).runTodo;
     expect(todo).toMatchObject({ id: asked });
     expect(todo.runRequestedAt).not.toBeNull();
-    expect(await stateOf(asked)).toMatchObject({ state: 'queued', reason: null, awaitsRun: false, runRequested: true });
-    expect(await stateOf(other)).toMatchObject({ state: 'parked', reason: 'Auto-run is off.' });
+    expect(await stateOf(asked)).toMatchObject({ state: 'QUEUED', reason: null, awaitsRun: false, runRequested: true });
+    expect(await stateOf(other)).toMatchObject({ state: 'PARKED', reason: 'Auto-run is off.' });
     expect(await queued()).toEqual([asked]);
     expect(await claim(other)).toBeNull();
 
     const run = await claim(asked);
     expect(run).not.toBeNull();
     expect((await rowOf(asked)).runRequestedAt).toBeNull();
-    await runner.expectOk(FINISH, { id: run?.runId, result: { status: 'ok', output: 'Done.' } });
+    await runner.expectOk(FINISH, { id: run?.runId, result: { status: 'OK', output: 'Done.' } });
     const done = await rowOf(asked);
     expect(done.laneId).toBe(board.lanes[2].id);
     expect(done.completedAt).not.toBeNull();
@@ -87,22 +87,22 @@ describe('runTodo', () => {
     const todoId = await board.addTodo('Two agent lanes');
     await board.person.expectOk(RUN, { id: todoId });
     const run = await claim(todoId);
-    await runner.expectOk(FINISH, { id: run?.runId, result: { status: 'ok', output: 'Half done.' } });
+    await runner.expectOk(FINISH, { id: run?.runId, result: { status: 'OK', output: 'Half done.' } });
 
     expect((await rowOf(todoId)).laneId).toBe(board.lanes[1].id);
     expect(await queued()).toEqual([]);
     expect(await claim(todoId, board.lanes[1].id)).toBeNull();
-    expect(await stateOf(todoId)).toMatchObject({ state: 'parked', reason: 'Auto-run is off.' });
+    expect(await stateOf(todoId)).toMatchObject({ state: 'PARKED', reason: 'Auto-run is off.' });
   });
 
   it('is one run when the run fails too', async () => {
     const todoId = await board.addTodo('Flaky');
     await board.person.expectOk(RUN, { id: todoId });
     const run = await claim(todoId);
-    await runner.expectOk(FINISH, { id: run?.runId, result: { status: 'error', error: 'It broke.' } });
+    await runner.expectOk(FINISH, { id: run?.runId, result: { status: 'ERROR', error: 'It broke.' } });
 
     expect(await queued()).toEqual([]);
-    expect(await stateOf(todoId)).toMatchObject({ state: 'parked', reason: 'Auto-run is off.', failures: 1 });
+    expect(await stateOf(todoId)).toMatchObject({ state: 'PARKED', reason: 'Auto-run is off.', failures: 1 });
   });
 
   it('is a retry: it forgets failures and restarts an agent that finished with the todo', async () => {
@@ -110,15 +110,15 @@ describe('runTodo', () => {
     const failed = await board.addTodo('Failed');
     await board.person.expectOk(RUN, { id: failed });
     const first = await claim(failed);
-    await runner.expectOk(FINISH, { id: first?.runId, result: { status: 'error', error: 'It broke.' } });
+    await runner.expectOk(FINISH, { id: first?.runId, result: { status: 'ERROR', error: 'It broke.' } });
     await board.person.expectOk(RUN, { id: failed });
-    expect(await stateOf(failed)).toMatchObject({ state: 'queued', failures: 0 });
+    expect(await stateOf(failed)).toMatchObject({ state: 'QUEUED', failures: 0 });
 
     const again = await claim(failed);
-    await runner.expectOk(FINISH, { id: again?.runId, result: { status: 'ok', output: 'Done.' } });
-    expect((await stateOf(failed)).state).toBe('handedBack');
+    await runner.expectOk(FINISH, { id: again?.runId, result: { status: 'OK', output: 'Done.' } });
+    expect((await stateOf(failed)).state).toBe('HANDED_BACK');
     await board.person.expectOk(RUN, { id: failed });
-    expect((await stateOf(failed)).state).toBe('queued');
+    expect((await stateOf(failed)).state).toBe('QUEUED');
     expect(await claim(failed)).not.toBeNull();
   });
 
@@ -131,7 +131,7 @@ describe('runTodo', () => {
     expect(await claim(second)).toBeNull();
     expect((await rowOf(second)).runRequestedAt).not.toBeNull();
 
-    await runner.expectOk(FINISH, { id: run?.runId, result: { status: 'ok', output: 'Done.' } });
+    await runner.expectOk(FINISH, { id: run?.runId, result: { status: 'OK', output: 'Done.' } });
     expect(await claim(second)).not.toBeNull();
   });
 
@@ -245,7 +245,7 @@ describe('runTodo refuses', () => {
   it('a todo in a lane with no agent', async () => {
     const todoId = await board.addTodo('Nobody home');
     await board.person.expectOk(MOVE, { id: todoId, laneId: board.lanes[1].id });
-    expect(await stateOf(todoId)).toMatchObject({ state: 'parked', awaitsRun: false });
+    expect(await stateOf(todoId)).toMatchObject({ state: 'PARKED', awaitsRun: false });
     expect(await refusal(todoId)).toEqual({ message: 'In progress has no agent.', code: 'BAD_USER_INPUT' });
   });
 

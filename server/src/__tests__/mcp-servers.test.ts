@@ -54,7 +54,7 @@ async function addServer(slug: string, more: Record<string, unknown> = {}): Prom
 async function claimed(): Promise<{ servers: Array<Record<string, unknown>>; notices: string[] }> {
   const todoId = await board.addTodo('Write it');
   const { runId, agent } = (await runner.expectOk(CLAIM_SERVERS, { todoId, laneId: board.lanes[0].id })).claimRun;
-  await runner.expectOk(FINISH, { id: runId, result: { status: 'error', error: 'model unreachable' } });
+  await runner.expectOk(FINISH, { id: runId, result: { status: 'ERROR', error: 'model unreachable' } });
   return { servers: JSON.parse(agent.mcpServers), notices: agent.mcpNotices };
 }
 
@@ -65,10 +65,10 @@ async function nameServers(slugs: string[] | null): Promise<void> {
 describe('the registry', () => {
   it('keeps a server, and shows the names of its secrets but never the values', async () => {
     const id = await addServer('docs', { args: [], hiddenTools: ['forget'] });
-    await board.person.expectOk(SECRET, { id, kind: 'header', name: 'Authorization', value: 'Bearer s3' });
+    await board.person.expectOk(SECRET, { id, kind: 'HEADER', name: 'Authorization', value: 'Bearer s3' });
     const { setMcpServerSecret } = await board.person.expectOk(SECRET, {
       id,
-      kind: 'env',
+      kind: 'ENV',
       name: 'API_TOKEN',
       value: 't0p',
     });
@@ -86,7 +86,7 @@ describe('the registry', () => {
     }
 
     // A null value takes one away.
-    await board.person.expectOk(SECRET, { id, kind: 'header', name: 'Authorization', value: null });
+    await board.person.expectOk(SECRET, { id, kind: 'HEADER', name: 'Authorization', value: null });
     const [row] = await db.select().from(dbSchema.mcpServers).where(eq(dbSchema.mcpServers.id, id));
     expect(row.headers).toEqual({});
     expect(row.env).toEqual({ API_TOKEN: 't0p' });
@@ -95,10 +95,10 @@ describe('the registry', () => {
   it('refuses a secret whose name could not be sent', async () => {
     const id = await addServer('docs');
     for (const [kind, name] of [
-      ['header', 'Bad Name'],
-      ['header', ''],
-      ['env', '1TOKEN'],
-      ['env', 'API-TOKEN'],
+      ['HEADER', 'Bad Name'],
+      ['HEADER', ''],
+      ['ENV', '1TOKEN'],
+      ['ENV', 'API-TOKEN'],
     ]) {
       expect((await board.person.expectError(SECRET, { id, kind, name, value: 'x' })).code).toBe('BAD_USER_INPUT');
     }
@@ -126,7 +126,7 @@ describe('the registry', () => {
     expect((await other.person.expectOk(LIST)).mcpServers).toEqual([]);
     expect((await other.person.expectOk(UPDATE, { id, set: { enabled: false } })).updateMcpServer).toBeNull();
     expect((await other.person.expectOk(DELETE, { id })).deleteMcpServer).toBeNull();
-    expect((await other.person.expectError(SECRET, { id, kind: 'env', name: 'A', value: 'b' })).code).toBe('NOT_FOUND');
+    expect((await other.person.expectError(SECRET, { id, kind: 'ENV', name: 'A', value: 'b' })).code).toBe('NOT_FOUND');
     // The same slug is free in another account.
     await other.person.expectOk(CREATE, { values: { slug: 'docs', name: 'Docs', url: 'http://docs.test' } });
 
@@ -136,8 +136,8 @@ describe('the registry', () => {
     });
     expect((await key.expectOk(LIST)).mcpServers).toEqual([]);
     expect((await key.expectError(UPDATE, { id, set: { enabled: false } })).code).toBe('FORBIDDEN');
-    expect((await key.expectError(SECRET, { id, kind: 'env', name: 'A', value: 'b' })).code).toBe('FORBIDDEN');
-    expect((await runner.expectError(SECRET, { id, kind: 'env', name: 'A', value: 'b' })).code).toBe('FORBIDDEN');
+    expect((await key.expectError(SECRET, { id, kind: 'ENV', name: 'A', value: 'b' })).code).toBe('FORBIDDEN');
+    expect((await runner.expectError(SECRET, { id, kind: 'ENV', name: 'A', value: 'b' })).code).toBe('FORBIDDEN');
   });
 
   it('does not let a client say what a test found', async () => {
@@ -157,7 +157,7 @@ describe("an agent's servers", () => {
 
   it('are every server when it names none, in slug order, with their secrets', async () => {
     const [alpha] = await db.select().from(dbSchema.mcpServers).where(eq(dbSchema.mcpServers.slug, 'alpha'));
-    await board.person.expectOk(SECRET, { id: alpha.id, kind: 'header', name: 'X-Key', value: 's3' });
+    await board.person.expectOk(SECRET, { id: alpha.id, kind: 'HEADER', name: 'X-Key', value: 's3' });
     const { servers, notices } = await claimed();
     expect(servers).toEqual([
       {

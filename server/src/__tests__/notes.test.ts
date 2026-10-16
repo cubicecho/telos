@@ -40,7 +40,7 @@ async function keyNote(key: TestClient, body = 'From outside.'): Promise<string>
 async function reportId(): Promise<string> {
   const runner = runnerClient(db);
   const { runId } = (await runner.expectOk(CLAIM, { todoId, laneId: board.lanes[0].id })).claimRun;
-  await runner.expectOk(FINISH, { id: runId, result: { status: 'ok', output: 'Wrote it.' } });
+  await runner.expectOk(FINISH, { id: runId, result: { status: 'OK', output: 'Wrote it.' } });
   const thread = await db.select().from(dbSchema.todoNotes).where(eq(dbSchema.todoNotes.todoId, todoId));
   return thread.find((note: { kind: string }) => note.kind === 'report').id;
 }

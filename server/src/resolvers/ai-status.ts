@@ -4,7 +4,8 @@ import { extendSchema, GraphQLError, type GraphQLObjectType, type GraphQLSchema,
 import { requireAi } from '../ai-gate.ts';
 import { resultRows } from '../blocking.ts';
 import type { Actor, Context } from '../context.ts';
-import { type WorkState, workStates } from '../ready.ts';
+import { HandBackEnum, WORK_STATES, type WorkState, WorkStateEnum, withEnums } from '../enums.ts';
+import { workStates } from '../ready.ts';
 import { runnerSeenAt } from '../runner-seen.ts';
 
 // Lanes' agents, as a person reads them: what they handed back, what is running,
@@ -25,12 +26,11 @@ const AI_STATUS_SDL = parse(`
     title: String!
     projectId: ID!
     laneId: ID
-    "handedBack, running, waiting (an umbrella, done when its pieces are), blocked, queued or parked."
-    state: String!
+    state: WorkState!
     "Why it is where it is, when that needs saying."
     reason: String
-    "Why its lane's agent handed it back: gaveUp (it failed more times than the lane allows) or finished (with nowhere to send it). Null unless its state is handedBack."
-    handedBack: String
+    "Why its lane's agent handed it back. Null unless its state is HANDED_BACK."
+    handedBack: HandBack
     "Failed runs since a person last touched it, or anyone sent it round again."
     failures: Int!
     "The run working it now."
@@ -216,10 +216,8 @@ async function whyNotRunnable(db: AnyRow, todo: AnyRow): Promise<string | null> 
   return null;
 }
 
-const STATES: WorkState[] = ['handedBack', 'running', 'waiting', 'blocked', 'queued', 'parked', 'done'];
-
 export function applyAiStatusExtension(schema: GraphQLSchema): GraphQLSchema {
-  const extendedSchema = extendSchema(schema, AI_STATUS_SDL);
+  const extendedSchema = extendSchema(withEnums(schema, [WorkStateEnum, HandBackEnum]), AI_STATUS_SDL);
   const queries = (extendedSchema.getType('Query') as GraphQLObjectType).getFields();
   const mutations = (extendedSchema.getType('Mutation') as GraphQLObjectType).getFields();
 
@@ -257,7 +255,7 @@ export function applyAiStatusExtension(schema: GraphQLSchema): GraphQLSchema {
     const tallies = new Map<string, Record<WorkState, number>>(
       lanes.map((lane) => [
         lane.id,
-        Object.fromEntries(STATES.map((state) => [state, 0])) as Record<WorkState, number>,
+        Object.fromEntries(WORK_STATES.map((state) => [state, 0])) as Record<WorkState, number>,
       ]),
     );
     for (const todo of todos) {

@@ -81,7 +81,7 @@ describe('a draft’s runs and the lanes’ agents', () => {
     expect(await queue()).toEqual([todoId]);
 
     const status = (await board.person.expectOk(STATUS, { projectId: board.projectId })).aiStatus;
-    expect(status.todos).toEqual([{ todoId, state: 'queued', failures: 0, liveRunId: null }]);
+    expect(status.todos).toEqual([{ todoId, state: 'QUEUED', failures: 0, liveRunId: null }]);
     expect(status.projects[0].lanes[0]).toMatchObject({ handedBack: 0, running: 0, queued: 1 });
   });
 
@@ -89,7 +89,7 @@ describe('a draft’s runs and the lanes’ agents', () => {
     const todoId = await board.addTodo('Ready');
     await claimedDraft(board, runner);
     const status = (await board.person.expectOk(STATUS, { projectId: board.projectId })).aiStatus;
-    expect(status.todos).toEqual([{ todoId, state: 'queued', failures: 0, liveRunId: null }]);
+    expect(status.todos).toEqual([{ todoId, state: 'QUEUED', failures: 0, liveRunId: null }]);
     expect(status.projects[0].lanes[0]).toMatchObject({ running: 0, queued: 1 });
   });
 
@@ -102,7 +102,7 @@ describe('a draft’s runs and the lanes’ agents', () => {
   it('leaves a todo’s own marks as they were', async () => {
     const todoId = await board.addTodo('Fails once');
     const { runId } = (await runner.expectOk(CLAIM_TURN, { todoId, laneId: board.lanes[0].id })).claimRun;
-    await runner.expectOk(FINISH, { id: runId, result: { status: 'error', error: 'It broke.' } });
+    await runner.expectOk(FINISH, { id: runId, result: { status: 'ERROR', error: 'It broke.' } });
     // A later, passing reply to a draft does not clear the todo's failure.
     await answeredDraft(board, runner);
     expect((await board.person.expectOk(MARKS, { projectId: board.projectId })).cardMarks).toEqual([
@@ -115,7 +115,7 @@ describe('a draft’s runs where runs are listed', () => {
   it('appears among a project’s runs and in its spend, marked as a draft’s', async () => {
     const todoId = await board.addTodo('Ready');
     const { runId: todoRunId } = (await runner.expectOk(CLAIM_TURN, { todoId, laneId: board.lanes[0].id })).claimRun;
-    await runner.expectOk(FINISH, { id: todoRunId, result: { status: 'ok', output: 'Done.', totalTokens: 7 } });
+    await runner.expectOk(FINISH, { id: todoRunId, result: { status: 'OK', output: 'Done.', totalTokens: 7 } });
     const { draftId, runId } = await answeredDraft(board, runner);
 
     const read = await board.person.expectOk(PROJECT_RUNS, { projectId: board.projectId });

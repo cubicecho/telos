@@ -3,6 +3,7 @@ import { and, inArray, sql } from 'drizzle-orm';
 import { GraphQLError } from 'graphql';
 import { resultRows } from './blocking.ts';
 import { type Context, isAiActor } from './context.ts';
+import type { ChangeEntity } from './enums.ts';
 import { requireAuth } from './resolvers/auth.ts';
 import { reachable } from './tenancy.ts';
 
@@ -51,8 +52,6 @@ export const CURSOR_MAX_AGE_DAYS = TOMBSTONE_RETENTION_DAYS - 1;
 
 const DAY_MS = 24 * 60 * 60_000;
 const CURSOR_VERSION = 'c1';
-
-export type ChangeEntity = 'project' | 'todo' | 'dependency';
 
 /** Where a consumer has read up to. */
 export interface FeedPosition {

@@ -55,7 +55,7 @@ const PAGE = { location: 'https://example.com/plan', label: 'The plan' };
  */
 async function ranWith(todoId: string, artifacts: Array<Record<string, unknown>>): Promise<string> {
   const { claimRun } = await runner.expectOk(CLAIM, { todoId, laneId: board.lanes[0].id });
-  await runner.expectOk(FINISH, { id: claimRun.runId, result: { status: 'ok', output: 'Done.', artifacts } });
+  await runner.expectOk(FINISH, { id: claimRun.runId, result: { status: 'OK', output: 'Done.', artifacts } });
   return claimRun.runId;
 }
 

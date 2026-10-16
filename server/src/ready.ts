@@ -1,5 +1,6 @@
 import { type SQL, sql } from 'drizzle-orm';
 import { resultRows } from './blocking.ts';
+import type { HandBack, WorkState } from './enums.ts';
 import { INSTANCE_AI_ON } from './instance.ts';
 
 // The readiness rules, in one place: which todos a lane's agent may start on,
@@ -209,12 +210,6 @@ export async function dropRunRequests(db: AnyDb, where: { todoId: string } | { p
   const narrow = 'todoId' in where ? sql`id = ${where.todoId}` : sql`project_id = ${where.projectId}`;
   await db.execute(sql`UPDATE todos SET run_requested_at = NULL WHERE run_requested_at IS NOT NULL AND ${narrow}`);
 }
-
-/** Where a todo stands with its lane's agent, for a person reading the board. */
-export type WorkState = 'handedBack' | 'running' | 'waiting' | 'blocked' | 'queued' | 'parked' | 'done';
-
-/** Why a lane's agent handed a todo back. */
-export type HandBack = 'gaveUp' | 'finished';
 
 export interface WorkTodo {
   todoId: string;

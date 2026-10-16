@@ -534,7 +534,7 @@ describe('the board’s agents and runs', () => {
 
     const { cancelRun } = await call(client, 'stop_run', { id: runId });
     expect(cancelRun.cancelRequestedAt).not.toBeNull();
-    await runnerClient(db).expectOk(FINISH, { id: runId, result: { status: 'error', error: 'Stopped.' } });
+    await runnerClient(db).expectOk(FINISH, { id: runId, result: { status: 'ERROR', error: 'Stopped.' } });
 
     // Stopping it set the todo aside from AI; its owner lets AI back at it.
     await db.update(dbSchema.todos).set({ aiIgnored: false }).where(eq(dbSchema.todos.id, todo));
