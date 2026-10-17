@@ -102,7 +102,7 @@ domain.
 | `PORT` | `3001` | Port the server listens on. |
 | `AUTH_MAGIC_LINK` | `true` | Set to `false` to sign in with an address alone, no link. |
 | `EXPOSE_MAGIC_LINK` | dev only | Return the magic link in the API response so the login page can show it. |
-| `OIDC_ISSUER` | — | Turns on sign-in through an OpenID Connect provider, with `OIDC_CLIENT_ID`. The issuer URL; for heautou it ends in `/oidc`. |
+| `OIDC_ISSUER` | — | Sets the OpenID Connect provider, with `OIDC_CLIENT_ID`, instead of pairing one from the app (below). The issuer URL; for heautou it ends in `/oidc`. |
 | `OIDC_CLIENT_ID` | — | The client ID registered with the provider. |
 | `OIDC_CLIENT_SECRET` | — | The client's secret. Leave it unset for a public client. |
 | `OIDC_CLIENT_AUTH` | `client_secret_basic` | How the secret is sent: `client_secret_basic` (heautou's default) or `client_secret_post`. |
@@ -120,14 +120,30 @@ read, or run with `AUTH_MAGIC_LINK=false`.
 ### Signing in with an OIDC provider
 
 Telos can sign people in through any OpenID Connect provider, next to magic
-links. To use heautou:
+links. With heautou, or any provider that supports Dynamic Client Registration,
+pairing is one paste:
 
-1. In heautou, add a client whose redirect URI is exactly
-   `<APP_URL>/api/auth/callback/oidc`. Its `allowedGroups` decide who may
-   sign in.
-2. Set `OIDC_ISSUER=https://<heautou>/oidc`, `OIDC_CLIENT_ID`,
-   `OIDC_CLIENT_SECRET` and, for the button, `OIDC_NAME=heautou`.
-3. Restart. The login page shows "Sign in with heautou".
+1. In heautou, make a setup URL for Telos and choose which groups may sign in.
+   It looks like `https://<heautou>/oidc#setup=<token>&name=heautou`, and works
+   once, for a short while.
+2. On a new instance, open the login page's **Set up sign-in** tab and paste it.
+   Once anyone has an account, an admin does this in **Settings → Sign-in**.
+3. The login page shows "Sign in with heautou" at once, with no restart. On a
+   new instance, the first account to sign in becomes the admin.
+
+Telos registers itself with the provider and keeps the client it gets back in
+the database. **Disconnect** in Settings deletes that client at the provider
+and takes the button away.
+
+For a provider without registration, or to pin the provider in configuration,
+use the environment instead, which wins over a pairing and cannot be changed
+from the app:
+
+1. Register a client whose redirect URI is exactly
+   `<APP_URL>/api/auth/callback/oidc`.
+2. Set `OIDC_ISSUER=https://<provider>/oidc`, `OIDC_CLIENT_ID`,
+   `OIDC_CLIENT_SECRET` and, for the button, `OIDC_NAME`.
+3. Restart.
 
 Someone signing in this way gets the account with the email address the
 provider vouches for, or a new one if there is none. Setting only one of

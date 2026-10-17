@@ -14,7 +14,7 @@ import { createContextFactory } from '../request-context.ts';
 import { AI_MUTATIONS } from '../resolvers/actor-lock.ts';
 import { RUN_REACH_EXEMPT, RUN_REACH_MUTATIONS } from '../resolvers/run-reach.ts';
 import { CLAIM, createBoard, FINISH, runnerClient, SET_AUTO_RUN } from './board.ts';
-import { authFor, createClient, createTestDb, createUser, schemaFor, type TestDb } from './helpers.ts';
+import { authFor, createClient, createTestDb, createUser, hostFor, schemaFor, type TestDb } from './helpers.ts';
 
 // The AI door end to end: a real HTTP server, the MCP SDK's own client, and an
 // API key in the header — the path Claude Code takes. What a key may see and
@@ -91,7 +91,7 @@ async function serve(ai = true): Promise<URL> {
     ai,
     db,
     schema,
-    contextFor: createContextFactory(db, authFor(db), { ai }),
+    contextFor: createContextFactory(db, hostFor(db), { ai }),
     version: '0',
   });
   closeMcp = handler ? () => handler.close() : null;

@@ -1119,6 +1119,45 @@ export const SignInOptionsDocument = graphql(`
   }
 `);
 
+/** How sign-in through an OIDC provider is set up, and whether this caller may pair one. */
+export const SsoSetupDocument = graphql(`
+  query SsoSetup {
+    ssoSetup {
+      source
+      issuer
+      name
+      canPair
+      redirectUri
+    }
+  }
+`);
+
+/** Pairs the instance with the provider a pasted setup URL names. */
+export const PairSsoDocument = graphql(`
+  mutation PairSso($setupUrl: String!) {
+    pairSso(setupUrl: $setupUrl) {
+      source
+      issuer
+      name
+      canPair
+      redirectUri
+    }
+  }
+`);
+
+/** Deletes the paired provider's client and takes its button off the login page. */
+export const UnpairSsoDocument = graphql(`
+  mutation UnpairSso {
+    unpairSso {
+      source
+      issuer
+      name
+      canPair
+      redirectUri
+    }
+  }
+`);
+
 /** The last leg of an OIDC sign-in: the one-time token the callback put on /auth/sso, for a session. */
 export const VerifyOneTimeTokenDocument = graphql(`
   mutation VerifyOneTimeToken($token: String!) {

@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import type { Actor, Context } from '../context.ts';
 import { createLoaders } from '../loaders.ts';
 import { type Board, createBoard } from './board.ts';
-import { authFor, createTestDb, createUser, schemaFor, type TestDb } from './helpers.ts';
+import { authFor, createTestDb, createUser, hostFor, schemaFor, type TestDb } from './helpers.ts';
 
 // Live boards: the database announces each change (the board_notify trigger),
 // and `boardChanged` relays the ones to a project its owner is watching.
@@ -25,6 +25,7 @@ async function watch(projectId: string, actor: Actor): Promise<Changes | Executi
   const contextValue: Context = {
     db,
     auth: authFor(db),
+    authHost: hostFor(db),
     userId: actor.userId,
     actor,
     loaders: createLoaders(db),

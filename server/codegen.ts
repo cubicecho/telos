@@ -49,6 +49,7 @@ const config: CodegenConfig = {
           ChangeEntity: '../src/enums.ts#ChangeEntity',
           RunOutcome: '../src/enums.ts#RunOutcome',
           RunEventKind: '../src/enums.ts#RunEventKind',
+          SsoSource: '../src/enums.ts#SsoSource',
         },
         avoidOptionals: {
           // Use `null` for nullable fields instead of optionals

@@ -101,3 +101,12 @@ export const RunEventKindEnum = serverEnum(
 export const RUN_OUTCOMES = ['ok', 'error', 'stopped'] as const;
 export type RunOutcome = (typeof RUN_OUTCOMES)[number];
 export const RunOutcomeEnum = serverEnum('RunOutcome', RUN_OUTCOMES, 'How a run ended: OK, ERROR or STOPPED.');
+
+/** Where the instance's OIDC provider comes from (oidc-settings.ts). */
+export const SSO_SOURCES = ['env', 'paired', 'none'] as const;
+export type SsoSource = (typeof SSO_SOURCES)[number];
+export const SsoSourceEnum = serverEnum(
+  'SsoSource',
+  SSO_SOURCES,
+  "Where the instance's OIDC provider comes from: ENV (OIDC_ISSUER, read-only from the app), PAIRED (from a setup URL) or NONE.",
+);

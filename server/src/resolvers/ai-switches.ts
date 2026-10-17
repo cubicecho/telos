@@ -54,7 +54,7 @@ export function applyAiSwitchesExtension(schema: GraphQLSchema): GraphQLSchema {
     }
     await setInstanceAi(context.db, args.enabled);
     if (!args.enabled) await cancelRunsUnder(context.db, {});
-    return { ai: args.enabled, aiAvailable: true, sso: ssoProvider() };
+    return { ai: args.enabled, aiAvailable: true, sso: await ssoProvider(context.db) };
   };
 
   mutations.setAiEnabled = async (_parent, args, context) => {

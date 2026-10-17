@@ -1,5 +1,6 @@
 import type { DB } from '@telos/db';
 import type { Auth } from './auth.ts';
+import type { AuthHost } from './auth-host.ts';
 import type { Loaders } from './loaders.ts';
 
 /**
@@ -40,7 +41,10 @@ export interface Actor {
  */
 export interface Context {
   db: DB;
+  /** The auth instance this request uses: `authHost.current()` when it began. */
   auth: Auth;
+  /** Where `auth` came from, for the writes that change the OIDC provider and must rebuild it. */
+  authHost: AuthHost;
   userId: string | null;
   actor: Actor;
   loaders: Loaders;

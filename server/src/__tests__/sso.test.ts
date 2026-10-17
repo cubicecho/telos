@@ -5,6 +5,7 @@ import express from 'express';
 import { exportJWK, generateKeyPair, SignJWT } from 'jose';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { type Auth, createAuth, resolveActor } from '../auth.ts';
+import { fixedAuthHost } from '../auth-host.ts';
 import type { OidcConfig } from '../config.ts';
 import { mountSso, SSO_START_PATH } from '../routes/sso.ts';
 import { createClient, createTestDb, createUser, type TestDb } from './helpers.ts';
@@ -139,7 +140,7 @@ beforeEach(async () => {
     name: 'heautou',
   };
   auth = createAuth(db, { oidc });
-  mountSso(app, auth);
+  mountSso(app, fixedAuthHost(auth, oidc));
 });
 
 afterEach(async () => {
