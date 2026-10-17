@@ -29,8 +29,7 @@ COPY db/package.json db/
 COPY server/package.json server/
 COPY app/package.json app/
 COPY runner/package.json runner/
-COPY better-auth-graphql/package.json better-auth-graphql/
-RUN npm ci --omit=dev --include-workspace-root --workspace @telos/db --workspace @telos/runner --workspace @cubicecho/better-auth-graphql --workspace @telos/server \
+RUN npm ci --omit=dev --include-workspace-root --workspace @telos/db --workspace @telos/runner --workspace @telos/server \
  && npm cache clean --force
 
 # The server is not compiled: it runs its TypeScript sources directly under
@@ -40,8 +39,6 @@ COPY db/drizzle db/drizzle
 COPY server/src server/src
 # The runner works the stations from inside the server's process.
 COPY runner/src runner/src
-# better-auth's endpoints as GraphQL; like the server, it runs from source.
-COPY better-auth-graphql/src better-auth-graphql/src
 COPY --from=builder /app/app/dist app/dist
 
 ENV NODE_ENV=production
