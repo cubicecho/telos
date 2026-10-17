@@ -1,21 +1,26 @@
-import { useMutation } from '@apollo/client';
-import { Link, useRouter } from 'expo-router';
+import { useMutation, useQuery } from '@apollo/client';
+import { Link, useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Text, View } from 'react-native';
 import { useAppForm } from '@/components/app-form';
 import { CardLayout } from '@/components/card-layout';
+import { Button } from '@/components/ui/button';
 import { Code } from '@/components/ui/code';
 import { Form } from '@/components/ui/form';
 import { CircleCheck } from '@/components/ui/icons';
+import { API_URL } from '@/lib/apollo';
 import { setToken } from '@/lib/auth';
 import { describeError } from '@/lib/errors';
-import { SignInMagicLinkDocument } from '@/lib/graphql';
+import { SignInMagicLinkDocument, SignInOptionsDocument } from '@/lib/graphql';
 
 export default function LoginScreen() {
   const router = useRouter();
   const [magicLink, setMagicLink] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
   const [signInMagicLink, { error }] = useMutation(SignInMagicLinkDocument);
+  const sso = useQuery(SignInOptionsDocument).data?.authConfig.sso ?? null;
+  // An OIDC sign-in that failed comes back here with better-auth's error code.
+  const { error: ssoError } = useLocalSearchParams<{ error?: string }>();
 
   const form = useAppForm({
     defaultValues: { email: '' },
@@ -52,6 +57,23 @@ export default function LoginScreen() {
           </Text>
           <Text className="mt-1 text-foreground/60 text-sm">Projects, todos, and what blocks them.</Text>
         </View>
+
+        {sso ? (
+          <View className="mb-6 gap-6">
+            <Button
+              onPress={() => window.location.assign(`${API_URL}${sso.signInPath}`)}
+              content={`Sign in with ${sso.name}`}
+            />
+            <Text className="text-center text-foreground/60 text-sm">or get a sign-in link</Text>
+          </View>
+        ) : null}
+
+        {ssoError ? (
+          <Text className="mb-4 text-negative text-sm">
+            {sso ? `Signing in with ${sso.name} didn't work` : "Signing in didn't work"} ({ssoError}). Try again, or ask
+            whoever runs this instance.
+          </Text>
+        ) : null}
 
         <form.AppForm>
           <Form className="gap-4">

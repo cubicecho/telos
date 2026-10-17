@@ -1107,6 +1107,27 @@ export const MagicLinkVerifyDocument = graphql(`
   }
 `);
 
+/** The OIDC provider the login page offers, if the instance has one. */
+export const SignInOptionsDocument = graphql(`
+  query SignInOptions {
+    authConfig {
+      sso {
+        name
+        signInPath
+      }
+    }
+  }
+`);
+
+/** The last leg of an OIDC sign-in: the one-time token the callback put on /auth/sso, for a session. */
+export const VerifyOneTimeTokenDocument = graphql(`
+  mutation VerifyOneTimeToken($token: String!) {
+    verifyOneTimeToken(token: $token) {
+      token
+    }
+  }
+`);
+
 /** Where every open todo stands with the lanes' agents, across the AI projects. */
 export const AiStatusDocument = graphql(`
   query AiStatus {

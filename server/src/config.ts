@@ -86,3 +86,42 @@ export const runnerKey: () => string = (() => {
   const key = process.env.RUNNER_KEY?.trim() || randomBytes(32).toString('hex');
   return () => key;
 })();
+
+/** The provider id the OIDC provider is registered under, and so its callback path. */
+export const OIDC_PROVIDER_ID = 'oidc';
+
+/** An OpenID Connect provider to sign in with (heautou, Keycloak, Authentik, …). */
+export interface OidcConfig {
+  /** The issuer URL. Its discovery document is at `/.well-known/openid-configuration` under it. */
+  issuer: string;
+  clientId: string;
+  /** Unset for a public client, which proves itself with PKCE alone. */
+  clientSecret: string | undefined;
+  /** How a confidential client sends its secret. The provider must expect the same. */
+  clientAuth: 'client_secret_basic' | 'client_secret_post';
+  /** What the login page's button calls it. */
+  name: string;
+}
+
+/**
+ * The OIDC provider, when `OIDC_ISSUER` and `OIDC_CLIENT_ID` are both set.
+ * preflight.ts refuses one without the other.
+ */
+export function oidcConfig(): OidcConfig | null {
+  const issuer = process.env.OIDC_ISSUER?.trim();
+  const clientId = process.env.OIDC_CLIENT_ID?.trim();
+  if (!issuer || !clientId) return null;
+  return {
+    issuer: issuer.replace(/\/+$/, ''),
+    clientId,
+    clientSecret: process.env.OIDC_CLIENT_SECRET?.trim() || undefined,
+    clientAuth:
+      process.env.OIDC_CLIENT_AUTH?.trim() === 'client_secret_post' ? 'client_secret_post' : 'client_secret_basic',
+    name: process.env.OIDC_NAME?.trim() || 'SSO',
+  };
+}
+
+/** The address to register with the provider as the client's redirect URI. */
+export function oidcRedirectUri(): string {
+  return appLink(`/api/auth/callback/${OIDC_PROVIDER_ID}`);
+}

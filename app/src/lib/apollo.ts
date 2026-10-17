@@ -20,7 +20,8 @@ function devApiUrl(): string {
   return `${window.location.protocol}//${window.location.hostname}:${process.env.EXPO_PUBLIC_API_PORT ?? '3001'}`;
 }
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL ?? devApiUrl();
+/** Where the API is: empty for the page's own origin. */
+export const API_URL = process.env.EXPO_PUBLIC_API_URL ?? devApiUrl();
 
 const httpLink = new HttpLink({ uri: `${API_URL}/graphql` });
 
