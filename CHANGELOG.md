@@ -1,3 +1,10 @@
+## [5.1.1](https://github.com/cubicecho/telos/compare/v5.1.0...v5.1.1) (2026-10-17)
+
+
+### Bug Fixes
+
+* ship the better-auth-graphql workspace in the Docker image ([664e40d](https://github.com/cubicecho/telos/commit/664e40dbc5bddf1008bac5b03443ea0a56f37257))
+
 # [5.1.0](https://github.com/cubicecho/telos/compare/v5.0.0...v5.1.0) (2026-10-17)
 
 
