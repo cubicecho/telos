@@ -1,3 +1,10 @@
+# [5.1.0](https://github.com/cubicecho/telos/compare/v5.0.0...v5.1.0) (2026-10-17)
+
+
+### Features
+
+* sign in through an OIDC provider such as heautou ([1f542a8](https://github.com/cubicecho/telos/commit/1f542a833a994fe5f6c0b9345bba1332e50824dd))
+
 # [5.0.0](https://github.com/cubicecho/telos/compare/v4.0.0...v5.0.0) (2026-10-16)
 
 
