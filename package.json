@@ -9,8 +9,7 @@
     "app",
     "server",
     "db",
-    "runner",
-    "better-auth-graphql"
+    "runner"
   ],
   "scripts": {
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:app\"",
@@ -26,7 +25,7 @@
     "check": "npm run codegen && npm run check:biome && npm run check:types",
     "check:biome": "biome check .",
     "check:fix": "biome check --write .",
-    "check:types": "tsc --noEmit -p db/tsconfig.json && tsc --noEmit -p server/tsconfig.json && tsc --noEmit -p app/tsconfig.json && tsc --noEmit -p runner/tsconfig.json && tsc --noEmit -p better-auth-graphql/tsconfig.json && tsc --noEmit -p scripts/tsconfig.json",
+    "check:types": "tsc --noEmit -p db/tsconfig.json && tsc --noEmit -p server/tsconfig.json && tsc --noEmit -p app/tsconfig.json && tsc --noEmit -p runner/tsconfig.json && tsc --noEmit -p scripts/tsconfig.json",
     "test": "vitest run",
     "test:watch": "vitest",
     "codegen": "npm run codegen:server && npm run codegen:app",

@@ -3,7 +3,7 @@ import {
   betterAuthGraphQL,
   type JsonSchema,
   type OperationOptions,
-} from '@cubicecho/better-auth-graphql';
+} from '@cubicecho/graphql-better-auth';
 import type { DB } from '@telos/db';
 import { GraphQLError, type GraphQLSchema } from 'graphql';
 import { captureMagicToken, createAuth, magicLinkUrl, signInDirectly } from '../auth.ts';
@@ -13,7 +13,7 @@ import { badInput, forbidden } from '../errors.ts';
 import { createRateLimiter } from '../rate-limit.ts';
 import { requireKeyManager } from './api-keys.ts';
 
-// better-auth's own endpoints, served as GraphQL by @cubicecho/better-auth-graphql:
+// better-auth's own endpoints, served as GraphQL by @cubicecho/graphql-better-auth:
 // signing in with a magic link, a person's sessions, and minting and revoking
 // API keys. The fields, their arguments and their types are read off the auth
 // config, so a better-auth upgrade moves them with it. What telos adds goes in
