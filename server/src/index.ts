@@ -9,13 +9,14 @@ import { type EmbeddedRunner, startRunner } from '@telos/runner/embed';
 import cors from 'cors';
 import { migrate } from 'drizzle-orm/postgres-js/migrator';
 import express from 'express';
-import { magicLinkExposed, magicLinkRequired, oidcConfig, oidcRedirectUri, runnerKey } from './config.ts';
+import { createAuthHost } from './auth-host.ts';
+import { magicLinkExposed, magicLinkRequired, oidcRedirectUri, runnerKey } from './config.ts';
 import { mountMcp } from './mcp.ts';
 import { createContextFactory } from './request-context.ts';
 import { startPruning } from './retention.ts';
 import { createGraphQLRouter } from './routes/graphql.ts';
 import { mountSso } from './routes/sso.ts';
-import { ai, auth, schema } from './schema.ts';
+import { ai, schema } from './schema.ts';
 import { createStaticHandler } from './static.ts';
 
 export type { Context } from './context.ts';
@@ -45,6 +46,9 @@ try {
   throw error;
 }
 
+// After migrating: it reads the OIDC pairing, if there is one.
+const authHost = await createAuthHost(db);
+
 let runner: EmbeddedRunner | undefined;
 // Old runs go whenever AI does; without it there are none to prune. The change
 // feed's old tombstones go either way.
@@ -53,14 +57,14 @@ const stopPruning = startPruning(db, { runs: ai });
 const app = express();
 const httpServer = createServer(app);
 const serveStatic = createStaticHandler(staticDir);
-const contextFor = createContextFactory(db, auth, { ai, runnerKey: runnerKey() });
+const contextFor = createContextFactory(db, authHost, { ai, runnerKey: runnerKey() });
 const { version } = JSON.parse(readFileSync(join(__dirname, '../package.json'), 'utf8')) as { version: string };
 
 app.use(cors());
 app.use('/graphql', await createGraphQLRouter(httpServer, contextFor));
 const mcp = mountMcp(app, { ai, db, schema, contextFor, version });
-const oidc = oidcConfig();
-if (oidc) mountSso(app, auth);
+// Always mounted: a provider can be paired while the server runs.
+mountSso(app, authHost);
 app.get('/healthz', (_req, res) => {
   res.json({ ok: true });
 });
@@ -76,6 +80,7 @@ httpServer.listen(PORT, '0.0.0.0', () => {
     runner = startRunner({ telosUrl: `http://127.0.0.1:${PORT}`, runnerKey: runnerKey() });
     console.log('   Runner working the lanes’ agents (idle until AI is on in Settings)');
   }
+  const oidc = authHost.oidc();
   if (oidc) console.log(`   Sign-in with ${oidc.name} (${oidc.issuer}); redirect URI ${oidcRedirectUri()}`);
   if (!magicLinkRequired()) {
     console.warn('⚠️  AUTH_MAGIC_LINK is off: any email address signs in without a link. Private networks only.');

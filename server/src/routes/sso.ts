@@ -1,5 +1,6 @@
 import type { Express, Request, Response } from 'express';
 import { type Auth, toHeaders } from '../auth.ts';
+import type { AuthHost } from '../auth-host.ts';
 import { appLink, appUrl, OIDC_PROVIDER_ID } from '../config.ts';
 
 // The two legs of an OIDC sign-in that cannot be GraphQL, because the browser
@@ -20,18 +21,22 @@ const SIGNED_IN_PATH = '/auth/sso';
 const FAILED_PATH = '/login';
 
 /**
- * Mounts the start and callback routes. Call it only when an OIDC provider is
- * configured: without one there is nothing to start.
+ * Mounts the start and callback routes. They are always there, because a
+ * provider can be paired while the server runs; each asks the host for the
+ * current auth instance, and with no provider sends the browser back to the
+ * login page.
  *
  * @param app The Express app.
- * @param auth The auth instance, with the generic OAuth plugin.
+ * @param host Where the current auth instance is.
  */
-export function mountSso(app: Express, auth: Auth): void {
+export function mountSso(app: Express, host: AuthHost): void {
   app.get(SSO_START_PATH, (req, res) => {
-    void start(auth, req, res).catch((error: unknown) => fail(res, 'sign_in_failed', error));
+    if (!host.oidc()) return off(res);
+    void start(host.current(), req, res).catch((error: unknown) => fail(res, 'sign_in_failed', error));
   });
   app.get(`/api/auth/callback/${OIDC_PROVIDER_ID}`, (req, res) => {
-    void callback(auth, req, res).catch((error: unknown) => fail(res, 'callback_failed', error));
+    if (!host.oidc()) return off(res);
+    void callback(host.current(), req, res).catch((error: unknown) => fail(res, 'callback_failed', error));
   });
 }
 
@@ -94,6 +99,11 @@ async function callback(auth: Auth, req: Request, res: Response): Promise<void> 
     location = target.toString();
   }
   res.redirect(302, location);
+}
+
+/** Back to the login page, which says there is no provider to sign in with. */
+function off(res: Response): void {
+  res.redirect(302, `${appLink(FAILED_PATH)}?error=sso_off`);
 }
 
 /** Back to the login page, which says that signing in failed. */

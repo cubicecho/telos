@@ -3,6 +3,7 @@ import { View } from 'react-native';
 import { AgentSettings, AiSettings } from '@/components/domain/ai/ai-settings';
 import { McpServerManager } from '@/components/domain/ai/mcp-server-manager';
 import { LabelManager } from '@/components/domain/label/label-manager';
+import { SsoSettings } from '@/components/domain/sso/sso-pairing';
 import { TemplateManager } from '@/components/domain/template/template-manager';
 import { PageLayout } from '@/components/page-layout';
 import { Section } from '@/components/section';
@@ -40,6 +41,8 @@ export default function SettingsScreen() {
       {/* Its own section: the header's "New label" shares the list's state. */}
       <LabelManager />
       <TemplateManager />
+      {/* How people sign in is the instance's, so only an admin sees it. */}
+      {ai.admin ? <SsoSettings /> : null}
     </View>
   );
 

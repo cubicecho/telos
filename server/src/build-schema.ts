@@ -22,6 +22,7 @@ import { applyNotesExtension } from './resolvers/notes.ts';
 import { applyRequestsExtension } from './resolvers/requests.ts';
 import { applyRunsExtension } from './resolvers/runs.ts';
 import { applySessionDeletesExtension } from './resolvers/session-deletes.ts';
+import { applySsoSetupExtension } from './resolvers/sso-setup.ts';
 import { applyTodosExtension } from './resolvers/todos.ts';
 import { onWrite } from './resolvers/write-guards.ts';
 import { contextValues, features, scope } from './tenancy.ts';
@@ -111,6 +112,7 @@ export function createSchema(db: DB, options: SchemaOptions) {
   });
 
   let schema = applyAuthExtension(drizzleSchema, options);
+  schema = applySsoSetupExtension(schema);
   schema = applyBetterAuthExtension(schema, db, options);
   schema = applyTodosExtension(schema);
   schema = applyLanesExtension(schema);

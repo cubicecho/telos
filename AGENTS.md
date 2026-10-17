@@ -162,6 +162,16 @@ an `actor` (`context.ts`): `user` for a session, `apiKey` for an MCP client,
 `ctx.userId` is always `ctx.actor.userId` — null for `system`, so generated
 CRUD refuses the runner outright.
 
+**The auth instance is swappable; never hold one from boot.** better-auth fixes
+its plugins at creation, and the OIDC provider is one, so pairing a provider
+(`oidc-pairing.ts`, `resolvers/sso-setup.ts`) rebuilds it. `auth-host.ts` holds
+the current one: the context factory, `routes/sso.ts` (always mounted, and
+`?error=sso_off` with no provider) and `authConfig` ask it per request, and a
+resolver uses `ctx.auth`. The provider is `effectiveOidc()` (`oidc-settings.ts`):
+`OIDC_ISSUER` wins over the `oidc_settings` row. Pairing is an admin's, or
+anyone's while there are no accounts; a stranger who could pair later could sign
+in as any address. Never log or store a setup URL's token.
+
 **AI is off unless every switch says on.** `AI_ENABLED=false` removes the AI
 extensions from the schema at all; otherwise they are built, and the instance's
 switch (`instance_settings.aiEnabled`, `instance.ts`) decides at runtime. Only

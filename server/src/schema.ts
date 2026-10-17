@@ -1,10 +1,10 @@
 import { db } from '@telos/db';
-import { createAuth } from './auth.ts';
 import { createSchema } from './build-schema.ts';
 import { aiAvailable } from './config.ts';
 
+// The auth instance is not built here: it reads the database's OIDC pairing,
+// so index.ts builds it (auth-host.ts) once migrations have run.
 const ai = aiAvailable();
 const { schema, entities } = createSchema(db, { ai });
-const auth = createAuth(db);
 
-export { ai, auth, schema, entities };
+export { ai, schema, entities };

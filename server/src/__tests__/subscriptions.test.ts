@@ -7,7 +7,7 @@ import { signInDirectly } from '../auth.ts';
 import { createContextFactory } from '../request-context.ts';
 import { serveSubscriptions } from '../routes/subscriptions.ts';
 import { type Board, createBoard } from './board.ts';
-import { authFor, createTestDb, schemaFor, type TestDb } from './helpers.ts';
+import { authFor, createTestDb, hostFor, schemaFor, type TestDb } from './helpers.ts';
 
 // The socket a live board rides, end to end: a real server, graphql-ws's own
 // client, and the session token sent the way a browser has to send it, in the
@@ -38,7 +38,7 @@ afterEach(async () => {
 async function serve(): Promise<string> {
   const { schema } = schemaFor(db, false);
   server = createServer();
-  closeSockets = serveSubscriptions(server, schema, createContextFactory(db, authFor(db), { ai: false }));
+  closeSockets = serveSubscriptions(server, schema, createContextFactory(db, hostFor(db), { ai: false }));
   await new Promise<void>((resolve) => server?.listen(0, '127.0.0.1', resolve));
   return `ws://127.0.0.1:${(server.address() as AddressInfo).port}/graphql`;
 }

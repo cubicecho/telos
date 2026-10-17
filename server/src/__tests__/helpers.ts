@@ -8,6 +8,7 @@ import { migrate } from 'drizzle-orm/pglite/migrator';
 import { type ExecutionResult, graphql } from 'graphql';
 import { expect } from 'vitest';
 import { type Auth, createAuth } from '../auth.ts';
+import { type AuthHost, fixedAuthHost } from '../auth-host.ts';
 import { createSchema } from '../build-schema.ts';
 import type { Actor, Context } from '../context.ts';
 import { setInstanceAi } from '../instance.ts';
@@ -104,6 +105,8 @@ export interface ClientOptions {
   ai?: boolean | undefined;
   /** Shared across clients of one database, so a session one opens another can see. */
   auth?: Auth | undefined;
+  /** Where `auth` came from. Defaults to one that only ever holds `auth`. */
+  authHost?: AuthHost | undefined;
   /** The request's headers, for calls that hand them to better-auth (`Authorization: Bearer ...`). */
   headers?: Headers | undefined;
 }
@@ -119,6 +122,11 @@ export function authFor(db: TestDb): Auth {
     auths.set(db, auth);
   }
   return auth;
+}
+
+/** A host that always hands out `authFor(db)`, for a context factory. */
+export function hostFor(db: TestDb): AuthHost {
+  return fixedAuthHost(authFor(db), null);
 }
 
 // One schema per database and AI flag, as the server builds one for every
@@ -150,7 +158,7 @@ export async function sessionClient(
   userId: string,
   options: Omit<ClientOptions, 'headers'> = {},
 ): Promise<TestClient> {
-  const auth = options.auth ?? authFor(db);
+  const auth = options.authHost?.current() ?? options.auth ?? authFor(db);
   const session = await (await auth.$context).internalAdapter.createSession(userId);
   return createClient(db, userId, {
     ...options,
@@ -161,12 +169,21 @@ export async function sessionClient(
 
 export function createClient(db: TestDb, userId: string | null, options: ClientOptions = {}): TestClient {
   const { schema } = schemaFor(db, options.ai ?? false);
-  const auth = options.auth ?? authFor(db);
+  const authHost = options.authHost ?? fixedAuthHost(options.auth ?? authFor(db), null);
   const actor: Actor = options.actor ?? (userId ? { kind: 'user', userId } : { kind: 'anonymous', userId: null });
 
   const run = async (query: string, variables?: Record<string, unknown>) => {
     const headers = options.headers ?? new Headers();
-    const contextValue: Context = { db, auth, userId: actor.userId, actor, loaders: createLoaders(db), headers };
+    const auth = authHost.current();
+    const contextValue: Context = {
+      db,
+      auth,
+      authHost,
+      userId: actor.userId,
+      actor,
+      loaders: createLoaders(db),
+      headers,
+    };
     return graphql({ schema, source: query, contextValue, variableValues: variables });
   };
 
