@@ -28,6 +28,7 @@ import { requireKeyManager } from './api-keys.ts';
 export const BETTER_AUTH_OPERATIONS = [
   'signInMagicLink',
   'magicLinkVerify',
+  'verifyOneTimeToken',
   'getSession',
   'listSessions',
   'signOut',
@@ -101,6 +102,26 @@ const signInMagicLink: OperationOptions<Context> = {
 };
 
 /**
+ * The last leg of an OIDC sign-in: the app's /auth/sso screen spends the
+ * one-time token routes/sso.ts put on its URL. Answers like `magicLinkVerify`,
+ * with the session's bearer token, rather than better-auth's whole session row.
+ */
+const verifyOneTimeToken: OperationOptions<Context> = {
+  result: () => ({
+    type: 'object',
+    properties: {
+      token: { type: 'string', description: 'The session, to send as `Authorization: Bearer <token>`.' },
+      userId: { type: 'string', format: 'uuid', description: "The session's user." },
+    },
+    required: ['token', 'userId'],
+  }),
+  around: async (_call, next) => {
+    const result = (await next()) as { session: { token: string }; user: { id: string } };
+    return { token: result.session.token, userId: result.user.id };
+  },
+};
+
+/**
  * Minting a key: a name and how long it lasts, nothing better-auth keeps for
  * the server (its owner, limits, permissions). Only a person with AI on.
  */
@@ -147,7 +168,9 @@ const deleteApiKey: OperationOptions<Context> = {
  * @returns The schema with them.
  */
 export function applyBetterAuthExtension(schema: GraphQLSchema, db: DB, options: { ai: boolean }): GraphQLSchema {
-  const built = betterAuthGraphQL<Context>(createAuth(db), {
+  // Described from an instance with no OIDC provider: the fields are the same
+  // either way, and describing one would fetch its discovery document.
+  const built = betterAuthGraphQL<Context>(createAuth(db, { oidc: null }), {
     include: options.ai ? [...BETTER_AUTH_OPERATIONS, ...BETTER_AUTH_KEY_OPERATIONS] : BETTER_AUTH_OPERATIONS,
     auth: (ctx) => ctx.auth,
     headers: (ctx) => ctx.headers,
@@ -158,7 +181,7 @@ export function applyBetterAuthExtension(schema: GraphQLSchema, db: DB, options:
         throw forbidden('Only a signed-in person can do this');
       }
     },
-    operations: { signInMagicLink, createApiKey, deleteApiKey },
+    operations: { signInMagicLink, verifyOneTimeToken, createApiKey, deleteApiKey },
   });
   return applyBetterAuthGraphQL(schema, built);
 }

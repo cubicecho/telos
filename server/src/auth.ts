@@ -4,19 +4,19 @@ import type { DB } from '@telos/db';
 import * as dbSchema from '@telos/db/schema';
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
-import { bearer, magicLink } from 'better-auth/plugins';
+import { bearer, genericOAuth, magicLink, oneTimeToken } from 'better-auth/plugins';
 import { and, eq, gt, isNull } from 'drizzle-orm';
-import { appLink, appUrl, authSecret } from './config.ts';
+import { appLink, appUrl, authSecret, OIDC_PROVIDER_ID, type OidcConfig, oidcConfig } from './config.ts';
 import type { Actor } from './context.ts';
 import { runToolsOff } from './door.ts';
 import { claimFirstAdmin, instanceAiOn } from './instance.ts';
 import { readRunToken, runnerKeyMatches } from './run-tokens.ts';
 
-// Sessions, magic links and API keys, all through better-auth. The server
-// mounts none of better-auth's REST routes: resolvers/better-auth.ts serves its
-// endpoints as GraphQL fields that call `auth.api` directly, and the bearer
-// plugin is what lets a request carry its session as
-// `Authorization: Bearer <token>`.
+// Sessions, magic links, OIDC sign-in and API keys, all through better-auth.
+// resolvers/better-auth.ts serves its endpoints as GraphQL fields that call
+// `auth.api` directly, and the bearer plugin is what lets a request carry its
+// session as `Authorization: Bearer <token>`. The one exception is OIDC, whose
+// two browser redirects routes/sso.ts serves over HTTP.
 
 /** Sessions last as long as the hand-rolled tokens they replaced did. */
 const SESSION_SECONDS = 30 * 24 * 60 * 60;
@@ -30,7 +30,13 @@ export const API_KEY_PREFIX = 'telos_';
 // caller reads it back out.
 const tokenCaptures = new Map<string, string>();
 
-export function createAuth(db: DB) {
+export interface AuthOptions {
+  /** The OIDC provider to sign in with. Defaults to the one the environment names (config.ts). */
+  oidc?: OidcConfig | null | undefined;
+}
+
+export function createAuth(db: DB, options: AuthOptions = {}) {
+  const oidc = options.oidc === undefined ? oidcConfig() : options.oidc;
   return betterAuth({
     // The rc drizzle instance is keyed by relations rather than tables, so the
     // adapter cannot discover models itself: map better-auth's names onto ours.
@@ -49,6 +55,15 @@ export function createAuth(db: DB) {
     // Every id column is a uuid, and existing users keep theirs.
     advanced: { database: { generateId: 'uuid' } },
     session: { expiresIn: SESSION_SECONDS },
+    // An address the OIDC provider vouches for (email_verified) signs in to the
+    // account that has it, even one whose address telos never checked itself:
+    // made with AUTH_MAGIC_LINK=false, or before sessions moved to better-auth.
+    // The provider is the operator's own, so its word on an address is good.
+    ...(oidc ? { account: { accountLinking: { requireLocalEmailVerified: false } } } : {}),
+    // Where an OIDC callback goes when it cannot tell where the sign-in came
+    // from (no state, or state that cannot be read): the login page, which
+    // shows the error, rather than better-auth's own error page.
+    onAPIError: { errorURL: appLink('/login') },
     // Whoever signs up first runs the instance.
     databaseHooks: { user: { create: { after: async (user) => claimFirstAdmin(db, user.id) } } },
     plugins: [
@@ -61,6 +76,17 @@ export function createAuth(db: DB) {
         rateLimit: { enabled: false },
       }),
       bearer(),
+      // How an OIDC sign-in reaches the app: the callback mints one of these
+      // for the session it opened, and the app's /auth/sso screen spends it
+      // over GraphQL, as /auth/verify spends a magic token. Only the server
+      // mints them, and the session itself never rides in a URL or a cookie.
+      oneTimeToken({
+        expiresIn: 3,
+        storeToken: 'hashed',
+        disableClientRequest: true,
+        disableSetSessionCookie: true,
+      }),
+      ...(oidc ? [oidcPlugin(oidc)] : []),
       magicLink({
         expiresIn: 15 * 60,
         storeToken: 'hashed',
@@ -78,6 +104,39 @@ export function createAuth(db: DB) {
 }
 
 export type Auth = ReturnType<typeof createAuth>;
+
+/**
+ * The OIDC provider, through better-auth's generic OAuth plugin: endpoints,
+ * keys and issuer come from its discovery document, the id token is checked
+ * against them, and better-auth's own sign-in and callback endpoints run the
+ * flow (state, PKCE, nonce).
+ */
+function oidcPlugin(oidc: OidcConfig) {
+  return genericOAuth({
+    config: [
+      {
+        providerId: OIDC_PROVIDER_ID,
+        name: oidc.name,
+        discoveryUrl: `${oidc.issuer}/.well-known/openid-configuration`,
+        requireIdTokenVerification: true,
+        clientId: oidc.clientId,
+        clientSecret: oidc.clientSecret,
+        tokenEndpointAuth: { method: oidc.clientSecret ? oidc.clientAuth : 'none' },
+        pkce: true,
+        scopes: ['openid', 'profile', 'email'],
+        // Accounts have a name column that is never null; a provider may
+        // release only a username, or nothing.
+        mapProfileToUser: (profile) => ({
+          name: stringClaim(profile.name) ?? stringClaim(profile.preferred_username) ?? '',
+        }),
+      },
+    ],
+  });
+}
+
+function stringClaim(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() !== '' ? value : undefined;
+}
 
 /** The app's verify screen, which hands the token to `magicLinkVerify`. */
 export function magicLinkUrl(token: string): string {

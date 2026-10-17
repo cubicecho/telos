@@ -20,3 +20,18 @@ if (process.env.NODE_ENV === 'production') {
     fatal('AUTH_SECRET must be set to a strong random value in production. Generate one with `openssl rand -hex 32`.');
   }
 }
+
+// Half an OIDC setup would leave the login page without its button and no
+// clue why; a typo in the issuer would only show up as a skipped provider.
+const oidcIssuer = process.env.OIDC_ISSUER?.trim();
+const oidcClientId = process.env.OIDC_CLIENT_ID?.trim();
+if (Boolean(oidcIssuer) !== Boolean(oidcClientId)) {
+  fatal('OIDC_ISSUER and OIDC_CLIENT_ID go together: set both to sign in with an OIDC provider, or neither.');
+}
+if (oidcIssuer && !URL.canParse(oidcIssuer)) {
+  fatal(`OIDC_ISSUER is not a URL: ${oidcIssuer}`);
+}
+const oidcClientAuth = process.env.OIDC_CLIENT_AUTH?.trim();
+if (oidcClientAuth && !['client_secret_basic', 'client_secret_post'].includes(oidcClientAuth)) {
+  fatal('OIDC_CLIENT_AUTH must be client_secret_basic or client_secret_post.');
+}
