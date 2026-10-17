@@ -1,3 +1,10 @@
+# [5.2.0](https://github.com/cubicecho/telos/compare/v5.1.1...v5.2.0) (2026-10-17)
+
+
+### Features
+
+* pair with an OIDC provider by pasting a setup URL ([f4bccb4](https://github.com/cubicecho/telos/commit/f4bccb43ffbd4d1c739d67f474cd1755a00ce588)), closes [#90](https://github.com/cubicecho/telos/issues/90)
+
 ## [5.1.1](https://github.com/cubicecho/telos/compare/v5.1.0...v5.1.1) (2026-10-17)
 
 
