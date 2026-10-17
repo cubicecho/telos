@@ -15,7 +15,8 @@ to projects and todos alike. That is the whole product.
   which means done. Drag a card there and it is ticked off; tick the box and the
   card moves. Everything the drag does, a menu does too.
 - **Labels** — one colour, one name, attachable to anything.
-- **Sign-in by magic link**, or no link at all on a private instance.
+- **Sign-in by magic link**, through an OpenID Connect provider such as
+  heautou, or with no link at all on a private instance.
 
 ## Quickstart
 
@@ -101,6 +102,11 @@ domain.
 | `PORT` | `3001` | Port the server listens on. |
 | `AUTH_MAGIC_LINK` | `true` | Set to `false` to sign in with an address alone, no link. |
 | `EXPOSE_MAGIC_LINK` | dev only | Return the magic link in the API response so the login page can show it. |
+| `OIDC_ISSUER` | — | Turns on sign-in through an OpenID Connect provider, with `OIDC_CLIENT_ID`. The issuer URL; for heautou it ends in `/oidc`. |
+| `OIDC_CLIENT_ID` | — | The client ID registered with the provider. |
+| `OIDC_CLIENT_SECRET` | — | The client's secret. Leave it unset for a public client. |
+| `OIDC_CLIENT_AUTH` | `client_secret_basic` | How the secret is sent: `client_secret_basic` (heautou's default) or `client_secret_post`. |
+| `OIDC_NAME` | `SSO` | The provider's name on the login button ("Sign in with …"). |
 | `AI_ENABLED` | — | Set to `false` to remove AI entirely: no MCP endpoint, no API keys, no agents, no switch in Settings. Otherwise an admin turns it on in Settings. |
 | `RUNNER_CONCURRENCY` | `2` | The most runs the runner works at once. |
 | `RUNNER_POLL_SECONDS` | `5` | How long the runner waits when nothing is ready. |
@@ -110,6 +116,22 @@ domain.
 Telos ships no mail provider. With magic links on, the link is written to the
 server log, and that is the delivery channel — pipe the log somewhere you can
 read, or run with `AUTH_MAGIC_LINK=false`.
+
+### Signing in with an OIDC provider
+
+Telos can sign people in through any OpenID Connect provider, next to magic
+links. To use heautou:
+
+1. In heautou, add a client whose redirect URI is exactly
+   `<APP_URL>/api/auth/callback/oidc`. Its `allowedGroups` decide who may
+   sign in.
+2. Set `OIDC_ISSUER=https://<heautou>/oidc`, `OIDC_CLIENT_ID`,
+   `OIDC_CLIENT_SECRET` and, for the button, `OIDC_NAME=heautou`.
+3. Restart. The login page shows "Sign in with heautou".
+
+Someone signing in this way gets the account with the email address the
+provider vouches for, or a new one if there is none. Setting only one of
+`OIDC_ISSUER` and `OIDC_CLIENT_ID` stops the server at boot.
 
 ## AI
 
