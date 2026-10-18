@@ -216,6 +216,16 @@ describe('finishRun', () => {
     expect(events.at(-1)).toMatchObject({ kind: 'move', noteId: note.id, reason: 'The review failed.' });
   });
 
+  it('hands the agent a todo comes back to the ruling that sent it back', async () => {
+    await setLane(board.person, board.lanes[0].id, { onFailureLaneId: board.lanes[1].id });
+    await setLane(board.person, board.lanes[1].id, { agentId: board.agentId, onSuccessLaneId: board.lanes[0].id });
+    const todoId = await board.addTodo('Review it');
+    const ruling = 'FAIL\n- The box is labelled: not met. src/search.tsx:4 has no label.';
+    await finish((await claim(todoId)).runId, { status: 'OK', output: ruling });
+    const back = await claim(todoId, board.lanes[1].id);
+    expect(back.assignment.why).toBe(ruling);
+  });
+
   it('stops retrying after maxAttempts failures, until a person moves it', async () => {
     await setLane(board.person, board.lanes[0].id, { maxAttempts: 1 });
     const todoId = await board.addTodo('Write it');
