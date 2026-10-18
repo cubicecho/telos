@@ -1,3 +1,9 @@
+/**
+ * The contract `label.tsx` and `label.web.tsx` both implement. Separate module
+ * for the usual reason — Metro resolves `./label` to `label.web.tsx` on web, so
+ * the web file cannot import shared types from `./label` without importing
+ * itself.
+ */
 import type { ReactNode } from 'react';
 
 export type LabelProps = {

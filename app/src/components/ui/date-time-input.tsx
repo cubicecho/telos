@@ -1,3 +1,21 @@
+/**
+ * Combined date + time picker — or, with `mode="date"`, a date on its own.
+ *
+ * - Date is chosen from a `Calendar` in a `Popover` — a dropdown anchored to the
+ *   trigger on web, a sheet on native.
+ * - Time is an `Input type="time"`: a real `<input type="time">` on web, a plain
+ *   HH:mm text field on native, which is the split `input` exists for.
+ *
+ * Shared by both platforms with no `.web.tsx`: every piece it composes is
+ * already a cross-platform primitive. The two halves always commit a single
+ * `Date` back through `onChange`, so a caller never has to reassemble one.
+ *
+ * `mode` and `clearable` are props rather than a second component because the
+ * date-only, optional field differs from this one by an input and a Clear row —
+ * the same argument `DatePicker` makes for `showTime`. `DatePicker` is on both
+ * platforms now too, with its own full-width trigger and the time box inside the
+ * popover; folding the two into one is still open.
+ */
 import { format } from 'date-fns';
 import { useId, useState } from 'react';
 import { Platform, Text, View } from 'react-native';

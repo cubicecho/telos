@@ -1,3 +1,12 @@
+/**
+ * The web tooltip: radix, shown on hover and focus. `tooltip.tsx` is the
+ * native counterpart and `tooltip-base.ts` holds the contract they share.
+ *
+ * Every part also takes the props of the radix part it renders, as shadcn's
+ * `tooltip` does — `open`/`onOpenChange`/`delayDuration` on `Tooltip`,
+ * `sideOffset`/`align` on the content — so a DOM call site ports unchanged.
+ */
+
 import { Tooltip as TooltipPrimitive } from 'radix-ui';
 import type * as React from 'react';
 import { createContext, useContext } from 'react';

@@ -1,3 +1,18 @@
+/**
+ * A dialog with its slots placed — written once here and compiled for the web by `scripts/rn2web`,
+ * on the `dialog` both platforms already share (radix on the web, a `Modal` on device).
+ *
+ * What differs, each behind a `Platform` test the compiler folds:
+ *
+ * - the height cap: `100dvh` and `calc()` on the web, the screen the `Modal` already fills on
+ *   device;
+ * - `hideTitle`: an `sr-only` clip on the web, a one-pixel box on device;
+ * - where the discard question is mounted — see the comment on it.
+ *
+ * The discard question is a `Dialog` with `role="alertdialog"` rather than the web-only
+ * `alert-dialog`, so both halves share it. It keeps what that primitive gave: the role, focus
+ * landing on "Keep editing", and a click on the overlay that does not answer the question.
+ */
 import type { ReactNode } from 'react';
 import { useState } from 'react';
 import { Platform, View } from 'react-native';

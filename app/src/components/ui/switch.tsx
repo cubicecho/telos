@@ -1,3 +1,13 @@
+/**
+ * The native switch: a `Pressable` track with a thumb that moves, rather than
+ * react-native's `Switch`. RN's takes `trackColor`/`thumbColor` as raw colour
+ * values, which would pin the control outside the tailwind theme and make it
+ * the one control that does not follow dark mode with the rest.
+ *
+ * `switch.web.tsx` is radix; `switch-base.ts` holds the contract and the track
+ * classes, so the two cannot drift visually.
+ */
+
 import { useEffect, useId, useRef, useState } from 'react';
 import { Platform, Pressable, Text, View } from 'react-native';
 import { SWITCH_THUMB_CLASS, SWITCH_TRACK_CLASS, type SwitchProps } from '@/components/ui/switch-base';

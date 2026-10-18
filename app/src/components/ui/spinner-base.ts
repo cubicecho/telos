@@ -1,3 +1,8 @@
+/**
+ * The contract `spinner.tsx` (native) and `spinner.web.tsx` (web) both implement.
+ * Its own module because Metro resolves `./spinner` to `spinner.web.tsx` on web.
+ */
+
 export type SpinnerProps = {
   /**
    * The spinner's accessible name, announced by its `role="status"`. Say what is

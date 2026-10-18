@@ -1,3 +1,13 @@
+/**
+ * Light, Dark and System as three tiles: a `RadioGroup variant="card"`. `variant="compact"` is the
+ * same choice as one row of icon-only segments, each named by its caption.
+ *
+ * By default the picker is bound to `useThemePreference()`, which stores the choice and applies
+ * it. Pass `value` and it is controlled instead: it only reports through `onValueChange` and the
+ * hook is not called. `palettes` adds a choice of palette under the first, bound or controlled the
+ * same way; a dark-only palette disables the theme choice rather than hiding it.
+ */
+
 import { View } from 'react-native';
 import { Monitor, Moon, Sun } from '@/components/ui/icons';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';

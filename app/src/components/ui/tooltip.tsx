@@ -1,3 +1,17 @@
+/**
+ * The native tooltip: long-press the trigger and the bubble appears above it
+ * for a few seconds.
+ *
+ * Hover does not exist on a touch screen, so radix's trigger has no direct
+ * equivalent — but dropping the content entirely would lose the only place
+ * some labels are written down. Long-press is the platform's own convention
+ * for "tell me more about this control", and it costs no dependency.
+ *
+ * `Tooltip` wraps its children in a relatively-positioned `View` so the bubble
+ * can be absolutely placed against the trigger; on web radix's root is a
+ * fragment and the wrapper is not there.
+ */
+
 import { cloneElement, createContext, isValidElement, type ReactElement, useContext, useEffect, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import {

@@ -1,3 +1,22 @@
+/**
+ * `DateTimeInput`, bound to a form field holding a `Date | null`.
+ *
+ * Its own item rather than another export of `@cubeui/form`, for the weight of what it imports: a
+ * calendar and `date-fns` on device, `react-day-picker` in the compiled half. A form of plain
+ * inputs installs `@cubeui/form` and pulls in none of it — the split the web `date-field` makes.
+ *
+ * The field is `asGroup`: the label names the trigger by `aria-labelledby`, and `DateTimeInput`
+ * follows the label's id with its own value text's, so the trigger is "Due September 15th, 2026".
+ * A `<label htmlFor>` would name it "Due" and drop the date — the part of the field that changes.
+ *
+ * ```tsx
+ * <form.AppField name="dueAt">
+ *   {() => <DateTimeField label="Due" mode="date" clearable />}
+ * </form.AppField>
+ * ```
+ *
+ * Or on `field.*`, with `createAppForm({ DateTimeField })`, or as one line with `bindToForm`.
+ */
 import { DateTimeInput } from '@/components/ui/date-time-input';
 import { type FieldProps, FieldWrapper, splitProps, useFieldContext } from '@/components/ui/form';
 

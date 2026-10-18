@@ -1,3 +1,14 @@
+/**
+ * The contract `menu.tsx` (native, on the popover) and `menu.web.tsx` (radix `DropdownMenu`)
+ * both implement. Its own module for the usual reason: Metro resolves `./menu` to `menu.web.tsx`
+ * on web, so the web file cannot import shared types from `./menu` without importing itself.
+ *
+ * A menu is a popover of actions. It exists because the popover alone left each app to build the
+ * rows by hand — a `Pressable role="menuitem"` with no `role="menu"` around it, no arrow keys, no
+ * focus back on the trigger, and an `onSelect` that had to close the popover itself because the
+ * caller owned `open`. Here the rows are `MenuItem`, the menu closes when one is chosen, and the
+ * caller owns nothing unless it wants to.
+ */
 import type { ReactElement, ReactNode } from 'react';
 import type { SlotNode } from '@/lib/utils';
 

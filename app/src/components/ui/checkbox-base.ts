@@ -1,3 +1,14 @@
+/**
+ * The contract `checkbox.tsx` (native) and `checkbox.web.tsx` (radix) both implement. Its own
+ * module because Metro resolves `./checkbox` to `checkbox.web.tsx` on web — the web file would
+ * otherwise import itself.
+ *
+ * Controlled or not, as radix's is: pass `checked` and `onCheckedChange` to drive it, or
+ * `defaultChecked` (or nothing) and let it hold its own state. The web half takes radix's whole
+ * `Checkbox.Root` surface on top of this — `name`, `value`, `required`, `id`, `"indeterminate"`,
+ * the `aria-*` props — because it installs over a DOM app's shadcn checkbox; this is the part that
+ * means something on both platforms.
+ */
 export type CheckboxProps = {
   checked?: boolean | undefined;
   /** Where an uncontrolled box starts. Ignored once `checked` is passed. */

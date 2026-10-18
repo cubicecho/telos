@@ -1,3 +1,18 @@
+/**
+ * The title block a page wears in a header slot — written once here and compiled for the web by
+ * `scripts/rn2web`, so the DOM `PageHeader` and the React Native one are the same component.
+ *
+ * Two things the web drew with CSS the device cannot, each behind a `Platform.select` the
+ * compiler folds so the web output keeps the classes it always had:
+ *
+ * - the icon is sized with `[&_svg]:size-5`, an arbitrary variant NativeWind has no answer for —
+ *   on device, pass the icon at the size you want;
+ * - a loading title keeps its name in an `sr-only` heading, which is a clip on the web and a
+ *   one-pixel box on device.
+ *
+ * The title's colour is not one of them: it is named on every platform, because react-native-web
+ * does not inherit it either.
+ */
 import type { ReactNode } from 'react';
 import { Platform, Text, View } from 'react-native';
 import { cn, type SlotNode } from '@/lib/utils';

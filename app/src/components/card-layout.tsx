@@ -1,3 +1,15 @@
+/**
+ * A card with its slots already placed — written once here and compiled for the web by
+ * `scripts/rn2web`, so the DOM `CardLayout` and the React Native one are the same component, built
+ * on the one `card` both platforms already share.
+ *
+ * What the device cannot draw the way the web did, each behind a `Platform.select` the compiler
+ * folds:
+ *
+ * - the icon is sized with `[&_svg]:size-4`, an arbitrary variant NativeWind has no answer for —
+ *   on device, pass the icon at the size you want;
+ * - the skeleton's bars are spaced with `gap`, not `space-y`, which NativeWind does not have.
+ */
 import type { ReactNode } from 'react';
 import { Children } from 'react';
 import { Platform, View } from 'react-native';

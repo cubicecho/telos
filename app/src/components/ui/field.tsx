@@ -1,3 +1,24 @@
+/**
+ * Field chrome — the label/description/error furniture around a control.
+ *
+ * Shared, with no `.web.tsx`: none of it does anything a `<div>` did that a
+ * `View` cannot. The one thing lost in the conversion is the
+ * `group-data-[disabled=true]/field:` variant `FieldLabel` used to carry —
+ * `data-*` attributes and group variants are DOM-only, and a compiled web build
+ * is where that would come back, not a hand-written override.
+ *
+ * **Every part shadcn's `field` exports is here, and each takes its element's
+ * props.** The compiled half installs over a DOM app's shadcn `field.tsx`, so
+ * `FieldSet`, `FieldLegend` and `FieldSeparator` exist, `FieldError` takes
+ * `errors`, `Field` takes `orientation="responsive"`, and every part spreads
+ * the rest of its props onto its root — `View`/`Text` props here, which the
+ * compiler turns into `<div>`/`<span>` props on the web.
+ *
+ * **Each part wears shadcn's `data-slot`**, as a `testID` the compiler turns into
+ * one: `form-field` promises that a project already styling
+ * `[data-slot=field-label]` styles it too, and shadcn's own `Field` variants
+ * select on `[data-slot=field-content]`.
+ */
 import { cva, type VariantProps } from 'class-variance-authority';
 import type * as React from 'react';
 import { Platform, Text, View } from 'react-native';

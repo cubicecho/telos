@@ -1,3 +1,19 @@
+/**
+ * The web calendar: react-day-picker, using the library's own stylesheet so we
+ * do not have to track its evolving `classNames` API across versions.
+ * `calendar.tsx` is the native counterpart; `calendar-base.ts` holds the
+ * contract they share.
+ *
+ * The contract's `DateMatcher` and `DateRange` are structurally react-day-picker's
+ * own, which is why the two `mode` branches pass straight through — the types are
+ * declared in `calendar-base.ts` rather than imported so the native half can share
+ * them, not because they differ.
+ *
+ * It also takes the rest of react-day-picker's props — `captionLayout`,
+ * `showOutsideDays`, `classNames`, `components`, `formatters`, `locale` — as
+ * shadcn's `calendar` does, and hands them to `DayPicker` unchanged. Those
+ * extras are web only.
+ */
 import type { CSSProperties } from 'react';
 import { DayPicker, getDefaultClassNames, type PropsBase } from 'react-day-picker';
 import type { CalendarProps } from '@/components/ui/calendar-base';

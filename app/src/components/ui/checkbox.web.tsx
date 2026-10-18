@@ -1,3 +1,15 @@
+/**
+ * The web checkbox: radix. `checkbox.tsx` is the native counterpart and `checkbox-base.ts` holds
+ * the contract they share.
+ *
+ * It used to be compiled from the native `Pressable`, which made it a `<button role="checkbox">`
+ * with a required `aria-label` and nothing else — no `name`, no `value`, no `required`, nothing a
+ * `<form>` submit could see, and no uncontrolled use. This file installs over a DOM app's shadcn
+ * checkbox at `components/ui/checkbox.tsx`, so it takes radix's `Checkbox.Root` props whole, as
+ * shadcn's does: radix renders the hidden `<input>` a native form submit reads, and a
+ * `<Label htmlFor={id}>` names it.
+ */
+
 import { Checkbox as CheckboxPrimitive } from 'radix-ui';
 import type { ComponentPropsWithRef } from 'react';
 import { CHECKBOX_CLASS } from '@/components/ui/checkbox-base';

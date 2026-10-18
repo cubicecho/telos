@@ -1,3 +1,21 @@
+/**
+ * A pill in a segmented control — a row of mutually exclusive options.
+ *
+ * Ships a component *and* two class helpers, which is unusual and deliberate.
+ * The same pill is often a router link rather than a button (a nav bar is a
+ * segmented control whose items navigate), and a link is a host component the
+ * app owns — expo-router's `<Link>`, react-router's `<NavLink>`. Those cannot
+ * take a `Pressable` wrapper without losing the router's press handling, so
+ * they take the class instead and render their own element.
+ *
+ * `SegmentedGroup` is the row they sit in: the frame, the `role="group"` and its
+ * name, and optionally the current value, so each pill can say `value="week"`
+ * instead of `active={view === "week"}`.
+ *
+ * A pill takes an `iconSlot`, drawn before its label and sized and coloured by the
+ * pill, and the group can drop the labels of such pills under a width or at
+ * every width (`labelHideBelow`), leaving the label as the pill's name.
+ */
 import type { ReactNode } from 'react';
 import * as React from 'react';
 import { Platform, Pressable, Text, View } from 'react-native';

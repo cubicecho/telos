@@ -1,3 +1,18 @@
+/**
+ * The icon set, native implementation. `icons.web.tsx` is its web counterpart and
+ * `icons-base.ts` holds what they share.
+ *
+ * Each icon is imported from `lucide-react-native/icons/<name>`, because Metro does not tree-shake
+ * the package barrel. `cssInterop` teaches each one `className`, and its colour is resolved
+ * eagerly since a device has no `currentColor`: `text-foreground`, then `IconClassContext`, then
+ * the call site's own `text-*`.
+ *
+ * A glyph an app needs and this set lacks is wrapped in the app with the exported `icon`, since
+ * the next `shadcn add` overwrites this file. A name added here goes in both files: TypeScript
+ * resolves only the native one, and `npm run registry:check` is what catches a name on one
+ * platform only. Names are lucide's canonical ones, not its deprecated aliases.
+ */
+
 import type { LucideIcon, LucideProps } from 'lucide-react-native';
 import ArrowDownWideNarrowSource from 'lucide-react-native/icons/arrow-down-wide-narrow';
 import ArrowLeftSource from 'lucide-react-native/icons/arrow-left';

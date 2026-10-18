@@ -1,3 +1,15 @@
+/**
+ * The native calendar: month grids built from date-fns.
+ *
+ * Written out rather than pulling in a native calendar library: the surface is
+ * month navigation, single and range selection, and disabled days, and a calendar
+ * library brings its own theming system that would sit outside the tailwind tokens
+ * every other primitive follows.
+ *
+ * `calendar.web.tsx` is react-day-picker; `calendar-base.ts` holds the contract.
+ * The matcher evaluation here is this file's own, because react-day-picker's lives
+ * inside react-day-picker.
+ */
 import {
   addMonths,
   eachDayOfInterval,

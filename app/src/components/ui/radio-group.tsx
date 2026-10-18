@@ -1,3 +1,13 @@
+/**
+ * A radio group built from `Pressable`s, in three presentations: `row` (circle, label and
+ * description), `card` (a bordered tile, icon over label) and `segmented` (an input-height frame
+ * of equal segments).
+ *
+ * The group is one tab stop, on the checked option or the first enabled one. Arrow keys, Home and
+ * End move focus and select, in document order, wrapping unless `loop={false}`. The keyboard is
+ * web-only, so a screen reader on device keeps its own focus order. `RadioGroupItem` with no
+ * `label` is the bare circle, for a caller that pairs it with its own `<Label htmlFor>`.
+ */
 import type { ReactNode } from 'react';
 import * as React from 'react';
 import { Platform, Pressable, Text, View } from 'react-native';

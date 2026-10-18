@@ -1,3 +1,8 @@
+/**
+ * A whole page — written once here and compiled for the web by `scripts/rn2web`. It is two other
+ * components of this set composed, so it has nothing of its own to translate: the platform
+ * differences all live in the chassis and the header.
+ */
 import type { ReactNode } from 'react';
 
 import { HeaderContentFooter, type HeaderContentFooterProps } from '@/components/header-content-footer';

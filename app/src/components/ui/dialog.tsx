@@ -1,3 +1,17 @@
+/**
+ * The native dialog: a transparent `Modal` with a dimmed backdrop and a centred
+ * card, matching what radix renders on web closely enough that no call site
+ * needs to branch.
+ *
+ * What does not carry over from radix, and is not faked here: the focus trap
+ * and the scroll lock (a `Modal` already owns the screen) and the enter/exit
+ * animations beyond the `fade` the `Modal` does itself. `Escape` becomes
+ * `onRequestClose`, which is the Android back button.
+ *
+ * `open === false` renders nothing at all, so a dialog's body unmounts between
+ * openings exactly as it does on web.
+ */
+
 import {
   Children,
   cloneElement,

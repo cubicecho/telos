@@ -1,3 +1,20 @@
+/**
+ * The web search box — see `search-input.tsx` for what it is and why, and `search-input-base.ts`
+ * for what the halves share.
+ *
+ * It takes what the web `Input` takes, so both change handlers work: `onChangeText` hands over the
+ * text, as on native, and `onChange` the DOM event, as on a shadcn input. The ✕ has to reach both,
+ * and it has no event to hand `onChange`, so it makes one: it writes the empty value through the
+ * element's own setter and dispatches `input`, which React reads as the user clearing the box and
+ * `Input` turns into both calls. That also clears an uncontrolled box, which is why this half never
+ * holds the text — only whether there is any, for the ✕.
+ *
+ * The ✕ is a plain `<button>` wearing `buttonVariants`, not `Button`, for the reason
+ * `file-picker.web.tsx` gives: this file is also what an Expo web app runs, where `Button` is a
+ * `Pressable` that takes `onPress`, while the compiled one takes `onClick`. A `<button>` is the same
+ * element in both. For the same reason the body touches only what both `Input` halves type —
+ * `onChange` passes through untouched rather than being read here.
+ */
 import { useCallback, useRef, useState } from 'react';
 import { buttonVariants } from '@/components/ui/button';
 import { Search, X } from '@/components/ui/icons';

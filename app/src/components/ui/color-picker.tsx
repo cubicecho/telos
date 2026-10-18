@@ -1,3 +1,16 @@
+/**
+ * Swatches plus a hex field, replacing `<input type="color">`.
+ *
+ * The DOM colour input has no native counterpart — react-native-web renders it
+ * as a plain text box and a `TextInput` cannot open a picker — so an app with
+ * both targets ends up with two different colour controls. This is the one that
+ * works on both: the swatch row is what a native sheet would offer anyway, and
+ * the hex field is still the way to enter a colour that is not on the list.
+ *
+ * ```tsx
+ * <ColorPicker value={color} onValueChange={setColor} swatches={ACTIVITY_COLORS} clearable />
+ * ```
+ */
 import { useId, useState } from 'react';
 import { Platform, Pressable, Text, View } from 'react-native';
 import { Button } from '@/components/ui/button';

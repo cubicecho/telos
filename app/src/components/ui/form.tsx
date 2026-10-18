@@ -1,3 +1,15 @@
+/**
+ * Bound form fields: the glue between TanStack Form and this registry's inputs. Each one reads
+ * its state from form context, so the label, control and error wiring is done once here.
+ * `ui/field` is the unbound chrome underneath, for a control this file does not cover.
+ *
+ * `FieldRow` stands in for a grid, which Yoga does not have. `NumberField` keeps what is typed as
+ * a draft, because a `TextInput` redrawn from the stored number loses a decimal point as it is
+ * typed. `SubmitButton` calls `handleSubmit()`, because a `Pressable` is not a submit control. The
+ * date and colour fields are items of their own, and `createAppForm` puts them on `field.*` beside
+ * these.
+ */
+
 import { Slot } from '@radix-ui/react-slot';
 import type { DeepKeys } from '@tanstack/react-form';
 import { createFormHook, createFormHookContexts, useStore } from '@tanstack/react-form';

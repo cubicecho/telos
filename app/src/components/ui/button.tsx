@@ -1,3 +1,19 @@
+/**
+ * One button for both platforms, built on `Pressable`, and the file every other converted
+ * primitive is modelled on.
+ *
+ * It takes no `children`: the inside is `iconSlot`, `content` and `trailingSlot`, which is what
+ * lets `loading` swap the icon for a spinner. A string `content` is wrapped in a `Text`, because
+ * text colour is not inherited on native. There is no `asChild`; a button that navigates takes
+ * the link as `linkSlot`. The compiled web half is a real `<button>` with the rest of its props,
+ * and its sizes and variants are a superset of shadcn's.
+ *
+ * An `icon*` size has to be given an `aria-label`. A `hint` is the button's tooltip, the only
+ * one it draws, and is read after the name: on the web from an always-mounted `sr-only` text
+ * the button points at, because Radix unmounts a closed tooltip, and on device as the
+ * accessibility hint. With a `hint`, `disabled` is `aria-disabled`, so the reason can be reached.
+ */
+
 import { Slot } from '@radix-ui/react-slot';
 import { cva, type VariantProps } from 'class-variance-authority';
 import * as React from 'react';

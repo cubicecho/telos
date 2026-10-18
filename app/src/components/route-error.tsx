@@ -1,3 +1,24 @@
+/**
+ * What shows when the tree below a route has thrown.
+ *
+ * Deliberately dependency-free beyond `ui/`: it must not rely on the data
+ * client, the router, or theme state, since any of those could be what failed.
+ *
+ * It is the whole screen and says everything an error boundary needs said, so
+ * the boundary renders it and nothing around it: the root is `role="alert"`,
+ * the raw message for a bug report is `details`, and a second way out (a
+ * reload, a restart) is `actionsSlot`.
+ *
+ * ```tsx
+ * <RouteError
+ *   error={error}
+ *   reset={retry}
+ *   describe={describeError}
+ *   details
+ *   actionsSlot={<Button variant="outline" size="sm" onPress={reload} content="Reload" />}
+ * />
+ * ```
+ */
 import type { ReactNode } from 'react';
 import { Platform, Text, View } from 'react-native';
 import { Button } from '@/components/ui/button';

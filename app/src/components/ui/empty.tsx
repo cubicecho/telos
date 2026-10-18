@@ -1,3 +1,13 @@
+/**
+ * shadcn's `Empty` parts on both platforms, under shadcn's names and nesting, so a DOM call site
+ * ports unchanged. The drawing is `EmptyState`'s, which is built on these parts, so the compound
+ * form and `<EmptyState />` give one empty state; pass a `className` for shadcn's look.
+ *
+ * `EmptyTitle` and `EmptyDescription` are `Text`, so a bare string inside them is safe on device.
+ * The title is plain text: pass `role="heading"` and an `aria-level` when the empty state is the
+ * screen. The icon bubble publishes its ink and size through `IconClassContext`.
+ */
+
 import * as React from 'react';
 import { Text, View } from 'react-native';
 import { IconClassContext } from '@/components/ui/icons-base';

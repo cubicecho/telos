@@ -1,3 +1,18 @@
+/**
+ * A description folded behind a small button: what `descriptionPlacement="popover"` draws on the
+ * bound fields, `CardLayout`, `Section` and `SettingRow`, written once so the four agree.
+ *
+ * A description that came from a schema is a paragraph, and a paragraph under every field, card
+ * and row is a page nobody reads. It is still the best answer to "what is this?", so it goes one
+ * press away instead of being deleted. Written by hand at a call site this goes wrong the same
+ * three ways each time: the button lands inside the label's `Text`, the name "About …" is built
+ * from a label that had to be narrowed to a string first, and the control stops being described
+ * because the text left the page with the popover.
+ *
+ * Two parts, because they sit in different places: `DescriptionHint` is the button and its pane,
+ * beside the title; `DescriptionHintText` is the copy assistive technology reads, wherever the
+ * inline description would have been.
+ */
 import type { ReactNode } from 'react';
 import { Platform, Text } from 'react-native';
 import { Button } from '@/components/ui/button';

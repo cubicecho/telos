@@ -1,3 +1,15 @@
+/**
+ * The native popover: a transparent `Modal` with a dimmed backdrop and a
+ * centred card.
+ *
+ * It is deliberately *not* anchored to its trigger. Anchoring means measuring
+ * the trigger and flipping the card against the viewport, which is a chunk of
+ * layout code to reproduce a hover-era affordance — on a phone a centred sheet
+ * is the native idiom anyway. `align` is accepted and ignored, and the same
+ * backdrop-as-sibling rule as `dialog.tsx` applies (a `Pressable` has no
+ * `stopPropagation`, so the card must not be nested inside it).
+ */
+
 import { cloneElement, createContext, isValidElement, type ReactElement, useContext, useState } from 'react';
 import { Modal, Pressable, Text, View } from 'react-native';
 import type {

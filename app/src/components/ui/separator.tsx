@@ -1,3 +1,12 @@
+/**
+ * A one-pixel rule between groups: shadcn's `Separator`, on both halves. It is `decorative` by
+ * default and hidden from assistive tech; `decorative={false}` makes it a `role="separator"`, for
+ * a rule that is the only thing marking a boundary.
+ *
+ * The size is a plain class per orientation, because react-native-web does not forward the
+ * `data-orientation` a variant would match. Vertical is `self-stretch` on device rather than
+ * `h-full`: a percentage of a row whose height is its content is zero in Yoga.
+ */
 import type * as React from 'react';
 import { Platform, View } from 'react-native';
 import { cn } from '@/lib/utils';

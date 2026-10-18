@@ -1,3 +1,22 @@
+/**
+ * A search box: `Input` with a `Search` icon at its start, `type="search"`, a name, and a ✕ that
+ * clears it. `search-input.web.tsx` is the web counterpart and `search-input-base.ts` holds what
+ * they share.
+ *
+ * Thirteen search boxes across eight projects are this written by hand — a `relative` wrapper, an
+ * absolute glyph, a `pl-8` — and most of them have no accessible name beyond a placeholder and no
+ * way to clear but backspace. This is those, with the three details in the box:
+ *
+ * - **It is a search field.** `type="search"` raises the search keyboard on device and, through
+ *   `Input`, is `role="searchbox"`, so a screen reader says what the box is for.
+ * - **It is named.** `label`, default "Search", unless something else already names it.
+ * - **The ✕ shows only with text in the box,** is a named button, and puts focus back in the
+ *   field, so clearing and typing again is one motion.
+ *
+ * The text is `onChangeText`, as on every native input. The box keeps its own copy only when the
+ * caller does not hold `value`, which is what lets the ✕ clear an uncontrolled box and still know
+ * when to show itself.
+ */
 import { useImperativeHandle, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Search, X } from '@/components/ui/icons';

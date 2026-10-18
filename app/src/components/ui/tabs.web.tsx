@@ -1,3 +1,11 @@
+/**
+ * The web tabs: radix. `tabs.tsx` is the native counterpart and `tabs-base.ts`
+ * holds the contract they share.
+ *
+ * Every part also takes the props of the radix part it renders, as shadcn's
+ * `tabs` does, so a DOM call site ports unchanged.
+ */
+
 import { Tabs as TabsPrimitive } from 'radix-ui';
 import * as React from 'react';
 import { useEffect, useRef } from 'react';

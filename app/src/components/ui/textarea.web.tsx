@@ -1,3 +1,22 @@
+/**
+ * The web implementation — see `textarea.tsx` for why this one is split, and
+ * `textarea-base.ts` for the contract both sides implement.
+ *
+ * It is hand-written rather than compiled because nothing `TextInput` does here
+ * survives a rename table: `editable={!disabled}` inverts, `onChangeText(text)`
+ * and `onChange(event)` are different signatures, and the element itself depends
+ * on the value of `multiline`. Each of those is the compiler guessing at
+ * semantics the source never stated, which is the one thing it is built not to
+ * do — so it refuses, and this file is the answer it asks for.
+ *
+ * **It is also shadcn's `Textarea`.** It installs over a DOM app's own
+ * `components/ui/textarea.tsx`, so it takes everything a `<textarea>` does —
+ * `onChange(event)` beside `onChangeText`, `name`, `defaultValue`, the key and
+ * focus handlers, a `ref` to the element — and a `value` left out is left
+ * uncontrolled, as it is on the DOM. (The native half holds a missing value at
+ * `""`; a bound field passes one either way.)
+ */
+
 import { type ComponentPropsWithoutRef, type KeyboardEventHandler, type Ref, useLayoutEffect, useRef } from 'react';
 import {
   fitRows,

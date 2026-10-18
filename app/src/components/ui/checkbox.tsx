@@ -1,3 +1,12 @@
+/**
+ * The native checkbox, built from a `Pressable`. `checkbox.web.tsx` is radix's, and
+ * `checkbox-base.ts` holds the contract they share.
+ *
+ * `role="checkbox"` plus `aria-checked` is what makes it a real checkbox to a
+ * screen reader; the role and `aria-checked` below are the part that actually
+ * matters, and they cost nothing.
+ */
+
 import { useState } from 'react';
 import { Pressable } from 'react-native';
 import { CHECKBOX_CLASS, type CheckboxProps } from '@/components/ui/checkbox-base';

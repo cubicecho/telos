@@ -1,3 +1,16 @@
+/**
+ * The page shell every route wraps its content in — see `ui/button.tsx` for the
+ * conversion rules.
+ *
+ * `scroll` picks the container: a `ScrollView` scrolls on both platforms, where
+ * `overflow-y-auto` on a `View` only ever worked on web. The padding therefore
+ * moves to `contentContainerClassName`, since padding on a `ScrollView` itself
+ * is applied to the clipping box and not to the scrolled content.
+ *
+ * `container mx-auto` stays in the class list even though nativewind resolves it
+ * to nothing on device: the breakpoint max-widths it carries are what keeps the
+ * web layout centred, and a phone is narrower than the first breakpoint anyway.
+ */
 import { Children, Fragment, isValidElement, type ReactElement } from 'react';
 import { ScrollView, View } from 'react-native';
 import { EmptyState, type EmptyStateProps } from '@/components/empty-state';

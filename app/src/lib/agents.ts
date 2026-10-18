@@ -16,13 +16,15 @@ export type Discovery = 'inherit' | 'on' | 'off';
 /** The settings an agent and the account's defaults share. */
 export interface LayerDraft {
   baseUrl: string;
-  model: string;
+  /** Null as well as blank: the model picker's blank row writes null. */
+  model: string | null;
   temperature: string;
   maxTokens: string;
   contextLength: string;
   maxToolIterations: string;
   toolDiscovery: Discovery;
-  toolSelectModel: string;
+  /** Null as well as blank, as `model` is. */
+  toolSelectModel: string | null;
   /** 'inherit', or a level as agent-core takes it, "off" among them. */
   reasoningEffort: string;
   requestTimeoutSeconds: string;
@@ -100,7 +102,7 @@ export function toAgentDraft(agent: AgentFieldsFragment | null | undefined): Age
   };
 }
 
-const orNull = (value: string) => (value.trim() === '' ? null : value.trim());
+const orNull = (value: string | null) => (value === null || value.trim() === '' ? null : value.trim());
 const numberOrNull = (value: string) => (value.trim() === '' ? null : Number(value));
 
 /** A layer's draft as what is stored: every field stated, blank as null. */
@@ -183,11 +185,11 @@ export function layerHints(inherited: Inherited | null | undefined, from: 'defau
  * @param inherited - What a blank resolves to, or nothing while it loads.
  * @returns A warning, or null when it has both or the defaults are not in yet.
  */
-export function missingSetup(own: { baseUrl: string; model: string }, inherited: Inherited | null | undefined) {
+export function missingSetup(own: { baseUrl: string; model: string | null }, inherited: Inherited | null | undefined) {
   if (!inherited) return null;
   const missing = [
     own.baseUrl.trim() || inherited.baseUrl ? null : 'endpoint',
-    own.model.trim() || inherited.model ? null : 'model',
+    own.model?.trim() || inherited.model ? null : 'model',
   ].filter(Boolean);
   if (missing.length === 0) return null;
   return `No ${missing.join(' and no ')}: give it one here, or set one in Agent defaults. Until then it cannot run.`;

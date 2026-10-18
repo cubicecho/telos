@@ -66,8 +66,9 @@ describe('TodoSearch', () => {
     expect(await screen.findByText('Grout the tile')).toBeInTheDocument();
     expect(screen.getAllByText('Kitchen · To do')).toHaveLength(2);
 
-    fireEvent.keyDown(window, { key: 'ArrowDown' });
-    expect(screen.getByRole('menuitem', { name: /Grout the tile/ })).toHaveAttribute('aria-selected', 'true');
+    // The first row is highlighted as the list arrives; the arrow moves on to the second.
+    await user.type(field, '{ArrowDown}');
+    expect(screen.getByRole('option', { name: /Grout the tile/ })).toHaveAttribute('aria-selected', 'true');
     await user.type(field, '{Enter}');
     await vi.waitFor(() => expect(push).toHaveBeenCalledWith('/projects/p1'));
     expect(screen.queryByLabelText('Search todos')).not.toBeInTheDocument();

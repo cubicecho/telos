@@ -1,3 +1,24 @@
+/**
+ * The native implementation. `input.web.tsx` is its web counterpart, and
+ * `input-base.ts` holds the contract they share.
+ *
+ * This is the plainest primitive that genuinely needs the split:
+ * `type="time"` and `type="number"` (with `min`/`max`) are real DOM input
+ * behaviour that `TextInput` cannot reproduce, and react-native-web offers no
+ * way to reach them. Because both files export the
+ * same `InputProps`, call sites never branch — the only rules are that they
+ * speak `onChangeText` rather than `onChange`, and reach the element through
+ * `InputHandle` rather than an `HTMLInputElement` ref. (The web half takes both
+ * of those as well, as shadcn's `Input` does; shared code should not.)
+ *
+ * `leadingSlot` and `trailingSlot` put an icon, or an icon-sized button, inside the
+ * field. Without either, the root is the `TextInput` and nothing else, so no
+ * existing call site gains a view. With one, the field sits in a `relative`
+ * box and each slot is positioned over it, drawn after the `TextInput` so it
+ * paints on top; the icon's size and ink come through `IconClassContext`,
+ * because an icon on device inherits nothing from the view around it.
+ */
+
 import { useId, useImperativeHandle, useRef, useState } from 'react';
 import { Platform, Pressable, Text, TextInput, View } from 'react-native';
 import { IconClassContext } from '@/components/ui/icons-base';
