@@ -11,7 +11,7 @@ import { Section } from '@/components/section';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
-import { Pencil, Plug, Plus, Trash2, X } from '@/components/ui/icons';
+import { FileText, Pencil, Plug, Plus, Trash2, X } from '@/components/ui/icons';
 import { LoadState } from '@/components/ui/load-failure';
 import { Switch } from '@/components/ui/switch';
 import { readServerSlugs } from '@/lib/agents';
@@ -38,6 +38,7 @@ import {
   toServerDraft,
 } from '@/lib/mcp-servers';
 import { CARD_TITLE } from '@/lib/styles';
+import { McpJsonPasteDialog } from './mcp-json-paste-dialog';
 
 type ServerRow = McpServerFieldsFragment;
 
@@ -60,6 +61,7 @@ export function McpServerManager() {
   const agentsQuery = useQuery(AgentsDocument);
   const [editing, setEditing] = useState<ServerRow | 'new' | null>(null);
   const [keying, setKeying] = useState<string | null>(null);
+  const [pasting, setPasting] = useState(false);
   const [deleteServer] = useMutation(DeleteMcpServerDocument, { refetchQueries: [McpServersDocument] });
   const [updateServer] = useMutation(UpdateMcpServerDocument);
   const [error, setError] = useState<string | null>(null);
@@ -88,13 +90,22 @@ export function McpServerManager() {
       title="MCP servers"
       description="Tool servers your agents can reach. Kept once here; each agent says which it uses."
       actionSlot={
-        <Button
-          variant="positive"
-          size="sm"
-          onPress={() => setEditing('new')}
-          iconSlot={<Plus className="h-4 w-4" />}
-          content="New server"
-        />
+        <>
+          <Button
+            variant="outline"
+            size="sm"
+            onPress={() => setPasting(true)}
+            iconSlot={<FileText className="h-4 w-4" />}
+            content="Paste .mcp.json"
+          />
+          <Button
+            variant="positive"
+            size="sm"
+            onPress={() => setEditing('new')}
+            iconSlot={<Plus className="h-4 w-4" />}
+            content="New server"
+          />
+        </>
       }
       contentSlot={
         <View className="gap-4">
@@ -179,6 +190,14 @@ export function McpServerManager() {
               onOpenChange={(open) => !open && setEditing(null)}
               server={editing === 'new' ? null : editing}
               taken={servers.filter((server) => editing === 'new' || server.id !== editing.id).map((row) => row.slug)}
+            />
+          ) : null}
+
+          {pasting ? (
+            <McpJsonPasteDialog
+              open
+              onOpenChange={(open) => !open && setPasting(false)}
+              taken={servers.map((server) => server.slug)}
             />
           ) : null}
 
