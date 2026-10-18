@@ -102,7 +102,7 @@ const LANE_AGENTS = {
   result: {
     data: {
       lanes: [laneAgent('l1', null), laneAgent('l2', 'a1')],
-      agents: [{ __typename: 'Agent', id: 'a1', name: 'Reviewer' }],
+      agents: [{ __typename: 'Agent', id: 'a1', name: 'Reviewer', model: null }],
     },
   },
 };
@@ -174,7 +174,7 @@ describe('Board lane agents', () => {
           result: {
             data: {
               lanes: [laneAgent('l1', null), laneAgent('l2', 'a1')],
-              agents: [{ __typename: 'Agent', id: 'a1', name: 'Reviewer' }],
+              agents: [{ __typename: 'Agent', id: 'a1', name: 'Reviewer', model: null }],
             },
           },
         },

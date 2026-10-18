@@ -561,6 +561,7 @@ export const ProjectLaneAgentsDocument = graphql(`
     agents(orderBy: { name: { direction: asc, priority: 1 } }) {
       id
       name
+      model
     }
   }
 `);
