@@ -43,7 +43,7 @@ describe("a server's test", () => {
     let waited: number | undefined;
     const dial = (async (_config, _client, options) => {
       waited = options?.timeoutMs;
-      return { ok: true, tools: [], error: '', instructions: '' };
+      return { ok: true, tools: [], toolsFingerprint: '', error: '', instructions: '' };
     }) as typeof probe;
     await testServer({ id: 'p', server: JSON.stringify(row) }, true, dial);
     return waited;

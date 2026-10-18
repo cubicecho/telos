@@ -14,7 +14,7 @@
   "dependencies": {
     "@better-auth/api-key": "^1.7.6",
     "@cubicecho/graphql-better-auth": "^1.1.0",
-    "@cubicecho/graphql-mcp": "^2.10.0",
+    "@cubicecho/graphql-mcp": "^3.0.0",
     "@telos/db": "*",
     "@telos/runner": "*",
     "@vantreeseba/drizzle-graphql": "^13.0.0",
