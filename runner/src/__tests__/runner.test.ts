@@ -14,6 +14,7 @@ import { createTestDb, hostFor, schemaFor, type TestDb } from '../../../server/s
 // a real telos up for it to talk to.
 import { toHeaders } from '../../../server/src/auth.ts';
 import { mountMcp } from '../../../server/src/mcp.ts';
+import { createRateLimiter } from '../../../server/src/rate-limit.ts';
 import { createContextFactory } from '../../../server/src/request-context.ts';
 import { startRunner } from '../embed.ts';
 import { type LoopOptions, tick } from '../loop.ts';
@@ -109,7 +110,7 @@ async function listen(handler: (req: IncomingMessage, res: ServerResponse) => vo
 async function serveTelos(): Promise<string> {
   const app = express();
   const { schema } = schemaFor(db, true);
-  const contextFor = createContextFactory(db, hostFor(db), { ai: true, runnerKey: RUNNER_KEY });
+  const contextFor = createContextFactory(db, hostFor(db), createRateLimiter(), { ai: true, runnerKey: RUNNER_KEY });
   app.post('/graphql', express.json(), async (req, res) => {
     const result = await graphql({
       schema,

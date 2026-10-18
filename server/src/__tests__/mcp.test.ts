@@ -10,6 +10,7 @@ import { mintApiKey } from '../auth.ts';
 import type { Actor } from '../context.ts';
 import { DOOR_TOOLS } from '../door.ts';
 import { mountMcp } from '../mcp.ts';
+import { createRateLimiter } from '../rate-limit.ts';
 import { createContextFactory } from '../request-context.ts';
 import { AI_MUTATIONS } from '../resolvers/actor-lock.ts';
 import { RUN_REACH_EXEMPT, RUN_REACH_MUTATIONS } from '../resolvers/run-reach.ts';
@@ -91,7 +92,7 @@ async function serve(ai = true): Promise<URL> {
     ai,
     db,
     schema,
-    contextFor: createContextFactory(db, hostFor(db), { ai }),
+    contextFor: createContextFactory(db, hostFor(db), createRateLimiter(), { ai }),
     version: '0',
   });
   closeMcp = handler ? () => handler.close() : null;

@@ -2,6 +2,10 @@ import type { DB } from '@telos/db';
 import type { Auth } from './auth.ts';
 import type { AuthHost } from './auth-host.ts';
 import type { Loaders } from './loaders.ts';
+import type { RateLimiter } from './rate-limit.ts';
+
+/** What `Context.ip` holds when the socket reports no address. One shared budget, not none. */
+export const UNKNOWN_IP = 'unknown';
 
 /**
  * Who is asking.
@@ -50,6 +54,10 @@ export interface Context {
   loaders: Loaders;
   /** The request's headers, for calls to `auth.api` that read the session from them. */
   headers: Headers;
+  /** The client's address as Express resolved it under `TRUST_PROXY`, for the sign-in throttle. Never an identity. */
+  ip: string;
+  /** Sign-in throttle; the sign-in operations call it first (throttle.ts). */
+  limiter: RateLimiter;
 }
 
 /**

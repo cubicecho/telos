@@ -2,6 +2,8 @@ import type { DB } from '@telos/db';
 import { extendSchema, GraphQLError, type GraphQLSchema, parse } from 'graphql';
 import type { QueryResolvers } from '../../__generated__/resolvers.ts';
 import { attachResolvers } from '../attach-resolvers.ts';
+import { sendsMagicLinks } from '../auth.ts';
+import { secureLocalNet } from '../config.ts';
 import type { Context } from '../context.ts';
 import { forbidden } from '../errors.ts';
 import { instanceAiOn } from '../instance.ts';
@@ -14,6 +16,10 @@ import { SSO_START_PATH } from '../routes/sso.ts';
 const AUTH_SDL = parse(`
   "What this instance offers, readable before signing in."
   type AuthConfig {
+    "Any email address signs in at once, with no link (SECURE_LOCAL_NET). Private networks only."
+    secureLocalNet: Boolean!
+    "Whether the instance can email sign-in links (SMTP_URL is set)."
+    magicLink: Boolean!
     "Whether AI is on for the instance: offered, and switched on by an admin. Off, the app shows no AI surface."
     ai: Boolean!
     "Whether the server offers AI at all (AI_ENABLED is not false), so an admin has a switch to flip."
@@ -26,7 +32,7 @@ const AUTH_SDL = parse(`
   type SsoProvider {
     "What the button calls it (OIDC_NAME, or the name in the setup URL)."
     name: String!
-    "Where the button sends the browser, on the API's origin."
+    "Where the button sends the browser, on the API's origin. A path, not a URL: the app prefixes the API's address, which in development it works out from the page's own host."
     signInPath: String!
   }
 
@@ -69,14 +75,29 @@ export async function ssoProvider(db: DB) {
   return config ? { name: config.name, signInPath: SSO_START_PATH } : null;
 }
 
+/**
+ * What the instance offers, as `authConfig` answers it.
+ *
+ * @param context - The request, for its auth instance and database.
+ * @param ai - Whether AI is on for the instance, as the caller has worked it out.
+ * @param aiAvailable - Whether the server offers AI at all.
+ * @returns The `AuthConfig`.
+ */
+export async function authConfigFor(context: Context, ai: boolean, aiAvailable: boolean) {
+  return {
+    secureLocalNet: secureLocalNet(),
+    magicLink: sendsMagicLinks(context.auth),
+    ai,
+    aiAvailable,
+    sso: await ssoProvider(context.db),
+  };
+}
+
 export function applyAuthExtension(schema: GraphQLSchema, options: { ai: boolean }): GraphQLSchema {
   const extendedSchema = extendSchema(schema, AUTH_SDL);
   const queries: QueryResolvers = {};
-  queries.authConfig = async (_parent, _args, context) => ({
-    ai: options.ai && (await instanceAiOn(context.db)),
-    aiAvailable: options.ai,
-    sso: await ssoProvider(context.db),
-  });
+  queries.authConfig = async (_parent, _args, context) =>
+    authConfigFor(context, options.ai && (await instanceAiOn(context.db)), options.ai);
 
   return attachResolvers(extendedSchema, { Query: queries });
 }

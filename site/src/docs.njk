@@ -38,11 +38,14 @@ description: Configuration, the AI switches, agents, lanes and runs, the MCP doo
         </thead>
         <tbody>
           <tr><td><code>DATABASE_URL</code></td><td>—</td><td><strong>Required.</strong> Postgres connection string. There is no embedded fallback.</td></tr>
-          <tr><td><code>AUTH_SECRET</code></td><td>—</td><td><strong>Required in production.</strong> Signs sessions. <code>openssl rand -hex 32</code>.</td></tr>
-          <tr><td><code>APP_URL</code></td><td><code>http://localhost:3001</code></td><td>Public URL. Magic links, and each todo's and project's link back, are built from it.</td></tr>
+          <tr><td><code>BETTER_AUTH_SECRET</code></td><td>—</td><td><strong>Required in production.</strong> Signs sessions. At least 32 characters: <code>openssl rand -hex 32</code>.</td></tr>
+          <tr><td><code>APP_URL</code></td><td><code>http://localhost:3001</code></td><td>Public URL. Sign-in links, and each todo's and project's link back, are built from it.</td></tr>
+          <tr><td><code>SERVER_URL</code></td><td><code>APP_URL</code> in production</td><td>Where a browser reaches the server, for the OIDC sign-in's redirects. Only differs in development.</td></tr>
           <tr><td><code>PORT</code></td><td><code>3001</code></td><td>Port the server listens on.</td></tr>
-          <tr><td><code>AUTH_MAGIC_LINK</code></td><td><code>true</code></td><td>Set to <code>false</code> to sign in with an address alone, no link.</td></tr>
-          <tr><td><code>EXPOSE_MAGIC_LINK</code></td><td>dev only</td><td>Return the magic link in the API response so the login page can show it.</td></tr>
+          <tr><td><code>SMTP_URL</code></td><td>—</td><td>How sign-in links are emailed: a nodemailer connection URL. Unset, no links are sent.</td></tr>
+          <tr><td><code>SMTP_FROM</code></td><td><code>telos@&lt;APP_URL's host&gt;</code></td><td>The address sign-in email comes from.</td></tr>
+          <tr><td><code>SECURE_LOCAL_NET</code></td><td><code>false</code></td><td>Typing an address signs in, with no link. Private networks only; refused with a public <code>APP_URL</code>.</td></tr>
+          <tr><td><code>TRUST_PROXY</code></td><td><code>false</code></td><td>Reverse proxies in front (<code>1</code> behind one). Sign-in is throttled per client address.</td></tr>
           <tr><td><code>AI_ENABLED</code></td><td>—</td><td>Set to <code>false</code> to remove AI entirely. Otherwise an admin turns it on in Settings.</td></tr>
           <tr><td><code>RUNNER_CONCURRENCY</code></td><td><code>2</code></td><td>The most runs the runner works at once.</td></tr>
           <tr><td><code>RUNNER_POLL_SECONDS</code></td><td><code>5</code></td><td>How long the runner waits when nothing is ready.</td></tr>
@@ -52,9 +55,12 @@ description: Configuration, the AI switches, agents, lanes and runs, the MCP doo
       </table>
     </div>
     <p>
-      Telos ships no mail provider. With magic links on, the link is written to
-      the server log, and that is the delivery channel: pipe the log somewhere
-      you can read it.
+      Telos has no passwords: people sign in with a link emailed through
+      <code>SMTP_URL</code>, through an OpenID Connect provider, or with
+      <code>SECURE_LOCAL_NET</code> on a private network. Upgrading from 5.x,
+      <code>AUTH_SECRET</code> is now <code>BETTER_AUTH_SECRET</code> and
+      <code>AUTH_MAGIC_LINK=false</code> is now <code>SECURE_LOCAL_NET=true</code>;
+      the server refuses to start while an old name is set.
     </p>
 
     <h2 id="switches">AI switches</h2>
@@ -154,10 +160,9 @@ description: Configuration, the AI switches, agents, lanes and runs, the MCP doo
       for one on the public internet.
     </p>
     <ul>
-      <li><strong>Put it behind something.</strong> A reverse proxy with TLS, and, if the instance is yours alone, an allowlist, VPN, or auth in front of it. Per-IP rate limiting is the proxy's job.</li>
-      <li><strong>Never set <code>AUTH_MAGIC_LINK=false</code></strong> on a reachable instance. An email address becomes the whole credential.</li>
-      <li><strong>Never set <code>EXPOSE_MAGIC_LINK=true</code></strong> on a reachable instance. It hands the sign-in token to whoever asked.</li>
-      <li><strong>Set a real <code>AUTH_SECRET</code></strong> and keep it. The server refuses to boot in production without one.</li>
+      <li><strong>Put it behind something.</strong> A reverse proxy with TLS, and, if the instance is yours alone, an allowlist, VPN, or auth in front of it. Behind a proxy, set <code>TRUST_PROXY</code> so the sign-in throttle sees real client addresses.</li>
+      <li><strong>Never set <code>SECURE_LOCAL_NET</code></strong> on a reachable instance. An email address becomes the whole credential.</li>
+      <li><strong>Set a real <code>BETTER_AUTH_SECRET</code></strong> and keep it. The server refuses to boot in production without a strong one.</li>
       <li><strong>Mind what agents can reach.</strong> An agent's base URL and the MCP servers are fetched from the server's host, so keep it away from anything private and leave <code>RUNNER_ALLOW_STDIO</code> off on a shared instance.</li>
     </ul>
 

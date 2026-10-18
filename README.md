@@ -15,8 +15,8 @@ to projects and todos alike. That is the whole product.
   which means done. Drag a card there and it is ticked off; tick the box and the
   card moves. Everything the drag does, a menu does too.
 - **Labels** — one colour, one name, attachable to anything.
-- **Sign-in by magic link**, through an OpenID Connect provider such as
-  heautou, or with no link at all on a private instance.
+- **Sign-in by emailed link**, through an OpenID Connect provider such as
+  heautou, or with an address alone on a private network. Never a password.
 
 ## Quickstart
 
@@ -37,11 +37,15 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      AUTH_SECRET: ${AUTH_SECRET:?generate one with `openssl rand -hex 32`}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?generate one with `openssl rand -hex 32`}
       DATABASE_URL: postgres://telos:${POSTGRES_PASSWORD:?set a database password}@postgres:5432/telos
-      # The address you actually reach Telos at. Magic-link URLs are built from
+      # The address you actually reach Telos at. Sign-in links are built from
       # it, so a link to localhost is useless in an inbox.
       APP_URL: ${APP_URL:-http://localhost:3001}
+      # How sign-in links are emailed: a nodemailer URL. See "Signing in" below.
+      SMTP_URL: ${SMTP_URL:-}
+      # Or, on a network nothing hostile can reach, an address alone signs in.
+      SECURE_LOCAL_NET: ${SECURE_LOCAL_NET:-false}
       NODE_ENV: production
     ports:
       - "${PORT:-3001}:3001"
@@ -70,21 +74,28 @@ volumes:
 Generate the two secrets it refuses to start without, then bring it up:
 
 ```bash
-printf 'AUTH_SECRET=%s\nPOSTGRES_PASSWORD=%s\n' \
+printf 'BETTER_AUTH_SECRET=%s\nPOSTGRES_PASSWORD=%s\n' \
   "$(openssl rand -hex 32)" "$(openssl rand -hex 24)" > .env
+```
 
+Then give it a way to sign people in, one of:
+
+- **Email**: add `SMTP_URL=smtp://user:pass@mail.example.com:587` to `.env`,
+  and links are emailed.
+- **An OpenID Connect provider** such as heautou: nothing to add now. The login
+  page of a new instance has a **Set up sign-in** tab to paste the provider's
+  setup URL into ([below](#signing-in-with-an-oidc-provider)).
+- **Just trying it on this machine**: add `SECURE_LOCAL_NET=true`, and typing an
+  address signs you in. Never on a reachable instance.
+
+```bash
 docker compose up -d
 ```
 
 Telos is on <http://localhost:3001>. Migrations run at boot, so there is no
-setup step. Sign in with any email address — Telos ships no mail provider, so
-the magic link goes to the log, and that is the delivery channel:
+setup step. The first account to sign in runs the instance.
 
-```bash
-docker compose logs -f telos
-```
-
-Keep that `.env`. `AUTH_SECRET` is what sessions are signed with, and
+Keep that `.env`. `BETTER_AUTH_SECRET` is what sessions are signed with, and
 `POSTGRES_PASSWORD` is the database's own. Your data lives in the
 `telos_pgdata` volume, which survives `docker compose down`; upgrade with
 `docker compose pull && docker compose up -d`.
@@ -97,11 +108,14 @@ domain.
 | Variable | Default | Meaning |
 | --- | --- | --- |
 | `DATABASE_URL` | — | **Required.** Postgres connection string. There is no embedded fallback. |
-| `AUTH_SECRET` | — | **Required in production.** Signs sessions. `openssl rand -hex 32`. `JWT_SECRET`, its old name, is still read. |
-| `APP_URL` | `http://localhost:3001` | Public URL; magic links and each todo's and project's `url` (`/todos/<id>`, `/projects/<id>`, for other apps to link back) are built from it. |
+| `BETTER_AUTH_SECRET` | — | **Required in production.** Signs sessions. At least 32 characters: `openssl rand -hex 32`. |
+| `APP_URL` | `http://localhost:3001` | Public URL; sign-in links and each todo's and project's `url` (`/todos/<id>`, `/projects/<id>`, for other apps to link back) are built from it. |
+| `SERVER_URL` | `APP_URL` in production | Where a browser reaches the server, for the OIDC sign-in's start and callback. Only differs from `APP_URL` in development, where the app has a port of its own. |
 | `PORT` | `3001` | Port the server listens on. |
-| `AUTH_MAGIC_LINK` | `true` | Set to `false` to sign in with an address alone, no link. |
-| `EXPOSE_MAGIC_LINK` | dev only | Return the magic link in the API response so the login page can show it. |
+| `SMTP_URL` | — | How sign-in links are emailed: a nodemailer connection URL. Unset, no links are sent. |
+| `SMTP_FROM` | `telos@<APP_URL's host>` | The address sign-in email comes from. |
+| `SECURE_LOCAL_NET` | `false` | Typing an address signs in, with no link. Private networks only: the server refuses it when `APP_URL` is a public host, unless `I_KNOW_SECURE_LOCAL_NET_IS_PUBLIC=true`. |
+| `TRUST_PROXY` | `false` | How many reverse proxies sit in front (`1` behind one), or Express's `trust proxy` value. Sign-in is throttled per client address, which is only right when this is. |
 | `OIDC_ISSUER` | — | Sets the OpenID Connect provider, with `OIDC_CLIENT_ID`, instead of pairing one from the app (below). The issuer URL; for heautou it ends in `/oidc`. |
 | `OIDC_CLIENT_ID` | — | The client ID registered with the provider. |
 | `OIDC_CLIENT_SECRET` | — | The client's secret. Leave it unset for a public client. |
@@ -113,9 +127,19 @@ domain.
 | `RUNNER_ALLOW_STDIO` | `false` | Let the runner spawn MCP servers that are commands. |
 | `RUNNER_KEY` | made up at boot | Only for a second runner on another host (`runner/`, with `TELOS_URL`): set the same value on both. |
 
-Telos ships no mail provider. With magic links on, the link is written to the
-server log, and that is the delivery channel — pipe the log somewhere you can
-read, or run with `AUTH_MAGIC_LINK=false`.
+### Signing in
+
+Telos has no passwords. A person signs in with a link emailed through
+`SMTP_URL`, through an OpenID Connect provider, or, with `SECURE_LOCAL_NET`, by
+typing their address. The login page shows only what the instance offers, and
+the server warns at boot when it offers nothing. Sign-in is throttled, per
+address and per client address: five tries in a quarter hour.
+
+Upgrading from 5.x: `AUTH_SECRET` (or `JWT_SECRET`) is now `BETTER_AUTH_SECRET`,
+`AUTH_MAGIC_LINK=false` is now `SECURE_LOCAL_NET=true`, and links are no longer
+written to the log or returned by `EXPOSE_MAGIC_LINK`: set `SMTP_URL`, or pair
+a provider. The server refuses to start while an old name is set, and says
+which to use instead.
 
 ### Signing in with an OIDC provider
 
@@ -140,7 +164,8 @@ use the environment instead, which wins over a pairing and cannot be changed
 from the app:
 
 1. Register a client whose redirect URI is exactly
-   `<APP_URL>/api/auth/callback/oidc`.
+   `<SERVER_URL>/api/auth/callback/oidc` (which is `<APP_URL>/…` in
+   production). The server prints it at boot.
 2. Set `OIDC_ISSUER=https://<provider>/oidc`, `OIDC_CLIENT_ID`,
    `OIDC_CLIENT_SECRET` and, for the button, `OIDC_NAME`.
 3. Restart.
@@ -271,7 +296,7 @@ stay as written: the next agent may already have been told them. An edit
 reaches the runs that start after it and no run already under way.
 
 ```bash
-export AUTH_SECRET=$(openssl rand -hex 32)
+export BETTER_AUTH_SECRET=$(openssl rand -hex 32)
 docker compose up --build
 # then, signed in as the admin: Settings → AI → switch on the instance, then your account
 ```
@@ -302,17 +327,15 @@ That is the right default for an instance only you can reach, and the wrong one
 for an instance on the public internet. Before putting Telos on a domain:
 
 - **Put it behind something.** A reverse proxy with TLS, and — if the instance is
-  yours alone — an allowlist, VPN, or auth in front of it. Telos rate-limits
-  sign-in requests per address in process; per-IP limiting is the proxy's job,
-  because the proxy is the only thing that reliably knows the client's address.
-- **Never set `AUTH_MAGIC_LINK=false` on a reachable instance.** It makes an email
+  yours alone — an allowlist, VPN, or auth in front of it. Telos throttles
+  sign-in per address and per client address, in process. Behind a proxy, set
+  `TRUST_PROXY` to say so, or every visitor shares the proxy's budget.
+- **Never set `SECURE_LOCAL_NET` on a reachable instance.** It makes an email
   address the entire credential: anyone who can load the login page can sign in
-  as anyone.
-- **Never set `EXPOSE_MAGIC_LINK=true` on a reachable instance.** It hands the
-  sign-in token to whoever asked for it, which is the same thing by another route.
-- **Set a real `AUTH_SECRET`** and keep it. Leaking it lets anyone forge a
-  signed session cookie. The server refuses to boot in production while it is
-  unset or still the default.
+  as anyone. The server refuses it when `APP_URL` names a public host.
+- **Set a real `BETTER_AUTH_SECRET`** and keep it. Leaking it lets anyone forge a
+  session. The server refuses to boot in production while it is unset, shorter
+  than 32 characters, or a published default.
 
 ## Development
 
@@ -321,7 +344,9 @@ git clone https://github.com/cubicecho/telos.git
 cd telos
 
 cp .env.example .env
-sed -i "s/^AUTH_SECRET=.*/AUTH_SECRET=$(openssl rand -hex 32)/" .env
+sed -i "s/^BETTER_AUTH_SECRET=.*/BETTER_AUTH_SECRET=$(openssl rand -hex 32)/" .env
+# No mail server in development: an address alone signs in, on localhost only.
+echo 'SECURE_LOCAL_NET=true' >> .env
 
 npm install
 npm run db:up          # Postgres on 127.0.0.1:5435
@@ -354,7 +379,7 @@ pulling it and publishes Postgres on `127.0.0.1:5435` so you can point your own
 tooling at it:
 
 ```bash
-export AUTH_SECRET=$(openssl rand -hex 32)
+export BETTER_AUTH_SECRET=$(openssl rand -hex 32)
 docker compose up --build
 ```
 

@@ -7,12 +7,13 @@ import { drizzle } from 'drizzle-orm/pglite';
 import { migrate } from 'drizzle-orm/pglite/migrator';
 import { type ExecutionResult, graphql } from 'graphql';
 import { expect } from 'vitest';
-import { type Auth, createAuth } from '../auth.ts';
+import { type Auth, createAuth, type MagicLink } from '../auth.ts';
 import { type AuthHost, fixedAuthHost } from '../auth-host.ts';
 import { createSchema } from '../build-schema.ts';
 import type { Actor, Context } from '../context.ts';
 import { setInstanceAi } from '../instance.ts';
 import { createLoaders } from '../loaders.ts';
+import { createRateLimiter, type RateLimiter } from '../rate-limit.ts';
 
 // A throwaway in-memory Postgres per suite. `@telos/db` is deliberately never
 // imported here — it opens a real connection at import time — so the schema is
@@ -109,19 +110,45 @@ export interface ClientOptions {
   authHost?: AuthHost | undefined;
   /** The request's headers, for calls that hand them to better-auth (`Authorization: Bearer ...`). */
   headers?: Headers | undefined;
+  /** The sign-in throttle. Share one across clients to reach its budget; a fresh, default one otherwise. */
+  limiter?: RateLimiter | undefined;
+  /** The client's address the throttle keys on. Default: `TEST_IP`. */
+  ip?: string | undefined;
 }
+
+/** Signing secret for test auth instances: long enough for production's check. */
+export const TEST_SECRET = 'test-secret-0123456789abcdef0123456789';
+/** The address a client's requests come from unless a test says otherwise. */
+export const TEST_IP = '127.0.0.1';
 
 // One better-auth instance per database: it holds no state of its own, but
 // building one is not free and every client of a suite shares its database.
-const auths = new WeakMap<object, Auth>();
+// Its sign-in links are captured instead of sent, newest last.
+const auths = new WeakMap<object, { auth: Auth; links: MagicLink[] }>();
+
+function testAuth(db: TestDb): { auth: Auth; links: MagicLink[] } {
+  let built = auths.get(db);
+  if (!built) {
+    const links: MagicLink[] = [];
+    const auth = createAuth(db, {
+      secret: TEST_SECRET,
+      sendMagicLink: async (link) => {
+        links.push(link);
+      },
+    });
+    built = { auth, links };
+    auths.set(db, built);
+  }
+  return built;
+}
 
 export function authFor(db: TestDb): Auth {
-  let auth = auths.get(db);
-  if (!auth) {
-    auth = createAuth(db);
-    auths.set(db, auth);
-  }
-  return auth;
+  return testAuth(db).auth;
+}
+
+/** The sign-in links `authFor(db)` has sent, newest last. */
+export function linksFor(db: TestDb): MagicLink[] {
+  return testAuth(db).links;
 }
 
 /** A host that always hands out `authFor(db)`, for a context factory. */
@@ -171,6 +198,8 @@ export function createClient(db: TestDb, userId: string | null, options: ClientO
   const { schema } = schemaFor(db, options.ai ?? false);
   const authHost = options.authHost ?? fixedAuthHost(options.auth ?? authFor(db), null);
   const actor: Actor = options.actor ?? (userId ? { kind: 'user', userId } : { kind: 'anonymous', userId: null });
+  const limiter = options.limiter ?? createRateLimiter();
+  const ip = options.ip ?? TEST_IP;
 
   const run = async (query: string, variables?: Record<string, unknown>) => {
     const headers = options.headers ?? new Headers();
@@ -183,6 +212,8 @@ export function createClient(db: TestDb, userId: string | null, options: ClientO
       actor,
       loaders: createLoaders(db),
       headers,
+      ip,
+      limiter,
     };
     return graphql({ schema, source: query, contextValue, variableValues: variables });
   };

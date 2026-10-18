@@ -130,8 +130,10 @@ beforeEach(async () => {
   const app = express();
   telos = createServer(app);
   appUrl = await listen(telos);
-  // better-auth builds its callback URL from this, and routes/sso.ts the app's.
+  // One server is both the app and the API here, as in production: better-auth
+  // builds its callback URL from SERVER_URL, and routes/sso.ts the app's from APP_URL.
   process.env.APP_URL = appUrl;
+  process.env.SERVER_URL = appUrl;
   const oidc: OidcConfig = {
     issuer: provider.issuer,
     clientId: CLIENT_ID,

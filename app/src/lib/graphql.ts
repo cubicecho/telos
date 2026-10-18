@@ -1092,7 +1092,6 @@ export const SignInMagicLinkDocument = graphql(`
   mutation SignInMagicLink($email: String!) {
     signInMagicLink(email: $email) {
       status
-      magicLink
       token
       userId
     }
@@ -1107,10 +1106,12 @@ export const MagicLinkVerifyDocument = graphql(`
   }
 `);
 
-/** The OIDC provider the login page offers, if the instance has one. */
+/** The ways of signing in the login page offers: an emailed link, the address alone, or an OIDC provider. */
 export const SignInOptionsDocument = graphql(`
   query SignInOptions {
     authConfig {
+      secureLocalNet
+      magicLink
       sso {
         name
         signInPath

@@ -8,7 +8,7 @@ import { badInput, forbidden, notFound } from '../errors.ts';
 import { isAdmin, setInstanceAi } from '../instance.ts';
 import { cancelRunsUnder, dropRunRequests } from '../ready.ts';
 import { MAX_RETENTION_DAYS } from '../retention.ts';
-import { requireSession, ssoProvider } from './auth.ts';
+import { authConfigFor, requireSession } from './auth.ts';
 
 // The instance's, the account's and a project's AI switches. Only a person with a session
 // flips them — a key or an agent switching AI on for itself would defeat the
@@ -54,7 +54,7 @@ export function applyAiSwitchesExtension(schema: GraphQLSchema): GraphQLSchema {
     }
     await setInstanceAi(context.db, args.enabled);
     if (!args.enabled) await cancelRunsUnder(context.db, {});
-    return { ai: args.enabled, aiAvailable: true, sso: await ssoProvider(context.db) };
+    return authConfigFor(context, args.enabled, true);
   };
 
   mutations.setAiEnabled = async (_parent, args, context) => {

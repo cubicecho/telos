@@ -120,6 +120,8 @@ beforeEach(async () => {
   telos = createServer(app);
   appUrl = await listen(telos);
   process.env.APP_URL = appUrl;
+  // The redirect URI pairing registers is on SERVER_URL.
+  process.env.SERVER_URL = appUrl;
   host = await createAuthHost(db);
   mountSso(app, host);
 });

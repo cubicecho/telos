@@ -1,7 +1,7 @@
 import * as dbSchema from '@telos/db/schema';
 import { eq } from 'drizzle-orm';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { mintApiKey, resolveActor, signInDirectly } from '../auth.ts';
+import { mintApiKey, resolveActor, signInOnLocalNet } from '../auth.ts';
 import type { Actor } from '../context.ts';
 import { authFor, createClient, createTestDb, createUser, sessionClient, type TestDb } from './helpers.ts';
 
@@ -20,7 +20,7 @@ const resolve = (headers: Record<string, string>, ai = true) =>
   resolveActor(authFor(db), db, new Headers(headers), { ai });
 
 async function session(email: string) {
-  return signInDirectly(authFor(db), email);
+  return signInOnLocalNet(authFor(db), email);
 }
 
 async function setAi(userId: string, on: boolean) {

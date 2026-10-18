@@ -28,10 +28,13 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      AUTH_SECRET: ${AUTH_SECRET:?generate one with `openssl rand -hex 32`}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?generate one with `openssl rand -hex 32`}
       DATABASE_URL: postgres://telos:${POSTGRES_PASSWORD:?set a database password}@postgres:5432/telos
-      <span class="cmt"># The address you actually reach Telos at. Magic-link URLs are built from it.</span>
+      <span class="cmt"># The address you actually reach Telos at. Sign-in links are built from it.</span>
       APP_URL: ${APP_URL:-http://localhost:3001}
+      <span class="cmt"># How sign-in links are emailed. See "Sign in" below.</span>
+      SMTP_URL: ${SMTP_URL:-}
+      SECURE_LOCAL_NET: ${SECURE_LOCAL_NET:-false}
       NODE_ENV: production
     ports:
       - "${PORT:-3001}:3001"
@@ -58,13 +61,13 @@ volumes:
   <section class="step">
     <h2>Make the secrets and start it</h2>
     <p>It refuses to start without both, so generate them into <code>.env</code> beside the compose file:</p>
-    <pre class="code"><code>printf 'AUTH_SECRET=%s\nPOSTGRES_PASSWORD=%s\n' \
+    <pre class="code"><code>printf 'BETTER_AUTH_SECRET=%s\nPOSTGRES_PASSWORD=%s\n' \
   "$(openssl rand -hex 32)" "$(openssl rand -hex 24)" &gt; .env
 
 docker compose up -d</code></pre>
     <p>
       Migrations run at boot, so there is no setup step. Keep that
-      <code>.env</code>: <code>AUTH_SECRET</code> signs sessions and
+      <code>.env</code>: <code>BETTER_AUTH_SECRET</code> signs sessions and
       <code>POSTGRES_PASSWORD</code> is the database's own.
     </p>
     <div class="gs-callout">
@@ -77,11 +80,15 @@ docker compose up -d</code></pre>
   <section class="step">
     <h2>Sign in</h2>
     <p>
-      Open <code>http://localhost:3001</code> and sign in with any email
-      address. Telos ships no mail provider, so the magic link goes to the log:
+      Telos has no passwords. Give it one way to sign people in, in
+      <code>.env</code>, then <code>docker compose up -d</code> again:
     </p>
-    <pre class="code"><code>docker compose logs -f telos</code></pre>
-    <p>The first account to sign up is the admin.</p>
+    <ul>
+      <li><strong>Email</strong>: <code>SMTP_URL=smtp://user:pass@mail.example.com:587</code>, and links are emailed.</li>
+      <li><strong>An OpenID Connect provider</strong> such as heautou: nothing to set. The login page of a new instance has a <strong>Set up sign-in</strong> tab to paste its setup URL into.</li>
+      <li><strong>Just this machine</strong>: <code>SECURE_LOCAL_NET=true</code>, and typing an address signs you in. Never on a reachable instance.</li>
+    </ul>
+    <p>Open <code>http://localhost:3001</code> and sign in. The first account to sign in is the admin.</p>
   </section>
 
   <section class="step">

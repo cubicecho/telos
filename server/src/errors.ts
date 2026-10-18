@@ -2,7 +2,7 @@ import { GraphQLError } from 'graphql';
 
 // The API's failures, by code. A message teaches the fix: what was wrong and
 // what to do instead. Codes only one place throws (CURSOR_EXPIRED,
-// UNAUTHENTICATED, TOO_MANY_REQUESTS) are built where they are thrown.
+// UNAUTHENTICATED) are built where they are thrown.
 
 /**
  * A row the caller cannot see: it does not exist, or it is not theirs.
@@ -42,4 +42,15 @@ export function conflict(message: string): GraphQLError {
  */
 export function forbidden(message: string): GraphQLError {
   return new GraphQLError(message, { extensions: { code: 'FORBIDDEN' } });
+}
+
+/**
+ * Too many attempts at something that is throttled (sign-in).
+ *
+ * @param message - When to try again, as a sentence.
+ * @param retryAfter - Seconds until the caller may try again.
+ * @returns A TOO_MANY_REQUESTS error carrying `retryAfter`.
+ */
+export function rateLimited(message: string, retryAfter: number): GraphQLError {
+  return new GraphQLError(message, { extensions: { code: 'TOO_MANY_REQUESTS', retryAfter } });
 }

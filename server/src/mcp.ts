@@ -116,7 +116,10 @@ export function createMcpHandler(schema: GraphQLSchema, contextFor: ContextFacto
   const handler = async (req: McpHttpRequest, res: ServerResponse): Promise<void> => {
     // Who is calling is settled once, since it decides which tools there are.
     // Each call still gets loaders of its own.
-    const context = await contextFor(toHeaders(req.headers));
+    const context = await contextFor(
+      toHeaders(req.headers),
+      'ip' in req && typeof req.ip === 'string' ? req.ip : undefined,
+    );
     const server = makeServer(() => ({ ...context, loaders: createLoaders(context.db) }));
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
     res.on('close', () => {

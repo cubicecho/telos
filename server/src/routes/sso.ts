@@ -1,7 +1,7 @@
 import type { Express, Request, Response } from 'express';
 import { type Auth, toHeaders } from '../auth.ts';
 import type { AuthHost } from '../auth-host.ts';
-import { appLink, appUrl, OIDC_PROVIDER_ID } from '../config.ts';
+import { appLink, appUrl, OIDC_PROVIDER_ID, serverUrl } from '../config.ts';
 
 // The two legs of an OIDC sign-in that cannot be GraphQL, because the browser
 // has to be sent somewhere: out to the provider, and back from it. Both are
@@ -68,7 +68,8 @@ async function start(auth: Auth, req: Request, res: Response): Promise<void> {
  * cookie it would have set for a one-time token on the app's URL.
  */
 async function callback(auth: Auth, req: Request, res: Response): Promise<void> {
-  const request = new Request(new URL(req.originalUrl, appUrl()), {
+  // The callback is this server's, which in development is not the app's origin.
+  const request = new Request(new URL(req.originalUrl, serverUrl()), {
     method: 'GET',
     headers: toHeaders(req.headers),
   });

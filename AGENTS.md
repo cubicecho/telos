@@ -55,6 +55,11 @@ telos/
 │       ├── request-context.ts  # Headers -> Context, shared by both doors
 │       ├── mcp.ts, mcp.graphql # The MCP door: the operations in mcp.graphql are its tools
 │       ├── preflight.ts     # Boot guards — imported first, on purpose
+│       ├── defaults.ts      # Sign-in's tunables: AUTH_DEFAULTS, RATE_LIMIT_DEFAULTS
+│       ├── auth.ts          # The better-auth instance, and who a request is (resolveActor)
+│       ├── email.ts         # Emails a sign-in link through SMTP_URL
+│       ├── throttle.ts      # What every sign-in step calls first
+│       ├── rate-limit.ts    # The sliding-window limiter behind it
 │       ├── build-schema.ts  # createSchema(db) — buildSchema + extensions
 │       ├── schema.ts        # Binds createSchema to the real database
 │       ├── tenancy.ts       # Row scope + server-owned columns, as buildSchema config
@@ -154,9 +159,23 @@ in the code will say so. `tenancy.test.ts` fails when you forget — do not dele
 the test to make it pass.
 
 **Auth is better-auth, reached only through GraphQL.** `server/src/auth.ts`
-configures it (bearer sessions, magic links, API keys) over the tables in
-`db/src/models/auth.ts`, which `build-schema.ts` excludes from the generated
-schema. None of better-auth's REST routes are mounted. Every request resolves to
+configures it (bearer sessions in Postgres, magic links, OIDC, API keys) over
+the tables in `db/src/models/auth.ts`, which `build-schema.ts` excludes from
+the generated schema. None of better-auth's REST routes are mounted:
+`resolvers/better-auth.ts` serves its endpoints as GraphQL through
+`@cubicecho/graphql-better-auth`, and only the two OIDC redirects are HTTP
+(`routes/sso.ts`). This follows the `cubicecho_backend` skill's auth.md and
+sso.md, with ethos as the reference; keep them in step.
+
+**Sign-in is a link, a provider, or the local network — never a password.**
+Links are emailed through `SMTP_URL` (`email.ts`) and nothing else: no `SMTP_URL`
+means no magic-link plugin at all, and `signInMagicLink` refuses. Links and their
+tokens are never logged or returned. `SECURE_LOCAL_NET` signs an address straight
+in, and preflight refuses it with a public `APP_URL`. Every sign-in step's
+`around` calls `throttle(ctx, …)` first, keyed by client address (`ctx.ip`, right
+only when `TRUST_PROXY` is) and by address; the limiter is one per process, on
+the context. A bad link or one-time token is `BAD_USER_INPUT`, never
+`UNAUTHENTICATED`, which the app drops its session on. Every request resolves to
 an `actor` (`context.ts`): `user` for a session, `apiKey` for an MCP client,
 `agent` for a run token, `system` for the runner, `anonymous` for nobody.
 `ctx.userId` is always `ctx.actor.userId` — null for `system`, so generated

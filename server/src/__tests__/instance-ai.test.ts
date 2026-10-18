@@ -1,7 +1,7 @@
 import * as dbSchema from '@telos/db/schema';
 import { eq } from 'drizzle-orm';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { mintApiKey, resolveActor, signInDirectly } from '../auth.ts';
+import { mintApiKey, resolveActor, signInOnLocalNet } from '../auth.ts';
 import { type Board, CLAIM, createBoard, FINISH, HEARTBEAT, QUEUE, runnerClient } from './board.ts';
 import { authFor, createClient, createTestDb, type TestClient, type TestDb } from './helpers.ts';
 
@@ -31,8 +31,8 @@ const resolve = (headers: Record<string, string>) =>
 describe('who runs the instance', () => {
   it('makes the first account an admin, and no other', async () => {
     const fresh = await createTestDb();
-    const first = await signInDirectly(authFor(fresh), 'first@example.com');
-    const second = await signInDirectly(authFor(fresh), 'second@example.com');
+    const first = await signInOnLocalNet(authFor(fresh), 'first@example.com');
+    const second = await signInOnLocalNet(authFor(fresh), 'second@example.com');
     const flags = await fresh.select({ id: dbSchema.users.id, isAdmin: dbSchema.users.isAdmin }).from(dbSchema.users);
     expect(flags).toEqual(
       expect.arrayContaining([
