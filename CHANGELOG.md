@@ -1,3 +1,10 @@
+# [7.1.0](https://github.com/cubicecho/telos/compare/v7.0.0...v7.1.0) (2026-10-18)
+
+
+### Features
+
+* **app:** add MCP servers from a pasted .mcp.json ([cc1dd83](https://github.com/cubicecho/telos/commit/cc1dd837747ea1ba822288373f8efc18e40c7e03)), closes [#96](https://github.com/cubicecho/telos/issues/96)
+
 # [7.0.0](https://github.com/cubicecho/telos/compare/v6.0.0...v7.0.0) (2026-10-18)
 
 
