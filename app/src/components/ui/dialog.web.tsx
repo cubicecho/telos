@@ -1,3 +1,16 @@
+/**
+ * The web dialog: radix, unchanged in behaviour from before the split. It keeps
+ * the focus trap, the scroll lock, the `Escape` handler and the enter/exit
+ * animations, none of which have a native counterpart worth faking.
+ *
+ * The exported surface is `dialog-base.ts`'s **plus radix's**: every part also
+ * takes the props of the radix part (or the `div`) it renders, exactly as
+ * shadcn's `dialog` does, so a DOM call site written against shadcn — `modal`,
+ * `onOpenAutoFocus`, `forceMount`, `id`, `data-*`, a `DialogClose asChild` round
+ * a Cancel button, a `DialogPortal` + `DialogOverlay` of its own — compiles and
+ * behaves unchanged. Those extras are web only; the base is what native honours.
+ */
+
 import { Dialog as DialogPrimitive } from 'radix-ui';
 import type * as React from 'react';
 import { Button } from '@/components/ui/button';

@@ -1,3 +1,25 @@
+/**
+ * Monospaced text, inline and as a block.
+ *
+ * `Code` is the inline span. `<code>` has no native counterpart and it appeared
+ * inline inside a sentence, so this has to be a `Text` — a `View` cannot be
+ * nested in one.
+ *
+ * `CodeBlock` is the box: preformatted text with one fill, one border and one
+ * padding, and a place at its far end for a `CopyButton`. Eleven screens in six
+ * apps drew it as a `<pre>` with a class list retyped from memory, and came out
+ * with four fills, a border on about half and three paddings. The two decisions
+ * each of them also made by class — does a long line wrap or scroll, and how tall
+ * may the block get — are props here.
+ *
+ * `title` labels a snippet the reader copies — ".mcp.json", "curl" — in a header row of the block's
+ * own, with the action beside it, instead of a heading each page puts above the box.
+ *
+ * `follow` keeps a growing log at its last line the way a terminal does: only while the reader is
+ * there. Scrolled up to read something, they keep their place, and a "Jump to latest" brings them
+ * back.
+ */
+
 import { createContext, type ReactNode, useLayoutEffect, useRef, useState } from 'react';
 import { Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { cn, type SlotNode } from '@/lib/utils';

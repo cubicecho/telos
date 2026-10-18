@@ -1,3 +1,9 @@
+/**
+ * The element `<Form>` renders on native: a plain `View`.
+ *
+ * There is no submit event to listen for off web — `SubmitButton` calls
+ * `form.handleSubmit()` on press, which is the only path to submission there.
+ */
 import { View } from 'react-native';
 import type { FormElementProps } from '@/components/ui/form-element-base';
 import { cn } from '@/lib/utils';

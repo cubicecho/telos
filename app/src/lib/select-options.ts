@@ -1,3 +1,9 @@
+/**
+ * What a select's `options` list holds, and the walk that turns it into the runs a menu draws.
+ * `Combobox` and the native form's `SelectField` both read a list through this, so one `options`
+ * array is the same list in a control and in a bound field, on both halves, whether the control
+ * holds one value or several.
+ */
 import type { ReactNode } from 'react';
 
 /** One choice in a select. */

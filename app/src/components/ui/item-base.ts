@@ -1,3 +1,13 @@
+/**
+ * The contract `item.tsx` (native) and `item.web.tsx` (web) both implement: shadcn's `Item` parts,
+ * with the part of each one's classes that Yoga can read. Its own module because Metro resolves
+ * `./item` to `item.web.tsx` on web.
+ *
+ * Each class here is what the two halves agree on; the web half adds what only the DOM has —
+ * `group-has-[…]`, `[&_svg]`, `[a]:`, the focus ring, `text-balance` — and the native half adds a
+ * `Text` around a string and the ink a `Text` does not inherit there. The metrics are shadcn's,
+ * so a row drawn with these parts on a device lines up with the same row in a DOM app.
+ */
 import { cva } from 'class-variance-authority';
 
 /** How an `Item`'s surface is drawn. */

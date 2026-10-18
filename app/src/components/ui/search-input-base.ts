@@ -1,3 +1,8 @@
+/**
+ * What `search-input.tsx` (native) and `search-input.web.tsx` share. Its own module because Metro
+ * resolves `./search-input` to the web file on web.
+ */
+
 import { useEffect, useRef } from 'react';
 
 /** The props a search box adds to the input it is. The rest are `Input`'s, on each half. */

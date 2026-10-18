@@ -1,3 +1,17 @@
+/**
+ * The contract `popover.tsx` (native) and `popover.web.tsx` (radix) both
+ * implement. Its own module for the usual reason: Metro resolves `./popover`
+ * to `popover.web.tsx` on web, so the web file cannot import shared types from
+ * `./popover` without importing itself.
+ *
+ * Narrower than radix's props on purpose: an `asChild` trigger and one content
+ * pane. That is the shape both platforms can honour — everything radix offers
+ * beyond it (collision handling, side flipping, a separate anchor) has no native
+ * counterpart. The web half accepts it all the same, on top of this contract,
+ * because it is a drop-in for shadcn's `popover`: `popover.web.tsx` widens each
+ * part to the radix part it renders. Those extras are web only, and on native a
+ * `PopoverAnchor` simply renders its children.
+ */
 import type { ReactNode } from 'react';
 
 export type PopoverProps = {

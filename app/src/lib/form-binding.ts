@@ -1,3 +1,8 @@
+/**
+ * What binding a control to a TanStack form field takes: the props a bound field adds, and the
+ * one loose view of `form.Field` that renders it. The native `form`, the web `app-form` and
+ * `RadioGroupField` all bind through this, so a validator or listener kind exists for all three.
+ */
 import type { AnyFieldApi, DeepKeys, DeepValue } from '@tanstack/react-form';
 import type { ComponentType, ReactNode } from 'react';
 

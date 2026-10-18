@@ -1,3 +1,12 @@
+/**
+ * What `theme-preference.tsx` (device) and `theme-preference.web.tsx` (the web, Expo's and the
+ * DOM's) share: the preference's type, where it is stored, and the pre-paint script.
+ *
+ * A separate module for the usual reason: Metro resolves `./theme-preference` to the `.web.tsx`
+ * on web, so the web file cannot import shared pieces from it without importing itself.
+ */
+
+/** Which palette to paint. `system` follows the device and is what nothing stored means. */
 export type ThemePreference = 'light' | 'dark' | 'system';
 
 /** In the order a picker shows them. */

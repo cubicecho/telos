@@ -1,3 +1,12 @@
+/**
+ * The contract `tabs.tsx` (native) and `tabs.web.tsx` (radix) both implement.
+ * Its own module because Metro resolves `./tabs` to `tabs.web.tsx` on web.
+ *
+ * Controlled (`value` + `onValueChange`) or uncontrolled (`defaultValue`), as
+ * radix is. The web half also takes radix's own props on top of this —
+ * `orientation`, `activationMode`, `forceMount`, `dir`, DOM attributes — as
+ * shadcn's `tabs` does; those extras are web only.
+ */
 import type { ReactElement, ReactNode } from 'react';
 import type { SlotNode } from '@/lib/utils';
 

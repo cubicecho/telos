@@ -1,3 +1,20 @@
+/**
+ * `ColorPicker`, bound to a form field holding a hex string.
+ *
+ * Its own item rather than another export of `@cubeui/form`, so a form of plain inputs does not
+ * pull in the picker — the split the web `color-field` makes. Named `color-picker-field` because
+ * `color-field` is that web-only item, and one name cannot be two items on the web.
+ *
+ * The label is a `<label htmlFor>` on the hex box, which a `<label>` can name; the swatch row is a
+ * `radiogroup`, which it cannot, so the row points back at the label's id by `aria-labelledby`.
+ * Both halves of the control are named "Colour" without the caller naming either.
+ *
+ * ```tsx
+ * <form.AppField name="color">
+ *   {() => <ColorField label="Colour" swatches={LABEL_COLORS} />}
+ * </form.AppField>
+ * ```
+ */
 import type { ComponentProps } from 'react';
 import { ColorPicker } from '@/components/ui/color-picker';
 import { type FieldProps, FieldWrapper, splitProps, useFieldContext, useFieldIds } from '@/components/ui/form';

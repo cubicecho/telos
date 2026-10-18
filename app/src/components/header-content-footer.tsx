@@ -1,3 +1,21 @@
+/**
+ * The page chassis: header, body, footer, in a column — written once here and compiled for the
+ * web by `scripts/rn2web`, so the DOM `HeaderContentFooter` and the React Native one are the same
+ * component rather than two to keep in step.
+ *
+ * The one place the platforms genuinely differ is the scrolling body. On the web it is a `<div>`
+ * with `overflow-y-auto` and a tab stop; on device `overflow` does not scroll anything, so it is a
+ * `ScrollView`. The two are written out as a `Platform.OS` branch in {@link Body}, which the
+ * compiler folds — the `ScrollView` never reaches the compiled file.
+ *
+ * Every slot is a flex column on both platforms, because on device there is no other box: a
+ * caller's `gap-4` on a slot, and a child's `flex-1`, mean the same thing in a browser as on a
+ * phone. A slot that was a block box on the web let both fail there without a word.
+ *
+ * Built to be composed: every slot is a node and every part carries a `testID` (`data-slot` on the
+ * web), so a shell built on it — `PageLayout`, `DialogLayout`, an app's sidebar — styles a part by
+ * its class prop rather than by reaching into the tree.
+ */
 import { type ElementRef, type Ref, useImperativeHandle, useRef } from 'react';
 import { Platform, ScrollView, View } from 'react-native';
 import { cn, type SlotNode } from '@/lib/utils';

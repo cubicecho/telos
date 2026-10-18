@@ -1,3 +1,16 @@
+/**
+ * The web select: radix. `select.tsx` is the native counterpart and
+ * `select-base.ts` holds the contract they share.
+ *
+ * **It is also shadcn's select, part for part and prop for prop.** It installs
+ * over a DOM app's `components/ui/select.tsx`, so every part takes radix's own
+ * props — `SelectTrigger` every `<button>` attribute and shadcn's `size`,
+ * `SelectContent` `position`/`side`/`align`, `SelectItem` `disabled` and
+ * `textValue`, the root `defaultValue`, `name` and `required` — and the two
+ * scroll buttons are exported and drawn inside the content, as shadcn draws them.
+ * `position` defaults to radix's `"item-aligned"`, which is shadcn's default too.
+ */
+
 import { Select as SelectPrimitive } from 'radix-ui';
 import type { ComponentPropsWithRef, ElementType } from 'react';
 import { Check, ChevronDown, ChevronUp } from '@/components/ui/icons';

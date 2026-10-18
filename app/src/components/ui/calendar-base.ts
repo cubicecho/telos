@@ -1,3 +1,17 @@
+/**
+ * The contract `calendar.tsx` (native) and `calendar.web.tsx` (react-day-picker)
+ * both implement. Its own module because Metro resolves `./calendar` to
+ * `calendar.web.tsx` on web.
+ *
+ * `mode` was originally left out, on the grounds that range selection had no
+ * native implementation behind it and a prop that works on one platform is a
+ * promise half-kept. It is in now because the implementation is in: `calendar.tsx`
+ * draws and selects ranges itself. `DateRange` and `DateMatcher` are declared here
+ * rather than imported from react-day-picker for the same reason — a shared type
+ * cannot come from a library only one platform has.
+ */
+
+/** A start and an end. `to` is absent while the range is half-picked. */
 export type DateRange = {
   from: Date | undefined;
   to?: Date | undefined;

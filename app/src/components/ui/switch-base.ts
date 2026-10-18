@@ -1,3 +1,13 @@
+/**
+ * The contract `switch.tsx` (native) and `switch.web.tsx` (radix) both
+ * implement. Its own module because Metro resolves `./switch` to
+ * `switch.web.tsx` on web — the web file would otherwise import itself.
+ *
+ * Controlled or not, as radix's is. The web half takes radix's whole
+ * `Switch.Root` surface on top of this — `name`, `value`, `required`, the
+ * `aria-*` props, shadcn's `size` — because it installs over a DOM app's
+ * shadcn switch; this is the part that means something on both platforms.
+ */
 import type { TooltipSide } from '@/components/ui/tooltip-base';
 
 export type SwitchProps = {

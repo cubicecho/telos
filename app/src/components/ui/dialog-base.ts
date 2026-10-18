@@ -1,3 +1,18 @@
+/**
+ * The contract `dialog.tsx` and `dialog.web.tsx` both implement. Separate
+ * module for the usual reason: Metro resolves `./dialog` to `dialog.web.tsx`
+ * on web, so the web file cannot import shared types from `./dialog` without
+ * importing itself.
+ *
+ * This is the surface both platforms honour. The web half widens every part to
+ * radix's own props on top of it — `modal`, `forceMount`, `onOpenAutoFocus`, a
+ * `div`'s attributes on the sections — so a DOM call site written against
+ * shadcn's `dialog` compiles unchanged; those extras are web only and live in
+ * `dialog.web.tsx`, not here. A shared contract is also the only thing that
+ * makes the platform pair checkable — TypeScript resolves the native file and
+ * never compares the two, so `scripts/check-registry-build.mjs` compares the
+ * exported names instead.
+ */
 import type { ReactNode } from 'react';
 
 export type DialogProps = {

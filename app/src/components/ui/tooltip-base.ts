@@ -1,3 +1,13 @@
+/**
+ * The contract `tooltip.tsx` (native) and `tooltip.web.tsx` (radix) both
+ * implement. Its own module because Metro resolves `./tooltip` to
+ * `tooltip.web.tsx` on web.
+ *
+ * The web half takes radix's props on top of this — `open`/`onOpenChange` on
+ * `Tooltip`, `sideOffset`/`align`/`hidden` on the content, the trigger's
+ * `<button>` attributes — as shadcn's `tooltip` does, so a DOM call site ports
+ * unchanged. Those extras are web only.
+ */
 import type { ReactNode } from 'react';
 
 export type TooltipProviderProps = {

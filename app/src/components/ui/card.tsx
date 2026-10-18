@@ -1,3 +1,16 @@
+/**
+ * One card for both platforms — see `ui/button.tsx` for the conversion rules.
+ *
+ * `CardTitle` and `CardDescription` are `<Text>`, which is not optional on
+ * native: a bare string inside a `<View>` throws there while rendering fine on
+ * web, so the two platforms disagree silently unless the text nodes are typed.
+ *
+ * The `role`/`aria-level` on `CardTitle` and the `role="button"` on a pressable
+ * card are not decoration. They are what a screen reader reads on device, and
+ * on web react-native-web turns them into the matching ARIA attributes — which
+ * is also what lets a compiled DOM version know this `<Text>` is an `<h3>`.
+ */
+
 import * as React from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { ColorBar } from '@/components/ui/color-bar';

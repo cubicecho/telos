@@ -1,3 +1,14 @@
+/**
+ * The theme preference on device. `theme-preference.web.tsx` is the web half and
+ * `theme-preference-base.ts` holds what the two share.
+ *
+ * Applying the choice is `Appearance.setColorScheme`, and `"unspecified"` hands it back to the
+ * system, so System needs no listener here. A palette is `PaletteProvider` at the app's root, and
+ * a dark-only one also sets the appearance to dark. `storage` is an adapter over whatever the app
+ * persists with; its read is asynchronous, so the stored choice lands just after the first
+ * render.
+ */
+
 import { VariableContextProvider } from 'nativewind';
 import { type ReactNode, useEffect, useMemo, useSyncExternalStore } from 'react';
 import { Appearance, useColorScheme } from 'react-native';

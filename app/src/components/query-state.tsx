@@ -1,3 +1,31 @@
+/**
+ * The three things a list of rows can be before it is a list of rows — see `ui/button.tsx` for
+ * the conversion rules.
+ *
+ * Every list screen in every one of these apps opens the same way — the request failed, or it has
+ * not landed, or it landed empty, or draw the rows — and every one of them writes that ladder
+ * out again. The rung that goes wrong is the last one, because it has two correct spellings:
+ *
+ * ```tsx
+ * data?.roles.length === 0                        // read straight off the query
+ * shown.length === 0 && !isPending && !isError    // already defaulted to []
+ * ```
+ *
+ * Six screens in one app, in both spellings, and neither is a bug — which is exactly why nobody
+ * ever consolidated them. Here the three rungs are exclusive by construction, and the screen says
+ * what it is about to draw rather than the guard working it out again.
+ *
+ * It returns `null` once there are rows, so a screen reads as the ladder and then the list:
+ *
+ * ```tsx
+ * <QueryState query={roles} what="your roles" count={shown.length} emptySlot={<Empty … />} />
+ * {shown.map(…)}
+ * ```
+ *
+ * `query` is taken structurally rather than as a TanStack `UseQueryResult` — the same line
+ * `Form` holds against form libraries. A shell that names one data library is a shell the next
+ * app cannot install.
+ */
 import { useState } from 'react';
 import { Text, View } from 'react-native';
 import { Button } from '@/components/ui/button';

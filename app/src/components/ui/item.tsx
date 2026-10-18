@@ -1,3 +1,12 @@
+/**
+ * shadcn's `Item` parts on React Native, under shadcn's names and with its `variant` and `size`.
+ * `item.web.tsx` is the web counterpart and `item-base.ts` holds the classes they share.
+ *
+ * These are for a row `ListItem` does not fit: a header line, a footer that opens, a title with a
+ * badge beside it. A string passed to a part is wrapped in a `Text`, since a bare string in a
+ * `View` throws on device. `ItemMedia` does not size what is in it, as there is no `[&_svg]`
+ * selector: pass an icon at `size-4`.
+ */
 import { Slot } from '@radix-ui/react-slot';
 import * as React from 'react';
 import { Text, View } from 'react-native';

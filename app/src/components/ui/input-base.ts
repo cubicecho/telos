@@ -1,3 +1,11 @@
+/**
+ * The contract both `input.tsx` (native) and `input.web.tsx` implement.
+ *
+ * It lives in its own module because Metro resolves `./input` to `input.web.tsx`
+ * on web — the web file importing the shared pieces from `./input` would be
+ * importing itself.
+ */
+
 import type { Ref } from 'react';
 import type { SlotNode } from '@/lib/utils';
 

@@ -1,3 +1,17 @@
+/**
+ * The theme preference on the web — an Expo app's web build, where Metro picks this file over
+ * `theme-preference.tsx`, and a DOM app, where it is the whole item. `theme-preference-base.ts`
+ * holds what the two halves share.
+ *
+ * `localStorage` is the store, and the source of truth: the hooks read it through
+ * `useSyncExternalStore`, so two components calling a hook, or two tabs, cannot disagree.
+ * Applying the choice is a class on `<html>`, and `data-palette` for a palette — see
+ * `THEME_PRE_PAINT_SCRIPT` for the rule and why System still sets `dark` on a dark device.
+ *
+ * Nothing touches `window` at import, and the server snapshots are `system` and `default`, so a
+ * server render paints what the pre-paint script is about to correct rather than throwing.
+ */
+
 import { Fragment, type ReactNode, useEffect, useSyncExternalStore } from 'react';
 import {
   DARK_ONLY_PALETTES,

@@ -1,3 +1,14 @@
+/**
+ * Deriving usable colours from a colour someone picked.
+ *
+ * A user-chosen hex is arbitrary: it can be near-white, near-black, or fully
+ * saturated, and any of those can vanish against a card or blow out next to
+ * text. These keep the hue someone chose and constrain everything else.
+ *
+ * Separate from `lib/utils` because these are the only functions here that a
+ * component might not want, and the registry installs whole files.
+ */
+
 const HEX_RADIX = 16;
 /** The largest value of one `rr` channel. */
 const CHANNEL_MAX = 255;

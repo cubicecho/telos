@@ -1,3 +1,11 @@
+/**
+ * One number on a card: a label, the figure under it, and a line under that. The parts are
+ * `PropertyRow`'s words: `label`, `value`, `hint`, with `iconSlot` before the label.
+ *
+ * Given `onPress` the card is a button, and with `selected` beside it a toggle carrying
+ * `aria-pressed`: a filter tile. `selected` without `onPress` is ignored, because `aria-pressed`
+ * on something that cannot be pressed is markup axe rejects.
+ */
 import type { ReactNode } from 'react';
 import { Platform, Text, View } from 'react-native';
 import { Card } from '@/components/ui/card';

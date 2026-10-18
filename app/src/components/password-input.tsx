@@ -1,3 +1,17 @@
+/**
+ * A password box with an eye on it: `Input` with `type="password"` and a named show/hide button in
+ * its `trailingSlot`. The rest of the props are `Input`'s, with `wrapperClassName` for the box
+ * that holds the field and the eye.
+ *
+ * The button's name changes with what it does ("Show password", "Hide password"), so it carries
+ * no `aria-pressed`. The masking is the `type` and not a CSS trick: `type="text"` while revealed
+ * is what stops Edge drawing a second eye, and on device it is `secureTextEntry`. Revealed state
+ * is local and not a prop, so no form remembers to show a password.
+ *
+ * ```tsx
+ * <PasswordInput id="token" value={token} onChangeText={setToken} />
+ * ```
+ */
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Eye, EyeOff } from '@/components/ui/icons';

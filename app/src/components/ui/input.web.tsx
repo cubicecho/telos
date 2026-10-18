@@ -1,3 +1,28 @@
+/**
+ * The web implementation — see `input.tsx` for why this one is split, and
+ * `input-base.ts` for the contract both sides implement.
+ *
+ * It keeps the DOM `<input>` so `type="time"`, `type="number"` and `min`/`max`
+ * keep working, and adapts the event to the shared `onChangeText` contract so
+ * no call site has to know which platform it is on.
+ *
+ * **It is also shadcn's `Input`, prop for prop.** This file installs at the
+ * same `components/ui/input.tsx` a DOM app's shadcn primitive lives at, so the
+ * first `shadcn add @cubeui/…` overwrites that primitive — and every
+ * `<Input onChange={(e) => …}>`, `name`, `defaultValue`, `onKeyDown`, every DOM
+ * input `type` and every `useRef<HTMLInputElement>` already in the app has to
+ * keep compiling and keep working. So the props are the shared contract on top
+ * of `ComponentProps<"input">`, both change handlers fire, and the ref is the
+ * element (which already satisfies `InputHandle`, so shared call sites holding
+ * one are served by the same object).
+ *
+ * `leadingSlot` and `trailingSlot` are the one place the root changes. Without them the
+ * root is the `<input>`, exactly shadcn's; with one, the input sits in a
+ * `relative` box beside an absolutely placed slot, which is where `PasswordInput` puts its
+ * eye. `className` and every DOM prop still land on the `<input>`, so `id`,
+ * `aria-*` and the ref reach the control a `<label>` points at.
+ */
+
 import {
   type ComponentPropsWithoutRef,
   type HTMLInputTypeAttribute,

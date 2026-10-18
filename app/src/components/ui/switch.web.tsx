@@ -1,3 +1,13 @@
+/**
+ * The web switch: radix. `switch.tsx` is the native counterpart and
+ * `switch-base.ts` holds the contract they share.
+ *
+ * It takes radix's `Switch.Root` props whole, plus shadcn's `size`, because it
+ * installs over a DOM app's shadcn switch at `components/ui/switch.tsx`:
+ * `defaultChecked`, `name`, `value`, `required` and the `aria-*` props all
+ * reach radix, which renders the hidden `<input>` a native form submit reads.
+ */
+
 import { Switch as SwitchPrimitive } from 'radix-ui';
 import { type ComponentPropsWithRef, useId } from 'react';
 import { SWITCH_THUMB_CLASS, SWITCH_TRACK_CLASS } from '@/components/ui/switch-base';

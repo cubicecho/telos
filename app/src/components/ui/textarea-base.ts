@@ -1,3 +1,15 @@
+/**
+ * The contract both `textarea.tsx` (native) and `textarea.web.tsx` implement.
+ *
+ * It lives in its own module for the same reason `input-base.ts` does: Metro
+ * resolves `./textarea` to `textarea.web.tsx` on web, so the web file importing
+ * the shared pieces from `./textarea` would be importing itself.
+ *
+ * The props are spelled out rather than taken from `TextInputProps` because
+ * callers write `onChangeText`, not a DOM change event — the same contract
+ * `input-base.ts` holds, so a bound field looks identical whichever it wraps.
+ */
+
 import type { Ref } from 'react';
 
 /**

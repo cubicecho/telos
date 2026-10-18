@@ -1,3 +1,15 @@
+/**
+ * Multi-line text entry on device — see `textarea-base.ts` for the contract both
+ * halves implement, and `textarea.web.tsx` for the other one.
+ *
+ * This file used to be the whole item: a `TextInput multiline` is a real
+ * `<textarea>` under react-native-web, so a web half looked like pure
+ * duplication. The compiled registry is what made that false — it ships to the
+ * DOM with no react-native-web underneath, so there is no longer anything to do
+ * the swap. `rn2web` refused the item and said so, which is how the gap surfaced
+ * rather than shipping as a `<div>` nobody could type into.
+ */
+
 import { useImperativeHandle, useLayoutEffect, useRef } from 'react';
 import { Platform, TextInput } from 'react-native';
 import {

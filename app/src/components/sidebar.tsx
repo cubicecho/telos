@@ -1,3 +1,12 @@
+/**
+ * An app's sidebar. `Sidebar` is the frame, `SidebarSection` a titled list of rows,
+ * `SidebarNavItem` the row, `BarNavItem` the same place drawn as an icon for a phone's bar, and
+ * `SidebarCollapseButton` what folds the frame to a rail.
+ *
+ * Routing stays the app's: the registry names no router, since one that imported expo-router would
+ * not install in a DOM app. `SidebarNavItem` forwards its props and ref, so the app's own
+ * `<Link href asChild>` or `createLink` wraps it and hands it the `href`.
+ */
 import type { ReactNode } from 'react';
 import * as React from 'react';
 import { Platform, Pressable, Text, View } from 'react-native';

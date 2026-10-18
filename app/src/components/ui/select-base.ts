@@ -1,3 +1,16 @@
+/**
+ * The contract `select.tsx` (native) and `select.web.tsx` (radix) both
+ * implement. Its own module because Metro resolves `./select` to
+ * `select.web.tsx` on web.
+ *
+ * Every part shadcn's select exports is here, so a DOM call site written against
+ * shadcn's compiles against either half. The types below are the part that means
+ * the same on both platforms; the web half widens each to radix's own props
+ * (`name`, `required`, `dir`, `position`, `textValue`, a trigger's `size` and
+ * every `<button>` attribute), because it installs over a DOM app's shadcn
+ * select. The two scroll buttons render nothing on native: a sheet scrolls by
+ * touch and has nothing to put one against.
+ */
 import type { ReactNode } from 'react';
 
 export type SelectProps = {

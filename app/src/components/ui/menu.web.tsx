@@ -1,3 +1,17 @@
+/**
+ * The web menu: radix `DropdownMenu`, anchored to its trigger. `menu.tsx` is the native
+ * counterpart and `menu-base.ts` holds the contract they share.
+ *
+ * Radix is the reason this half is hand-written rather than compiled: `role="menu"` with the
+ * trigger as its name, arrow keys and Home/End between the rows (skipping disabled ones),
+ * typeahead on each row's label, focus moved into the menu on open and back to the trigger on
+ * close (unless the row chosen is `focusesElsewhere`), and the menu closing when a row is
+ * chosen. None of that is layout, so none of it could come out of the React Native source.
+ *
+ * Each part also takes the props of the radix part it renders — `side`, `sideOffset`, `modal`,
+ * `onCloseAutoFocus` — on top of the contract. Those extras are web only.
+ */
+
 import { DropdownMenu as MenuPrimitive } from 'radix-ui';
 import type * as React from 'react';
 import { cloneElement, createContext, type RefObject, useContext, useRef, useState } from 'react';

@@ -1,3 +1,17 @@
+/**
+ * The contract `badge.tsx` (native) and `badge.web.tsx` (web) both implement.
+ * Its own module because Metro resolves `./badge` to `badge.web.tsx` on web.
+ *
+ * The variant names are shadcn's six — `default`, `secondary`, `destructive`,
+ * `outline`, `ghost`, `link` — with their meanings, plus `positive`, `warning` and `info`,
+ * which shadcn's token set has no answer for and cubeui's has (see `badge.tsx`'s header). Each
+ * coloured meaning also has a `-soft` form — a tint, an edge and a dot in the hue, with the words in
+ * the foreground — for a badge that is not the main thing on its row.
+ *
+ * The web half also takes every `<span>` attribute (`style`, `title`, `onClick`,
+ * `data-*`) and shadcn's `asChild`, so a DOM call site ports unchanged. Those
+ * extras are web only.
+ */
 import { cva } from 'class-variance-authority';
 import { Children, type ReactNode } from 'react';
 

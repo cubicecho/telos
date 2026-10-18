@@ -1,3 +1,12 @@
+/**
+ * The native tabs: a row of `Pressable`s over a context holding the active
+ * value, and content panes that render only when selected.
+ *
+ * The active value is the caller's `value` when given, and this component's
+ * own state otherwise (see `tabs-base.ts`). Unselected panes unmount, as they
+ * do under radix without `forceMount`.
+ */
+
 import { Slot } from '@radix-ui/react-slot';
 import {
   Children,

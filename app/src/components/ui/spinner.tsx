@@ -1,3 +1,17 @@
+/**
+ * A loading indicator: the `LoaderCircle` glyph, turning. `spinner.web.tsx` is
+ * the web counterpart and `spinner-base.ts` holds what they share.
+ *
+ * Not `ActivityIndicator`. That one draws the platform's own spinner, which is
+ * a different shape on iOS, on Android and in the browser, and takes a colour
+ * prop but no class. This is the same glyph the web half turns, sized and
+ * coloured by `className` through `@cubeui/icons` — so inside a `Button` it
+ * takes the button's ink from `IconClassContext`, as any icon there does.
+ *
+ * The turn is `Animated` on the native driver, one linear turn a second, which
+ * is Tailwind's `animate-spin`. The compiler refuses `Animated`, which is why
+ * the web half is hand-written rather than compiled from this file.
+ */
 import { useEffect, useRef } from 'react';
 import { Animated, Easing } from 'react-native';
 import { LoaderCircle } from '@/components/ui/icons';

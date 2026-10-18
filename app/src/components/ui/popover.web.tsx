@@ -1,3 +1,13 @@
+/**
+ * The web popover: radix, anchored to its trigger. `popover.tsx` is the native
+ * counterpart and `popover-base.ts` holds the contract they share.
+ *
+ * Every part also takes the props of the radix part (or element) it renders, as
+ * shadcn's `popover` does — `side`, `sideOffset`, `onOpenAutoFocus`, `modal`, a
+ * `PopoverAnchor` — so a DOM call site written against shadcn compiles and
+ * behaves unchanged. Those extras are web only.
+ */
+
 import { Popover as PopoverPrimitive } from 'radix-ui';
 import type * as React from 'react';
 import type {
