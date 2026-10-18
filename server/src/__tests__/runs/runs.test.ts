@@ -177,6 +177,88 @@ describe('claimRun', () => {
   });
 });
 
+describe('a lane that reviews work', () => {
+  // To do works it and passes it to In progress, which reviews it: its
+  // failure route goes back to the lane that feeds it.
+  const WORKED =
+    '## Changes\nAdded src/search.tsx.\n\n## Verification\nAll good, trust me.\n\n## Open questions\nNone.';
+  const RULING = 'FAIL\n- The box is labelled: not met. src/search.tsx:4 has no label.';
+
+  beforeEach(async () => {
+    await setLane(board.person, board.lanes[0].id, { onSuccessLaneId: board.lanes[1].id });
+    await setLane(board.person, board.lanes[1].id, {
+      agentId: board.agentId,
+      onSuccessLaneId: board.lanes[2].id,
+      onFailureLaneId: board.lanes[0].id,
+    });
+  });
+
+  async function worked(): Promise<{ todoId: string; runId: string }> {
+    const todoId = await board.addTodo('Add a search box');
+    const { runId } = await claim(todoId);
+    await finish(runId, { status: 'OK', output: WORKED });
+    return { todoId, runId };
+  }
+
+  it('is handed the todo and where the work is, but not the worker’s account of it', async () => {
+    const { todoId, runId } = await worked();
+    await board.person.expectOk(
+      `mutation { createTodoNote(values: { todoId: "${todoId}", body: "Mind the tone." }) { id } }`,
+    );
+    await db
+      .insert(dbSchema.todoNotes)
+      .values({ userId: board.userId, todoId, kind: 'note', body: 'I checked it all.', actorKind: 'agent', runId });
+    await db.insert(dbSchema.artifacts).values([
+      {
+        userId: board.userId,
+        projectId: board.projectId,
+        todoId,
+        runId,
+        location: 'src/search.tsx',
+        source: 'detected',
+      },
+      {
+        userId: board.userId,
+        projectId: board.projectId,
+        todoId,
+        runId,
+        location: 'telos:note/x',
+        source: 'detected',
+      },
+    ]);
+
+    const review = await claim(todoId, board.lanes[1].id);
+    expect(review.assignment).toMatchObject({
+      title: 'Add a search box',
+      reviews: true,
+      report: null,
+      why: null,
+      ruling: null,
+      notes: ['Mind the tone.'],
+      artifacts: [{ location: 'src/search.tsx', action: 'created', title: null }],
+    });
+  });
+
+  it('is handed its last ruling when the work comes round again, and the worker its report and the ruling', async () => {
+    const { todoId } = await worked();
+    await finish((await claim(todoId, board.lanes[1].id)).runId, { status: 'OK', output: RULING });
+
+    const rework = await claim(todoId);
+    expect(rework.assignment).toMatchObject({ reviews: false, report: WORKED, why: RULING, ruling: RULING });
+    await finish(rework.runId, { status: 'OK', output: WORKED });
+
+    const again = await claim(todoId, board.lanes[1].id);
+    expect(again.assignment).toMatchObject({ reviews: true, report: null, why: null, ruling: RULING });
+  });
+
+  it('is only one whose failure route goes back to a lane that feeds it', async () => {
+    await setLane(board.person, board.lanes[1].id, { onFailureLaneId: null });
+    const { todoId } = await worked();
+    const claimed = await claim(todoId, board.lanes[1].id);
+    expect(claimed.assignment).toMatchObject({ reviews: false, report: WORKED, why: WORKED });
+  });
+});
+
 describe('finishRun', () => {
   it('sends passing work down the success route, completing it in the done lane', async () => {
     const todoId = await board.addTodo('Write it');

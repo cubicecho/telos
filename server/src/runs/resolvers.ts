@@ -23,6 +23,7 @@ import { attachResolvers } from '../graphql/attach-resolvers.ts';
 import { instanceAiOn } from '../instance/settings.ts';
 import { assertNoCycle, findBlocked } from '../todos/blocking.ts';
 import { stampActor } from '../todos/provenance.ts';
+import { NOTE_LOCATION } from './artifacts.ts';
 import { dropRunRequests, expireLapsedRuns, LEASE_SECONDS, readyTodos } from './ready.ts';
 import { markRunnerSeen } from './runner-seen.ts';
 import { openSession } from './todo-sessions.ts';
@@ -102,12 +103,30 @@ const RUNS_SDL = parse(`
     title: String!
     brief: String
     acceptance: String
-    "What the last agent to work it reported."
+    "What the last agent to work it reported. Never handed to a lane that reviews work."
     report: String
     "Why it came back here, when it did."
     why: String
-    "What people have said about it, oldest first."
+    "What people have said about it, oldest first. A lane that reviews work gets only what no agent signed."
     notes: [String!]!
+    """
+    Whether this lane reviews work: its failure route goes back to a lane whose
+    success route leads here. Its agent rules on the work itself, so it is not
+    handed the report of the run that did it.
+    """
+    reviews: Boolean!
+    "The last ruling on the todo, from any lane."
+    ruling: String
+    "What has been made for the todo, the newest first: places to look at the work."
+    artifacts: [RunAssignmentArtifact!]!
+  }
+
+  "Something made for the todo, as a run is told of it."
+  type RunAssignmentArtifact {
+    location: String!
+    "created, updated, moved or deleted."
+    action: String!
+    title: String
   }
 
   type RunClaim {
@@ -236,6 +255,8 @@ const STREAMED = new Set(['thinking', 'output']);
 const PROMPT_CHARS = 64_000;
 /** The most artifacts one run may report. */
 const MAX_ARTIFACTS = 100;
+/** The most of a todo's artifacts a run is told of: enough to find the work, not a listing of it. */
+const ASSIGNMENT_ARTIFACTS = 50;
 
 /** A reply that opens with FAIL is a failing verdict: the todo takes the failure route. */
 const FAILS = /^\s*FAIL\b/i;
@@ -306,7 +327,20 @@ async function assignmentFor(tx: AnyRow, todo: AnyRow, lane: AnyRow, project: An
     .from(dbSchema.todoNotes)
     .where(eq(dbSchema.todoNotes.todoId, todo.id))
     .orderBy(asc(dbSchema.todoNotes.createdAt));
-  const report = thread.filter((note) => note.kind === 'report').at(-1)?.body ?? null;
+  // A lane that reviews work is told what was asked and where to look, and
+  // rules on what it finds there, not on the worker's account of it: no report,
+  // no report standing in as why it is here, and no note an agent signed.
+  // People's notes and the last ruling stay. Read off the routes, since a lane
+  // has no contract: the failure route goes back to a lane that feeds this one.
+  const [failureLane] = lane.onFailureLaneId
+    ? await tx
+        .select({ onSuccessLaneId: dbSchema.lanes.onSuccessLaneId })
+        .from(dbSchema.lanes)
+        .where(eq(dbSchema.lanes.id, lane.onFailureLaneId))
+    : [];
+  const reviews = !!failureLane && failureLane.onSuccessLaneId === lane.id;
+  const report = reviews ? null : (thread.filter((note) => note.kind === 'report').at(-1)?.body ?? null);
+  const ruling = thread.filter((note) => note.kind === 'verdict').at(-1)?.body ?? null;
 
   // Why it is back: the note (or else the reason) on the move that brought it
   // here, when that move was not its first arrival. The note comes first: a
@@ -326,7 +360,21 @@ async function assignmentFor(tx: AnyRow, todo: AnyRow, lane: AnyRow, project: An
     .orderBy(desc(dbSchema.todoEvents.at))
     .limit(1);
   const arrivalNote = arrival?.noteId ? thread.find((note) => note.id === arrival.noteId) : undefined;
-  const why = arrivalNote?.body ?? arrival?.reason ?? null;
+  const why = reviews && arrivalNote?.kind === 'report' ? null : (arrivalNote?.body ?? arrival?.reason ?? null);
+
+  // A run's own notes are links to notes already in the thread.
+  const artifacts = await tx
+    .select({
+      location: dbSchema.artifacts.location,
+      action: dbSchema.artifacts.action,
+      title: dbSchema.artifacts.title,
+    })
+    .from(dbSchema.artifacts)
+    .where(
+      and(eq(dbSchema.artifacts.todoId, todo.id), sql`${dbSchema.artifacts.location} NOT LIKE ${`${NOTE_LOCATION}%`}`),
+    )
+    .orderBy(desc(dbSchema.artifacts.createdAt))
+    .limit(ASSIGNMENT_ARTIFACTS);
 
   return {
     projectName: project.name,
@@ -338,7 +386,12 @@ async function assignmentFor(tx: AnyRow, todo: AnyRow, lane: AnyRow, project: An
     acceptance: todo.acceptance,
     report,
     why,
-    notes: thread.filter((note) => note.kind === 'note').map((note) => note.body as string),
+    notes: thread
+      .filter((note) => note.kind === 'note' && !(reviews && note.actorKind === 'agent'))
+      .map((note) => note.body as string),
+    reviews,
+    ruling,
+    artifacts,
   };
 }
 

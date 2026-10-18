@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assignmentPrompt, readReply, STANDING_SYSTEM, systemPromptFor } from '../prompts.ts';
+import { assignmentPrompt, REVIEW_NOTE, readReply, STANDING_SYSTEM, systemPromptFor } from '../prompts.ts';
 import type { Assignment } from '../telos.ts';
 
 const ASSIGNMENT: Assignment = {
@@ -13,6 +13,9 @@ const ASSIGNMENT: Assignment = {
   report: 'Added the box.',
   why: 'It does not filter.',
   notes: ['It does not filter.', 'Keep it small.'],
+  reviews: false,
+  ruling: null,
+  artifacts: [],
 };
 
 describe('systemPromptFor', () => {
@@ -70,6 +73,38 @@ describe('assignmentPrompt', () => {
     expect(order.every((at) => at >= 0)).toBe(true);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
     expect(prompt.match(/It does not filter\./g)).toHaveLength(1);
+    expect(prompt).not.toContain(REVIEW_NOTE);
+  });
+
+  it('tells a reviewer it rules on the work, and where the work is', () => {
+    const prompt = assignmentPrompt({
+      ...ASSIGNMENT,
+      reviews: true,
+      report: null,
+      why: null,
+      ruling: 'FAIL\n- Typing filters the list: not met.',
+      artifacts: [
+        { location: 'src/search.tsx', action: 'updated', title: 'The search box' },
+        { location: 'https://example.com/pr/1', action: 'created', title: null },
+      ],
+    });
+
+    expect(prompt).toContain(REVIEW_NOTE);
+    expect(prompt).not.toContain('What the last agent reported');
+    expect(prompt).toContain('- updated src/search.tsx (The search box)\n- created https://example.com/pr/1');
+    expect(prompt).toContain('The last ruling on this todo:\nFAIL\n- Typing filters the list: not met.');
+    const order = ['Done when:', REVIEW_NOTE, 'What has been made', 'The last ruling'].map((part) =>
+      prompt.indexOf(part),
+    );
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+  });
+
+  it('gives the last ruling once, when it is already why the todo came back', () => {
+    const ruling = 'FAIL\n- Typing filters the list: not met.';
+    const prompt = assignmentPrompt({ ...ASSIGNMENT, ruling, why: ruling });
+
+    expect(prompt).not.toContain('The last ruling on this todo');
+    expect(prompt.match(/not met\./g)).toHaveLength(1);
   });
 });
 
