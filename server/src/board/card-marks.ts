@@ -3,7 +3,7 @@ import { sql } from 'drizzle-orm';
 import { extendSchema, type GraphQLSchema, parse } from 'graphql';
 import type { QueryResolvers } from '../../__generated__/resolvers.ts';
 import { aiAllowed } from '../ai/gate.ts';
-import { requireSession } from '../auth/resolvers.ts';
+import { requireAuth } from '../auth/resolvers.ts';
 import { loadOwnedProject } from '../core/owned.ts';
 import { attachResolvers } from '../graphql/attach-resolvers.ts';
 import { failuresSinceTouched } from '../runs/ready.ts';
@@ -124,7 +124,7 @@ export function applyCardMarksExtension(schema: GraphQLSchema, options: { ai: bo
 
   queries.cardMarks = async (_parent, args, context) => {
     // A person's, like the board it is drawn on.
-    const userId = requireSession(context);
+    const userId = requireAuth(context);
     const db = context.db;
     const project = await loadOwnedProject(db, userId, args.projectId);
 

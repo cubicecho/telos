@@ -3,14 +3,13 @@ import { resolveAgent } from '@telos/runner/spec';
 import { extendSchema, type GraphQLSchema, parse } from 'graphql';
 import type { MutationResolvers, QueryResolvers } from '../../__generated__/resolvers.ts';
 import { requireAi } from '../ai/gate.ts';
-import { requireSession } from '../auth/resolvers.ts';
 import { badInput } from '../core/errors.ts';
 import { attachResolvers } from '../graphql/attach-resolvers.ts';
 import { LAYER_FIELDS, loadAgentDefaults } from './agent-defaults.ts';
 
 // The account's agent defaults (db/src/models/agent-defaults.ts): read and set
-// by a person in Settings, as their agents are (`requireSession`), and closed
-// to AI and the runner by the actor lock. The table generates nothing, so a missing row can read as "no
+// by a person in Settings, as their agents are, and closed to AI and the
+// runner by graphql/permissions.ts. The table generates nothing, so a missing row can read as "no
 // defaults" and a save can be one upsert of the whole layer. The key is
 // write-only, as an agent's is: `hasApiKey` says whether there is one.
 //
@@ -171,13 +170,11 @@ export function applyAgentDefaultsExtension(schema: GraphQLSchema): GraphQLSchem
   const mutations: MutationResolvers = {};
 
   queries.agentDefaults = async (_parent, _args, context) => {
-    requireSession(context);
     const userId = await requireAi(context);
     return visible(userId, await loadAgentDefaults(context.db, userId));
   };
 
   mutations.setAgentDefaults = async (_parent, args, context) => {
-    requireSession(context);
     const userId = await requireAi(context);
     const set = columns(args.values);
     const [row] = await (context.db as AnyRow)
@@ -189,7 +186,6 @@ export function applyAgentDefaultsExtension(schema: GraphQLSchema): GraphQLSchem
   };
 
   mutations.setAgentDefaultsApiKey = async (_parent, args, context) => {
-    requireSession(context);
     const userId = await requireAi(context);
     const apiKey = args.apiKey?.trim() || null;
     const [row] = await (context.db as AnyRow)

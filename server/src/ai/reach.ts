@@ -13,7 +13,7 @@ import { loadAiProject, loadAiTodo } from '../core/owned.ts';
 // that caller could have read, and answered NOT_FOUND otherwise.
 //
 // Stated here as a table rather than in each resolver, so the resolvers stay
-// the person's and a mutation opened to AI later (actor-lock.ts) has one place
+// the person's and a mutation opened to AI later (graphql/permissions.ts) has one place
 // to say what its arguments are. Generated writes need none of this: their rows
 // are scoped by tenancy.ts and their foreign keys by write-guards.ts. The request
 // mutations check for themselves.

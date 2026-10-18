@@ -15,7 +15,7 @@ import { requireAi } from './gate.ts';
 // table — dropped into the project's first open lane, where the board's own
 // agents (or its person) pick it up. It is the one way to add work without
 // naming a lane; the rest of what AI may do to the board is the generated
-// writes actor-lock.ts lets through (AI_MUTATIONS).
+// writes graphql/permissions.ts lets through (AI_MUTATIONS).
 //
 // Every mutation here is answered NOT_FOUND for anything AI may not see: an
 // account or project with AI off, a todo the user told AI to ignore. From the
