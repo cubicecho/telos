@@ -10,6 +10,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import express, { type Express, type Response } from 'express';
 import { type GraphQLSchema, Source } from 'graphql';
+import { HTTP_DEFAULTS } from '../core/defaults.ts';
 import type { ContextFactory } from '../graphql/context-factory.ts';
 import { createLoaders } from '../graphql/loaders.ts';
 import { toHeaders } from '../http/headers.ts';
@@ -156,7 +157,7 @@ export function mountMcp(
     return null;
   }
   const handler = createMcpHandler(options.schema, options.contextFor, options.version);
-  app.all('/mcp', express.json({ limit: '1mb' }), (req, res, next) => {
+  app.all('/mcp', express.json({ limit: HTTP_DEFAULTS.bodyLimit }), (req, res, next) => {
     instanceAiOn(options.db)
       .then((on) => (on ? handler(req, res) : off(res)))
       .catch((error: unknown) => {

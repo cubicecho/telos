@@ -4,7 +4,7 @@ import type { Auth } from '../auth/better-auth.ts';
 import type { RateLimiter } from '../auth/rate-limit.ts';
 import type { Loaders } from '../graphql/loaders.ts';
 
-/** What `Context.ip` holds when the socket reports no address. One shared budget, not none. */
+/** What `Context.ip` holds when Express reports no address. One shared budget, not none. */
 export const UNKNOWN_IP = 'unknown';
 
 /**

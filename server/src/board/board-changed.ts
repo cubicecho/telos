@@ -11,7 +11,7 @@ import { type BoardChange, boardEventsFor } from './events.ts';
 // it already has, so what it may see is decided in one place, the scope.
 //
 // For the person who owns the project. An MCP client or an agent works a board
-// through tools and cannot hold a socket open, so it has no use for one.
+// through tools and cannot hold a stream open, so it has no use for one.
 
 const BOARD_CHANGES_SDL = (hasRoot: boolean) =>
   parse(`

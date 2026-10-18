@@ -148,8 +148,17 @@ export function appLink(path: string): string {
 export function serverUrl(): string {
   const configured = process.env.SERVER_URL?.trim().replace(/\/+$/, '');
   if (configured) return configured;
-  if (process.env.NODE_ENV === 'production') return appUrl().replace(/\/+$/, '');
+  if (isProduction()) return appUrl().replace(/\/+$/, '');
   return `http://localhost:${process.env.PORT ?? 3001}`;
+}
+
+/**
+ * Whether this is a production run: preflight is stricter, and GraphiQL is off.
+ *
+ * @returns true when `NODE_ENV` is "production".
+ */
+export function isProduction(): boolean {
+  return process.env.NODE_ENV === 'production';
 }
 
 /**

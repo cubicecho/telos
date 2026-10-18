@@ -13,7 +13,7 @@ workspaces) with three packages — `app/` (frontend), `server/` (GraphQL API),
 | -------- | -------------------------------------------------------- |
 | Frontend | React 19, Expo Router (web target), Apollo Client        |
 | UI       | React Native primitives, NativeWind 5 + Tailwind 4, cubeui (native registry) |
-| API      | Apollo Server 5 on Express 5, GraphQL                    |
+| API      | GraphQL Yoga 5 on Express 5; subscriptions over SSE      |
 | Database | Drizzle ORM + PostgreSQL (`postgres-js`)                 |
 | Testing  | Vitest, PGlite as an in-memory Postgres fixture          |
 | Linting  | Biome (formatter + linter)                               |
@@ -150,6 +150,18 @@ names the todo only, so it survives a move between projects: the
 on `?view=archived`). Keep that URL shape stable; it is in other apps' data.
 
 ## Rules that carry weight
+
+**/graphql is Yoga, and subscriptions are SSE on the same path.**
+`http/app.ts` builds the app (no listen, no side effects; tests drive it over
+HTTP) and `graphql/handler.ts` is the Yoga instance. A live board is a GraphQL
+over SSE stream in distinct-connections mode: the app's `SseLink`
+(`app/src/lib/apollo.ts`) opens one per subscription with the session in the
+`Authorization` header, retries forever, and refetches what is on screen after a
+reconnect. There is no WebSocket server. Yoga masks any error that is not a
+coded `GraphQLError` as "Unexpected error." and `graphql/logger.ts` logs the
+cause under `[graphql]`, so a failure a client should read must throw a coded
+error. Shutdown (`http/shutdown.ts`) drains, then cuts open streams after
+`HTTP_DEFAULTS.drainSeconds`.
 
 **A module goes in the folder for its concept** (the tree above, and the
 `cubicecho_backend` skill's app.md, "Folders"). A domain folder holds its rules,

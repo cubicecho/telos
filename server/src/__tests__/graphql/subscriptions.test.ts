@@ -1,25 +1,21 @@
-import { createServer, type Server } from 'node:http';
+import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { type Client, createClient } from 'graphql-ws';
+import { type Client, createClient } from 'graphql-sse';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import WebSocket from 'ws';
 import { signInOnLocalNet } from '../../auth/better-auth.ts';
-import { createRateLimiter } from '../../auth/rate-limit.ts';
-import { createContextFactory } from '../../graphql/context-factory.ts';
-import { serveSubscriptions } from '../../graphql/subscriptions.ts';
+import { createApp } from '../../http/app.ts';
 import { type Board, createBoard } from '../board.ts';
 import { authFor, createTestDb, hostFor, schemaFor, type TestDb } from '../helpers.ts';
 
-// The socket a live board rides, end to end: a real server, graphql-ws's own
-// client, and the session token sent the way a browser has to send it, in the
-// connection's params.
+// The stream a live board rides, end to end: the real app, graphql-sse's own
+// client in distinct-connections mode (what Yoga serves on /graphql), and the
+// session token in the Authorization header, as every other request sends it.
 
 const WATCH = `subscription ($projectId: ID!) { boardChanged(projectId: $projectId) { projectId table } }`;
 
 let db: TestDb;
 let board: Board;
 let server: Server | null = null;
-let closeSockets: (() => Promise<void>) | null = null;
 const clients: Client[] = [];
 
 beforeEach(async () => {
@@ -28,31 +24,29 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  await Promise.all(clients.splice(0).map((client) => client.dispose()));
-  await closeSockets?.();
-  closeSockets = null;
+  for (const client of clients.splice(0)) client.dispose();
   server?.closeAllConnections();
   await new Promise<void>((resolve) => (server ? server.close(() => resolve()) : resolve()));
   server = null;
 });
 
 async function serve(): Promise<string> {
-  const { schema } = schemaFor(db, false);
-  server = createServer();
-  closeSockets = serveSubscriptions(
-    server,
-    schema,
-    createContextFactory(db, hostFor(db), createRateLimiter(), { ai: false }),
-  );
-  await new Promise<void>((resolve) => server?.listen(0, '127.0.0.1', resolve));
-  return `ws://127.0.0.1:${(server.address() as AddressInfo).port}/graphql`;
+  const { app } = createApp({
+    db,
+    authHost: hostFor(db),
+    schema: schemaFor(db, false).schema,
+    ai: false,
+    version: '0',
+  });
+  server = app.listen(0, '127.0.0.1');
+  await new Promise<void>((resolve) => server?.once('listening', () => resolve()));
+  return `http://127.0.0.1:${(server.address() as AddressInfo).port}/graphql`;
 }
 
 function connect(url: string, token?: string): Client {
   const client = createClient({
     url,
-    webSocketImpl: WebSocket,
-    connectionParams: token ? { authorization: `Bearer ${token}` } : {},
+    headers: token ? { authorization: `Bearer ${token}` } : {},
     retryAttempts: 0,
   });
   clients.push(client);
@@ -76,7 +70,7 @@ function first(client: Client, projectId = board.projectId): Promise<unknown> {
   });
 }
 
-describe('the board socket', () => {
+describe('the board stream', () => {
   it('delivers a change to the signed-in owner', async () => {
     const { token } = await signInOnLocalNet(authFor(db), 'owner@example.com');
     const client = connect(await serve(), token);
@@ -94,7 +88,7 @@ describe('the board socket', () => {
     expect(await change).toEqual({ data: { boardChanged: { projectId: board.projectId, table: 'todos' } } });
   });
 
-  it('refuses a socket without a session', async () => {
+  it('refuses a stream without a session', async () => {
     const client = connect(await serve());
     const result = (await first(client)) as { errors?: Array<{ extensions?: { code?: string } }> };
     expect(result.errors?.[0]?.extensions?.code).toBe('UNAUTHENTICATED');

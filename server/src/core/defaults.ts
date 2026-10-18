@@ -1,4 +1,4 @@
-// Every tunable value sign-in uses, as plain data. Nothing here computes, reads
+// Every tunable value the server uses, as plain data. Nothing here computes, reads
 // the environment or imports. A different value is passed as an override where
 // the thing is built (a test's tighter limiter), never by editing a group at
 // runtime: each group is frozen.
@@ -46,4 +46,20 @@ export const AUTH_DEFAULTS: Readonly<AuthSettings> = Object.freeze({
   // The default the OIDC spec names.
   oidcClientAuth: 'client_secret_basic',
   oidcPairingTimeoutMs: 10_000,
+});
+
+/** Settings for the HTTP doors and the process behind them. */
+export interface HttpSettings {
+  /** Largest JSON body /graphql and /mcp accept, as `express.json` reads it. Real operations are a few kB. */
+  bodyLimit: string;
+  /** How long shutdown lets open requests finish before it cuts them, live boards included. */
+  drainSeconds: number;
+  /** How long shutdown may take in all before a hard exit. Keep it under Docker's 10 s stop grace period. */
+  shutdownDeadlineSeconds: number;
+}
+
+export const HTTP_DEFAULTS: Readonly<HttpSettings> = Object.freeze({
+  bodyLimit: '1mb',
+  drainSeconds: 5,
+  shutdownDeadlineSeconds: 8,
 });
