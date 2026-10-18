@@ -1,0 +1,47 @@
+import type { Server } from 'node:http';
+import { ApolloServer } from '@apollo/server';
+import { ApolloServerPluginDrainHttpServer } from '@apollo/server/plugin/drainHttpServer';
+import { expressMiddleware } from '@as-integrations/express5';
+import express, { Router } from 'express';
+import type { Context } from '../core/context.ts';
+import { toHeaders } from '../http/headers.ts';
+import type { ContextFactory } from './context-factory.ts';
+import { schema } from './schema.ts';
+import { serveSubscriptions } from './subscriptions.ts';
+
+export type { Context };
+
+export async function createGraphQLRouter(httpServer: Server, contextFor: ContextFactory) {
+  const closeSockets = serveSubscriptions(httpServer, schema, contextFor);
+
+  const apolloServer = new ApolloServer<Context>({
+    schema,
+    plugins: [
+      ApolloServerPluginDrainHttpServer({ httpServer }),
+      // Close open sockets on shutdown, or the HTTP server waits on them.
+      {
+        async serverWillStart() {
+          return {
+            async drainServer() {
+              await closeSockets();
+            },
+          };
+        },
+      },
+    ],
+  });
+
+  await apolloServer.start();
+
+  const router = Router();
+
+  router.use(
+    express.json({ limit: '1mb' }),
+    expressMiddleware(apolloServer, {
+      // Express's view of the caller, which honours TRUST_PROXY.
+      context: ({ req }) => contextFor(toHeaders(req.headers), req.ip),
+    }),
+  );
+
+  return router;
+}

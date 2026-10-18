@@ -3,7 +3,7 @@ import { boolean, index, integer, pgTable, text, timestamp, uniqueIndex, uuid } 
 import { users } from './users.ts';
 
 // better-auth's tables. Its models are `user`, `session`, `account`,
-// `verification` and `apikey`; `server/src/auth.ts` maps them onto these by
+// `verification` and `apikey`; `server/src/auth/better-auth.ts` maps them onto these by
 // key, so the property names below are the ones better-auth reads and must
 // not be renamed. None of them is in the GraphQL schema (`build-schema.ts`
 // excludes them): sessions, key hashes and magic-link tokens are only ever

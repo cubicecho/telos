@@ -1,0 +1,148 @@
+import type { DB } from '@telos/db';
+import * as dbSchema from '@telos/db/schema';
+import { and, eq, sql } from 'drizzle-orm';
+import { extendSchema, type GraphQLSchema, parse } from 'graphql';
+import type { MutationResolvers } from '../../__generated__/resolvers.ts';
+import { findNewTodoLaneId } from '../board/lanes.ts';
+import type { Context } from '../core/context.ts';
+import { badInput, notFound } from '../core/errors.ts';
+import { loadAiProject, loadAiTodo } from '../core/owned.ts';
+import { attachResolvers } from '../graphql/attach-resolvers.ts';
+import { stampActor } from '../todos/provenance.ts';
+import { requireAi } from './gate.ts';
+
+// How AI hands work to the board. A request is a todo — there is no second
+// table — dropped into the project's first open lane, where the board's own
+// agents (or its person) pick it up. It is the one way to add work without
+// naming a lane; the rest of what AI may do to the board is the generated
+// writes actor-lock.ts lets through (AI_MUTATIONS).
+//
+// Every mutation here is answered NOT_FOUND for anything AI may not see: an
+// account or project with AI off, a todo the user told AI to ignore. From the
+// AI side those simply are not there.
+//
+// Applied only when the instance has AI on.
+
+// biome-ignore lint/suspicious/noExplicitAny: drizzle-orm 1.0 table/column type compat
+type AnyRow = any;
+
+const REQUESTS_SDL = parse(`
+  extend type Mutation {
+    """
+    Hands a piece of work to a project: a new todo in its first open lane.
+    \`brief\` is what to do and why; \`acceptance\` is how to tell it is done.
+    \`parentId\` makes it part of a larger todo in the same project.
+    The project must have AI switched on.
+    """
+    submitRequest(projectId: ID!, title: String!, brief: String, acceptance: String, parentId: ID): Todo!
+    """
+    Withdraws a request: AI stops seeing it and it goes back to its owner, who
+    decides what to do with it. \`reason\` is added to its thread.
+    """
+    cancelRequest(id: ID!, reason: String): Boolean!
+    "Adds a note to a todo's thread, signed as whoever is calling."
+    addTodoNote(todoId: ID!, body: String!): TodoNote!
+  }
+`);
+
+/** Below the lane's last card, so a new request queues behind what is there. */
+export async function nextPosition(tx: DB, projectId: string, laneId: string | null): Promise<number> {
+  const [row] = await tx
+    .select({ max: sql<number | null>`max(${dbSchema.todos.position})` })
+    .from(dbSchema.todos)
+    .where(
+      and(
+        eq(dbSchema.todos.projectId, projectId),
+        laneId ? eq(dbSchema.todos.laneId, laneId) : sql`${dbSchema.todos.laneId} is null`,
+      ),
+    );
+  return row?.max == null ? 0 : Number(row.max) + 1;
+}
+
+async function insertNote(tx: DB, context: Context, userId: string, todoId: string, body: string): Promise<AnyRow> {
+  const [note] = await tx
+    .insert(dbSchema.todoNotes)
+    .values({
+      userId,
+      todoId,
+      kind: 'note',
+      body,
+      actorKind: context.actor.kind === 'anonymous' ? 'system' : context.actor.kind,
+      actorKeyId: context.actor.keyId ?? null,
+      runId: context.actor.runId ?? null,
+    })
+    .returning();
+  return note;
+}
+
+/**
+ * `value` without its surrounding space, or BAD_USER_INPUT when nothing is left.
+ *
+ * @param value - What the caller sent.
+ * @param field - The argument's name, for the message.
+ * @returns The trimmed text.
+ */
+export function requireText(value: string, field: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    throw badInput(`${field} cannot be empty`);
+  }
+  return trimmed;
+}
+
+export function applyRequestsExtension(schema: GraphQLSchema): GraphQLSchema {
+  const extendedSchema = extendSchema(schema, REQUESTS_SDL);
+  const mutations: MutationResolvers = {};
+
+  mutations.submitRequest = async (_parent, args, context) => {
+    const userId = await requireAi(context);
+    const title = requireText(args.title, 'title');
+    const project = await loadAiProject(context.db, userId, args.projectId);
+    if (args.parentId) {
+      const parent = await loadAiTodo(context.db, userId, args.parentId);
+      if (parent.projectId !== project.id) throw notFound('Parent todo');
+    }
+    return context.db.transaction(async (tx) => {
+      await stampActor(tx, context.actor);
+      const laneId = await findNewTodoLaneId(tx, project.id);
+      const [todo] = await tx
+        .insert(dbSchema.todos)
+        .values({
+          userId,
+          projectId: project.id,
+          title,
+          notes: args.brief?.trim() || null,
+          acceptance: args.acceptance?.trim() || null,
+          parentId: args.parentId ?? null,
+          laneId,
+          position: await nextPosition(tx, project.id, laneId),
+        })
+        .returning();
+      return todo;
+    });
+  };
+
+  mutations.cancelRequest = async (_parent, args, context) => {
+    const userId = await requireAi(context);
+    const todo = await loadAiTodo(context.db, userId, args.id);
+    const reason = args.reason?.trim() || null;
+    await context.db.transaction(async (tx) => {
+      const note = reason ? await insertNote(tx, context, userId, todo.id, reason) : null;
+      await stampActor(tx, context.actor, { reason, noteId: note?.id });
+      await tx
+        .update(dbSchema.todos)
+        .set({ aiIgnored: true, updatedAt: new Date() })
+        .where(and(eq(dbSchema.todos.id, todo.id), eq(dbSchema.todos.userId, userId)));
+    });
+    return true;
+  };
+
+  mutations.addTodoNote = async (_parent, args, context) => {
+    const userId = await requireAi(context);
+    const body = requireText(args.body, 'body');
+    const todo = await loadAiTodo(context.db, userId, args.todoId);
+    return insertNote(context.db, context, userId, todo.id, body);
+  };
+
+  return attachResolvers(extendedSchema, { Mutation: mutations });
+}

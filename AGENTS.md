@@ -50,31 +50,30 @@ telos/
 │   └── postcss.config.mjs
 ├── server/                  # GraphQL API (port 3001)
 │   ├── __generated__/       # Generated SDL + resolver types (not committed)
-│   └── src/
-│       ├── index.ts         # Entry point: migrate, mount /graphql and /mcp, serve the SPA
-│       ├── request-context.ts  # Headers -> Context, shared by both doors
-│       ├── mcp.ts, mcp.graphql # The MCP door: the operations in mcp.graphql are its tools
-│       ├── preflight.ts     # Boot guards — imported first, on purpose
-│       ├── defaults.ts      # Sign-in's tunables: AUTH_DEFAULTS, RATE_LIMIT_DEFAULTS
-│       ├── auth.ts          # The better-auth instance, and who a request is (resolveActor)
-│       ├── email.ts         # Emails a sign-in link through SMTP_URL
-│       ├── throttle.ts      # What every sign-in step calls first
-│       ├── rate-limit.ts    # The sliding-window limiter behind it
-│       ├── build-schema.ts  # createSchema(db) — buildSchema + extensions
-│       ├── schema.ts        # Binds createSchema to the real database
-│       ├── tenancy.ts       # Row scope + server-owned columns, as buildSchema config
-│       ├── blocking.ts      # The dependency rules, in one place
-│       ├── lanes.ts         # The lane rules, in one place
-│       ├── ready.ts         # Which todos an agent may start on, and stopping runs
-│       ├── agent-defaults.ts # An account's agent defaults, and what an agent resolves to over them
-│       ├── instance.ts      # The instance's AI switch, and its admins
-│       ├── run-tokens.ts    # Per-run tokens, and the runner's key check
-│       ├── loaders.ts       # Per-request DataLoaders
-│       ├── board-events.ts  # Relays the board_notify trigger's NOTIFYs to `boardChanged`
-│       ├── changes.ts       # The change feed: `changes(since:)`, its cursor, tombstone pruning
-│       ├── routes/          # /graphql over HTTP, and its socket for subscriptions
-│       ├── resolvers/       # SDL extensions for what CRUD cannot express
-│       └── __tests__/       # Server tests
+│   └── src/                 # One folder per concept; tests mirror it under __tests__/
+│       ├── index.ts         # Boot only: migrate, build the auth host, mount the doors, listen
+│       ├── core/            # What every folder reads, about no one concept: config, defaults,
+│       │                    #   errors, context, enums, preflight (imported first), owned()
+│       ├── http/            # Express-side pieces: the SPA (static.ts), the OIDC redirects
+│       │                    #   (sso.ts), Express headers as fetch Headers (headers.ts)
+│       ├── graphql/         # The served schema and its rules: build-schema, schema, tenancy,
+│       │                    #   write-guards, loaders, the context factory both doors share,
+│       │                    #   the /graphql handler, and subscriptions
+│       ├── auth/            # Who the caller is and how they sign in: better-auth, actor
+│       │                    #   (resolveActor), endpoints, throttle, rate-limit, email, api-keys
+│       ├── sso/             # Pairing with an OIDC provider from the app: settings, pairing, resolvers
+│       ├── instance/        # The instance's settings row: its AI switch, and its admins
+│       ├── ai/              # Whether AI may act, and what it sees and writes: gate, switches,
+│       │                    #   reach, reads, setup, status, actor-lock, requests, account-activity
+│       ├── mcp/             # The AI door: endpoint, door (+ door.graphql, its tools), prompts
+│       ├── agents/          # A lane's agents, their account defaults, their MCP servers and probes
+│       ├── runs/            # The runner's side: resolvers, ready (which todos an agent may start
+│       │                    #   on), tokens, artifacts, run-reach, session deletes, retention
+│       ├── board/           # Lanes (lanes.ts: the rules; lanes-resolvers.ts), live boards
+│       │                    #   (events.ts, board-changed.ts), card marks, templates
+│       ├── todos/           # Todos' own fields, dependencies (blocking.ts), notes, provenance
+│       ├── changes/         # The change feed: feed.ts, and `changes(since:)` in resolvers.ts
+│       └── __tests__/       # The same folders as src; helpers.ts and board.ts at the root
 ├── db/
 │   ├── drizzle/             # Generated migrations (committed)
 │   └── src/
@@ -142,7 +141,7 @@ Two consequences worth internalising:
   required `where` and returns one row or null. `deleteTodo(where: …)` deletes
   one row — reach for `deleteTodos` when you mean every match.
 
-**Links out are built from `APP_URL`, with `appLink()`** (`server/src/config.ts`).
+**Links out are built from `APP_URL`, with `appLink()`** (`server/src/core/config.ts`).
 `Todo.url` is `/todos/<id>` and `Project.url` is `/projects/<id>`, for other apps
 (a calendar's Today, Home Assistant, a dashboard) to link back. A todo's link
 names the todo only, so it survives a move between projects: the
@@ -152,19 +151,27 @@ on `?view=archived`). Keep that URL shape stable; it is in other apps' data.
 
 ## Rules that carry weight
 
-**Every table needs a `scope` entry.** `server/src/tenancy.ts` maps each table to
+**A module goes in the folder for its concept** (the tree above, and the
+`cubicecho_backend` skill's app.md, "Folders"). A domain folder holds its rules,
+its hand-written fields and their tests' subject together; `core/` is only for
+what every folder reads. No module is named for its folder, so a folder's main
+GraphQL extension is `resolvers.ts`, and a second one is named for what it does
+(`lanes-resolvers.ts` beside the `lanes.ts` rules). Tests mirror the folders
+under `__tests__/`. Imports use the full relative path.
+
+**Every table needs a `scope` entry.** `server/src/graphql/tenancy.ts` maps each table to
 a `RowScope` that is ANDed into the SQL of every generated read, update and
 delete. A table missing from `scope` is visible across tenants, and nothing else
 in the code will say so. `tenancy.test.ts` fails when you forget — do not delete
 the test to make it pass.
 
-**Auth is better-auth, reached only through GraphQL.** `server/src/auth.ts`
+**Auth is better-auth, reached only through GraphQL.** `server/src/auth/better-auth.ts`
 configures it (bearer sessions in Postgres, magic links, OIDC, API keys) over
 the tables in `db/src/models/auth.ts`, which `build-schema.ts` excludes from
 the generated schema. None of better-auth's REST routes are mounted:
-`resolvers/better-auth.ts` serves its endpoints as GraphQL through
+`auth/endpoints.ts` serves its endpoints as GraphQL through
 `@cubicecho/graphql-better-auth`, and only the two OIDC redirects are HTTP
-(`routes/sso.ts`). This follows the `cubicecho_backend` skill's auth.md and
+(`http/sso.ts`). This follows the `cubicecho_backend` skill's auth.md and
 sso.md, with ethos as the reference; keep them in step.
 
 **Sign-in is a link, a provider, or the local network — never a password.**
@@ -183,8 +190,8 @@ CRUD refuses the runner outright.
 
 **The auth instance is swappable; never hold one from boot.** better-auth fixes
 its plugins at creation, and the OIDC provider is one, so pairing a provider
-(`oidc-pairing.ts`, `resolvers/sso-setup.ts`) rebuilds it. `auth-host.ts` holds
-the current one: the context factory, `routes/sso.ts` (always mounted, and
+(`sso/pairing.ts`, `sso/resolvers.ts`) rebuilds it. `auth-host.ts` holds
+the current one: the context factory, `http/sso.ts` (always mounted, and
 `?error=sso_off` with no provider) and `authConfig` ask it per request, and a
 resolver uses `ctx.auth`. The provider is `effectiveOidc()` (`oidc-settings.ts`):
 `OIDC_ISSUER` wins over the `oidc_settings` row. Pairing is an admin's, or
@@ -193,10 +200,10 @@ in as any address. Never log or store a setup URL's token.
 
 **AI is off unless every switch says on.** `AI_ENABLED=false` removes the AI
 extensions from the schema at all; otherwise they are built, and the instance's
-switch (`instance_settings.aiEnabled`, `instance.ts`) decides at runtime. Only
+switch (`instance_settings.aiEnabled`, `instance/settings.ts`) decides at runtime. Only
 an admin (`users.isAdmin`; the first account to sign up) flips it, with
 `setInstanceAiEnabled`. It is read on every request, never cached: by
-`ai-gate.ts`, by `resolveActor` for API keys and run tokens, by `readyTodos`
+`ai/gate.ts`, by `resolveActor` for API keys and run tokens, by `readyTodos`
 (`INSTANCE_AI_ON`), by `finishRun`/`heartbeatRun` and by `/mcp`. The runner's
 key still resolves with it off, so a heartbeat can say stop. `users.aiEnabled`
 (account) is asked by the same places. All of them default to off. An AI resolver calls `requireAi`, and
@@ -208,25 +215,25 @@ key cannot mint its own successor.
 `apiKey` or `agent` actor (`isAiActor`) is held to narrower rules. What it
 sees: `tenancy.ts` narrows its scope to projects with `aiEnabled` and, in them,
 todos without `aiIgnored`, and hides everything hanging off a hidden todo; the
-`agents` table is closed to it outright, and `agentRoster` (`resolvers/ai-reads.ts`)
+`agents` table is closed to it outright, and `agentRoster` (`ai/reads.ts`)
 is all it learns of agents — no key, prompt, base URL or MCP servers. A
 resolver that reads rows directly (a loader, a hand-written mutation) has to
 apply the same narrowing itself — see `visibleToAi`/`hiddenFromAi` in
-`resolvers/todos.ts`, `loadAiTodo` in `resolvers/requests.ts`, and
-`resolvers/ai-reach.ts`, which checks the ids a hand-written mutation is handed
+`todos/resolvers.ts`, `loadAiTodo` in `ai/requests.ts`, and
+`ai/reach.ts`, which checks the ids a hand-written mutation is handed
 and answers NOT_FOUND for what AI cannot see. What it writes:
-`resolvers/actor-lock.ts` wraps every mutation and refuses AI all but
+`ai/actor-lock.ts` wraps every mutation and refuses AI all but
 `AI_MUTATIONS` — projects (create and rename, nothing else:
 `holdAiProjectWrite`), todos (create, edit, move, retry, run, stop a run,
 dependencies, archive, restore, delete), notes, artifacts and board
 templates. Still a person's: the AI switches, auto-run, agents and their keys
 and MCP servers, API keys, lanes and their agents, the project's new-todo lane, bulk mutations, and archiving
 or deleting a project. A new mutation is closed to AI until it is added there.
-The MCP door (`mcp.ts`) serves only the operations written in `mcp.graphql`,
+The MCP door (`mcp/endpoint.ts`) serves only the operations written in `mcp/door.graphql`,
 and a test pins its mutations to `AI_MUTATIONS`: the tool list is the menu,
 the lock is the lock. Each key has a switch per tool (`api_key_tools`,
 `door.ts`): every tool is on until its owner turns it off in Settings, and one
-that is off is left out of the key's listing (`mcp.ts`) *and* refused by the
+that is off is left out of the key's listing (`mcp/endpoint.ts`) *and* refused by the
 lock (`toolsOff` on the actor, read in `auth.ts`), for the root fields the tool
 uses. A run has the same switches through its agent (`agents.tools_off`,
 edited in the agent form): null is the run default (`runToolsOff` in
@@ -236,7 +243,7 @@ computed in code so a tool the door gains later is off for a run until
 someone switches it on; `record_artifact` is never a run's (`NOT_FOR_RUNS`).
 Whatever its switches say, a run writes only its own todo, the todos under it
 and the todos a run of its todo created, and its own board
-(`resolvers/run-reach.ts`, applied by the lock after `ai-reach.ts`): out of
+(`runs/run-reach.ts`, applied by the lock after `ai-reach.ts`): out of
 reach is NOT_FOUND, and editing, moving, finishing, archiving, deleting,
 re-running or re-pointing the dependencies of its own todo is FORBIDDEN, since
 that is `finishRun`'s to decide: a run rewrites its todo with a refine. A mutation added to `AI_MUTATIONS` needs an entry in
@@ -258,7 +265,7 @@ ideas, one name each:
 
 There is no lane prompt and no per-lane contract: what a lane asks for is its
 agent's instructions, and every reply is read the same way (`verdictOf` in
-`resolvers/runs.ts`). A reply that opens with FAIL fails and takes the failure
+`runs/resolvers.ts`). A reply that opens with FAIL fails and takes the failure
 route; one that opens with PASS passes; anything else is a report and passes.
 A passing run may refine its todo with a fenced `refine` block (`title`,
 `brief`, `acceptance`; what it leaves out stays), which `finishRun` writes
@@ -291,7 +298,7 @@ never re-queues work its lane already did. `archiveOnSuccess` is the other answe
 to a pass: `finishRun` completes the todo, puts it in the done lane and
 archives it in one write, as the run. It is that or a success route, never
 both; the lane write guard (`assertArchiveOnSuccessFits`) holds it and says
-what to change. `assignmentFor` in `resolvers/runs.ts` assembles what a run is
+what to change. `assignmentFor` in `runs/resolvers.ts` assembles what a run is
 handed; the runner adds the agent's instructions and one standing protocol
 (`STANDING_SYSTEM` in `runner/src/prompts.ts`).
 The runner (`@telos/runner`, which never
@@ -314,11 +321,11 @@ the AI switches, a lane without an agent, a blocker or the WIP limit, and it is
 also a retry: its `run` event is a person's arrival in the lane, as
 `retryTodo`'s is. Switching auto-run off cancels nothing. `aiStatus` reads the
 same rules back: such a todo is `parked` with `awaitsRun` until asked for.
-`aiSetup` (`resolvers/ai-setup.ts`) answers what an account has in place for a
+`aiSetup` (`ai/setup.ts`) answers what an account has in place for a
 first run, in one statement and with nothing remembered; the app's setup
 checklist (`ai-setup-checklist.tsx`) adds the two switches from `useAi()` and
 disappears when every step is taken. A new step goes in both.
-`cardMarks` (`resolvers/card-marks.ts`) is what a board's cards show about
+`cardMarks` (`board/card-marks.ts`) is what a board's cards show about
 their threads and last runs, one query for the board and only the todos with
 something to mark. It is applied with AI off too, because notes are not an AI
 feature; the run half needs AI on for the instance, the account and the
@@ -333,7 +340,7 @@ and a stopped run writes nothing. `agents.apiKey` is excluded from the schema;
 it is written with `setAgentApiKey` and read only by the runner, in a claim.
 
 **An agent says only what is different about it.** `agent_defaults` (one row
-per account, a server-only table, `resolvers/agent-defaults.ts`) is the layer
+per account, a server-only table, `agents/agent-defaults-resolvers.ts`) is the layer
 under every agent the account has: endpoint, model, sampling, tool discovery,
 the tool-picking model, iterations, timeout and retries. A null on the agent
 inherits the default, a null there agent-core's `RESOLVED_DEFAULTS`; zero and
@@ -363,7 +370,7 @@ enabled server, including ones added later), `[]` (none) or a list of slugs
 (exactly those). A list only narrows: a slug that names no server is left out
 and the run says so (`mcpNotices` on the claim, shown as a notice), never read
 as "all"; a server switched off is left out without a word. The server works
-the list out (`serversFor` in `server/src/mcp-servers.ts`) and hands the runner
+the list out (`serversFor` in `server/src/agents/mcp-servers.ts`) and hands the runner
 the rows in slug order, so a run's tools come in the same order every time.
 The slug is what the tools are named under (`slug__tool`), so renaming one is
 followed into agents' lists by the `mcp_servers_rename` trigger; deleting one
@@ -390,7 +397,7 @@ can write. A stopped run keeps its events but no artifacts.
 **An artifact says who vouches for it, and outlives its todo.** `source` is
 `declared` or `detected` for what a run reported (`RUN_ARTIFACT_SOURCES`, the
 only two `finishRun` accepts) and `client` for what an MCP client recorded with
-`recordArtifact` (`resolvers/artifacts.ts`, `record_artifact` on `/mcp`): a
+`recordArtifact` (`runs/artifacts.ts`, `record_artifact` on `/mcp`): a
 location and a label on a todo the caller can see, signed like a note
 (`actor_kind`, `actor_key_id`), and checked by nothing. So `client` is its own
 source, the app marks it unverified, and a run cannot use the mutation: it is
@@ -420,7 +427,7 @@ never waits for it.** `todo_sessions.todo_id` has no foreign key: the
 `todos_end_sessions` trigger stamps `deleted_at` on a hard delete by any path
 (a project's delete included; archiving is not a delete), and the runner
 comes for what is owed as it comes for MCP tests (`takeSessionDeletes`,
-`finishSessionDelete` in `server/src/resolvers/session-deletes.ts`;
+`finishSessionDelete` in `server/src/runs/session-deletes.ts`;
 `runner/src/session-deletes.ts`). Only servers with an enabled `sessionDelete`
 hook are sent, and a session nobody asked to hear the end of is forgotten. A
 failure is retried with a backoff up to `SESSION_DELETE_ATTEMPTS`, then
@@ -435,7 +442,7 @@ server.
 (`account-activity.tsx`) lists runs, artifacts and archived todos with the
 generated queries and no project filter, which are already the account's own,
 and reuses the project's rows (`RunRow`, `ArtifactRow`, `ArchivedTodoList`,
-`RunDialog`). What those cannot say is in `resolvers/account-activity.ts`,
+`RunDialog`). What those cannot say is in `ai/account-activity.ts`,
 both a person's (`requireSession`) and behind `requireAi`: `accountSpend` adds
 up a window's runs by project and by agent, over
 every project the account owns, and returns `keptSince` when run retention is
@@ -447,14 +454,14 @@ without its todo. The sidebar link and the route both go when `useAi().on` is
 false.
 
 **`scope` cannot reach a plain insert.** Any foreign key a caller can state gets
-checked in an `onWrite` hook in `server/src/resolvers/write-guards.ts`. A new
+checked in an `onWrite` hook in `server/src/graphql/write-guards.ts`. A new
 table with a user-facing FK needs an entry in `FOREIGN_KEYS`.
 
 **Todo history is written by a trigger; stamp the actor before writing a todo.**
 The `todos_history` trigger (richer_todos migration) records one `todo_events`
 row per todo per transaction and reads who did it from `telos.*` settings.
 Any code that writes `todos` does so inside a transaction that first calls
-`stampActor` (`server/src/provenance.ts`); the `todos` and `lanes` write hooks
+`stampActor` (`server/src/todos/provenance.ts`); the `todos` and `lanes` write hooks
 already do this for generated writes. A write that forgets is recorded as
 `system`. Because the trigger lives in a migration, tests build their database
 from the migrations, not `pushSchema`.
@@ -475,7 +482,7 @@ the server.
 
 **The lane and the checkbox say the same thing.** In a project that has a done
 lane, a todo with a lane is completed *if and only if* that lane is the done one.
-`server/src/lanes.ts` states the biconditional and keeps it: `moveTodo`,
+`server/src/board/lanes.ts` states the biconditional and keeps it: `moveTodo`,
 `completeTodo`, `reopenTodo` and `setDoneLane` each maintain it directly, and
 `assertCompletionMatchesLane` re-asserts it after any generated write — so
 dropping a card in the done column ticks it off, ticking the box moves the card,
@@ -493,7 +500,7 @@ rather than a rule someone has to remember.
 **`position` is project-wide, not per-lane.** One sequence orders the list view
 and every column of the board, so the two tabs cannot disagree about what comes
 first. A drop names an index *within a column*; `reposition()` in
-`server/src/resolvers/lanes.ts` and `moveTodoInList()` in `app/src/lib/lanes.ts`
+`server/src/board/lanes-resolvers.ts` and `moveTodoInList()` in `app/src/lib/lanes.ts`
 translate that into the global sequence, and they translate it the same way — if
 they drift, the board reshuffles itself on the next fetch. Lane `position` has
 deliberately no unique constraint: reordering rewrites several lanes in one
@@ -512,7 +519,7 @@ dependency edge, upserted by triggers in its migration on every insert, real
 update (`OLD.* IS DISTINCT FROM NEW.*`) and delete, cascades included. So a
 new write path needs nothing to appear in the feed, and nothing may write
 `change_log` by hand. Its position is the writing transaction's id and a
-sequence, and `server/src/changes.ts` serves only what is below the oldest
+sequence, and `server/src/changes/feed.ts` serves only what is below the oldest
 transaction still running, so nothing can commit behind a cursor; a long
 transaction holds the feed up until it ends. Rows are read back through
 `reachable()`, so the feed's scope is tenancy's: what a caller cannot see now
@@ -530,7 +537,7 @@ lives. `setTodoDependencies` replaces a todo's whole list in one transaction,
 for a caller that would otherwise leave it half-written; the one-edge mutations
 are what the app uses. A refused edge names the todos in the loop.
 
-**Notes are added by generated CRUD and changed only by `resolvers/notes.ts`.**
+**Notes are added by generated CRUD and changed only by `todos/notes.ts`.**
 `features` turns off generated update and delete for `todoNotes`, because who
 may change a note is not something a `where` can say. `editTodoNote` and
 `deleteTodoNote` hold the rule: a report or a verdict is what a run said and

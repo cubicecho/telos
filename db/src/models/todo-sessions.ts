@@ -14,7 +14,7 @@ import { users } from './users.ts';
 // `todos_end_sessions` trigger (todo_sessions migration) stamps `deleted_at`,
 // and the row waits for the runner to tell the agent's servers
 // (`sessionDelete`) before it goes. Written only by the server
-// (resolvers/runs.ts, resolvers/session-deletes.ts), so it generates nothing.
+// (runs/resolvers.ts, runs/session-deletes.ts), so it generates nothing.
 export const todoSessions = pgTable(
   'todo_sessions',
   {

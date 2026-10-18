@@ -1,6 +1,6 @@
 import type { CodegenConfig } from '@graphql-codegen/cli';
 
-// The SDL this reads is written by src/write_schema.ts, which builds the schema
+// The SDL this reads is written by src/graphql/write-schema.ts, which builds the schema
 // from the Drizzle tables — so `npm run codegen` regenerates both halves and the
 // resolver types can never drift from the schema the server actually serves.
 const config: CodegenConfig = {
@@ -11,7 +11,7 @@ const config: CodegenConfig = {
       plugins: ['typescript', 'typescript-resolvers'],
       config: {
         inputMaybeValue: 'T | null | undefined',
-        contextType: '../src/context.ts#Context',
+        contextType: '../src/core/context.ts#Context',
         useTypeImports: true,
         scalars: {
           UUID: 'string',
@@ -40,16 +40,16 @@ const config: CodegenConfig = {
         },
         mapperTypeSuffix: 'Row',
         // Resolvers see an enum's server value (`handedBack`), not its wire
-        // name (`HANDED_BACK`): src/enums.ts translates between the two.
+        // name (`HANDED_BACK`): src/core/enums.ts translates between the two.
         enumValues: {
-          WorkState: '../src/enums.ts#WorkState',
-          HandBack: '../src/enums.ts#HandBack',
-          McpProbeStatus: '../src/enums.ts#McpProbeStatus',
-          McpSecretKind: '../src/enums.ts#McpSecretKind',
-          ChangeEntity: '../src/enums.ts#ChangeEntity',
-          RunOutcome: '../src/enums.ts#RunOutcome',
-          RunEventKind: '../src/enums.ts#RunEventKind',
-          SsoSource: '../src/enums.ts#SsoSource',
+          WorkState: '../src/core/enums.ts#WorkState',
+          HandBack: '../src/core/enums.ts#HandBack',
+          McpProbeStatus: '../src/core/enums.ts#McpProbeStatus',
+          McpSecretKind: '../src/core/enums.ts#McpSecretKind',
+          ChangeEntity: '../src/core/enums.ts#ChangeEntity',
+          RunOutcome: '../src/core/enums.ts#RunOutcome',
+          RunEventKind: '../src/core/enums.ts#RunEventKind',
+          SsoSource: '../src/core/enums.ts#SsoSource',
         },
         avoidOptionals: {
           // Use `null` for nullable fields instead of optionals

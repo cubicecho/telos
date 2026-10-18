@@ -10,12 +10,12 @@ import { graphql } from 'graphql';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { type Board, createBoard, SET_AUTO_RUN, setLane } from '../../../server/src/__tests__/board.ts';
 import { createTestDb, hostFor, schemaFor, type TestDb } from '../../../server/src/__tests__/helpers.ts';
+import { createRateLimiter } from '../../../server/src/auth/rate-limit.ts';
+import { createContextFactory } from '../../../server/src/graphql/context-factory.ts';
 // The runner never imports the server or the database; its test does, to stand
 // a real telos up for it to talk to.
-import { toHeaders } from '../../../server/src/auth.ts';
-import { mountMcp } from '../../../server/src/mcp.ts';
-import { createRateLimiter } from '../../../server/src/rate-limit.ts';
-import { createContextFactory } from '../../../server/src/request-context.ts';
+import { toHeaders } from '../../../server/src/http/headers.ts';
+import { mountMcp } from '../../../server/src/mcp/endpoint.ts';
 import { startRunner } from '../embed.ts';
 import { type LoopOptions, tick } from '../loop.ts';
 import { takeTests } from '../probes.ts';

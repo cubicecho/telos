@@ -86,7 +86,7 @@ const PLAIN_NOTE = 'note';
 /** Who signs what a person writes here. */
 const SIGNED_BY_PERSON = 'user';
 
-// Which notes offer what. The server decides (resolvers/notes.ts); this only
+// Which notes offer what. The server decides (todos/notes.ts); this only
 // keeps a button off a note it would refuse. A person rewrites what they wrote,
 // and may clear any plain note off their board. What a run reported stays.
 

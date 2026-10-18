@@ -9,7 +9,7 @@
     "build": "echo 'no server build needed — TypeScript runs directly'",
     "start": "node --experimental-strip-types src/index.ts",
     "clean": "rm -rf __generated__",
-    "codegen": "node --experimental-strip-types --import=./src/preload-env.ts src/write_schema.ts && graphql-codegen-esm"
+    "codegen": "node --experimental-strip-types --import=./src/core/preload-env.ts src/graphql/write-schema.ts && graphql-codegen-esm"
   },
   "dependencies": {
     "@apollo/server": "^5.5.1",

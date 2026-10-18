@@ -17,7 +17,7 @@ export type NoteKind = (typeof NOTE_KINDS)[number];
 
 // A todo's running commentary. What a run wrote stays as written, so what an
 // agent said is what it said. A plain note can be rewritten or taken away by
-// whoever wrote it (server resolvers/notes.ts), and says when it was.
+// whoever wrote it (server todos/notes.ts), and says when it was.
 export const todoNotes = pgTable(
   'todo_notes',
   {

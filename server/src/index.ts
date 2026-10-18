@@ -1,4 +1,4 @@
-import './preflight.ts';
+import './core/preflight.ts';
 
 import { readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
@@ -9,18 +9,26 @@ import { type EmbeddedRunner, startRunner } from '@telos/runner/embed';
 import cors from 'cors';
 import { migrate } from 'drizzle-orm/postgres-js/migrator';
 import express from 'express';
-import { createAuthHost } from './auth-host.ts';
-import { appUrl, oidcRedirectUri, runnerKey, secureLocalNet, serverUrl, smtpConfigured, trustProxy } from './config.ts';
-import { mountMcp } from './mcp.ts';
-import { createRateLimiter } from './rate-limit.ts';
-import { createContextFactory } from './request-context.ts';
-import { startPruning } from './retention.ts';
-import { createGraphQLRouter } from './routes/graphql.ts';
-import { mountSso } from './routes/sso.ts';
-import { ai, schema } from './schema.ts';
-import { createStaticHandler } from './static.ts';
+import { createAuthHost } from './auth/auth-host.ts';
+import { createRateLimiter } from './auth/rate-limit.ts';
+import {
+  appUrl,
+  oidcRedirectUri,
+  runnerKey,
+  secureLocalNet,
+  serverUrl,
+  smtpConfigured,
+  trustProxy,
+} from './core/config.ts';
+import { createContextFactory } from './graphql/context-factory.ts';
+import { createGraphQLRouter } from './graphql/handler.ts';
+import { ai, schema } from './graphql/schema.ts';
+import { mountSso } from './http/sso.ts';
+import { createStaticHandler } from './http/static.ts';
+import { mountMcp } from './mcp/endpoint.ts';
+import { startPruning } from './runs/retention.ts';
 
-export type { Context } from './context.ts';
+export type { Context } from './core/context.ts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT ?? 3001);

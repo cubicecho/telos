@@ -3,7 +3,7 @@ import { bigint, boolean, check, index, pgTable, primaryKey, text, timestamp, uu
 
 import { users } from './users.ts';
 
-// The change feed (`changes(since:)`, server/src/changes.ts): one row per
+// The change feed (`changes(since:)`, server/src/changes/feed.ts): one row per
 // project, todo and dependency edge that exists or was deleted lately, saying
 // when it last changed. Written only by triggers (change_feed migration), so
 // every write path stamps it, raw SQL and cascades included; read only by the
