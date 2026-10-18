@@ -36,7 +36,7 @@ export interface RunEvent {
 }
 
 // One agent working one todo in one lane. Written only by the server — the
-// runner claims, renews and finishes a run through resolvers/runs.ts, and a
+// runner claims, renews and finishes a run through runs/resolvers.ts, and a
 // person can only ask for one to stop — so it is read-only through the API.
 export const runs = pgTable(
   'runs',
@@ -69,7 +69,7 @@ export const runs = pgTable(
     completionTokens: integer('completion_tokens').notNull().default(0),
     totalTokens: integer('total_tokens').notNull().default(0),
     // What the run did as it went, appended by each heartbeat and the finish.
-    // Capped (resolvers/runs.ts), so a chatty agent cannot grow a row forever.
+    // Capped (runs/resolvers.ts), so a chatty agent cannot grow a row forever.
     events: jsonb('events').$type<RunEvent[]>().notNull().default([]),
     // A running run whose lease has passed is abandoned: its runner died.
     // The next claim of its todo marks it `error` and starts again.

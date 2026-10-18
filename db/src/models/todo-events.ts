@@ -21,7 +21,7 @@ export type TodoEventKind = (typeof TODO_EVENT_KINDS)[number];
 // A todo's history. Nothing in the server inserts here: the `todos_history`
 // trigger (see the richer_todos migration) writes one row per insert or
 // meaningful update, whichever path made it, and reads who did it from the
-// transaction's `telos.*` settings (server/src/provenance.ts). Read-only
+// transaction's `telos.*` settings (server/src/todos/provenance.ts). Read-only
 // through the API.
 export const todoEvents = pgTable(
   'todo_events',

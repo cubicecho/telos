@@ -29,7 +29,7 @@ const connection: any = {
 /**
  * The database, whichever driver is under it: postgres-js here, PGlite in the
  * server's tests. Both are this. What `execute` returns still differs by
- * driver, which `resultRows` (server/src/blocking.ts) papers over.
+ * driver, which `resultRows` (server/src/todos/blocking.ts) papers over.
  */
 export type DB = PgAsyncDatabase<PgQueryResultHKT, typeof relations>;
 export const db = drizzle({ connection, relations });

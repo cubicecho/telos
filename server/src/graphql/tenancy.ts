@@ -1,0 +1,203 @@
+import * as dbSchema from '@telos/db/schema';
+import type { BuildSchemaConfig, RowScope } from '@vantreeseba/drizzle-graphql';
+import { and, eq, inArray, isNull, type SQL, sql } from 'drizzle-orm';
+import { requireAuth } from '../auth/resolvers.ts';
+import { type Context, isAiActor } from '../core/context.ts';
+
+// Multi-tenancy, expressed as drizzle-graphql configuration rather than as
+// resolver wrappers. `scope` is ANDed into the SQL of every read, update and
+// delete the library generates — list and single queries, aggregates, groupBy,
+// relation fields, cursor pages — after the client's own `where`, so a client
+// filter can only ever narrow it. `contextValues` is the write-side half: it
+// takes `userId` out of every create and update input and stamps it from the
+// request, so ownership is never something a caller states.
+//
+// A `scope` cannot reach a plain insert, and it says nothing about the rows a
+// foreign key *points at* — graphql/write-guards.ts closes that half.
+//
+// The rule for anyone adding a table: it needs an entry here, or its rows are
+// visible across tenants. __tests__/tenancy.test.ts fails when one is missing.
+
+// biome-ignore lint/suspicious/noExplicitAny: drizzle-orm 1.0 table/column type compat
+type AnyTable = any;
+
+/**
+ * Every table but `users` carries its own `user_id` — junctions included.
+ * Philotes routes junction ownership through a subquery against the parent row;
+ * carrying the column directly costs one uuid per join row and lets every table
+ * share the same one-line scope.
+ */
+export const USER_OWNED_TABLES = [
+  'projects',
+  'lanes',
+  'todos',
+  'todoDependencies',
+  'labels',
+  'projectLabels',
+  'todoLabels',
+  'todoNotes',
+  'todoEvents',
+  'agents',
+  'mcpServers',
+  'runs',
+  'artifacts',
+  'boardTemplates',
+] as const;
+
+/** Every table drizzle-graphql will generate fields for. */
+export const ALL_TABLES = ['users', ...USER_OWNED_TABLES] as const;
+
+type OwnedTable = (typeof USER_OWNED_TABLES)[number];
+
+/** A row scope that is always SQL, so code outside the library can use it too. */
+type SqlScope = (context: Context, table: AnyTable) => SQL | undefined;
+
+const scopeByUserId: SqlScope = (context, table) => eq(table.userId, requireAuth(context));
+
+// What AI sees is narrower than what its user sees: only projects with AI
+// switched on, and in them only the todos nobody told AI to ignore. Everything
+// hanging off a hidden project or todo — lanes, notes, history, labels on it,
+// dependency edges touching it — is hidden with it. A person's session is
+// untouched by any of this.
+
+/** The caller's projects with AI on, as a subquery. */
+function aiProjectIds(context: Context, userId: string) {
+  return context.db
+    .select({ id: dbSchema.projects.id })
+    .from(dbSchema.projects)
+    .where(and(eq(dbSchema.projects.userId, userId), eq(dbSchema.projects.aiEnabled, true)));
+}
+
+/** The caller's todos AI may see, as a subquery. */
+function aiTodoIds(context: Context, userId: string) {
+  return context.db
+    .select({ id: dbSchema.todos.id })
+    .from(dbSchema.todos)
+    .where(
+      and(
+        eq(dbSchema.todos.userId, userId),
+        eq(dbSchema.todos.aiIgnored, false),
+        isNull(dbSchema.todos.archivedAt),
+        inArray(dbSchema.todos.projectId, aiProjectIds(context, userId)),
+      ),
+    );
+}
+
+/** The user scope, and for an AI caller whatever `narrow` adds to it. */
+function aiNarrowed(narrow: (context: Context, table: AnyTable, userId: string) => SQL | undefined): SqlScope {
+  return (context, table) => {
+    const userId = requireAuth(context);
+    const own = eq(table.userId, userId);
+    return isAiActor(context) ? and(own, narrow(context, table, userId)) : own;
+  };
+}
+
+const AI_SCOPES: Partial<Record<OwnedTable, SqlScope>> = {
+  // An agent's row holds its key and its MCP servers' secrets. The AI side
+  // reads the roster instead (`agentRoster`, ai/reads.ts), which
+  // carries neither.
+  agents: aiNarrowed(() => sql`false`),
+  mcpServers: aiNarrowed(() => sql`false`),
+  runs: aiNarrowed((context, table, userId) => inArray(table.todoId, aiTodoIds(context, userId))),
+  // By todo as well, so one whose todo was deleted is a person's to see.
+  artifacts: aiNarrowed((context, table, userId) => inArray(table.todoId, aiTodoIds(context, userId))),
+  projects: aiNarrowed((_context, table) => eq(table.aiEnabled, true)),
+  lanes: aiNarrowed((context, table, userId) => inArray(table.projectId, aiProjectIds(context, userId))),
+  projectLabels: aiNarrowed((context, table, userId) => inArray(table.projectId, aiProjectIds(context, userId))),
+  todos: aiNarrowed((context, table, userId) =>
+    and(eq(table.aiIgnored, false), inArray(table.projectId, aiProjectIds(context, userId))),
+  ),
+  todoNotes: aiNarrowed((context, table, userId) => inArray(table.todoId, aiTodoIds(context, userId))),
+  todoEvents: aiNarrowed((context, table, userId) => inArray(table.todoId, aiTodoIds(context, userId))),
+  todoLabels: aiNarrowed((context, table, userId) => inArray(table.todoId, aiTodoIds(context, userId))),
+  todoDependencies: aiNarrowed((context, table, userId) =>
+    and(inArray(table.todoId, aiTodoIds(context, userId)), inArray(table.dependsOnTodoId, aiTodoIds(context, userId))),
+  ),
+};
+
+/**
+ * The rows of a table the caller may reach, as SQL: theirs, and for an AI
+ * caller only what AI may see of them. What the generated resolvers are
+ * confined to, for the hand-written checks that must agree with them.
+ *
+ * @param context The request.
+ * @param name The table's drizzle-graphql key.
+ * @param table The table, or the alias of it the statement runs against.
+ * @returns The predicate.
+ */
+export function reachable(context: Context, name: OwnedTable, table: AnyTable): SQL | undefined {
+  return (AI_SCOPES[name] ?? scopeByUserId)(context, table);
+}
+
+export const scope: NonNullable<BuildSchemaConfig['scope']> = {
+  // A user row is only ever visible to its owner. There is no directory here.
+  users: (context, table) => eq((table as AnyTable).id, requireAuth(context as Context)),
+  ...Object.fromEntries(
+    USER_OWNED_TABLES.map((name): [string, RowScope<Context>] => [
+      name,
+      (context, table) => reachable(context, name, table),
+    ]),
+  ),
+};
+
+/**
+ * Columns the server owns: removed from every create and update input, stamped
+ * from the request on insert. This is what makes `userId` unstatable rather than
+ * merely overwritten.
+ */
+export const contextValues: NonNullable<BuildSchemaConfig['contextValues']> = {
+  ...Object.fromEntries(
+    USER_OWNED_TABLES.map((name) => [name, { userId: (context: Context) => requireAuth(context) }]),
+  ),
+  // Who wrote a note is a fact about the request, like whose it is. An MCP
+  // client cannot sign a note as the user it acts for.
+  todoNotes: {
+    userId: (context: Context) => requireAuth(context),
+    actorKind: (context: Context) => context.actor.kind,
+    actorKeyId: (context: Context) => context.actor.keyId ?? null,
+    runId: (context: Context) => context.actor.runId ?? null,
+  },
+  // What a test of the server found is the runner's to say (`finishProbe`),
+  // so no client states it: a new server has never been tested.
+  mcpServers: {
+    userId: (context: Context) => requireAuth(context),
+    checkedAt: () => null,
+    checkOk: () => null,
+    checkError: () => null,
+    tools: () => [],
+  },
+};
+
+/**
+ * Tables whose writes belong to a hand-written mutation instead of generated CRUD.
+ *
+ * `users` is the auth flow's (auth/resolvers.ts): an account exists because a
+ * sign-in created it. `todoDependencies` is `addTodoDependency`'s — a generated
+ * insert would let a client write an edge without the cycle check, and a cycle
+ * is a set of todos none of which can ever be completed. `todoEvents` is the
+ * `todos_history` trigger's, and history nobody can edit is the point of it.
+ * `runs` belong to the runner's mutations (runs/resolvers.ts): a run is
+ * claimed, renewed and finished, and a person may only ask one to stop.
+ * `artifacts` are what a finished run reports (`finishRun`) or a client says it
+ * made (`recordArtifact`), each stamped with where it came from; a person may
+ * take one off the board (`deleteArtifact`), and nothing else.
+ */
+const WRITES_RESERVED = new Set<string>(['users', 'todoDependencies', 'todoEvents', 'runs', 'artifacts']);
+
+/**
+ * Tables generated CRUD may add to and nothing more. Rewriting a note or taking
+ * one away depends on who wrote it and what kind it is, which a `where` cannot
+ * say: `editTodoNote` and `deleteTodoNote` (todos/notes.ts) decide. A report
+ * an agent wrote, or a verdict it returned, should read later as it read then.
+ */
+const INSERT_ONLY = new Set<string>(['todoNotes']);
+
+const generatedWritesAllowed = (table: string) => !WRITES_RESERVED.has(table);
+const generatedChangesAllowed = (table: string) => generatedWritesAllowed(table) && !INSERT_ONLY.has(table);
+
+export const features: NonNullable<BuildSchemaConfig['features']> = {
+  insert: generatedWritesAllowed,
+  update: generatedChangesAllowed,
+  updateMany: generatedChangesAllowed,
+  delete: generatedChangesAllowed,
+};

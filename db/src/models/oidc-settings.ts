@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm';
 import { check, pgTable, text, timestamp } from 'drizzle-orm/pg-core';
 
-// The OIDC provider this instance was paired with (server/src/oidc-pairing.ts):
+// The OIDC provider this instance was paired with (server/src/sso/pairing.ts):
 // one row or none, owned by no user, written only by the server. OIDC_ISSUER in
 // the environment wins over it. The secret and the registration access token
 // are credentials; nothing reads them back out through the API.

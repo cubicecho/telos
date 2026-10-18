@@ -7,13 +7,13 @@ import { drizzle } from 'drizzle-orm/pglite';
 import { migrate } from 'drizzle-orm/pglite/migrator';
 import { type ExecutionResult, graphql } from 'graphql';
 import { expect } from 'vitest';
-import { type Auth, createAuth, type MagicLink } from '../auth.ts';
-import { type AuthHost, fixedAuthHost } from '../auth-host.ts';
-import { createSchema } from '../build-schema.ts';
-import type { Actor, Context } from '../context.ts';
-import { setInstanceAi } from '../instance.ts';
-import { createLoaders } from '../loaders.ts';
-import { createRateLimiter, type RateLimiter } from '../rate-limit.ts';
+import { type AuthHost, fixedAuthHost } from '../auth/auth-host.ts';
+import { type Auth, createAuth, type MagicLink } from '../auth/better-auth.ts';
+import { createRateLimiter, type RateLimiter } from '../auth/rate-limit.ts';
+import type { Actor, Context } from '../core/context.ts';
+import { createSchema } from '../graphql/build-schema.ts';
+import { createLoaders } from '../graphql/loaders.ts';
+import { setInstanceAi } from '../instance/settings.ts';
 
 // A throwaway in-memory Postgres per suite. `@telos/db` is deliberately never
 // imported here — it opens a real connection at import time — so the schema is
@@ -178,7 +178,7 @@ export function schemaFor(db: TestDb, ai: boolean): ReturnType<typeof createSche
 
 /**
  * A client for a person signed in with a real session, which better-auth's
- * own fields (resolvers/better-auth.ts) read from the request's headers.
+ * own fields (auth/endpoints.ts) read from the request's headers.
  */
 export async function sessionClient(
   db: TestDb,

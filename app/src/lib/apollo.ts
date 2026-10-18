@@ -1,9 +1,19 @@
-import { ApolloClient, from, HttpLink, InMemoryCache, split } from '@apollo/client';
+import {
+  ApolloClient,
+  ApolloLink,
+  type FetchResult,
+  from,
+  HttpLink,
+  InMemoryCache,
+  Observable,
+  type Operation,
+  split,
+} from '@apollo/client';
 import { setContext } from '@apollo/client/link/context';
 import { onError } from '@apollo/client/link/error';
-import { GraphQLWsLink } from '@apollo/client/link/subscriptions';
 import { getMainDefinition } from '@apollo/client/utilities';
-import { createClient } from 'graphql-ws';
+import { print } from 'graphql';
+import { type Client, createClient } from 'graphql-sse';
 import { Platform } from 'react-native';
 import { clearToken, getToken } from '@/lib/auth';
 
@@ -25,40 +35,54 @@ export const API_URL = process.env.EXPO_PUBLIC_API_URL ?? devApiUrl();
 
 const httpLink = new HttpLink({ uri: `${API_URL}/graphql` });
 
-// Subscriptions (a live board) go over a socket on the same path. Same origin
-// is the page's own host; a named API swaps http for ws.
-function socketUrl(): string | null {
-  const base = API_URL || (Platform.OS === 'web' ? window.location.origin : '');
-  return base ? `${base.replace(/^http/, 'ws')}/graphql` : null;
+/**
+ * Subscriptions (a live board) as Server-Sent Events from the same /graphql,
+ * one stream per subscription (graphql-sse's distinct-connections mode, which
+ * is what the server's Yoga speaks). A stream opens with its subscription and
+ * closes with it, so a screen that watches nothing holds nothing open.
+ */
+class SseLink extends ApolloLink {
+  private readonly sse: Client;
+
+  constructor(sse: Client) {
+    super();
+    this.sse = sse;
+  }
+
+  public request(operation: Operation): Observable<FetchResult> {
+    return new Observable((sink) =>
+      this.sse.subscribe(
+        { ...operation, query: print(operation.query) },
+        {
+          // An ExecutionResult off the wire is the FetchResult Apollo's sink takes.
+          next: (result) => sink.next(result as FetchResult),
+          complete: () => sink.complete(),
+          error: (error) => sink.error(error),
+        },
+      ),
+    );
+  }
 }
 
-let connectedBefore = false;
-
-// Lazy: the socket opens with the first subscription and closes after the
-// last, so a screen that watches nothing holds nothing open. A browser cannot
-// put headers on a socket, so the token rides in the connection's params, read
-// afresh on every connect so a new sign-in is the one that counts.
-const wsUrl = socketUrl();
-const wsLink = wsUrl
-  ? new GraphQLWsLink(
-      createClient({
-        url: wsUrl,
-        connectionParams: () => {
-          const token = getToken();
-          return token ? { authorization: `Bearer ${token}` } : {};
-        },
-        retryAttempts: Number.POSITIVE_INFINITY,
-        on: {
-          // Changes made while the socket was down were never announced, so a
-          // reconnect refetches what is on screen rather than trusting it.
-          connected: () => {
-            if (connectedBefore) void client.refetchQueries({ include: 'active' });
-            connectedBefore = true;
-          },
-        },
-      }),
-    )
-  : null;
+const sseLink = new SseLink(
+  createClient({
+    url: `${API_URL}/graphql`,
+    // Read on every connect, so a new sign-in is the one that counts. Unlike a
+    // socket, a stream is a fetch, so the token rides in the usual header.
+    headers: (): Record<string, string> => {
+      const token = getToken();
+      return token ? { authorization: `Bearer ${token}` } : {};
+    },
+    retryAttempts: Number.POSITIVE_INFINITY,
+    on: {
+      // Changes made while the stream was down were never announced, so a
+      // reconnect refetches what is on screen rather than trusting it.
+      connected: (reconnected) => {
+        if (reconnected) void client.refetchQueries({ include: 'active' });
+      },
+    },
+  }),
+);
 
 const authLink = setContext((_operation, { headers }) => {
   const token = getToken();
@@ -138,15 +162,13 @@ export const client = new ApolloClient({
   cache,
   link: from([
     errorLink,
-    wsLink
-      ? split(
-          ({ query }) => {
-            const definition = getMainDefinition(query);
-            return definition.kind === 'OperationDefinition' && definition.operation === 'subscription';
-          },
-          wsLink,
-          from([authLink, httpLink]),
-        )
-      : from([authLink, httpLink]),
+    split(
+      ({ query }) => {
+        const definition = getMainDefinition(query);
+        return definition.kind === 'OperationDefinition' && definition.operation === 'subscription';
+      },
+      sseLink,
+      from([authLink, httpLink]),
+    ),
   ]),
 });

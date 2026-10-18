@@ -1,26 +1,19 @@
-import './preflight.ts';
+import './core/preflight.ts';
 
 import { readFileSync } from 'node:fs';
-import { createServer } from 'node:http';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { db } from '@telos/db';
 import { type EmbeddedRunner, startRunner } from '@telos/runner/embed';
-import cors from 'cors';
 import { migrate } from 'drizzle-orm/postgres-js/migrator';
-import express from 'express';
-import { createAuthHost } from './auth-host.ts';
-import { appUrl, oidcRedirectUri, runnerKey, secureLocalNet, serverUrl, smtpConfigured, trustProxy } from './config.ts';
-import { mountMcp } from './mcp.ts';
-import { createRateLimiter } from './rate-limit.ts';
-import { createContextFactory } from './request-context.ts';
-import { startPruning } from './retention.ts';
-import { createGraphQLRouter } from './routes/graphql.ts';
-import { mountSso } from './routes/sso.ts';
-import { ai, schema } from './schema.ts';
-import { createStaticHandler } from './static.ts';
+import { createAuthHost } from './auth/auth-host.ts';
+import { appUrl, oidcRedirectUri, runnerKey, secureLocalNet, serverUrl, smtpConfigured } from './core/config.ts';
+import { ai, schema } from './graphql/schema.ts';
+import { createApp } from './http/app.ts';
+import { stopOnSignals } from './http/shutdown.ts';
+import { startPruning } from './runs/retention.ts';
 
-export type { Context } from './context.ts';
+export type { Context } from './core/context.ts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT ?? 3001);
@@ -55,27 +48,10 @@ let runner: EmbeddedRunner | undefined;
 // feed's old tombstones go either way.
 const stopPruning = startPruning(db, { runs: ai });
 
-const app = express();
-const httpServer = createServer(app);
-const serveStatic = createStaticHandler(staticDir);
-// One per process, so the sign-in throttle counts across every request.
-const limiter = createRateLimiter();
-const contextFor = createContextFactory(db, authHost, limiter, { ai, runnerKey: runnerKey() });
 const { version } = JSON.parse(readFileSync(join(__dirname, '../package.json'), 'utf8')) as { version: string };
+const { app, mcp } = createApp({ db, authHost, schema, ai, version, staticDir });
 
-// Which proxy hops may set X-Forwarded-For. `req.ip` keys the sign-in throttle.
-app.set('trust proxy', trustProxy());
-app.use(cors());
-app.use('/graphql', await createGraphQLRouter(httpServer, contextFor));
-const mcp = mountMcp(app, { ai, db, schema, contextFor, version });
-// Always mounted: a provider can be paired while the server runs.
-mountSso(app, authHost);
-app.get('/healthz', (_req, res) => {
-  res.json({ ok: true });
-});
-app.use((req, res) => serveStatic(req, res));
-
-httpServer.listen(PORT, '0.0.0.0', () => {
+const httpServer = app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Telos ready at http://localhost:${PORT}`);
   console.log(`   GraphQL at http://localhost:${PORT}/graphql`);
   if (mcp) console.log(`   MCP at http://localhost:${PORT}/mcp (API key in x-api-key)`);
@@ -98,14 +74,14 @@ httpServer.listen(PORT, '0.0.0.0', () => {
 });
 
 // Stop the runner first, while the server can still take its runs' reports,
-// then close open MCP streams, so the HTTP server is not left waiting on them.
-for (const signal of ['SIGTERM', 'SIGINT'] as const) {
-  process.once(signal, () => {
-    void (async () => {
-      stopPruning?.();
-      await runner?.stop().catch((error: unknown) => console.error('[runner] stop failed:', error));
-      await mcp?.close().catch((error: unknown) => console.error('[mcp] close failed:', error));
-      httpServer.close(() => process.exit(0));
-    })();
-  });
-}
+// then drain: a live board's stream is cut once the drain time is up, and the
+// app reconnects it. Open MCP streams close last.
+stopOnSignals(httpServer, {
+  before: async () => {
+    stopPruning?.();
+    await runner?.stop().catch((error: unknown) => console.error('[runner] stop failed:', error));
+  },
+  after: async () => {
+    await mcp?.close().catch((error: unknown) => console.error('[mcp] close failed:', error));
+  },
+});
