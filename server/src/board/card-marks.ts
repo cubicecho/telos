@@ -79,7 +79,7 @@ async function readMarks(db: DB, userId: string, projectId: string, runs: boolea
         ) AS notes,
         last.id AS run_id, last.status, last.verdict, coalesce(last.error, last.output) AS reason,
         CASE WHEN ${runs} THEN ${failuresSinceTouched(sql`t.id`)} ELSE 0 END AS attempts,
-        CASE WHEN ${runs} AND l.agent_id IS NOT NULL THEN l.max_attempts END AS max_attempts
+        CASE WHEN ${runs} AND (l.agent_id IS NOT NULL OR l.check_command IS NOT NULL) THEN l.max_attempts END AS max_attempts
       FROM todos t
       LEFT JOIN lanes l ON l.id = t.lane_id
       LEFT JOIN LATERAL (
