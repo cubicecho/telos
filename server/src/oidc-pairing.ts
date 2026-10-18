@@ -1,5 +1,6 @@
 import type { DB } from '@telos/db';
 import { oidcRedirectUri } from './config.ts';
+import { AUTH_DEFAULTS } from './defaults.ts';
 import { clearPairedOidc, type PairedOidc, readPairedOidc, savePairedOidc } from './oidc-settings.ts';
 
 // Pairing with an OIDC provider by pasting one URL, instead of copying a client
@@ -47,12 +48,6 @@ export interface SetupUrl {
   name: string;
 }
 
-/** What the button calls a provider whose setup URL names none. */
-const DEFAULT_NAME = 'SSO';
-
-/** How long to wait on the provider before calling it unreachable. */
-const TIMEOUT_MS = 10_000;
-
 /**
  * Takes a setup URL apart.
  *
@@ -79,14 +74,14 @@ export function parseSetupUrl(text: string): SetupUrl {
   return {
     issuer: url.toString().replace(/\/+$/, ''),
     token,
-    name: params.get('name')?.trim() || DEFAULT_NAME,
+    name: params.get('name')?.trim() || AUTH_DEFAULTS.oidcName,
   };
 }
 
 /** Fetches with a timeout, calling any network failure the provider being unreachable. */
 async function call(url: string, init: RequestInit = {}): Promise<Response> {
   try {
-    return await fetch(url, { ...init, signal: AbortSignal.timeout(TIMEOUT_MS) });
+    return await fetch(url, { ...init, signal: AbortSignal.timeout(AUTH_DEFAULTS.oidcPairingTimeoutMs) });
   } catch {
     throw new PairingError('NOT_A_PROVIDER', `Could not reach ${new URL(url).origin}. Check the setup URL.`);
   }
@@ -216,7 +211,7 @@ export async function unpair(db: DB): Promise<boolean> {
       const response = await fetch(paired.registrationClientUri, {
         method: 'DELETE',
         headers: { authorization: `Bearer ${paired.registrationAccessToken}` },
-        signal: AbortSignal.timeout(TIMEOUT_MS),
+        signal: AbortSignal.timeout(AUTH_DEFAULTS.oidcPairingTimeoutMs),
       });
       // A 401 or 404: the client is already gone, which is what was wanted.
       removed = response.ok || response.status === 401 || response.status === 404;

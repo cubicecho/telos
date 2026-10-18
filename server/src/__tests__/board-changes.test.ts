@@ -2,8 +2,9 @@ import { type ExecutionResult, parse, subscribe } from 'graphql';
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { Actor, Context } from '../context.ts';
 import { createLoaders } from '../loaders.ts';
+import { createRateLimiter } from '../rate-limit.ts';
 import { type Board, createBoard } from './board.ts';
-import { authFor, createTestDb, createUser, hostFor, schemaFor, type TestDb } from './helpers.ts';
+import { authFor, createTestDb, createUser, hostFor, schemaFor, TEST_IP, type TestDb } from './helpers.ts';
 
 // Live boards: the database announces each change (the board_notify trigger),
 // and `boardChanged` relays the ones to a project its owner is watching.
@@ -30,6 +31,8 @@ async function watch(projectId: string, actor: Actor): Promise<Changes | Executi
     actor,
     loaders: createLoaders(db),
     headers: new Headers(),
+    ip: TEST_IP,
+    limiter: createRateLimiter(),
   };
   return (await subscribe({ schema, document: parse(WATCH), variableValues: { projectId }, contextValue })) as
     | Changes

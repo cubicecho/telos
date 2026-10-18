@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto';
+import { AUTH_DEFAULTS } from './defaults.ts';
 
 /** Truthy env-var values: "1", "true", "yes" (case-insensitive). */
 export function envFlag(value: string | undefined): boolean {
@@ -10,41 +11,111 @@ function envDisabled(value: string | undefined): boolean {
   return ['0', 'false', 'no'].includes((value ?? '').trim().toLowerCase());
 }
 
-/**
- * Whether signing in requires following a magic link at all.
- *
- * With `AUTH_MAGIC_LINK=false`, `signInMagicLink` hands back a live session for
- * whatever address it is given: there is no second factor and no link to follow.
- * That is a deliberate convenience for a self-hosted instance on a private
- * network. Anyone who can reach the port can then sign in as anyone, so it must
- * never be set on an instance exposed to the internet.
- */
-export function magicLinkRequired(): boolean {
-  return !envDisabled(process.env.AUTH_MAGIC_LINK);
-}
-
-/**
- * Whether the magic link is returned in the API response rather than only being
- * logged server-side.
- *
- * On outside production, or anywhere `EXPOSE_MAGIC_LINK` is set — which is what
- * a self-hosted instance with no mail provider wants, since the link has nowhere
- * else to go. Same warning as above: on a public deployment this lets anyone who
- * knows an address sign in as its owner.
- */
-export function magicLinkExposed(): boolean {
-  return process.env.NODE_ENV !== 'production' || envFlag(process.env.EXPOSE_MAGIC_LINK);
-}
-
-/** What signs sessions when nothing is configured. preflight.ts refuses it in production. */
+/** What signs sessions when `BETTER_AUTH_SECRET` is unset. preflight.ts refuses it in production. */
 export const DEV_SECRET = 'dev-secret-change-in-production';
 
+/** The value `.env.example` ships. Public, so as good as no secret at all. */
+export const PLACEHOLDER_SECRET = 'change-me-to-a-long-random-string';
+
 /**
- * The secret better-auth signs with. `AUTH_SECRET`, or `JWT_SECRET` for an
- * instance configured before sessions moved to better-auth.
+ * Why `secret` must not sign production tokens, or undefined when it may.
+ *
+ * better-auth signs with this and nothing else, so a secret that is published
+ * or short enough to guess lets anyone forge what it signs.
+ *
+ * @param secret - `BETTER_AUTH_SECRET` as set.
+ * @returns The reason, as the end of a sentence ("is not set").
+ */
+export function describeWeakSecret(secret: string | undefined): string | undefined {
+  if (secret === undefined || secret === '') return 'is not set';
+  if (secret === DEV_SECRET || secret === PLACEHOLDER_SECRET) return 'is a published default';
+  if (secret.length < AUTH_DEFAULTS.minSecretLength) {
+    return `is shorter than ${AUTH_DEFAULTS.minSecretLength} characters`;
+  }
+  return undefined;
+}
+
+/**
+ * The secret as configured, for preflight to judge.
+ *
+ * @returns `BETTER_AUTH_SECRET`, or undefined when unset.
+ */
+export function configuredAuthSecret(): string | undefined {
+  return process.env.BETTER_AUTH_SECRET;
+}
+
+/**
+ * What better-auth signs with. Read at call time so a test sees the current environment.
+ *
+ * @returns `BETTER_AUTH_SECRET`, or the development secret when unset.
  */
 export function authSecret(): string {
-  return process.env.AUTH_SECRET || process.env.JWT_SECRET || DEV_SECRET;
+  return configuredAuthSecret() || DEV_SECRET;
+}
+
+/**
+ * Whether typing an address signs in, with no link. The network is then the
+ * whole credential: anyone who can reach the port can sign in as anyone. For a
+ * self-hosted instance on a private network, and nothing else; preflight.ts
+ * refuses it when APP_URL names a public host.
+ *
+ * @returns `SECURE_LOCAL_NET` as a flag, off when unset.
+ */
+export function secureLocalNet(): boolean {
+  return envFlag(process.env.SECURE_LOCAL_NET);
+}
+
+/**
+ * Whether SECURE_LOCAL_NET may be on with a public APP_URL: the operator's word
+ * that nothing hostile can reach the port anyway.
+ *
+ * @returns `I_KNOW_SECURE_LOCAL_NET_IS_PUBLIC` as a flag, off when unset.
+ */
+export function allowsPublicLocalNet(): boolean {
+  return envFlag(process.env.I_KNOW_SECURE_LOCAL_NET_IS_PUBLIC);
+}
+
+/**
+ * Where sign-in email is sent through: a nodemailer connection URL
+ * (`smtp://user:pass@mail.example.com:587`).
+ *
+ * @returns `SMTP_URL`, or an empty string when unset.
+ */
+export function smtpUrl(): string {
+  return process.env.SMTP_URL?.trim() ?? '';
+}
+
+/**
+ * The address sign-in email comes from.
+ *
+ * @returns `SMTP_FROM`, or `telos@` the host of `APP_URL`.
+ */
+export function smtpFrom(): string {
+  return process.env.SMTP_FROM?.trim() || `telos@${new URL(appUrl()).hostname}`;
+}
+
+/**
+ * Whether sign-in links can be emailed. Without it, the instance sends no links
+ * at all, and people sign in through an OIDC provider or SECURE_LOCAL_NET.
+ *
+ * @returns true when `SMTP_URL` is set.
+ */
+export function smtpConfigured(): boolean {
+  return smtpUrl() !== '';
+}
+
+/**
+ * Express `trust proxy`: which hops may set X-Forwarded-For, and so what
+ * `req.ip` is. Sign-in is throttled per client address, so behind a proxy this
+ * must say so, or every visitor shares the proxy's budget. Never `true` on a
+ * port the internet reaches directly: a client could then pick its own address.
+ *
+ * @returns false when `TRUST_PROXY` is unset or "false", a hop count for digits, otherwise the value as given.
+ */
+export function trustProxy(): boolean | number | string {
+  const raw = (process.env.TRUST_PROXY ?? '').trim();
+  if (raw === '' || raw === 'false') return false;
+  return /^\d+$/.test(raw) ? Number(raw) : raw;
 }
 
 /**
@@ -64,6 +135,21 @@ export function appUrl(): string {
  */
 export function appLink(path: string): string {
   return `${appUrl().replace(/\/+$/, '')}${path}`;
+}
+
+/**
+ * Where a browser reaches this server: the OIDC sign-in's start and callback
+ * live here. In production one server serves both the API and the app, so it is
+ * APP_URL. In development the Expo dev server is the app and this is the API,
+ * on a port of its own.
+ *
+ * @returns `SERVER_URL`, `APP_URL` in production, or this server's own localhost address.
+ */
+export function serverUrl(): string {
+  const configured = process.env.SERVER_URL?.trim().replace(/\/+$/, '');
+  if (configured) return configured;
+  if (process.env.NODE_ENV === 'production') return appUrl().replace(/\/+$/, '');
+  return `http://localhost:${process.env.PORT ?? 3001}`;
 }
 
 /**
@@ -90,6 +176,9 @@ export const runnerKey: () => string = (() => {
 /** The provider id the OIDC provider is registered under, and so its callback path. */
 export const OIDC_PROVIDER_ID = 'oidc';
 
+/** The `OIDC_CLIENT_AUTH` values a provider can expect. */
+export const OIDC_CLIENT_AUTH_METHODS = ['client_secret_basic', 'client_secret_post'] as const;
+
 /** An OpenID Connect provider to sign in with (heautou, Keycloak, Authentik, …). */
 export interface OidcConfig {
   /** The issuer URL. Its discovery document is at `/.well-known/openid-configuration` under it. */
@@ -98,7 +187,7 @@ export interface OidcConfig {
   /** Unset for a public client, which proves itself with PKCE alone. */
   clientSecret: string | undefined;
   /** How a confidential client sends its secret. The provider must expect the same. */
-  clientAuth: 'client_secret_basic' | 'client_secret_post';
+  clientAuth: (typeof OIDC_CLIENT_AUTH_METHODS)[number];
   /** What the login page's button calls it. */
   name: string;
 }
@@ -116,12 +205,14 @@ export function oidcConfig(): OidcConfig | null {
     clientId,
     clientSecret: process.env.OIDC_CLIENT_SECRET?.trim() || undefined,
     clientAuth:
-      process.env.OIDC_CLIENT_AUTH?.trim() === 'client_secret_post' ? 'client_secret_post' : 'client_secret_basic',
-    name: process.env.OIDC_NAME?.trim() || 'SSO',
+      process.env.OIDC_CLIENT_AUTH?.trim() === 'client_secret_post'
+        ? 'client_secret_post'
+        : AUTH_DEFAULTS.oidcClientAuth,
+    name: process.env.OIDC_NAME?.trim() || AUTH_DEFAULTS.oidcName,
   };
 }
 
-/** The address to register with the provider as the client's redirect URI. */
+/** The address to register with the provider as the client's redirect URI: better-auth's callback, under `serverUrl()`. */
 export function oidcRedirectUri(): string {
-  return appLink(`/api/auth/callback/${OIDC_PROVIDER_ID}`);
+  return `${serverUrl()}/api/auth/callback/${OIDC_PROVIDER_ID}`;
 }

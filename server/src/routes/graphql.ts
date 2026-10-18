@@ -38,7 +38,8 @@ export async function createGraphQLRouter(httpServer: Server, contextFor: Contex
   router.use(
     express.json({ limit: '1mb' }),
     expressMiddleware(apolloServer, {
-      context: ({ req }) => contextFor(toHeaders(req.headers)),
+      // Express's view of the caller, which honours TRUST_PROXY.
+      context: ({ req }) => contextFor(toHeaders(req.headers), req.ip),
     }),
   );
 

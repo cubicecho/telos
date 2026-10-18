@@ -3,7 +3,8 @@ import type { AddressInfo } from 'node:net';
 import { type Client, createClient } from 'graphql-ws';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import WebSocket from 'ws';
-import { signInDirectly } from '../auth.ts';
+import { signInOnLocalNet } from '../auth.ts';
+import { createRateLimiter } from '../rate-limit.ts';
 import { createContextFactory } from '../request-context.ts';
 import { serveSubscriptions } from '../routes/subscriptions.ts';
 import { type Board, createBoard } from './board.ts';
@@ -38,7 +39,11 @@ afterEach(async () => {
 async function serve(): Promise<string> {
   const { schema } = schemaFor(db, false);
   server = createServer();
-  closeSockets = serveSubscriptions(server, schema, createContextFactory(db, hostFor(db), { ai: false }));
+  closeSockets = serveSubscriptions(
+    server,
+    schema,
+    createContextFactory(db, hostFor(db), createRateLimiter(), { ai: false }),
+  );
   await new Promise<void>((resolve) => server?.listen(0, '127.0.0.1', resolve));
   return `ws://127.0.0.1:${(server.address() as AddressInfo).port}/graphql`;
 }
@@ -73,7 +78,7 @@ function first(client: Client, projectId = board.projectId): Promise<unknown> {
 
 describe('the board socket', () => {
   it('delivers a change to the signed-in owner', async () => {
-    const { token } = await signInDirectly(authFor(db), 'owner@example.com');
+    const { token } = await signInOnLocalNet(authFor(db), 'owner@example.com');
     const client = connect(await serve(), token);
     const change = first(client);
     // The subscription has to be in place before the change it should hear; a

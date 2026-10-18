@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { resolveActor } from '../auth.ts';
 import { authFor, createClient, createTestDb, type TestClient, type TestDb } from './helpers.ts';
 
@@ -12,12 +12,17 @@ let db: TestDb;
 
 beforeEach(async () => {
   db = await createTestDb();
-  process.env.AUTH_MAGIC_LINK = 'false';
+  process.env.SECURE_LOCAL_NET = 'true';
+});
+
+// Test files share a worker, so the switch must not outlive this one.
+afterEach(() => {
+  delete process.env.SECURE_LOCAL_NET;
 });
 
 let addresses = 0;
 
-/** Signs an address in (no-link mode) and returns a client carrying its session. */
+/** Signs an address in (SECURE_LOCAL_NET) and returns a client carrying its session. */
 async function signIn(
   email = `sessions${++addresses}@example.com`,
 ): Promise<{ client: TestClient; token: string; userId: string }> {

@@ -10,8 +10,9 @@ import cors from 'cors';
 import { migrate } from 'drizzle-orm/postgres-js/migrator';
 import express from 'express';
 import { createAuthHost } from './auth-host.ts';
-import { magicLinkExposed, magicLinkRequired, oidcRedirectUri, runnerKey } from './config.ts';
+import { appUrl, oidcRedirectUri, runnerKey, secureLocalNet, serverUrl, smtpConfigured, trustProxy } from './config.ts';
 import { mountMcp } from './mcp.ts';
+import { createRateLimiter } from './rate-limit.ts';
 import { createContextFactory } from './request-context.ts';
 import { startPruning } from './retention.ts';
 import { createGraphQLRouter } from './routes/graphql.ts';
@@ -57,9 +58,13 @@ const stopPruning = startPruning(db, { runs: ai });
 const app = express();
 const httpServer = createServer(app);
 const serveStatic = createStaticHandler(staticDir);
-const contextFor = createContextFactory(db, authHost, { ai, runnerKey: runnerKey() });
+// One per process, so the sign-in throttle counts across every request.
+const limiter = createRateLimiter();
+const contextFor = createContextFactory(db, authHost, limiter, { ai, runnerKey: runnerKey() });
 const { version } = JSON.parse(readFileSync(join(__dirname, '../package.json'), 'utf8')) as { version: string };
 
+// Which proxy hops may set X-Forwarded-For. `req.ip` keys the sign-in throttle.
+app.set('trust proxy', trustProxy());
 app.use(cors());
 app.use('/graphql', await createGraphQLRouter(httpServer, contextFor));
 const mcp = mountMcp(app, { ai, db, schema, contextFor, version });
@@ -80,12 +85,15 @@ httpServer.listen(PORT, '0.0.0.0', () => {
     runner = startRunner({ telosUrl: `http://127.0.0.1:${PORT}`, runnerKey: runnerKey() });
     console.log('   Runner working the lanes’ agents (idle until AI is on in Settings)');
   }
+  console.log(`[auth] links point at ${appUrl()}; OIDC redirects at ${serverUrl()}`);
   const oidc = authHost.oidc();
-  if (oidc) console.log(`   Sign-in with ${oidc.name} (${oidc.issuer}); redirect URI ${oidcRedirectUri()}`);
-  if (!magicLinkRequired()) {
-    console.warn('⚠️  AUTH_MAGIC_LINK is off: any email address signs in without a link. Private networks only.');
-  } else if (magicLinkExposed()) {
-    console.warn('⚠️  EXPOSE_MAGIC_LINK is on: sign-in links are returned in API responses. Private networks only.');
+  if (oidc) console.log(`[auth] sign-in with ${oidc.name} (${oidc.issuer}); redirect URI ${oidcRedirectUri()}`);
+  if (secureLocalNet()) {
+    console.warn('[auth] SECURE_LOCAL_NET is on: any email signs in without a link. Private networks only.');
+  } else if (!smtpConfigured() && !oidc) {
+    console.warn(
+      '[auth] Nobody can sign in: set SMTP_URL to email sign-in links, set OIDC_ISSUER or pair a provider from the sign-in page, or SECURE_LOCAL_NET on a private network.',
+    );
   }
 });
 

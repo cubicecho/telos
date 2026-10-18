@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from '@apollo/client';
-import { Link, useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Text, View } from 'react-native';
 import { SsoSource } from '@/__generated__/graphql';
@@ -7,7 +7,6 @@ import { useAppForm } from '@/components/app-form';
 import { CardLayout } from '@/components/card-layout';
 import { PairSsoForm } from '@/components/domain/sso/sso-pairing';
 import { Button } from '@/components/ui/button';
-import { Code } from '@/components/ui/code';
 import { Form } from '@/components/ui/form';
 import { CircleCheck } from '@/components/ui/icons';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -18,10 +17,13 @@ import { SignInMagicLinkDocument, SignInOptionsDocument, SsoSetupDocument } from
 
 export default function LoginScreen() {
   const router = useRouter();
-  const [magicLink, setMagicLink] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
   const [signInMagicLink, { error }] = useMutation(SignInMagicLinkDocument);
-  const sso = useQuery(SignInOptionsDocument).data?.authConfig.sso ?? null;
+  const options = useQuery(SignInOptionsDocument).data?.authConfig;
+  const sso = options?.sso ?? null;
+  // The address alone signs in (SECURE_LOCAL_NET), or it is where a link is emailed.
+  const localNet = options?.secureLocalNet === true;
+  const offersEmail = localNet || options?.magicLink === true;
   // An OIDC sign-in that failed comes back here with better-auth's error code.
   const { error: ssoError } = useLocalSearchParams<{ error?: string }>();
   // A new instance (no accounts yet, no provider) offers to pair one here, so
@@ -39,19 +41,17 @@ export default function LoginScreen() {
 
   async function send(email: string) {
     setSent(false);
-    setMagicLink(null);
     try {
       const { data } = await signInMagicLink({ variables: { email } });
       const result = data?.signInMagicLink;
       if (!result) return;
-      // With AUTH_MAGIC_LINK=false the server hands back a live session instead of
-      // a link, so the client keeps one code path and stores whatever it gets.
+      // Under SECURE_LOCAL_NET the server hands back a live session instead of
+      // sending a link, so the client keeps one code path and stores whatever it gets.
       if (result.token) {
         setToken(result.token);
         router.replace('/');
         return;
       }
-      setMagicLink(result.magicLink ?? null);
       setSent(true);
     } catch {
       // Rendered from `error` below.
@@ -66,8 +66,19 @@ export default function LoginScreen() {
             onPress={() => window.location.assign(`${API_URL}${sso.signInPath}`)}
             content={`Sign in with ${sso.name}`}
           />
-          <Text className="text-center text-foreground/60 text-sm">or get a sign-in link</Text>
+          {offersEmail ? (
+            <Text className="text-center text-foreground/60 text-sm">
+              {localNet ? 'or sign in with your email' : 'or get a sign-in link'}
+            </Text>
+          ) : null}
         </View>
+      ) : null}
+
+      {options && !offersEmail && !sso ? (
+        <Text className="mb-4 text-foreground/60 text-sm">
+          This instance has no way to sign in yet. Whoever runs it can set SMTP_URL to email sign-in links, or pair an
+          OpenID Connect provider.
+        </Text>
       ) : null}
 
       {ssoError ? (
@@ -77,17 +88,22 @@ export default function LoginScreen() {
         </Text>
       ) : null}
 
-      <form.AppForm>
-        <Form className="gap-4">
-          <form.AppField
-            name="email"
-            validators={{ onChange: ({ value }) => (value.trim() === '' ? 'Enter your email.' : undefined) }}
-          >
-            {(field) => <field.InputField label="Email" type="email" placeholder="you@example.com" />}
-          </form.AppField>
-          <form.SubmitButton createLabel="Send sign-in link" savingLabel="Sending…" />
-        </Form>
-      </form.AppForm>
+      {offersEmail ? (
+        <form.AppForm>
+          <Form className="gap-4">
+            <form.AppField
+              name="email"
+              validators={{ onChange: ({ value }) => (value.trim() === '' ? 'Enter your email.' : undefined) }}
+            >
+              {(field) => <field.InputField label="Email" type="email" placeholder="you@example.com" />}
+            </form.AppField>
+            <form.SubmitButton
+              createLabel={localNet ? 'Sign in' : 'Send sign-in link'}
+              savingLabel={localNet ? 'Signing in…' : 'Sending…'}
+            />
+          </Form>
+        </form.AppForm>
+      ) : null}
 
       {error ? <Text className="mt-4 text-negative text-sm">{describeError(error)}</Text> : null}
 
@@ -97,25 +113,9 @@ export default function LoginScreen() {
           iconSlot={<CircleCheck className="size-4 text-positive" />}
           title="Sign-in link sent"
           contentSlot={
-            magicLink ? (
-              <View className="gap-2">
-                <Text className="text-foreground/60 text-sm">
-                  This instance has no mail relay, so the link is shown here and printed to the server log.
-                </Text>
-                <Link href={magicLink} className="break-all text-info text-sm underline">
-                  {magicLink}
-                </Link>
-              </View>
-            ) : (
-              /* Not "check your inbox": Telos ships no mail relay, so nothing
-                 was ever sent anywhere. The link is in the server log, and
-                 saying so is the difference between a reader waiting for an
-                 email that will not come and one who knows where to look. */
-              <Text className="text-foreground/60 text-sm">
-                This instance sends no mail — the link was written to the server log. Whoever runs it can read it from
-                there, or set <Code>EXPOSE_MAGIC_LINK=true</Code> to show it on this page.
-              </Text>
-            )
+            <Text className="text-foreground/60 text-sm">
+              Check your inbox for a link to sign in with. It works once, for a few minutes.
+            </Text>
           }
         />
       ) : null}
