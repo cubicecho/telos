@@ -186,7 +186,9 @@ Generated reads default to person-or-AI and generated writes to person; every
 hand-written field is named in `ROOT_FIELDS`. A field named nowhere is
 FORBIDDEN to everyone, and `permissions.test.ts` fails until it is named. An
 anonymous caller passes as a person, so the field itself answers
-UNAUTHENTICATED.
+UNAUTHENTICATED. The hand-written lookups (`core/owned.ts`) read through
+tenancy's `reachable()`, so they agree with generated CRUD on what a caller,
+AI included, may reach.
 
 **Auth is better-auth, reached only through GraphQL.** `server/src/auth/better-auth.ts`
 configures it (bearer sessions in Postgres, magic links, OIDC, API keys) over

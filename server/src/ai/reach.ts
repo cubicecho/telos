@@ -72,7 +72,7 @@ async function assertAiRun(context: Context, userId: string, id: string): Promis
   if (!run?.todoId) {
     throw notFound('Run');
   }
-  await loadAiTodo(context.db, userId, run.todoId).catch(() => {
+  await loadAiTodo(context, run.todoId).catch(() => {
     throw notFound('Run');
   });
 }
@@ -92,13 +92,13 @@ async function assertSeen(context: Context, userId: string, named: Named, id: st
     throw notFound(ENTITY[named]);
   }
   if (named === 'project') {
-    await loadAiProject(context.db, userId, id);
+    await loadAiProject(context, id);
   } else if (named === 'lane') {
     await assertAiLane(context, userId, id);
   } else if (named === 'run') {
     await assertAiRun(context, userId, id);
   } else {
-    await loadAiTodo(context.db, userId, id);
+    await loadAiTodo(context, id);
   }
 }
 

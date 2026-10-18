@@ -126,7 +126,7 @@ export function applyCardMarksExtension(schema: GraphQLSchema, options: { ai: bo
     // A person's, like the board it is drawn on.
     const userId = requireAuth(context);
     const db = context.db;
-    const project = await loadOwnedProject(db, userId, args.projectId);
+    const project = await loadOwnedProject(context, args.projectId);
 
     const runs = options.ai && project.aiEnabled && (await aiAllowed(context));
     const rows = await readMarks(db, userId, project.id, runs);
