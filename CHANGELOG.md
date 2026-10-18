@@ -1,3 +1,20 @@
+# [6.0.0](https://github.com/cubicecho/telos/compare/v5.2.0...v6.0.0) (2026-10-18)
+
+
+* feat(auth)!: sign in by emailed link, provider or local net, as the backend skill says ([a40b65f](https://github.com/cubicecho/telos/commit/a40b65fac93c307c251ff5ca282ede32ab05ba29))
+
+
+### BREAKING CHANGES
+
+* AUTH_SECRET and JWT_SECRET are now BETTER_AUTH_SECRET.
+AUTH_MAGIC_LINK=false is now SECURE_LOCAL_NET=true. EXPOSE_MAGIC_LINK is
+gone, and links are no longer written to the server log: set SMTP_URL, pair
+an OIDC provider, or use SECURE_LOCAL_NET on a private network. The server
+refuses to start while an old name is set. signInMagicLink no longer has a
+magicLink field.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
 # [5.2.0](https://github.com/cubicecho/telos/compare/v5.1.1...v5.2.0) (2026-10-17)
 
 
