@@ -306,6 +306,44 @@ describe('AgentManager', () => {
     expect(screen.getByLabelText('Context length')).toHaveValue('8192');
   });
 
+  it('takes a model the endpoint does not list, and saves the blank row as inherit', async () => {
+    const user = userEvent.setup();
+    const update = vi.fn((_variables: { set: { model: string | null; toolSelectModel: string | null } }) => ({
+      data: { updateAgent: AGENT },
+    }));
+    manager([
+      agents([{ ...AGENT, toolSelectModel: 'qwen3:4b' }]),
+      {
+        request: {
+          query: AgentModelsDocument,
+          variables: { baseUrl: 'http://localhost:11434/v1', agentId: 'a1', apiKey: null },
+        },
+        result: { data: { agentModels: [{ __typename: 'AgentModel', id: 'llama3:8b', contextLength: 8192 }] } },
+      },
+      { request: { query: UpdateAgentDocument }, variableMatcher: () => true, result: update },
+    ]);
+
+    await user.click(await screen.findByRole('button', { name: 'Edit Reviewer' }));
+    expect(await screen.findByText('Connected')).toBeInTheDocument();
+
+    // The stored model is not in the list, and is still what the trigger shows.
+    const model = screen.getByRole('combobox', { name: 'Model' });
+    expect(model).toHaveTextContent('qwen3:14b');
+    await user.click(model);
+    await user.type(await screen.findByPlaceholderText('Find or type a model…'), 'mistral:7b');
+    await user.click(await screen.findByRole('option', { name: /mistral:7b/ }));
+    expect(screen.getByRole('combobox', { name: 'Model' })).toHaveTextContent('mistral:7b');
+
+    const toolModel = screen.getByRole('combobox', { name: 'Tool selection model' });
+    expect(toolModel).toHaveTextContent('qwen3:4b');
+    await user.click(toolModel);
+    await user.click(await screen.findByRole('option', { name: /^Inherit/ }));
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(update).toHaveBeenCalled());
+    expect(update.mock.calls[0][0]).toMatchObject({ set: { model: 'mistral:7b', toolSelectModel: null } });
+  });
+
   it('says when the endpoint will not list its models, and lets one be typed', async () => {
     const user = userEvent.setup();
     manager([

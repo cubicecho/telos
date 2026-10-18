@@ -1,18 +1,20 @@
 import { useLazyQuery } from '@apollo/client';
-import { useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { ComboboxField } from '@/components/ui/combobox-field';
 import { FieldWrapper, useFieldContext } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { describeError } from '@/lib/errors';
 import { AgentModelsDocument } from '@/lib/graphql';
+import { withOrphanOptions } from '@/lib/select-options';
 
 // The endpoint first, then its models: the shape min-agent's Model panel has.
 // A base URL is typed (and a key, if it wants one), its models are asked for,
 // and the model is then picked from what it lists rather than typed from
-// memory. Typing one in stays possible, for an endpoint that lists nothing.
+// memory. Typing one in stays possible: into the list's search, or into a box
+// for an endpoint that lists nothing.
 
 /** A model as the endpoint lists it. */
 export interface EndpointModel {
@@ -107,18 +109,16 @@ export function EndpointStatus({
   );
 }
 
-/** A select's value for "leave it blank": radix will not take an empty one. */
-const BLANK = '__blank__';
-
 /**
- * A model field: a select of what the endpoint lists once it has listed
- * something, a text box until then or when asked for one.
+ * A model field: a searchable list of what the endpoint lists once it has listed
+ * something, a text box until then. A name the list does not have can still be
+ * typed into the list's search and used, and the first row leaves it blank.
  *
  * @param label - The field's label.
  * @param models - What the endpoint lists, or null while there is no list.
  * @param blankLabel - What the blank choice says: what it inherits, or that it is off.
  * @param placeholder - The text box's, for the same.
- * @param onPick - Told the model picked from the list, for its context length.
+ * @param onPick - Told the model chosen when the list has it, for its context length.
  */
 export function ModelField({
   label,
@@ -133,58 +133,59 @@ export function ModelField({
   placeholder?: string;
   onPick?: (model: EndpointModel) => void;
 }) {
-  const field = useFieldContext<string>();
-  const [typing, setTyping] = useState(false);
+  // Null once the list's blank row is chosen, which is what `clearable` writes.
+  const field = useFieldContext<string | null>();
   const value = field.state.value ?? '';
-  const listed = models !== null && models.length > 0 && !typing;
+  const listed = models !== null && models.length > 0;
 
-  const control = listed ? (
-    <Select
-      value={value.trim() === '' ? BLANK : value}
-      onValueChange={(next) => {
-        field.handleChange(next === BLANK ? '' : next);
-        const model = models.find((entry) => entry.id === next);
-        if (model) onPick?.(model);
-      }}
-    >
-      {/* cubeui's FieldWrapper names inputs, not a select's trigger: it is named here. */}
-      <SelectTrigger aria-label={label} onBlur={field.handleBlur}>
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value={BLANK}>{blankLabel}</SelectItem>
-        {models.some((entry) => entry.id === value) || value.trim() === '' ? null : (
-          <SelectItem value={value}>{`${value} (not listed)`}</SelectItem>
-        )}
-        {models.map((model) => (
-          <SelectItem key={model.id} value={model.id}>
-            {model.contextLength ? `${model.id} · ${model.contextLength.toLocaleString()} ctx` : model.id}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  ) : (
-    <Input
-      value={value}
-      placeholder={placeholder}
-      onBlur={field.handleBlur}
-      onChangeText={(text) => field.handleChange(text)}
-    />
+  // The field wires the combobox's own change handler, so a choice is heard as the value moving.
+  const last = useRef(value);
+  useEffect(() => {
+    if (value === last.current) return;
+    last.current = value;
+    const model = models?.find((entry) => entry.id === value);
+    if (model) onPick?.(model);
+  }, [value, models, onPick]);
+
+  const options = useMemo(
+    () =>
+      withOrphanOptions(
+        (models ?? []).map((model) => ({
+          value: model.id,
+          label: model.id,
+          className: 'font-mono',
+          meta: model.contextLength ? `${model.contextLength.toLocaleString()} ctx` : undefined,
+        })),
+        value.trim() === '' ? [] : [value],
+      ),
+    [models, value],
   );
 
+  if (!listed) {
+    return (
+      <FieldWrapper
+        label={label}
+        controlSlot={
+          <Input
+            value={value}
+            placeholder={placeholder}
+            onBlur={field.handleBlur}
+            onChangeText={(text) => field.handleChange(text)}
+          />
+        }
+      />
+    );
+  }
   return (
-    <View className="gap-1">
-      <FieldWrapper label={label} controlSlot={control} />
-      {models !== null && models.length > 0 ? (
-        <Button
-          variant="link"
-          size="sm"
-          className="self-start px-0"
-          onPress={() => setTyping(!typing)}
-          content={typing ? 'Pick from the list' : 'Type a name instead'}
-        />
-      ) : null}
-    </View>
+    <ComboboxField
+      label={label}
+      options={options}
+      searchable
+      freeText
+      searchPlaceholder="Find or type a model…"
+      clearable
+      emptyLabel={blankLabel}
+    />
   );
 }
 
