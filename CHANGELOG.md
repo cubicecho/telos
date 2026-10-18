@@ -1,3 +1,18 @@
+# [7.0.0](https://github.com/cubicecho/telos/compare/v6.0.0...v7.0.0) (2026-10-18)
+
+
+* feat(server)!: serve /graphql with GraphQL Yoga, and live boards over SSE ([80e79dd](https://github.com/cubicecho/telos/commit/80e79ddee643093204d756c35c6050c26b4c4033))
+
+
+### BREAKING CHANGES
+
+* subscriptions are no longer served over WebSocket
+(graphql-transport-ws). A client that subscribes must use GraphQL over SSE on
+/graphql (graphql-sse, distinct-connections mode). Unexpected errors now read
+"Unexpected error." instead of their original message.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
 # [6.0.0](https://github.com/cubicecho/telos/compare/v5.2.0...v6.0.0) (2026-10-18)
 
 
