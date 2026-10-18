@@ -36,6 +36,25 @@ describe('systemPromptFor', () => {
   });
 });
 
+describe('STANDING_SYSTEM', () => {
+  it('asks a work run to plan, check each criterion, and end on its three sections', () => {
+    const report = STANDING_SYSTEM.slice(STANDING_SYSTEM.indexOf('A report.'), STANDING_SYSTEM.indexOf('A refine.'));
+    expect(report).toContain('first plan it');
+    expect(report).toContain('check every criterion yourself');
+    const sections = ['## Changes', '## Verification', '## Open questions'].map((section) => report.indexOf(section));
+    expect(sections.every((at) => at >= 0)).toBe(true);
+    expect([...sections].sort((a, b) => a - b)).toEqual(sections);
+  });
+
+  it('asks a ruling for each criterion with quoted evidence, and still to open on PASS or FAIL', () => {
+    const ruling = STANDING_SYSTEM.slice(STANDING_SYSTEM.indexOf('A ruling.'), STANDING_SYSTEM.indexOf('A report.'));
+    expect(ruling).toContain('begin with PASS or FAIL on its own');
+    expect(ruling).toContain('acceptance criteria one at a time');
+    expect(ruling).toContain('quote the evidence');
+    expect(ruling).toContain('FAIL only on a criterion you can name as not met');
+  });
+});
+
 describe('assignmentPrompt', () => {
   it('gives the todo, its criteria, the last report, why it came back, then the other notes', () => {
     const prompt = assignmentPrompt(ASSIGNMENT);
@@ -67,6 +86,24 @@ describe('readReply', () => {
 
   it('leaves a reply with no todos block as it is', () => {
     expect(readReply('Done: added the box.')).toEqual({ report: 'Done: added the box.', todos: [], refine: null });
+  });
+
+  it('leaves a structured report whole: its sections are the report', () => {
+    const reply =
+      'Planned: the box, then the filter.\n\n## Changes\nAdded src/search.tsx.\n\n' +
+      '## Verification\n- Typing filters the list: `npm test` printed "12 passed".\n\n## Open questions\nNone.';
+
+    expect(readReply(reply)).toEqual({ report: reply, todos: [], refine: null });
+  });
+
+  it('leaves a ruling per criterion whole, its first word first', () => {
+    const reply =
+      'FAIL\n- Typing filters the list: met. `npm test` printed "12 passed".\n' +
+      '- The box is labelled: not met. src/search.tsx:4 reads `<input />`.';
+    const read = readReply(reply);
+
+    expect(read).toEqual({ report: reply, todos: [], refine: null });
+    expect(read.report.split(/\s/)[0]).toBe('FAIL');
   });
 
   it('reads no todos from a block that is not JSON', () => {

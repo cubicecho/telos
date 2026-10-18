@@ -216,6 +216,28 @@ describe('finishRun', () => {
     expect(events.at(-1)).toMatchObject({ kind: 'move', noteId: note.id, reason: 'The review failed.' });
   });
 
+  it('reads a ruling per acceptance criterion off its first word alone', async () => {
+    await setLane(board.person, board.lanes[0].id, { onFailureLaneId: board.lanes[1].id });
+    const ruling = (verdict: string) =>
+      `${verdict}\n- Typing filters the list: met. \`npm test\` printed "12 passed".\n` +
+      `- The box is labelled: not met. src/search.tsx:4 reads \`<input />\`, with no label.`;
+    const failing = await board.addTodo('Review it');
+    expect(await finish((await claim(failing)).runId, { status: 'OK', output: ruling('FAIL') })).toMatchObject({
+      verdict: 'fail',
+    });
+    const passing = await board.addTodo('Review it again');
+    expect(await finish((await claim(passing)).runId, { status: 'OK', output: ruling('PASS') })).toMatchObject({
+      verdict: 'pass',
+    });
+    // A structured report is a report, whatever its sections say.
+    const working = await board.addTodo('Do it');
+    const report =
+      '## Changes\nAdded the box.\n\n## Verification\nFAIL at first, then 12 passed.\n\n## Open questions\nNone.';
+    expect(await finish((await claim(working)).runId, { status: 'OK', output: report })).toMatchObject({
+      verdict: 'none',
+    });
+  });
+
   it('hands the agent a todo comes back to the ruling that sent it back', async () => {
     await setLane(board.person, board.lanes[0].id, { onFailureLaneId: board.lanes[1].id });
     await setLane(board.person, board.lanes[1].id, { agentId: board.agentId, onSuccessLaneId: board.lanes[0].id });
