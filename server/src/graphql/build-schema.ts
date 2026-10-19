@@ -4,7 +4,6 @@ import { buildSchema, GraphQLDateTime } from '@vantreeseba/drizzle-graphql';
 import { applyAgentDefaultsExtension } from '../agents/agent-defaults-resolvers.ts';
 import { applyAgentsExtension } from '../agents/resolvers.ts';
 import { applyAccountActivityExtension } from '../ai/account-activity.ts';
-import { applyActorLock } from '../ai/actor-lock.ts';
 import { applyAiReadsExtension } from '../ai/reads.ts';
 import { applyRequestsExtension } from '../ai/requests.ts';
 import { applyAiSetupExtension } from '../ai/setup.ts';
@@ -24,6 +23,7 @@ import { applySessionDeletesExtension } from '../runs/session-deletes.ts';
 import { applySsoSetupExtension } from '../sso/resolvers.ts';
 import { applyNotesExtension } from '../todos/notes.ts';
 import { applyTodosExtension } from '../todos/resolvers.ts';
+import { applyCallerPermissions } from './permissions.ts';
 import { contextValues, features, scope } from './tenancy.ts';
 import { onWrite } from './write-guards.ts';
 
@@ -137,8 +137,8 @@ export function createSchema(db: DB, options: SchemaOptions) {
     schema = applyAccountActivityExtension(schema);
     schema = applyAiReadsExtension(schema);
   }
-  // Last, so it sees every mutation the extensions above added.
-  schema = applyActorLock(schema);
+  // Last, so it sees every root field the extensions above added.
+  schema = applyCallerPermissions(schema, entities);
 
   return { schema, entities };
 }

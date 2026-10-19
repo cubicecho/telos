@@ -57,14 +57,14 @@ telos/
 │       ├── http/            # Express-side pieces: the SPA (static.ts), the OIDC redirects
 │       │                    #   (sso.ts), Express headers as fetch Headers (headers.ts)
 │       ├── graphql/         # The served schema and its rules: build-schema, schema, tenancy,
-│       │                    #   write-guards, loaders, the context factory both doors share,
+│       │                    #   permissions (who calls which root field), write-guards, loaders, the context factory both doors share,
 │       │                    #   the /graphql handler, and subscriptions
 │       ├── auth/            # Who the caller is and how they sign in: better-auth, actor
-│       │                    #   (resolveActor), endpoints, throttle, rate-limit, email, api-keys
+│       │                    #   (resolveActor), abilities (defineAbilitiesFor), endpoints, throttle, rate-limit, email, api-keys
 │       ├── sso/             # Pairing with an OIDC provider from the app: settings, pairing, resolvers
 │       ├── instance/        # The instance's settings row: its AI switch, and its admins
 │       ├── ai/              # Whether AI may act, and what it sees and writes: gate, switches,
-│       │                    #   reach, reads, setup, status, actor-lock, requests, account-activity
+│       │                    #   reach, reads, setup, status, requests, account-activity
 │       ├── mcp/             # The AI door: endpoint, door (+ door.graphql, its tools), prompts
 │       ├── agents/          # A lane's agents, their account defaults, their MCP servers and probes
 │       ├── runs/            # The runner's side: resolvers, ready (which todos an agent may start
@@ -179,6 +179,19 @@ delete. A table missing from `scope` is visible across tenants, and nothing else
 in the code will say so. `tenancy.test.ts` fails when you forget — do not delete
 the test to make it pass.
 
+**Every root field needs an audience.** `server/src/graphql/permissions.ts` is a
+graphql-casl permissions map over the root types: each field is for a person
+(`Audience.Person`), a person or AI (`PersonOrAi`, the MCP door's writes and
+every read), or the runner, and the caller's ability (`defineAbilitiesFor` in
+`auth/abilities.ts`, built once on the context) says which audiences it is.
+Generated reads default to person-or-AI and generated writes to person; every
+hand-written field is named in `ROOT_FIELDS`. A field named nowhere is
+FORBIDDEN to everyone, and `permissions.test.ts` fails until it is named. An
+anonymous caller passes as a person, so the field itself answers
+UNAUTHENTICATED. The hand-written lookups (`core/owned.ts`) read through
+tenancy's `reachable()`, so they agree with generated CRUD on what a caller,
+AI included, may reach.
+
 **Auth is better-auth, reached only through GraphQL.** `server/src/auth/better-auth.ts`
 configures it (bearer sessions in Postgres, magic links, OIDC, API keys) over
 the tables in `db/src/models/auth.ts`, which `build-schema.ts` excludes from
@@ -222,8 +235,8 @@ an admin (`users.isAdmin`; the first account to sign up) flips it, with
 key still resolves with it off, so a heartbeat can say stop. `users.aiEnabled`
 (account) is asked by the same places. All of them default to off. An AI resolver calls `requireAi`, and
 answers NOT_FOUND rather than FORBIDDEN, because for someone who turned AI off
-the surface is not there. Key management needs a session (`requireSession`): a
-key cannot mint its own successor.
+the surface is not there. Key management is a person's alone (`Audience.Person` in
+`graphql/permissions.ts`): a key cannot mint its own successor.
 
 **AI works the board as far as its owner lets it, and no further.** An
 `apiKey` or `agent` actor (`isAiActor`) is held to narrower rules. What it
@@ -236,7 +249,7 @@ apply the same narrowing itself — see `visibleToAi`/`hiddenFromAi` in
 `todos/resolvers.ts`, `loadAiTodo` in `ai/requests.ts`, and
 `ai/reach.ts`, which checks the ids a hand-written mutation is handed
 and answers NOT_FOUND for what AI cannot see. What it writes:
-`ai/actor-lock.ts` wraps every mutation and refuses AI all but
+`graphql/permissions.ts` gates every root field and refuses AI all but
 `AI_MUTATIONS` — projects (create and rename, nothing else:
 `holdAiProjectWrite`), todos (create, edit, move, retry, run, stop a run,
 dependencies, archive, restore, delete), notes, artifacts and board
@@ -245,10 +258,10 @@ and MCP servers, API keys, lanes and their agents and check commands, the projec
 or deleting a project. A new mutation is closed to AI until it is added there.
 The MCP door (`mcp/endpoint.ts`) serves only the operations written in `mcp/door.graphql`,
 and a test pins its mutations to `AI_MUTATIONS`: the tool list is the menu,
-the lock is the lock. Each key has a switch per tool (`api_key_tools`,
+the permissions map is the lock. Each key has a switch per tool (`api_key_tools`,
 `door.ts`): every tool is on until its owner turns it off in Settings, and one
 that is off is left out of the key's listing (`mcp/endpoint.ts`) *and* refused by the
-lock (`toolsOff` on the actor, read in `auth.ts`), for the root fields the tool
+permissions map (`toolsOff` on the actor, read in `auth/actor.ts`), for the root fields the tool
 uses. A run has the same switches through its agent (`agents.tools_off`,
 edited in the agent form): null is the run default (`runToolsOff` in
 `door.ts`: every read, `set_todo_dependencies` and the note tools; not
@@ -257,7 +270,7 @@ computed in code so a tool the door gains later is off for a run until
 someone switches it on; `record_artifact` is never a run's (`NOT_FOR_RUNS`).
 Whatever its switches say, a run writes only its own todo, the todos under it
 and the todos a run of its todo created, and its own board
-(`runs/run-reach.ts`, applied by the lock after `ai-reach.ts`): out of
+(`runs/run-reach.ts`, applied by the permissions map after `ai/reach.ts`): out of
 reach is NOT_FOUND, and editing, moving, finishing, archiving, deleting,
 re-running or re-pointing the dependencies of its own todo is FORBIDDEN, since
 that is `finishRun`'s to decide: a run rewrites its todo with a refine. A mutation added to `AI_MUTATIONS` needs an entry in
@@ -480,7 +493,7 @@ server.
 generated queries and no project filter, which are already the account's own,
 and reuses the project's rows (`RunRow`, `ArtifactRow`, `ArchivedTodoList`,
 `RunDialog`). What those cannot say is in `ai/account-activity.ts`,
-both a person's (`requireSession`) and behind `requireAi`: `accountSpend` adds
+both a person's (`Audience.Person`) and behind `requireAi`: `accountSpend` adds
 up a window's runs by project and by agent, over
 every project the account owns, and returns `keptSince` when run retention is
 shorter than the window; `accountHandedBack` is the todos in `workStates`'s

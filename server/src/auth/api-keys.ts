@@ -7,7 +7,7 @@ import type { Context } from '../core/context.ts';
 import { badInput, notFound } from '../core/errors.ts';
 import { attachResolvers } from '../graphql/attach-resolvers.ts';
 import { DOOR_TOOL_NAMES, DOOR_TOOLS, NOT_FOR_RUNS, onForRuns } from '../mcp/door.ts';
-import { requireSession } from './resolvers.ts';
+import { requireAuth } from './resolvers.ts';
 
 // API keys: how an MCP host reaches this server as one of its users. They are
 // the AI door, so this whole extension exists only when the instance has AI
@@ -84,13 +84,14 @@ interface KeyRow {
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
- * Only a person with a session and AI on manages keys.
+ * Only a person with AI on manages keys: their fields are a person's alone
+ * (graphql/permissions.ts), so a key cannot mint its own successor.
  *
  * @param ctx The request.
  * @returns The caller.
  */
 export async function requireKeyManager(ctx: Context): Promise<string> {
-  const userId = requireSession(ctx);
+  const userId = requireAuth(ctx);
   await requireAi(ctx);
   return userId;
 }

@@ -183,23 +183,23 @@ export function applyTodosExtension(schema: GraphQLSchema): GraphQLSchema {
   const mutations: MutationResolvers = {};
 
   mutations.completeTodo = async (_parent, args, context) => {
-    const userId = requireAuth(context);
-    const todo = await loadOwnedTodo(context.db, userId, args.id);
+    requireAuth(context);
+    const todo = await loadOwnedTodo(context, args.id);
     if (todo.completedAt != null) return todo;
     await assertNotBlocked(context.db, [args.id]);
     return setCompletedAt(context, todo, new Date(), args.reason);
   };
 
   mutations.reopenTodo = async (_parent, args, context) => {
-    const userId = requireAuth(context);
-    const todo = await loadOwnedTodo(context.db, userId, args.id);
+    requireAuth(context);
+    const todo = await loadOwnedTodo(context, args.id);
     if (todo.completedAt == null) return todo;
     return setCompletedAt(context, todo, null, args.reason);
   };
 
   mutations.unsplitTodo = async (_parent, args, context) => {
-    const userId = requireAuth(context);
-    const todo = await loadOwnedTodo(context.db, userId, args.id);
+    requireAuth(context);
+    const todo = await loadOwnedTodo(context, args.id);
     const byPerson = context.actor.kind === 'user';
     if (byPerson === false) {
       throw forbidden('Only a person can unsplit a todo.');
@@ -221,8 +221,8 @@ export function applyTodosExtension(schema: GraphQLSchema): GraphQLSchema {
     // Both ends must be the caller's — otherwise the edge would leak whether a
     // stranger's todo exists, and later report it as a blocker.
     const [todo, blocker] = await Promise.all([
-      loadOwnedTodo(context.db, userId, args.todoId),
-      loadOwnedTodo(context.db, userId, args.dependsOnTodoId),
+      loadOwnedTodo(context, args.todoId),
+      loadOwnedTodo(context, args.dependsOnTodoId),
     ]);
     assertNotCompletedBehind(todo, blocker);
     await assertNoCycle(context.db, args.todoId, args.dependsOnTodoId);
@@ -230,7 +230,7 @@ export function applyTodosExtension(schema: GraphQLSchema): GraphQLSchema {
       .insert(dbSchema.todoDependencies)
       .values({ userId, todoId: args.todoId, dependsOnTodoId: args.dependsOnTodoId })
       .onConflictDoNothing();
-    return loadOwnedTodo(context.db, userId, args.todoId);
+    return loadOwnedTodo(context, args.todoId);
   };
 
   mutations.removeTodoDependency = async (_parent, args, context) => {
@@ -244,12 +244,12 @@ export function applyTodosExtension(schema: GraphQLSchema): GraphQLSchema {
           eq(dbSchema.todoDependencies.dependsOnTodoId, args.dependsOnTodoId),
         ),
       );
-    return loadOwnedTodo(context.db, userId, args.todoId);
+    return loadOwnedTodo(context, args.todoId);
   };
 
   mutations.setTodoDependencies = async (_parent, args, context) => {
     const userId = requireAuth(context);
-    const todo = await loadOwnedTodo(context.db, userId, args.id);
+    const todo = await loadOwnedTodo(context, args.id);
     const wanted = new Set(args.dependsOn);
     const existing: Array<{ dependsOnTodoId: string }> = await context.db
       .select({ dependsOnTodoId: dbSchema.todoDependencies.dependsOnTodoId })
@@ -269,7 +269,7 @@ export function applyTodosExtension(schema: GraphQLSchema): GraphQLSchema {
       if (id === todo.id) {
         throw badInput('A todo cannot depend on itself.');
       }
-      assertNotCompletedBehind(todo, await loadOwnedTodo(context.db, userId, id));
+      assertNotCompletedBehind(todo, await loadOwnedTodo(context, id));
     }
     await context.db.transaction(async (tx) => {
       if (dropped.length > 0) {
@@ -293,7 +293,7 @@ export function applyTodosExtension(schema: GraphQLSchema): GraphQLSchema {
           .onConflictDoNothing();
       }
     });
-    return loadOwnedTodo(context.db, userId, todo.id);
+    return loadOwnedTodo(context, todo.id);
   };
 
   return attachResolvers(extendedSchema, { Todo: todoFields, Project: projectFields, Mutation: mutations });

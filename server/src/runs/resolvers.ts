@@ -14,7 +14,6 @@ import type {
   RunUsageInput,
 } from '../../__generated__/resolvers.ts';
 import { runnerAgent } from '../agents/mcp-servers.ts';
-import { requireSystem } from '../ai/gate.ts';
 import { requireAuth } from '../auth/resolvers.ts';
 import { findDoneLaneId, findNewTodoLaneId } from '../board/lanes.ts';
 import type { Actor, Context } from '../core/context.ts';
@@ -869,14 +868,12 @@ export function applyRunsExtension(schema: GraphQLSchema): GraphQLSchema {
   const mutations: MutationResolvers = {};
 
   queries.runnerQueue = async (_parent, args, context) => {
-    requireSystem(context);
     markRunnerSeen();
     const limit = Math.max(1, Math.min(args.limit ?? 20, 200));
     return readyTodos(context.db, {}, limit);
   };
 
   mutations.claimRun = async (_parent, args, context) => {
-    requireSystem(context);
     try {
       return await (context.db as AnyRow).transaction(async (tx: AnyRow) => {
         // Claims in one lane take turns, so two runners cannot both see
@@ -938,7 +935,6 @@ export function applyRunsExtension(schema: GraphQLSchema): GraphQLSchema {
   };
 
   mutations.heartbeatRun = async (_parent, args, context) => {
-    requireSystem(context);
     return (context.db as AnyRow).transaction(async (tx: AnyRow) => {
       const { run, aiOff } = await loadRunForUpdate(tx, args.id);
       if (run.status !== 'running') return true;
@@ -965,7 +961,6 @@ export function applyRunsExtension(schema: GraphQLSchema): GraphQLSchema {
   };
 
   mutations.finishRun = async (_parent, args, context) => {
-    requireSystem(context);
     return finish(context, args.id, args.result);
   };
 

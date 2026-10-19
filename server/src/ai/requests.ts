@@ -15,7 +15,7 @@ import { requireAi } from './gate.ts';
 // table — dropped into the project's first open lane, where the board's own
 // agents (or its person) pick it up. It is the one way to add work without
 // naming a lane; the rest of what AI may do to the board is the generated
-// writes actor-lock.ts lets through (AI_MUTATIONS).
+// writes graphql/permissions.ts lets through (AI_MUTATIONS).
 //
 // Every mutation here is answered NOT_FOUND for anything AI may not see: an
 // account or project with AI off, a todo the user told AI to ignore. From the
@@ -97,9 +97,9 @@ export function applyRequestsExtension(schema: GraphQLSchema): GraphQLSchema {
   mutations.submitRequest = async (_parent, args, context) => {
     const userId = await requireAi(context);
     const title = requireText(args.title, 'title');
-    const project = await loadAiProject(context.db, userId, args.projectId);
+    const project = await loadAiProject(context, args.projectId);
     if (args.parentId) {
-      const parent = await loadAiTodo(context.db, userId, args.parentId);
+      const parent = await loadAiTodo(context, args.parentId);
       if (parent.projectId !== project.id) throw notFound('Parent todo');
     }
     return context.db.transaction(async (tx) => {
@@ -124,7 +124,7 @@ export function applyRequestsExtension(schema: GraphQLSchema): GraphQLSchema {
 
   mutations.cancelRequest = async (_parent, args, context) => {
     const userId = await requireAi(context);
-    const todo = await loadAiTodo(context.db, userId, args.id);
+    const todo = await loadAiTodo(context, args.id);
     const reason = args.reason?.trim() || null;
     await context.db.transaction(async (tx) => {
       const note = reason ? await insertNote(tx, context, userId, todo.id, reason) : null;
@@ -140,7 +140,7 @@ export function applyRequestsExtension(schema: GraphQLSchema): GraphQLSchema {
   mutations.addTodoNote = async (_parent, args, context) => {
     const userId = await requireAi(context);
     const body = requireText(args.body, 'body');
-    const todo = await loadAiTodo(context.db, userId, args.todoId);
+    const todo = await loadAiTodo(context, args.todoId);
     return insertNote(context.db, context, userId, todo.id, body);
   };
 

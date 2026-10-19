@@ -131,7 +131,7 @@ export function applyBoardTemplatesExtension(schema: GraphQLSchema): GraphQLSche
     const name = args.name.trim();
     if (!name || name.length > MAX_NAME) throw badInput(`Name the template, in ${MAX_NAME} characters or fewer.`);
     const db = context.db;
-    await loadOwnedProject(db, userId, args.projectId);
+    await loadOwnedProject(context, args.projectId);
     const rows = await db
       .select()
       .from(dbSchema.lanes)
@@ -164,7 +164,7 @@ export function applyBoardTemplatesExtension(schema: GraphQLSchema): GraphQLSche
   mutations.applyBoardTemplate = async (_parent, args, context) => {
     const userId = requireAuth(context);
     return context.db.transaction(async (tx) => {
-      const project = await loadOwnedProject(tx, userId, args.projectId);
+      const project = await loadOwnedProject(context, args.projectId, tx);
       const [template] = await tx
         .select()
         .from(dbSchema.boardTemplates)

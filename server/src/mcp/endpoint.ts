@@ -22,8 +22,8 @@ import { registerPrompts } from './prompts.ts';
 // holding an API key. The tools are the hand-written operations in
 // mcp/door.graphql and nothing else, so what an MCP client can do is what that file
 // says — the generated CRUD surface is never projected. Behind it, the same
-// tenancy narrows what a key sees (tenancy.ts) and the actor lock refuses any
-// write but the ones meant for AI (ai/actor-lock.ts); the tool list is
+// tenancy narrows what a key sees (tenancy.ts) and the permissions map refuses
+// any write but the ones meant for AI (graphql/permissions.ts); the tool list is
 // the menu, not the lock.
 //
 // A key has a switch per tool (door.ts), and so does a run, through its agent.
