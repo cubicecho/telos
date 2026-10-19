@@ -1,3 +1,11 @@
+# [7.4.0](https://github.com/cubicecho/telos/compare/v7.3.0...v7.4.0) (2026-10-19)
+
+
+### Features
+
+* **app:** warn when a lane's reviewer uses the model of the lane it reviews ([3ce5c72](https://github.com/cubicecho/telos/commit/3ce5c72b36fd47c97fa25d7b6c7706a00234bab2))
+* **runs:** a lane that reviews work rules on the work, not the worker's report ([459f525](https://github.com/cubicecho/telos/commit/459f52532d4385a598019931677190885be20e90))
+
 # [7.3.0](https://github.com/cubicecho/telos/compare/v7.2.0...v7.3.0) (2026-10-19)
 
 
