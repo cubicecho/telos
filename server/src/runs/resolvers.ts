@@ -181,6 +181,8 @@ const RUNS_SDL = parse(`
     promptTokens: Int!
     completionTokens: Int!
     totalTokens: Int!
+    "How many of promptTokens came from the endpoint's prompt cache. Left out when it has not said."
+    cachedInputTokens: Int
   }
 
   "Something a run left behind: where it is, not what is in it."
@@ -207,6 +209,8 @@ const RUNS_SDL = parse(`
     promptTokens: Int
     completionTokens: Int
     totalTokens: Int
+    "How many of promptTokens came from the endpoint's prompt cache. Left out when it has not said."
+    cachedInputTokens: Int
     "The todos the agent split this one into, if any: two or more. This one is done when they all are. One is read as a refine."
     todos: [ProposedTodoInput!]
     "The todo as the agent rewrote it, if it did. It then passes, as a report would. Never with todos."
@@ -587,6 +591,7 @@ export function reported(
           completionTokens: Math.max(0, usage.completionTokens),
           totalTokens: Math.max(0, usage.totalTokens),
           ...(usage.toolCalls == null ? {} : { toolCalls: Math.max(0, usage.toolCalls) }),
+          ...(usage.cachedInputTokens == null ? {} : { cachedInputTokens: Math.max(0, usage.cachedInputTokens) }),
         }
       : {}),
   };
@@ -640,6 +645,8 @@ function spend(run: AnyRow, result: RunResultInput) {
     promptTokens: result.promptTokens ?? run.promptTokens ?? 0,
     completionTokens: result.completionTokens ?? run.completionTokens ?? 0,
     totalTokens: result.totalTokens ?? run.totalTokens ?? 0,
+    cachedInputTokens:
+      result.cachedInputTokens == null ? (run.cachedInputTokens ?? null) : Math.max(0, result.cachedInputTokens),
   };
 }
 

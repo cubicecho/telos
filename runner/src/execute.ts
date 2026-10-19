@@ -58,6 +58,7 @@ export class EventFeed {
   #usage: RunUsage | undefined;
   #usageSent = true;
   #toolCalls = 0;
+  #cacheReported = false;
 
   push(event: RunEvent): void {
     const last = this.#pending.at(-1);
@@ -76,6 +77,15 @@ export class EventFeed {
   /** What the agent was told; sent with every beat until one lands. */
   prompt(prompt: RunPrompt): void {
     this.#prompt = prompt;
+  }
+
+  /**
+   * How much of the run's prompt the endpoint served from its cache, so far.
+   * Undefined until a turn reports a cache count: a zero from an endpoint that
+   * says nothing about its cache is not a miss.
+   */
+  get cachedInputTokens(): number | undefined {
+    return this.#cacheReported ? this.#usage?.cachedInputTokens : undefined;
   }
 
   /** Whether a beat now would say anything. */
@@ -114,11 +124,14 @@ export class EventFeed {
       this.push({ kind: 'turn', text: event.text || null });
     } else if (event.kind === 'usage') {
       if (event.usage) {
+        // agent-core says a turn reported its cache by giving `uncached`.
+        this.#cacheReported ||= event.usage.turn?.uncached !== undefined;
         this.#usage = {
           toolCalls: this.#toolCalls,
           promptTokens: event.usage.promptTokens,
           completionTokens: event.usage.completionTokens,
           totalTokens: event.usage.totalTokens,
+          ...(this.#cacheReported ? { cachedInputTokens: event.usage.cachedTokens ?? 0 } : {}),
         };
         this.#usageSent = false;
       }
@@ -381,6 +394,7 @@ async function work(
     promptTokens: loop.usage.prompt,
     completionTokens: loop.usage.completion,
     totalTokens: loop.usage.total,
+    ...(feed.cachedInputTokens === undefined ? {} : { cachedInputTokens: feed.cachedInputTokens }),
   };
   return { status: 'ok', output: report, todos, refine, ...spent };
 }

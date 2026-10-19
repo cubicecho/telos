@@ -203,7 +203,12 @@ async function serveLlm(): Promise<string> {
           created: 0,
           model: 'tiny',
           choices: [],
-          usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
+          usage: {
+            prompt_tokens: 10,
+            completion_tokens: 5,
+            total_tokens: 15,
+            prompt_tokens_details: { cached_tokens: 4 },
+          },
         })}\n\n`,
       );
       res.end('data: [DONE]\n\n');
@@ -567,6 +572,18 @@ describe('the runner', () => {
   it('is refused by telos without the right key', async () => {
     await board.addTodo('Write it');
     await expect(cycle(loopOptions({ telos: createTelos({ telosUrl, runnerKey: 'wrong' }) }))).rejects.toThrow();
+  });
+});
+
+describe('the prefix a prompt cache keeps', () => {
+  it('records how much of each prompt the endpoint served from its cache', async () => {
+    const todoId = await board.addTodo('Write it');
+    llm.script = () => ({ content: 'Done.' });
+
+    await cycle();
+
+    const [run] = await runsOf(todoId);
+    expect(run).toMatchObject({ promptTokens: 10, cachedInputTokens: 4 });
   });
 });
 
