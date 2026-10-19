@@ -1,3 +1,17 @@
+# [8.0.0](https://github.com/cubicecho/telos/compare/v7.5.0...v8.0.0) (2026-10-19)
+
+
+* feat!: drop stdio MCP servers; give check lanes RUNNER_ALLOW_CHECKS ([b4821c3](https://github.com/cubicecho/telos/commit/b4821c3052f0391fbf3587dbd5f1cadbc5439c71))
+
+
+### BREAKING CHANGES
+
+* stdio MCP servers are removed. McpServer.command, args,
+cwd and envNames, the matching create/update input fields, and the ENV
+McpSecretKind are gone, and url is required. Existing servers without a
+URL are deleted by the migration. RUNNER_ALLOW_STDIO is no longer read:
+set RUNNER_ALLOW_CHECKS=true to let check lanes run.
+
 # [7.5.0](https://github.com/cubicecho/telos/compare/v7.4.0...v7.5.0) (2026-10-19)
 
 
