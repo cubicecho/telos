@@ -1,3 +1,11 @@
+# [7.5.0](https://github.com/cubicecho/telos/compare/v7.4.0...v7.5.0) (2026-10-19)
+
+
+### Features
+
+* **runner:** keep the front of a run's requests the same from todo to todo ([27766c7](https://github.com/cubicecho/telos/commit/27766c71257a15884e82c03bc8d2d693452d4876))
+* **runs:** record how much of a run's prompt came from the endpoint's cache ([0d70c74](https://github.com/cubicecho/telos/commit/0d70c74c531af4712db41e65272c768f9a026cd3))
+
 # [7.4.0](https://github.com/cubicecho/telos/compare/v7.3.0...v7.4.0) (2026-10-19)
 
 
