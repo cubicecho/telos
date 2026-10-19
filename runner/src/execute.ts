@@ -3,6 +3,7 @@ import {
   type HookNote,
   type HookRunner,
   notify,
+  PRESELECT_APPEND,
   preselect,
   type RunEventInput,
   runAgentLoop,
@@ -355,6 +356,12 @@ async function work(
     messages: [{ role: 'user', content: prompt }],
     tools: stores ? [...pool.tools(), RECORD_ARTIFACT_DEFINITION] : pool.tools(),
     ...(catalog ? { catalog, loaded: stores ? [RECORD_ARTIFACT] : [] } : {}),
+    // The front of every request is what a prompt cache keeps, so it stays put:
+    // all tools sorted by name when they are all sent, and on demand the same
+    // opening set, with each tool loaded (or preselected) after it in the order
+    // it came. Sorted, a load would land mid-array and move every tool after it.
+    toolOrder: !catalog,
+    preselectRouting: PRESELECT_APPEND,
     preselected,
     dispatch: async (call, callSignal) => {
       if (stores && call.name === RECORD_ARTIFACT) {

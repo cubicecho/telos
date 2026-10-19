@@ -576,6 +576,56 @@ describe('the runner', () => {
 });
 
 describe('the prefix a prompt cache keeps', () => {
+  /** What the first request of each run declared: its system prompt, and its tools whole. */
+  async function firstRequests(titles: string[]): Promise<Array<{ system: string; tools: string }>> {
+    const seen: Array<{ system: string; tools: string }> = [];
+    llm.script = (messages, tools) => {
+      if (messages.length === 2) seen.push({ system: String(messages[0].content), tools: JSON.stringify(tools) });
+      return { content: 'Done.' };
+    };
+    for (const title of titles) {
+      await board.addTodo(title);
+      await cycle(loopOptions({ concurrency: 1 }));
+    }
+    return seen;
+  }
+
+  for (const toolDiscovery of [false, true]) {
+    it(`is the same for two todos in one lane, byte for byte (${toolDiscovery ? 'on demand' : 'eager'})`, async () => {
+      const desk = await serveTools('');
+      await setServers([{ id: 'desk', name: 'Desk', url: desk.url }]);
+      await db.update(dbSchema.agents).set({ toolDiscovery }).where(eq(dbSchema.agents.id, board.agentId));
+
+      const [first, second] = await firstRequests(['Add a search box', 'Fix the export, which drops rows']);
+
+      expect(first.system).toContain('Project: P');
+      expect(first.system).not.toContain('search box');
+      expect(second.system).toBe(first.system);
+      expect(second.tools).toBe(first.tools);
+      expect(JSON.parse(first.tools).length).toBeGreaterThan(0);
+    });
+  }
+
+  it('adds a tool loaded on demand at the end, in the order it was loaded', async () => {
+    const desk = await serveTools('');
+    await setServers([{ id: 'desk', name: 'Desk', url: desk.url }]);
+    await db.update(dbSchema.agents).set({ toolDiscovery: true }).where(eq(dbSchema.agents.id, board.agentId));
+    const declared: string[][] = [];
+    llm.script = (_messages, tools) => {
+      declared.push(tools.map((tool) => tool.function.name));
+      if (declared.length === 1) return { tool: 'load_tools', args: { names: ['desk__write_file'] } };
+      if (declared.length === 2) return { tool: 'load_tools', args: { names: ['desk__recall'] } };
+      return { content: 'Done.' };
+    };
+    await board.addTodo('Write it');
+
+    await cycle();
+
+    const [start, afterOne, afterTwo] = declared;
+    expect(afterOne).toEqual([...start, 'desk__write_file']);
+    expect(afterTwo).toEqual([...afterOne, 'desk__recall']);
+  });
+
   it('records how much of each prompt the endpoint served from its cache', async () => {
     const todoId = await board.addTodo('Write it');
     llm.script = () => ({ content: 'Done.' });
