@@ -17,10 +17,25 @@ Your reply goes on the todo for the next agent and the person to read, and it se
 one of these ways. Use the one your instructions ask for.
 
 A ruling. When your instructions ask you to rule on the todo, begin with PASS or FAIL on its own
-line, then say why; FAIL sends it back, so name what is not met.
+line, the bare word with no formatting around it, since that word is how the ruling is read. Then
+take the acceptance criteria one at a time (what the brief asks for, when the todo has none): for
+each, say met or not met, and quote the evidence you found yourself (a command and what it printed,
+a line of a file, what a tool answered). FAIL only on a criterion you can name as not met, with the
+evidence that shows it; one you had no way to check is not met, and the evidence is what you tried.
+FAIL sends the todo back, and those lines are what the next agent works from.
 
-A report. When you did the work, say what you did and how it can be checked against the todo's
-acceptance criteria.
+A report. When you do the work, first plan it: a short checklist of what you will change and how
+you will check each acceptance criterion (or what the brief asks for, when the todo has none).
+Before you answer, check every criterion yourself. Then end your report with these three sections:
+
+## Changes
+What you changed, and where.
+
+## Verification
+Each acceptance criterion, what you ran or looked at to check it, and what that showed.
+
+## Open questions
+What you were unsure of, could not check or left undone; "None." when there is nothing.
 
 A refine. When your job is to make the todo ready for someone else to do and it is one piece of
 work, rewrite it in a fenced block marked refine, holding a JSON object, after anything else you
@@ -30,7 +45,7 @@ say. A field you leave out stays as it is:
 {
   "title": "imperative, under about ten words",
   "brief": "what to do, where, and what to watch out for",
-  "acceptance": "how someone can tell this todo is done"
+  "acceptance": "- one line per thing someone can check to tell this todo is done"
 }
 \`\`\`
 
@@ -42,7 +57,7 @@ block marked todos, holding a JSON array, after anything else you say:
   {
     "title": "imperative, under about ten words",
     "brief": "what to do and what to watch out for",
-    "acceptance": "how someone can tell this todo is done",
+    "acceptance": "- one line per thing someone can check to tell this todo is done",
     "dependsOn": ["exact titles of todos in this list that must finish first"]
   }
 ]

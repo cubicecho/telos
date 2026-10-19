@@ -376,9 +376,11 @@ async function assignmentFor(tx: AnyRow, todo: AnyRow, lane: AnyRow, project: An
     .orderBy(asc(dbSchema.todoNotes.createdAt));
   const report = thread.filter((note) => note.kind === 'report').at(-1)?.body ?? null;
 
-  // Why it is back: the reason (or the note) on the move that brought it here,
-  // when that move was not its first arrival. An edit is not an arrival
-  // (`arrivedIn` in ready.ts).
+  // Why it is back: the note (or else the reason) on the move that brought it
+  // here, when that move was not its first arrival. The note comes first: a
+  // FAIL's move carries the fixed reason "The review failed." beside the
+  // verdict itself, and the verdict is what the next agent has to act on. An
+  // edit is not an arrival (`arrivedIn` in ready.ts).
   const [arrival] = await tx
     .select({ reason: dbSchema.todoEvents.reason, noteId: dbSchema.todoEvents.noteId })
     .from(dbSchema.todoEvents)
@@ -391,8 +393,8 @@ async function assignmentFor(tx: AnyRow, todo: AnyRow, lane: AnyRow, project: An
     )
     .orderBy(desc(dbSchema.todoEvents.at))
     .limit(1);
-  const why =
-    arrival?.reason ?? (arrival?.noteId ? (thread.find((note) => note.id === arrival.noteId)?.body ?? null) : null);
+  const arrivalNote = arrival?.noteId ? thread.find((note) => note.id === arrival.noteId) : undefined;
+  const why = arrivalNote?.body ?? arrival?.reason ?? null;
 
   return {
     projectName: project.name,
