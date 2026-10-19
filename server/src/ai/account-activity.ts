@@ -2,7 +2,6 @@ import * as dbSchema from '@telos/db/schema';
 import { eq, sql } from 'drizzle-orm';
 import { extendSchema, type GraphQLSchema, parse } from 'graphql';
 import type { QueryResolvers } from '../../__generated__/resolvers.ts';
-import { requireSession } from '../auth/resolvers.ts';
 import { type HandBack, HandBackEnum, withEnums } from '../core/enums.ts';
 import { attachResolvers } from '../graphql/attach-resolvers.ts';
 import { type WorkTodo, workStates } from '../runs/ready.ts';
@@ -140,7 +139,6 @@ export function applyAccountActivityExtension(schema: GraphQLSchema): GraphQLSch
 
   queries.accountSpend = async (_parent, args, context) => {
     // A person's, like the page it is drawn on.
-    requireSession(context);
     const userId = await requireAi(context);
     const db = context.db;
     const since = new Date(args.since);
@@ -190,7 +188,6 @@ export function applyAccountActivityExtension(schema: GraphQLSchema): GraphQLSch
   };
 
   queries.accountHandedBack = async (_parent, _args, context) => {
-    requireSession(context);
     const userId = await requireAi(context);
     const { todos } = await workStates(context.db, userId);
     return todos

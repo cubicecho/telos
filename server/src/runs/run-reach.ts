@@ -23,12 +23,12 @@ import { resultRows } from '../todos/blocking.ts';
 // the lane. A run that rewrites its todo says so in its reply, as a refine.
 // Leaving notes on it is fine.
 //
-// A todo out of reach is NOT_FOUND, as one AI cannot see is (ai-reach.ts): the
+// A todo out of reach is NOT_FOUND, as one AI cannot see is (ai/reach.ts): the
 // run is not told that it exists. Its own todo is FORBIDDEN, since it knows
 // that one is there, and the message says why.
 //
-// Applied by the actor lock after the switches and ai-reach.ts, to an `agent`
-// actor only. A mutation with no entry here writes nothing a run could reach
+// Applied by graphql/permissions.ts after the switches and ai/reach.ts, to an
+// `agent` actor only. A mutation with no entry here writes nothing a run could reach
 // past (notes it signed: todos/notes.ts) or is closed to runs already
 // (`recordArtifact`, runs/artifacts.ts).
 
