@@ -124,7 +124,7 @@ domain.
 | `AI_ENABLED` | — | Set to `false` to remove AI entirely: no MCP endpoint, no API keys, no agents, no switch in Settings. Otherwise an admin turns it on in Settings. |
 | `RUNNER_CONCURRENCY` | `2` | The most runs the runner works at once. |
 | `RUNNER_POLL_SECONDS` | `5` | How long the runner waits when nothing is ready. |
-| `RUNNER_ALLOW_STDIO` | `false` | Let the runner spawn MCP servers that are commands, and run check lanes' commands. |
+| `RUNNER_ALLOW_CHECKS` | `false` | Let the runner run check lanes' shell commands. (`RUNNER_ALLOW_STDIO` is gone: telos runs no stdio MCP servers, and the runner warns if it is still set.) |
 | `RUNNER_KEY` | made up at boot | Only for a second runner on another host (`runner/`, with `TELOS_URL`): set the same value on both. |
 
 ### Signing in
@@ -244,8 +244,9 @@ the agent chose to record. What was made for a todo outlives it: delete the
 todo for good and its artifacts stay on the project's Artifacts list, under the
 title the todo had, until you remove them or delete the project. **MCP
 servers** are kept once, under Settings → MCP servers, and each agent reaches every one
-of them or only the ones you tick. A server's headers and environment are
-secrets: you can see which are set, never their values, and only the runner is
+of them or only the ones you tick. Every server is a URL (streamable HTTP):
+telos does not run stdio servers, so a pasted `.mcp.json` lists any command
+entries as not supported. A server's headers are secrets: you can see which are set, never their values, and only the runner is
 sent them. Test a server there and it keeps what it found, so the list shows
 which servers answer and the tools each offers. An agent that names a server
 you have since deleted carries on without it, and its runs say so. A server
@@ -304,7 +305,7 @@ docker compose up --build
 Agents talk to any OpenAI-compatible endpoint, so a local Ollama works. An
 agent's base URL and the account's MCP servers are fetched from the server's host, so on
 a shared instance keep it where it cannot reach anything private, and leave
-`RUNNER_ALLOW_STDIO` off.
+`RUNNER_ALLOW_CHECKS` off.
 
 ## Keeping a copy in step
 

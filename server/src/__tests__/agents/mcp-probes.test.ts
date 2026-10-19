@@ -85,7 +85,7 @@ describe('testing an MCP server', () => {
 
   it('hands the runner the stored headers and env, which nobody else is shown', async () => {
     const SECRET = `mutation ($id: ID!, $kind: McpSecretKind!, $name: String!, $value: String) {
-      setMcpServerSecret(id: $id, kind: $kind, name: $name, value: $value) { headerNames envNames }
+      setMcpServerSecret(id: $id, kind: $kind, name: $name, value: $value) { headerNames }
     }`;
     await board.person.expectOk(SECRET, { id: serverId, kind: 'HEADER', name: 'Authorization', value: 'Bearer s3' });
     await board.person.expectOk(TEST, { id: serverId });

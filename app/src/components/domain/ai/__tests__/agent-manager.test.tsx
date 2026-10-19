@@ -104,9 +104,6 @@ const SERVER = {
   slug: 'docs',
   name: 'Docs',
   url: 'http://localhost:8080/mcp',
-  command: null,
-  args: [],
-  cwd: null,
   connectTimeoutMs: null,
   callTimeoutMs: null,
   idleTimeoutMs: null,
@@ -118,7 +115,6 @@ const SERVER = {
   checkError: null,
   tools: [],
   headerNames: [],
-  envNames: [],
 };
 
 function servers(rows: unknown[]) {

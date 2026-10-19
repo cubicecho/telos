@@ -20,11 +20,12 @@ export interface McpServerTool {
   description: string;
 }
 
-// An MCP server the account's agents may reach: an HTTP endpoint, or a command
-// the runner spawns. One row per server, however many agents use it; an agent
+// An MCP server the account's agents may reach: an HTTP endpoint (streamable
+// HTTP). Telos does not run stdio servers, so there is no command to spawn and
+// every row has a URL. One row per server, however many agents use it; an agent
 // names the ones it may reach by slug (`agents.mcp_server_slugs`).
 //
-// `headers` and `env` are secrets, as an agent's API key is. They are excluded
+// `headers` are secrets, as an agent's API key is. They are excluded
 // from the generated GraphQL surface (build-schema.ts), written through
 // `setMcpServerSecret` and read only by the runner, through `claimRun`.
 //
@@ -40,14 +41,8 @@ export const mcpServers = pgTable(
       .references(() => users.id, { onDelete: 'cascade' }),
     slug: text('slug').notNull(),
     name: text('name').notNull(),
-    url: text('url'),
-    // Spawned on the runner's host, and only when it sets RUNNER_ALLOW_STDIO.
-    command: text('command'),
-    args: jsonb('args').$type<string[]>().notNull().default([]),
-    // Where the command runs. Absent, the runner's own directory. Nothing for a URL.
-    cwd: text('cwd'),
+    url: text('url').notNull(),
     headers: jsonb('headers').$type<Record<string, string>>().notNull().default({}),
-    env: jsonb('env').$type<Record<string, string>>().notNull().default({}),
     // `ToolHook`s, as @cubicecho/agent-mcp-pool reads them. The runner checks them.
     hooks: jsonb('hooks').$type<unknown[]>().notNull().default([]),
     // Tools the model is not offered, for the hooks' use.
@@ -76,7 +71,6 @@ export const mcpServers = pgTable(
     uniqueIndex('uq_mcp_servers_user_slug').on(t.userId, t.slug),
     // `telos` is the board's own door, which every run already has.
     check('ck_mcp_servers_slug', sql`${t.slug} ~ '^[A-Za-z0-9_-]+$' AND ${t.slug} <> 'telos'`),
-    check('ck_mcp_servers_target', sql`${t.url} IS NOT NULL OR ${t.command} IS NOT NULL`),
     check(
       'ck_mcp_servers_timeouts',
       sql`(${t.connectTimeoutMs} IS NULL OR ${t.connectTimeoutMs} > 0) AND (${t.callTimeoutMs} IS NULL OR ${t.callTimeoutMs} > 0) AND (${t.idleTimeoutMs} IS NULL OR ${t.idleTimeoutMs} >= 0)`,

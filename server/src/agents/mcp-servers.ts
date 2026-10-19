@@ -11,12 +11,8 @@ export interface RunnerServer {
   /** The slug, which the server's tools are named under. */
   id: string;
   name: string;
-  url?: string;
-  command?: string;
-  args?: string[];
-  cwd?: string;
+  url: string;
   headers?: Record<string, string>;
-  env?: Record<string, string>;
   hiddenTools?: string[];
   hooks?: unknown[];
   connectTimeoutMs?: number;
@@ -41,12 +37,8 @@ export function runnerServer(server: dbSchema.McpServer): RunnerServer {
   return {
     id: server.slug,
     name: server.name,
-    ...(server.url ? { url: server.url } : {}),
-    ...(server.command ? { command: server.command } : {}),
-    ...(server.args.length > 0 ? { args: server.args } : {}),
-    ...(server.cwd ? { cwd: server.cwd } : {}),
+    url: server.url,
     ...(Object.keys(server.headers).length > 0 ? { headers: server.headers } : {}),
-    ...(Object.keys(server.env).length > 0 ? { env: server.env } : {}),
     ...(server.hiddenTools.length > 0 ? { hiddenTools: server.hiddenTools } : {}),
     ...(server.hooks.length > 0 ? { hooks: server.hooks } : {}),
     ...(server.connectTimeoutMs === null ? {} : { connectTimeoutMs: server.connectTimeoutMs }),

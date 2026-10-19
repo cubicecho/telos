@@ -74,13 +74,17 @@ export const McpProbeStatusEnum = serverEnum(
   'Where a test of an MCP server has got to: PENDING (waiting for the runner), TESTING or DONE.',
 );
 
-/** Which of an MCP server's secrets: a header, or an environment variable. */
-export const MCP_SECRET_KINDS = ['header', 'env'] as const;
+/**
+ * Which of an MCP server's secrets: a header. The only kind since stdio servers,
+ * and their environment variables, went; kept as an argument so another kind
+ * of secret can join it without changing the mutation again.
+ */
+export const MCP_SECRET_KINDS = ['header'] as const;
 export type McpSecretKind = (typeof MCP_SECRET_KINDS)[number];
 export const McpSecretKindEnum = serverEnum(
   'McpSecretKind',
   MCP_SECRET_KINDS,
-  "Which of an MCP server's secrets: a HEADER sent to its URL, or an ENV variable in its command's environment.",
+  "Which of an MCP server's secrets: a HEADER sent to its URL.",
 );
 
 /** What a change-feed entry is about. */

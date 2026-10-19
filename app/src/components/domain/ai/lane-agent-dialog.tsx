@@ -30,7 +30,7 @@ const DEFAULT_WIP_LIMIT = 1;
  */
 const CHECK_WARNING =
   'Runs as a shell command on the runner’s host, in its working directory, with its rights. ' +
-  'Exit 0 passes the todo; anything else fails it. The runner refuses checks unless RUNNER_ALLOW_STDIO is set there. ' +
+  'Exit 0 passes the todo; anything else fails it. The runner refuses checks unless RUNNER_ALLOW_CHECKS is set there. ' +
   'Every check shares that one directory, so a check lane works one todo at a time.';
 
 /** The longest a lane may let its check run: the server's own bound (LANE_CHECK_DEFAULTS). */

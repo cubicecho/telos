@@ -1,7 +1,7 @@
 import type { McpPool, McpServerConfig } from '@cubicecho/agent-mcp-pool';
 import { HOST } from './execute.ts';
 import type { SessionDelete, Telos } from './telos.ts';
-import { openPool, readServers, serverConfig } from './tools.ts';
+import { openPool, readServers, serverConfig, unreachable } from './tools.ts';
 
 // A todo is the session an agent's MCP hooks file things under, and a deleted
 // todo is a session that is gone. Telos cannot reach the servers to say so and
@@ -14,13 +14,11 @@ import { openPool, readServers, serverConfig } from './tools.ts';
  * Tells one agent's servers that a todo's session is gone.
  *
  * @param owed The session, and the servers to tell.
- * @param allowStdio Whether commands may be spawned.
  * @param open Connects to the servers; `openPool` unless a test says otherwise.
  * @returns Null when every hook ran, or why one did not.
  */
 export async function tellServers(
   owed: SessionDelete,
-  allowStdio: boolean,
   open: (configs: McpServerConfig[]) => Promise<McpPool> = openPool,
 ): Promise<string | null> {
   const problems: string[] = [];
@@ -28,10 +26,10 @@ export async function tellServers(
   for (const row of readServers(owed.mcpServers)) {
     // What is said of a server only counts against it when it cannot be told.
     const said: string[] = [];
-    const config = serverConfig(row, allowStdio, (text) => said.push(text));
+    const config = serverConfig(row, (text) => said.push(text));
     if (config?.hooks?.length) configs.push(config);
     else if (config) problems.push(...said);
-    else problems.push(`"${row.name || row.id}" is not a server this runner can reach.`);
+    else problems.push(unreachable(row));
   }
   if (configs.length === 0) return problems.join(' ') || 'No server to tell.';
   const pool = await open(configs);
@@ -56,19 +54,17 @@ export async function tellServers(
  * finishes. Nothing waits on them: they must not hold up the board's work.
  *
  * @param telos The runner's client.
- * @param allowStdio Whether commands may be spawned.
  * @param log Told when a server could not be told, or a report does not reach telos.
  * @param open Connects to the servers.
  * @returns The tellings under way.
  */
 export async function takeSessionDeletes(
   telos: Telos,
-  allowStdio: boolean,
   log: (text: string) => void,
   open: (configs: McpServerConfig[]) => Promise<McpPool> = openPool,
 ): Promise<Array<Promise<void>>> {
   return (await telos.sessionDeletes()).map((owed) =>
-    tellServers(owed, allowStdio, open)
+    tellServers(owed, open)
       .catch((error) => (error instanceof Error ? error.message : String(error)))
       .then((error) => {
         if (error) log(`[runner] telling ${owed.agentName}'s servers todo ${owed.todoId} was deleted failed: ${error}`);

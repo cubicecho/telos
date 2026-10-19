@@ -395,9 +395,9 @@ export const SetAgentDefaultsApiKeyDocument = graphql(`
   }
 `);
 
-// The account's MCP servers, which its agents name by slug. `headers` and `env`
-// are not in the schema: they are written one at a time with
-// `setMcpServerSecret`, and all that comes back is their names.
+// The account's MCP servers, which its agents name by slug. `headers` are not
+// in the schema: they are written one at a time with `setMcpServerSecret`, and
+// all that comes back is their names.
 
 export const McpServerFieldsFragment = graphql(`
   fragment McpServerFields on McpServer {
@@ -405,9 +405,6 @@ export const McpServerFieldsFragment = graphql(`
     slug
     name
     url
-    command
-    args
-    cwd
     connectTimeoutMs
     callTimeoutMs
     idleTimeoutMs
@@ -419,7 +416,6 @@ export const McpServerFieldsFragment = graphql(`
     checkError
     tools
     headerNames
-    envNames
   }
 `);
 
@@ -460,7 +456,6 @@ export const SetMcpServerSecretDocument = graphql(`
     setMcpServerSecret(id: $id, kind: $kind, name: $name, value: $value) {
       id
       headerNames
-      envNames
     }
   }
 `);

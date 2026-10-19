@@ -36,6 +36,7 @@ import {
   secondsRule,
   slugRule,
   toServerDraft,
+  urlRule,
 } from '@/lib/mcp-servers';
 import { CARD_TITLE } from '@/lib/styles';
 import { McpJsonPasteDialog } from './mcp-json-paste-dialog';
@@ -52,7 +53,7 @@ interface AgentUse {
  * The account's MCP servers: the tool servers its agents may reach, kept once
  * here and named by each agent. Rendered only while AI is on, as agents are.
  *
- * A server's headers and environment are secrets. They have their own dialog,
+ * A server's headers are secrets. They have their own dialog,
  * which can only say which are set: their values go to the runner and nowhere
  * else.
  */
@@ -138,7 +139,7 @@ export function McpServerManager() {
                       <Text className="font-mono text-foreground/60"> {server.slug}</Text>
                     </Text>
                     <Text numberOfLines={1} className="text-foreground/60 text-xs">
-                      {server.url ?? server.command}
+                      {server.url}
                     </Text>
                   </View>
                   <Switch
@@ -225,7 +226,7 @@ function describeUse(server: ServerRow, agents: AgentUse[]): string {
   return `Used by ${users.map((agent) => agent.name).join(', ')}.`;
 }
 
-const secretCount = (server: ServerRow) => server.headerNames.length + server.envNames.length;
+const secretCount = (server: ServerRow) => server.headerNames.length;
 
 function describeSecrets(server: ServerRow): string {
   const count = secretCount(server);
@@ -331,9 +332,8 @@ function describeCheck(server: ServerRow): { text: string; failed: boolean } {
  * Creating a server or editing one. Everything but its secrets, which are
  * write-only and have their own dialog.
  *
- * A URL is an HTTP server; a command is a process the runner spawns, which it
- * refuses unless its host has set RUNNER_ALLOW_STDIO — the command would run
- * there, with the runner's rights.
+ * Every server is a URL: telos reaches MCP servers over HTTP, and does not run
+ * stdio ones.
  */
 export function McpServerFormDialog({
   open,
@@ -350,7 +350,6 @@ export function McpServerFormDialog({
   const isEdit = server !== null;
   const [createServer, createState] = useMutation(CreateMcpServerDocument, { refetchQueries: [McpServersDocument] });
   const [updateServer, updateState] = useMutation(UpdateMcpServerDocument);
-  const [targetError, setTargetError] = useState<string | null>(null);
   const error = createState.error ?? updateState.error;
   const initial = useMemo(() => toServerDraft(server), [server]);
   const form = useAppForm({
@@ -363,11 +362,6 @@ export function McpServerFormDialog({
   }, [open, initial, form]);
 
   async function save(value: McpServerDraft) {
-    if (value.url.trim() === '' && value.command.trim() === '') {
-      setTargetError('A server needs a URL or a command.');
-      return;
-    }
-    setTargetError(null);
     const values = fromServerDraft(value);
     try {
       if (server) await updateServer({ variables: { id: server.id, set: values } });
@@ -379,7 +373,7 @@ export function McpServerFormDialog({
     onOpenChange(false);
   }
 
-  const failure = targetError ?? (error ? describeError(error) : null);
+  const failure = error ? describeError(error) : null;
 
   return (
     <form.AppForm>
@@ -387,7 +381,7 @@ export function McpServerFormDialog({
         open={open}
         onOpenChange={onOpenChange}
         title={isEdit ? `Edit ${server.name}` : 'New MCP server'}
-        description="A URL for an HTTP server, or a command for one the runner starts itself."
+        description="An MCP server at a URL (streamable HTTP). The runner connects to it from its host."
         size="lg"
         hasUnsavedChanges={() => !form.state.isDefaultValue}
         footerSlot={
@@ -419,27 +413,11 @@ export function McpServerFormDialog({
                 </View>
               )}
             </form.AppField>
-            <form.AppField name="url">
-              {(field) => <field.InputField label="URL" type="url" placeholder="http://localhost:8080/mcp" />}
-            </form.AppField>
-            <form.AppField name="command">
+            <form.AppField name="url" validators={{ onChange: urlRule, onSubmit: urlRule }}>
               {(field) => (
                 <View className="gap-1">
-                  <field.InputField label="Or a command (stdio)" placeholder="npx" />
-                  <Hint>
-                    Refused by the runner unless its host sets RUNNER_ALLOW_STDIO, because it would run on that machine.
-                  </Hint>
-                </View>
-              )}
-            </form.AppField>
-            <form.AppField name="args">
-              {(field) => <field.TextAreaField label="Arguments" placeholder="For a command, one per line" rows={2} />}
-            </form.AppField>
-            <form.AppField name="cwd">
-              {(field) => (
-                <View className="gap-1">
-                  <field.InputField label="Working directory" placeholder="/srv/files" />
-                  <Hint>Where a command runs, on the runner's host. Blank is the runner's own directory.</Hint>
+                  <field.InputField label="URL" type="url" placeholder="http://localhost:8080/mcp" />
+                  <Hint>Telos reaches MCP servers over HTTP. It does not run commands (stdio servers).</Hint>
                 </View>
               )}
             </form.AppField>
@@ -498,14 +476,8 @@ function Hint({ children }: { children: string }) {
   return <Text className="text-foreground/60 text-xs">{children}</Text>;
 }
 
-const SECRET_KINDS = [
-  { label: 'Header', value: McpSecretKind.Header },
-  { label: 'Environment variable', value: McpSecretKind.Env },
-] as const;
-
 /**
- * A server's secrets: the headers sent to a URL, and the environment a command
- * is started with. Set and removed one at a time. A value is never read back —
+ * A server's secrets: the headers sent to its URL. Set and removed one at a time. A value is never read back —
  * not here, not anywhere but the runner's claim — so the dialog can only name
  * what is stored.
  */
@@ -521,7 +493,7 @@ function McpServerSecretsDialog({
   const [setSecret, { loading }] = useMutation(SetMcpServerSecretDocument);
   const [error, setError] = useState<string | null>(null);
   const form = useAppForm({
-    defaultValues: { kind: (server.url ? McpSecretKind.Header : McpSecretKind.Env) as string, name: '', value: '' },
+    defaultValues: { name: '', value: '' },
     onSubmit: ({ value }) => add(value),
   });
 
@@ -536,18 +508,14 @@ function McpServerSecretsDialog({
     }
   }
 
-  async function add({ kind, name, value }: { kind: string; name: string; value: string }) {
-    const secretKind = kind === McpSecretKind.Env ? McpSecretKind.Env : McpSecretKind.Header;
+  async function add({ name, value }: { name: string; value: string }) {
     const saved = await run(() =>
-      setSecret({ variables: { id: server.id, kind: secretKind, name: name.trim(), value } }),
+      setSecret({ variables: { id: server.id, kind: McpSecretKind.Header, name: name.trim(), value } }),
     );
-    if (saved) form.reset({ kind, name: '', value: '' });
+    if (saved) form.reset({ name: '', value: '' });
   }
 
-  const stored = [
-    ...server.headerNames.map((name) => ({ kind: McpSecretKind.Header, name, what: 'Header' })),
-    ...server.envNames.map((name) => ({ kind: McpSecretKind.Env, name, what: 'Environment variable' })),
-  ];
+  const stored = server.headerNames.map((name) => ({ kind: McpSecretKind.Header, name, what: 'Header' }));
 
   return (
     <form.AppForm>
@@ -555,7 +523,7 @@ function McpServerSecretsDialog({
         open={open}
         onOpenChange={onOpenChange}
         title={`Secrets for ${server.name}`}
-        description="Headers sent to its URL, and the environment its command starts with. A value cannot be shown again; setting a name that is there replaces it."
+        description="Headers sent to its URL, such as Authorization. A value cannot be shown again; setting a name that is there replaces it."
         hasUnsavedChanges={() => !form.state.isDefaultValue}
         footerSlot={
           error ? (
@@ -607,14 +575,11 @@ function McpServerSecretsDialog({
               />
             )}
             <Form className="gap-4">
-              <form.AppField name="kind">
-                {(field) => <field.SelectField label="Kind" options={SECRET_KINDS} />}
-              </form.AppField>
               <form.AppField
                 name="name"
                 validators={{ onChange: ({ value }) => (value.trim() === '' ? 'A secret needs a name.' : undefined) }}
               >
-                {(field) => <field.InputField label="Name" placeholder="Authorization" />}
+                {(field) => <field.InputField label="Header" placeholder="Authorization" />}
               </form.AppField>
               <form.AppField
                 name="value"

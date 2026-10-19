@@ -16,6 +16,7 @@ import { createContextFactory } from '../../../server/src/graphql/context-factor
 // a real telos up for it to talk to.
 import { toHeaders } from '../../../server/src/http/headers.ts';
 import { mountMcp } from '../../../server/src/mcp/endpoint.ts';
+import { readConfig } from '../config.ts';
 import { startRunner } from '../embed.ts';
 import { type LoopOptions, tick } from '../loop.ts';
 import { takeTests } from '../probes.ts';
@@ -276,7 +277,7 @@ function loopOptions(overrides: Partial<LoopOptions> = {}): LoopOptions {
   return {
     telos: createTelos({ telosUrl, runnerKey: RUNNER_KEY }),
     telosUrl,
-    allowStdio: false,
+    allowChecks: false,
     concurrency: 2,
     pollMs: 10,
     heartbeatMs: 50,
@@ -641,13 +642,13 @@ describe('testing an MCP server', () => {
   const ASK = `mutation ($id: ID!) { testMcpServer(id: $id) { id } }`;
   const READ = `query ($id: ID!) { mcpProbe(id: $id) { status ok tools { name } error } }`;
 
-  async function testOf(server: { id: string; url?: string; command?: string }, allowStdio = false) {
+  async function testOf(server: { id: string; url: string }) {
     const [row] = await db
       .insert(dbSchema.mcpServers)
-      .values({ userId: board.userId, slug: server.id, name: server.id, url: server.url, command: server.command })
+      .values({ userId: board.userId, slug: server.id, name: server.id, url: server.url })
       .returning();
     const { id } = (await board.person.expectOk(ASK, { id: row.id })).testMcpServer;
-    await Promise.all(await takeTests(createTelos({ telosUrl, runnerKey: RUNNER_KEY }), allowStdio, () => {}));
+    await Promise.all(await takeTests(createTelos({ telosUrl, runnerKey: RUNNER_KEY }), () => {}));
     return (await board.person.expectOk(READ, { id })).mcpProbe;
   }
 
@@ -665,11 +666,6 @@ describe('testing an MCP server', () => {
     const probe = await testOf({ id: 'gone', url: 'http://127.0.0.1:9/mcp' });
     expect(probe).toMatchObject({ status: 'DONE', ok: false, tools: [] });
     expect(probe.error).toBeTruthy();
-  });
-
-  it('will not run a command without RUNNER_ALLOW_STDIO', async () => {
-    const probe = await testOf({ id: 'local', command: 'echo' });
-    expect(probe).toMatchObject({ ok: false, error: expect.stringMatching(/RUNNER_ALLOW_STDIO/) });
   });
 });
 
@@ -693,7 +689,7 @@ describe('a deleted todo’s session', () => {
   }
 
   async function tell(log: (text: string) => void = () => {}): Promise<void> {
-    await Promise.all(await takeSessionDeletes(createTelos({ telosUrl, runnerKey: RUNNER_KEY }), false, log));
+    await Promise.all(await takeSessionDeletes(createTelos({ telosUrl, runnerKey: RUNNER_KEY }), log));
   }
 
   it('is told to the servers that asked, as sessionDelete with the todo’s id', async () => {
@@ -790,7 +786,7 @@ describe('a check lane', () => {
 
   it('fails a todo on a non-zero exit, with what the command printed', async () => {
     const todoId = await board.addTodo('Fix it');
-    expect(await cycle(loopOptions({ allowStdio: true }))).toBe(1);
+    expect(await cycle(loopOptions({ allowChecks: true }))).toBe(1);
     const [run] = await runsOf(todoId);
     expect(run).toMatchObject({ status: 'ok', verdict: 'fail', agentId: null });
     expect(run.output).toMatch(/^FAIL: the check .* exited with code 3\./);
@@ -802,17 +798,27 @@ describe('a check lane', () => {
   it('passes a todo on exit 0', async () => {
     await setLane(board.person, board.lanes[0].id, { checkCommand: 'true' });
     const todoId = await board.addTodo('Fix it');
-    expect(await cycle(loopOptions({ allowStdio: true }))).toBe(1);
+    expect(await cycle(loopOptions({ allowChecks: true }))).toBe(1);
     const [run] = await runsOf(todoId);
     expect(run).toMatchObject({ status: 'ok', verdict: 'pass' });
     expect((await todoRow(todoId)).laneId).toBe(board.lanes[2].id);
   });
 
-  it('is refused by a runner that does not run commands', async () => {
+  it('is refused by a runner that does not run checks', async () => {
     const todoId = await board.addTodo('Fix it');
     expect(await cycle()).toBe(1);
     const [run] = await runsOf(todoId);
     expect(run).toMatchObject({ status: 'error', verdict: 'none' });
-    expect(run.error).toContain('RUNNER_ALLOW_STDIO');
+    expect(run.error).toContain('RUNNER_ALLOW_CHECKS=true');
+    expect(run.error).not.toContain('RUNNER_ALLOW_STDIO');
+  });
+
+  it('is refused by a runner that only has the old RUNNER_ALLOW_STDIO on', async () => {
+    const config = readConfig({ RUNNER_KEY, TELOS_URL: telosUrl, RUNNER_ALLOW_STDIO: 'true' });
+    const todoId = await board.addTodo('Fix it');
+    expect(await cycle(loopOptions({ allowChecks: config?.allowChecks ?? true }))).toBe(1);
+    const [run] = await runsOf(todoId);
+    expect(run).toMatchObject({ status: 'error', verdict: 'none' });
+    expect(run.error).toContain('RUNNER_ALLOW_CHECKS=true');
   });
 });

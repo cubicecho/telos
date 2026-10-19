@@ -310,8 +310,7 @@ check command or its time limit**: the actor lock keeps AI and the runner off
 lane writes, the lanes write hook refuses the columns from anyone else
 (`assertCheckFromPerson`), and `applyBoardTemplate` drops checks unless a
 person applies it. A check is a user's command on the runner's host, so the
-runner refuses check runs unless `RUNNER_ALLOW_STDIO=true`, as it refuses stdio
-MCP servers.
+runner refuses check runs unless `RUNNER_ALLOW_CHECKS=true`.
 
 There is no lane prompt and no per-lane contract: what a lane asks for is its
 agent's instructions, and every reply is read the same way (`verdictOf` in
@@ -410,9 +409,18 @@ so.
 comes from `runnerQueue` and `claimRun`, and everything it does goes back
 through `finishRun` or, for the agent, through `/mcp` with the run token; its
 tests import server code only to stand a real telos up. Each run gets its own
-MCP pool, because the telos server in it carries that run's token. stdio MCP
-servers, and check lanes' commands, are refused unless `RUNNER_ALLOW_STDIO=true`:
-a server or a lane belongs to a user, and a command runs on the runner's host with its rights.
+MCP pool, because the telos server in it carries that run's token. Check
+lanes' commands are refused unless `RUNNER_ALLOW_CHECKS=true`: a lane belongs
+to a user, and a command runs on the runner's host with its rights.
+`RUNNER_ALLOW_STDIO` is no longer read (`configWarnings` says so at start).
+
+**Telos runs no stdio MCP servers.** Every server is a URL (streamable HTTP):
+`mcp_servers.url` is NOT NULL and there is no command, arguments, working
+directory or environment to give (the no_stdio_mcp migration deleted the rows
+that had no URL, and took their slugs out of agents' lists). The runner refuses
+a stdio row defensively anyway, should an older server send one
+(`serverConfig` returns null, `unreachable` says why), and a pasted
+`.mcp.json` lists a command entry as not supported and never creates it.
 
 **MCP servers are the account's, and an agent names the ones it reaches.**
 `mcp_servers` holds one row per server; `agents.mcp_server_slugs` is null (every
@@ -424,15 +432,14 @@ the list out (`serversFor` in `server/src/agents/mcp-servers.ts`) and hands the 
 the rows in slug order, so a run's tools come in the same order every time.
 The slug is what the tools are named under (`slug__tool`), so renaming one is
 followed into agents' lists by the `mcp_servers_rename` trigger; deleting one
-is not. `headers` and `env` are secrets, as an agent's key is: excluded from
-the schema, written one at a time with `setMcpServerSecret`, readable only as
-names (`headerNames`, `envNames`) and sent only to the runner. `testMcpServer`
+is not. `headers` are secrets, as an agent's key is: excluded from the schema,
+written one at a time with `setMcpServerSecret` (kind `HEADER`, the only one),
+readable only as names (`headerNames`) and sent only to the runner. `testMcpServer`
 tests a saved server by id, so the test has its secrets, and `finishProbe`
 keeps what it found on the row (`checked_at`, `check_ok`, `check_error`,
 `tools`), which only the server writes. A row may override the pool's limits
 (`connect_timeout_ms`, `call_timeout_ms`, `idle_timeout_ms`, null for the
-pool's) and say where a command runs (`cwd`, which only a runner with
-`RUNNER_ALLOW_STDIO` ever uses); a test waits as long as the row's connect
+pool's); a test waits as long as the row's connect
 timeout rather than its own 10s.
 
 **A run reports what it did; it never writes it.** The runner sends events

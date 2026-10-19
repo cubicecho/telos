@@ -11,7 +11,6 @@ import type {
 } from '../../__generated__/resolvers.ts';
 import { requireAi } from '../ai/gate.ts';
 import { requireAuth } from '../auth/resolvers.ts';
-import type { Context } from '../core/context.ts';
 import { McpProbeStatusEnum, McpSecretKindEnum, withEnums } from '../core/enums.ts';
 import { badInput, notFound } from '../core/errors.ts';
 import { attachResolvers } from '../graphql/attach-resolvers.ts';
@@ -25,7 +24,7 @@ import { runnerServer } from './mcp-servers.ts';
 // the only way out is the runner's `claimRun`. A person can see whether one is
 // set, never what it is.
 //
-// An MCP server's headers and env are the same kind of thing, kept the same
+// An MCP server's headers are the same kind of thing, kept the same
 // way: `setMcpServerSecret` writes one, the runner reads them with the run it
 // claims, and a person sees their names.
 //
@@ -43,8 +42,6 @@ const AGENTS_SDL = parse(`
   extend type McpServer {
     "The names of the headers stored for this server. Their values are never readable."
     headerNames: [String!]!
-    "The names of the environment variables stored for this server. Their values are never readable."
-    envNames: [String!]!
   }
 
   "A model an endpoint offers, as its \`/models\` lists it."
@@ -107,7 +104,7 @@ const AGENTS_SDL = parse(`
   extend type Mutation {
     "Stores an agent's API key, or clears it with null."
     setAgentApiKey(agentId: ID!, apiKey: String): Agent!
-    "Stores one header or environment variable of an MCP server, or removes it with a null value."
+    "Stores one header of an MCP server, or removes it with a null value."
     setMcpServerSecret(id: ID!, kind: McpSecretKind!, name: String!, value: String): McpServer!
     "Asks the runner to connect to one of your MCP servers and list its tools. Read the answer with mcpProbe; the server keeps what was found."
     testMcpServer(id: ID!): McpProbe!
@@ -134,15 +131,13 @@ function visibleProbe(probe: McpProbe) {
   return visible;
 }
 
-/** The longest name and value a header or a variable may have. */
+/** The longest name and value a header may have. */
 const SECRET_NAME_CHARS = 200;
 const SECRET_VALUE_CHARS = 8000;
-/** The most headers, and the most variables, one server keeps. */
+/** The most headers one server keeps. */
 const SECRET_LIMIT = 50;
 /** A header's name, as HTTP spells a token. */
 const HEADER_NAME = /^[A-Za-z0-9!#$%&'*+.^_`|~-]+$/;
-/** A variable's name, as a shell would take it. */
-const ENV_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 /**
  * The caller's MCP server, secrets and all, or NOT_FOUND.
@@ -163,9 +158,9 @@ async function ownedServer(db: AnyRow, userId: string, id: string, lock = false)
   return row;
 }
 
-/** A server as a person reads it: without what its headers and env hold. */
+/** A server as a person reads it: without what its headers hold. */
 function visibleServer(server: dbSchema.McpServer) {
-  const { headers: _headers, env: _env, ...visible } = server;
+  const { headers: _headers, ...visible } = server;
   return visible;
 }
 
@@ -292,43 +287,35 @@ export function applyAgentsExtension(schema: GraphQLSchema): GraphQLSchema {
   };
 
   // The generated resolvers never select an excluded column, so ask.
-  const secretNames =
-    (column: 'headers' | 'env') => async (parent: { id: string }, _args: unknown, context: Context) => {
-      const [row] = await (context.db as AnyRow)
-        .select({ secrets: dbSchema.mcpServers[column] })
-        .from(dbSchema.mcpServers)
-        .where(eq(dbSchema.mcpServers.id, parent.id));
-      return Object.keys(row?.secrets ?? {}).sort();
-    };
-  mcpServer.headerNames = secretNames('headers');
-  mcpServer.envNames = secretNames('env');
+  mcpServer.headerNames = async (parent, _args, context) => {
+    const [row] = await (context.db as AnyRow)
+      .select({ headers: dbSchema.mcpServers.headers })
+      .from(dbSchema.mcpServers)
+      .where(eq(dbSchema.mcpServers.id, parent.id));
+    return Object.keys(row?.headers ?? {}).sort();
+  };
 
   mutations.setMcpServerSecret = async (_parent, args, context) => {
     const userId = requireAuth(context);
     const name = args.name.trim();
-    const pattern = args.kind === 'header' ? HEADER_NAME : ENV_NAME;
-    if (name.length > SECRET_NAME_CHARS || !pattern.test(name)) {
-      throw badInput(
-        args.kind === 'header'
-          ? 'A header name is letters, digits and dashes, such as Authorization.'
-          : 'A variable name is letters, digits and underscores, and does not start with a digit, such as API_TOKEN.',
-      );
+    if (args.kind !== 'header') throw badInput('An MCP server keeps headers, and no other kind of secret.');
+    if (name.length > SECRET_NAME_CHARS || !HEADER_NAME.test(name)) {
+      throw badInput('A header name is letters, digits and dashes, such as Authorization.');
     }
     if ((args.value?.length ?? 0) > SECRET_VALUE_CHARS) {
       throw badInput(`A value can be at most ${SECRET_VALUE_CHARS} characters.`);
     }
-    const column = args.kind === 'header' ? 'headers' : 'env';
     return (context.db as AnyRow).transaction(async (tx: AnyRow) => {
       const server = await ownedServer(tx, userId, args.id, true);
-      const secrets = { ...server[column] };
+      const secrets = { ...server.headers };
       if (args.value == null || args.value === '') delete secrets[name];
       else secrets[name] = args.value;
       if (Object.keys(secrets).length > SECRET_LIMIT) {
-        throw badInput(`A server keeps at most ${SECRET_LIMIT} of these. Remove one first.`);
+        throw badInput(`A server keeps at most ${SECRET_LIMIT} headers. Remove one first.`);
       }
       const [row] = await tx
         .update(dbSchema.mcpServers)
-        .set({ [column]: secrets })
+        .set({ headers: secrets })
         .where(eq(dbSchema.mcpServers.id, server.id))
         .returning();
       return visibleServer(row);

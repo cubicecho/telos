@@ -49,7 +49,7 @@ description: Configuration, the AI switches, agents, lanes and runs, the MCP doo
           <tr><td><code>AI_ENABLED</code></td><td>—</td><td>Set to <code>false</code> to remove AI entirely. Otherwise an admin turns it on in Settings.</td></tr>
           <tr><td><code>RUNNER_CONCURRENCY</code></td><td><code>2</code></td><td>The most runs the runner works at once.</td></tr>
           <tr><td><code>RUNNER_POLL_SECONDS</code></td><td><code>5</code></td><td>How long the runner waits when nothing is ready.</td></tr>
-          <tr><td><code>RUNNER_ALLOW_STDIO</code></td><td><code>false</code></td><td>Let the runner spawn MCP servers that are commands.</td></tr>
+          <tr><td><code>RUNNER_ALLOW_CHECKS</code></td><td><code>false</code></td><td>Let the runner run check lanes' shell commands. <code>RUNNER_ALLOW_STDIO</code> is gone: telos runs no stdio MCP servers.</td></tr>
           <tr><td><code>RUNNER_KEY</code></td><td>made up at boot</td><td>Only for a second runner on another host: set the same value on both.</td></tr>
         </tbody>
       </table>
@@ -112,9 +112,10 @@ description: Configuration, the AI switches, agents, lanes and runs, the MCP doo
     <h2 id="mcp-servers">MCP servers and hooks</h2>
     <p>
       MCP servers are kept once, under Settings → MCP servers, and each agent
-      reaches all of them or only the ones you tick. A server's headers and
-      environment are secrets: you see which are set, never their values, and
-      only the runner is sent them.
+      reaches all of them or only the ones you tick. Every server is a URL
+      (streamable HTTP): telos does not run stdio servers. A server's headers
+      are secrets: you see which are set, never their values, and only the
+      runner is sent them.
     </p>
     <p>A server can carry hooks, a memory lookup before each turn for example. The todo is the hooks' session:</p>
     <div class="table-scroll">
@@ -163,7 +164,7 @@ description: Configuration, the AI switches, agents, lanes and runs, the MCP doo
       <li><strong>Put it behind something.</strong> A reverse proxy with TLS, and, if the instance is yours alone, an allowlist, VPN, or auth in front of it. Behind a proxy, set <code>TRUST_PROXY</code> so the sign-in throttle sees real client addresses.</li>
       <li><strong>Never set <code>SECURE_LOCAL_NET</code></strong> on a reachable instance. An email address becomes the whole credential.</li>
       <li><strong>Set a real <code>BETTER_AUTH_SECRET</code></strong> and keep it. The server refuses to boot in production without a strong one.</li>
-      <li><strong>Mind what agents can reach.</strong> An agent's base URL and the MCP servers are fetched from the server's host, so keep it away from anything private and leave <code>RUNNER_ALLOW_STDIO</code> off on a shared instance.</li>
+      <li><strong>Mind what agents can reach.</strong> An agent's base URL and the MCP servers are fetched from the server's host, so keep it away from anything private and leave <code>RUNNER_ALLOW_CHECKS</code> off on a shared instance.</li>
     </ul>
 
     <p class="readme-link">
