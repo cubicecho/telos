@@ -7,6 +7,7 @@ import { drizzle } from 'drizzle-orm/pglite';
 import { migrate } from 'drizzle-orm/pglite/migrator';
 import { type ExecutionResult, graphql } from 'graphql';
 import { expect } from 'vitest';
+import { defineAbilitiesFor } from '../auth/abilities.ts';
 import { type AuthHost, fixedAuthHost } from '../auth/auth-host.ts';
 import { type Auth, createAuth, type MagicLink } from '../auth/better-auth.ts';
 import { createRateLimiter, type RateLimiter } from '../auth/rate-limit.ts';
@@ -210,6 +211,7 @@ export function createClient(db: TestDb, userId: string | null, options: ClientO
       authHost,
       userId: actor.userId,
       actor,
+      ability: defineAbilitiesFor(actor),
       loaders: createLoaders(db),
       headers,
       ip,

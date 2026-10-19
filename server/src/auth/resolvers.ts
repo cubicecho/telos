@@ -3,7 +3,6 @@ import { extendSchema, GraphQLError, type GraphQLSchema, parse } from 'graphql';
 import type { QueryResolvers } from '../../__generated__/resolvers.ts';
 import { secureLocalNet } from '../core/config.ts';
 import type { Context } from '../core/context.ts';
-import { forbidden } from '../core/errors.ts';
 import { attachResolvers } from '../graphql/attach-resolvers.ts';
 import { SSO_START_PATH } from '../http/sso.ts';
 import { instanceAiOn } from '../instance/settings.ts';
@@ -48,19 +47,6 @@ export function requireAuth(ctx: Context): string {
     });
   }
   return ctx.userId;
-}
-
-/**
- * Only a person signed in with a session. An API key acts for its owner but
- * may not manage the account itself: a leaked key that could mint its own
- * successor would outlive being revoked.
- */
-export function requireSession(ctx: Context): string {
-  const userId = requireAuth(ctx);
-  if (ctx.actor.kind !== 'user') {
-    throw forbidden('Only a signed-in person can do this');
-  }
-  return userId;
 }
 
 /**

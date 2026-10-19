@@ -9,8 +9,8 @@ import type {
   MutationResolvers,
   QueryResolvers,
 } from '../../__generated__/resolvers.ts';
-import { requireAi, requireSystem } from '../ai/gate.ts';
-import { requireSession } from '../auth/resolvers.ts';
+import { requireAi } from '../ai/gate.ts';
+import { requireAuth } from '../auth/resolvers.ts';
 import type { Context } from '../core/context.ts';
 import { McpProbeStatusEnum, McpSecretKindEnum, withEnums } from '../core/enums.ts';
 import { badInput, notFound } from '../core/errors.ts';
@@ -229,7 +229,6 @@ export function applyAgentsExtension(schema: GraphQLSchema): GraphQLSchema {
   queries.agentModels = async (_parent, args, context) => {
     // A person only: an agent or a key has no business making the server
     // fetch a URL of its choosing.
-    requireSession(context);
     const userId = await requireAi(context);
     let own: string | null = null;
     if (args.agentId) {
@@ -247,21 +246,18 @@ export function applyAgentsExtension(schema: GraphQLSchema): GraphQLSchema {
   };
 
   queries.mcpProbe = async (_parent, args, context) => {
-    requireSession(context);
     const userId = await requireAi(context);
     const probe = readProbe(args.id, userId);
     return probe ? visibleProbe(probe) : null;
   };
 
-  queries.runnerProbes = (_parent, _args, context) => {
-    requireSystem(context);
+  queries.runnerProbes = () => {
     markRunnerSeen();
     return takeProbes().map(({ id, server }) => ({ id, server }));
   };
 
   mutations.testMcpServer = async (_parent, args, context) => {
     // A person only, as with the models: it has a process dial where it is told.
-    requireSession(context);
     const userId = await requireAi(context);
     const server = await ownedServer(context.db, userId, args.id);
     const probe = askProbe(userId, server.id, JSON.stringify(runnerServer(server)));
@@ -270,7 +266,6 @@ export function applyAgentsExtension(schema: GraphQLSchema): GraphQLSchema {
   };
 
   mutations.finishProbe = async (_parent, args, context) => {
-    requireSystem(context);
     const { ok, tools, instructions, error } = args.result;
     const probe = finishProbe(args.id, {
       ok,
@@ -309,7 +304,7 @@ export function applyAgentsExtension(schema: GraphQLSchema): GraphQLSchema {
   mcpServer.envNames = secretNames('env');
 
   mutations.setMcpServerSecret = async (_parent, args, context) => {
-    const userId = requireSession(context);
+    const userId = requireAuth(context);
     const name = args.name.trim();
     const pattern = args.kind === 'header' ? HEADER_NAME : ENV_NAME;
     if (name.length > SECRET_NAME_CHARS || !pattern.test(name)) {
@@ -350,7 +345,7 @@ export function applyAgentsExtension(schema: GraphQLSchema): GraphQLSchema {
   };
 
   mutations.setAgentApiKey = async (_parent, args, context) => {
-    const userId = requireSession(context);
+    const userId = requireAuth(context);
     const [row] = await (context.db as AnyRow)
       .update(dbSchema.agents)
       .set({ apiKey: args.apiKey?.trim() || null })

@@ -3,7 +3,7 @@ import * as dbSchema from '@telos/db/schema';
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import { extendSchema, type GraphQLSchema, parse } from 'graphql';
 import type { MutationResolvers, QueryResolvers } from '../../__generated__/resolvers.ts';
-import type { Actor } from '../core/context.ts';
+import type { Actor, Context } from '../core/context.ts';
 import { HandBackEnum, WORK_STATES, type WorkState, WorkStateEnum, withEnums } from '../core/enums.ts';
 import { badInput, conflict } from '../core/errors.ts';
 import { loadOwnedTodo } from '../core/owned.ts';
@@ -50,7 +50,7 @@ const AI_STATUS_SDL = parse(`
   type LaneTally {
     laneId: ID!
     name: String!
-    "Whether an agent works this lane."
+    "Whether an agent, or a check command, works this lane."
     station: Boolean!
     isDone: Boolean!
     handedBack: Int!
@@ -98,13 +98,13 @@ const RUN_EVENT = 'run' as const;
  * Finds a todo a lane's agent could be nudged about: the caller's, not archived,
  * in a lane, and not being worked now.
  *
- * @param db - The database or transaction.
- * @param userId - The caller.
+ * @param context - The request.
  * @param id - The todo.
+ * @param db - The database or transaction.
  * @returns The todo's row.
  */
-async function restingTodo(db: DB, userId: string, id: string): Promise<AnyRow> {
-  const todo = await loadOwnedTodo(db, userId, id);
+async function restingTodo(context: Context, id: string, db: DB): Promise<AnyRow> {
+  const todo = await loadOwnedTodo(context, id, db);
   if (todo.laneId === null) {
     throw badInput('It is in no lane, so no agent can take it. Move it to a lane with an agent.');
   }
@@ -176,7 +176,7 @@ async function whyNotRunnable(db: DB, todo: AnyRow): Promise<string | null> {
   }>(
     await db.execute(sql`
       SELECT
-        p.ai_enabled, p.archived_at IS NOT NULL AS project_archived, l.name AS lane_name, l.is_done, l.agent_id IS NOT NULL AS has_agent,
+        p.ai_enabled, p.archived_at IS NOT NULL AS project_archived, l.name AS lane_name, l.is_done, (l.agent_id IS NOT NULL OR l.check_command IS NOT NULL) AS has_agent,
         t.split_at IS NOT NULL AS split,
         (
           SELECT string_agg(b.title, ', ' ORDER BY b.title) FROM todo_dependencies d
@@ -270,7 +270,7 @@ export function applyAiStatusExtension(schema: GraphQLSchema): GraphQLSchema {
           .map((lane) => ({
             laneId: lane.id,
             name: lane.name,
-            station: lane.agentId != null,
+            station: lane.agentId != null || lane.checkCommand != null,
             isDone: lane.isDone,
             ...(tallies.get(lane.id) ?? noTally()),
           })),
@@ -280,17 +280,17 @@ export function applyAiStatusExtension(schema: GraphQLSchema): GraphQLSchema {
   };
 
   mutations.retryTodo = async (_parent, args, context) => {
-    const userId = await requireAi(context);
+    await requireAi(context);
     const db = context.db;
-    const todo = await restingTodo(db, userId, args.id);
+    const todo = await restingTodo(context, args.id, db);
     await recordNudge(db, context.actor, todo, RETRY_EVENT, args.reason);
     return true;
   };
 
   mutations.runTodo = async (_parent, args, context) => {
-    const userId = await requireAi(context);
+    await requireAi(context);
     return context.db.transaction(async (tx) => {
-      const todo = await restingTodo(tx, userId, args.id);
+      const todo = await restingTodo(context, args.id, tx);
       const refusal = await whyNotRunnable(tx, todo);
       if (refusal !== null) {
         throw badInput(refusal);

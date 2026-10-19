@@ -1,3 +1,22 @@
+# [7.3.0](https://github.com/cubicecho/telos/compare/v7.2.0...v7.3.0) (2026-10-19)
+
+
+### Bug Fixes
+
+* **runs:** hand a todo sent back the ruling that sent it, not the fixed reason ([36ce225](https://github.com/cubicecho/telos/commit/36ce2254381d9098e1125cb1328f89985f8584ce))
+
+
+### Features
+
+* **runner:** ask for a structured work report and a ruling per acceptance criterion ([8c0c3f1](https://github.com/cubicecho/telos/commit/8c0c3f112cf6174fb40f47bf3e83ffd75d2536a5))
+
+# [7.2.0](https://github.com/cubicecho/telos/compare/v7.1.0...v7.2.0) (2026-10-19)
+
+
+### Features
+
+* check lanes that pass or fail on a command's exit code ([c01d21b](https://github.com/cubicecho/telos/commit/c01d21b2720dba2152d4eab42217e9f68f203192)), closes [#106](https://github.com/cubicecho/telos/issues/106)
+
 # [7.1.0](https://github.com/cubicecho/telos/compare/v7.0.0...v7.1.0) (2026-10-18)
 
 

@@ -93,9 +93,9 @@ export function applyLanesExtension(schema: GraphQLSchema): GraphQLSchema {
 
     return db.transaction(async (tx) => {
       await stampActor(tx, context.actor, { reason: args.reason });
-      const todo = await loadOwnedTodo(tx, userId, args.id);
+      const todo = await loadOwnedTodo(context, args.id, tx);
 
-      const lane = await loadOwnedLane(tx, userId, args.laneId);
+      const lane = await loadOwnedLane(context, args.laneId, tx);
       if (lane.projectId !== todo.projectId) {
         throw badInput('That lane belongs to another project.');
       }
@@ -143,11 +143,11 @@ export function applyLanesExtension(schema: GraphQLSchema): GraphQLSchema {
   };
 
   mutations.setDoneLane = async (_parent, args, context) => {
-    const userId = requireAuth(context);
+    requireAuth(context);
     const db = context.db;
 
     return db.transaction(async (tx) => {
-      await loadOwnedProject(tx, userId, args.projectId);
+      await loadOwnedProject(context, args.projectId, tx);
       // Moving the flag moves todos (syncLaneCompletion), which is history.
       await stampActor(tx, context.actor);
       const now = new Date();
@@ -160,7 +160,7 @@ export function applyLanesExtension(schema: GraphQLSchema): GraphQLSchema {
         .where(and(eq(dbSchema.lanes.projectId, args.projectId), eq(dbSchema.lanes.isDone, true)));
 
       if (args.laneId) {
-        const lane = await loadOwnedLane(tx, userId, args.laneId);
+        const lane = await loadOwnedLane(context, args.laneId, tx);
         if (lane.projectId !== args.projectId) {
           throw badInput('That lane belongs to another project.');
         }
@@ -175,11 +175,11 @@ export function applyLanesExtension(schema: GraphQLSchema): GraphQLSchema {
   };
 
   mutations.reorderLanes = async (_parent, args, context) => {
-    const userId = requireAuth(context);
+    requireAuth(context);
     const db = context.db;
 
     return db.transaction(async (tx) => {
-      await loadOwnedProject(tx, userId, args.projectId);
+      await loadOwnedProject(context, args.projectId, tx);
       const lanes = await projectLanes(tx, args.projectId);
       const known = new Set(lanes.map((lane: AnyRow) => lane.id as string));
       const distinct = new Set(args.laneIds);

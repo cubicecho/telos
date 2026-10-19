@@ -3,7 +3,6 @@ import { and, asc, eq, isNotNull, isNull, lte, or } from 'drizzle-orm';
 import { extendSchema, type GraphQLSchema, parse } from 'graphql';
 import type { MutationResolvers } from '../../__generated__/resolvers.ts';
 import { serversFor } from '../agents/mcp-servers.ts';
-import { requireSystem } from '../ai/gate.ts';
 import { attachResolvers } from '../graphql/attach-resolvers.ts';
 import { instanceAiOn } from '../instance/settings.ts';
 import { markRunnerSeen } from './runner-seen.ts';
@@ -102,7 +101,6 @@ export function applySessionDeletesExtension(schema: GraphQLSchema): GraphQLSche
   const mutations: MutationResolvers = {};
 
   mutations.takeSessionDeletes = async (_parent, args, context) => {
-    requireSystem(context);
     markRunnerSeen();
     if ((await instanceAiOn(context.db)) === false) {
       return [];
@@ -156,7 +154,6 @@ export function applySessionDeletesExtension(schema: GraphQLSchema): GraphQLSche
   };
 
   mutations.finishSessionDelete = async (_parent, args, context) => {
-    requireSystem(context);
     return context.db.transaction(async (tx) => {
       const [session]: dbSchema.TodoSession[] = await tx
         .select()

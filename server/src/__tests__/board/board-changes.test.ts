@@ -1,5 +1,6 @@
 import { type ExecutionResult, parse, subscribe } from 'graphql';
 import { beforeEach, describe, expect, it } from 'vitest';
+import { defineAbilitiesFor } from '../../auth/abilities.ts';
 import { createRateLimiter } from '../../auth/rate-limit.ts';
 import type { Actor, Context } from '../../core/context.ts';
 import { createLoaders } from '../../graphql/loaders.ts';
@@ -29,6 +30,7 @@ async function watch(projectId: string, actor: Actor): Promise<Changes | Executi
     authHost: hostFor(db),
     userId: actor.userId,
     actor,
+    ability: defineAbilitiesFor(actor),
     loaders: createLoaders(db),
     headers: new Headers(),
     ip: TEST_IP,
