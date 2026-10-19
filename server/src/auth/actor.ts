@@ -26,7 +26,7 @@ export interface ActorOptions {
  * own included:
  *
  * - `x-runner-key`: the runner, as the system principal. It owns no rows and
- *   may call only the runner's own mutations (ai/actor-lock.ts). It
+ *   may call only the runner's own mutations (graphql/permissions.ts). It
  *   resolves with the instance switch off too, so it can hear that its runs
  *   were stopped; the queue is empty then, and nothing can be claimed.
  * - `x-run-token`: an agent at work, for exactly as long as its run is live
@@ -113,6 +113,8 @@ async function resolveRun(db: DB, runId: string): Promise<Actor> {
         eq(dbSchema.runs.status, 'running'),
         gt(dbSchema.runs.leaseExpiresAt, new Date()),
         isNull(dbSchema.runs.cancelRequestedAt),
+        // A check run has no agent, so its token opens nothing.
+        isNull(dbSchema.runs.checkCommand),
         eq(dbSchema.users.aiEnabled, true),
         eq(dbSchema.projects.aiEnabled, true),
         eq(dbSchema.todos.aiIgnored, false),

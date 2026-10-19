@@ -1,4 +1,5 @@
 import type { DB } from '@telos/db';
+import type { CallerAbility } from '../auth/abilities.ts';
 import type { AuthHost } from '../auth/auth-host.ts';
 import type { Auth } from '../auth/better-auth.ts';
 import type { RateLimiter } from '../auth/rate-limit.ts';
@@ -51,6 +52,8 @@ export interface Context {
   authHost: AuthHost;
   userId: string | null;
   actor: Actor;
+  /** What `actor` may do: `defineAbilitiesFor(actor)`, built once with the context. */
+  ability: CallerAbility;
   loaders: Loaders;
   /** The request's headers, for calls to `auth.api` that read the session from them. */
   headers: Headers;
@@ -63,7 +66,7 @@ export interface Context {
 /**
  * Whether the caller is AI: an MCP client on a key, or an agent on a run token.
  * What such a caller may see is narrower than what its user may (tenancy.ts),
- * and what it may write is a stated list (ai/actor-lock.ts), less
+ * and what it may write is a stated list (graphql/permissions.ts), less
  * whatever its key has switched off.
  */
 export function isAiActor(ctx: Pick<Context, 'actor'>): boolean {

@@ -12,10 +12,10 @@ export interface RunnerConfig {
   /** The most runs this process works at once, across every user. */
   concurrency: number;
   /**
-   * Whether an agent may name an MCP server to spawn as a command. Off by
-   * default: agents belong to the board's users, and a command runs on this
-   * host with this process's rights. Turn it on only when every user with AI on
-   * is someone you would hand a shell.
+   * Whether an agent may name an MCP server to spawn as a command, and a check
+   * lane may run its command. Off by default: agents and lanes belong to the
+   * board's users, and a command runs on this host with this process's rights.
+   * Turn it on only when every user with AI on is someone you would hand a shell.
    */
   allowStdio: boolean;
 }

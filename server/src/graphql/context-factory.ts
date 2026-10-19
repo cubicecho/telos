@@ -1,4 +1,5 @@
 import type { DB } from '@telos/db';
+import { defineAbilitiesFor } from '../auth/abilities.ts';
 import { type ActorOptions, resolveActor } from '../auth/actor.ts';
 import type { AuthHost } from '../auth/auth-host.ts';
 import type { RateLimiter } from '../auth/rate-limit.ts';
@@ -18,7 +19,18 @@ export function createContextFactory(db: DB, authHost: AuthHost, limiter: RateLi
   return async (headers: Headers, ip: string = UNKNOWN_IP): Promise<Context> => {
     const auth = authHost.current();
     const actor = await resolveActor(auth, db, headers, options);
-    return { db, auth, authHost, userId: actor.userId, actor, loaders: createLoaders(db), headers, ip, limiter };
+    return {
+      db,
+      auth,
+      authHost,
+      userId: actor.userId,
+      actor,
+      ability: defineAbilitiesFor(actor),
+      loaders: createLoaders(db),
+      headers,
+      ip,
+      limiter,
+    };
   };
 }
 

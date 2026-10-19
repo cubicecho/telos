@@ -29,7 +29,8 @@ export function startRunner(options: { telosUrl: string; runnerKey: string; env?
   // readConfig is only null without a key, and one was just given.
   if (!config) throw new Error('startRunner needs a runner key');
   const abort = new AbortController();
-  if (config.allowStdio) console.warn('⚠️  RUNNER_ALLOW_STDIO is on: agents may spawn commands on this host.');
+  if (config.allowStdio)
+    console.warn('⚠️  RUNNER_ALLOW_STDIO is on: agents and check lanes may run commands on this host.');
   const done = runLoop({ ...config, telos: createTelos(config) }, abort.signal);
   return {
     stop() {

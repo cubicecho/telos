@@ -40,7 +40,7 @@ export function applyBoardChangesExtension(schema: GraphQLSchema): GraphQLSchema
       if (context.actor.kind !== 'user') {
         throw forbidden('Only a person can watch a board.');
       }
-      const project = await loadOwnedProject(context.db, userId, args.projectId);
+      const project = await loadOwnedProject(context, args.projectId);
 
       const events = boardEventsFor(context.db);
       await events.listening();

@@ -11,8 +11,8 @@
 #
 # Every tool here has a switch per API key (Settings), on unless turned off. A
 # tool that is off is not listed to that key and cannot be called by it
-# (door.ts, resolvers/actor-lock.ts). A mutation's root field must also be in
-# `AI_MUTATIONS` (resolvers/actor-lock.ts), which a test holds this file to.
+# (door.ts, graphql/permissions.ts). A mutation's root field must also be in
+# `AI_MUTATIONS` (graphql/permissions.ts), which a test holds this file to.
 
 # The projects open to AI, each with its lanes in board order. Start here: a
 # request needs a project id, and a lane id means nothing without its name.

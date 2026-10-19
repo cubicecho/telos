@@ -63,3 +63,19 @@ export const HTTP_DEFAULTS: Readonly<HttpSettings> = Object.freeze({
   drainSeconds: 5,
   shutdownDeadlineSeconds: 8,
 });
+
+/** A check lane's command (write-guards.ts) and what its run leaves on the thread (runs/resolvers.ts). */
+export interface LaneCheckSettings {
+  /** The longest command a lane may hold. A check is a line, or a script's name, not a script. */
+  maxCommandChars: number;
+  /** The longest a lane may let its command run. The runner keeps the lease meanwhile. */
+  maxTimeoutSeconds: number;
+  /** How much of the command's output, from the end, its verdict note keeps. */
+  outputChars: number;
+}
+
+export const LANE_CHECK_DEFAULTS: Readonly<LaneCheckSettings> = Object.freeze({
+  maxCommandChars: 2000,
+  maxTimeoutSeconds: 3600,
+  outputChars: 4000,
+});

@@ -3,7 +3,6 @@ import { eq } from 'drizzle-orm';
 import { GraphQLError } from 'graphql';
 import { requireAuth } from '../auth/resolvers.ts';
 import type { Context } from '../core/context.ts';
-import { forbidden } from '../core/errors.ts';
 import { instanceAiOn } from '../instance/settings.ts';
 
 // The one question every AI resolver asks: is AI on for this caller? Whether
@@ -31,14 +30,4 @@ export async function requireAi(ctx: Context): Promise<string> {
     throw new GraphQLError('AI is switched off', { extensions: { code: 'NOT_FOUND' } });
   }
   return requireAuth(ctx);
-}
-
-/**
- * Throws unless the caller is the runner. FORBIDDEN rather than NOT_FOUND: the
- * runner's fields are in the schema whenever AI is on, and saying so costs
- * nothing, where a person's AI surface is theirs to hide.
- */
-export function requireSystem(ctx: Context): void {
-  if (ctx.actor.kind === 'system') return;
-  throw forbidden('Only the runner may do this.');
 }

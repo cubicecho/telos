@@ -13,7 +13,7 @@ import { loadAiProject, loadAiTodo } from '../core/owned.ts';
 // that caller could have read, and answered NOT_FOUND otherwise.
 //
 // Stated here as a table rather than in each resolver, so the resolvers stay
-// the person's and a mutation opened to AI later (actor-lock.ts) has one place
+// the person's and a mutation opened to AI later (graphql/permissions.ts) has one place
 // to say what its arguments are. Generated writes need none of this: their rows
 // are scoped by tenancy.ts and their foreign keys by write-guards.ts. The request
 // mutations check for themselves.
@@ -72,7 +72,7 @@ async function assertAiRun(context: Context, userId: string, id: string): Promis
   if (!run?.todoId) {
     throw notFound('Run');
   }
-  await loadAiTodo(context.db, userId, run.todoId).catch(() => {
+  await loadAiTodo(context, run.todoId).catch(() => {
     throw notFound('Run');
   });
 }
@@ -92,13 +92,13 @@ async function assertSeen(context: Context, userId: string, named: Named, id: st
     throw notFound(ENTITY[named]);
   }
   if (named === 'project') {
-    await loadAiProject(context.db, userId, id);
+    await loadAiProject(context, id);
   } else if (named === 'lane') {
     await assertAiLane(context, userId, id);
   } else if (named === 'run') {
     await assertAiRun(context, userId, id);
   } else {
-    await loadAiTodo(context.db, userId, id);
+    await loadAiTodo(context, id);
   }
 }
 

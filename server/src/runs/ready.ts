@@ -13,6 +13,7 @@ import { resultRows } from '../todos/blocking.ts';
 //
 // A todo is ready for its lane's agent when all of these hold:
 //
+//   - its lane has an enabled agent, or a check command (IS_CHECK_LANE)
 //   - every AI switch over it is on: its user's, its project's, and it is not
 //     ignored — the same three checks a run token makes on every request
 //   - its project runs by itself (auto-run), or a person asked for this todo
@@ -26,6 +27,13 @@ import { resultRows } from '../todos/blocking.ts';
 //   - it has failed no more than `maxAttempts` times since a person last
 //     touched it, which is what stops a Doing↔Review loop spending forever
 //   - the lane has room under its WIP limit
+
+/**
+ * Whether the lane `l` is a check lane: its command, not an agent, works its
+ * todos. A check is the runner's work as an agent's run is, so every switch
+ * above still applies to it.
+ */
+export const IS_CHECK_LANE = sql`(l.check_command IS NOT NULL)`;
 
 /** How long a claim holds a todo without a heartbeat before it counts as abandoned. */
 export const LEASE_SECONDS = 120;
@@ -116,10 +124,11 @@ export async function readyTodos(
         row_number() OVER (PARTITION BY l.id ORDER BY t.position, t.created_at) AS place
       FROM todos t
       JOIN lanes l ON l.id = t.lane_id
-      JOIN agents a ON a.id = l.agent_id
+      LEFT JOIN agents a ON a.id = l.agent_id
       JOIN projects p ON p.id = t.project_id
       JOIN users u ON u.id = t.user_id
-      WHERE ${INSTANCE_AI_ON} AND u.ai_enabled AND p.ai_enabled AND NOT t.ai_ignored AND a.enabled
+      WHERE ${INSTANCE_AI_ON} AND u.ai_enabled AND p.ai_enabled AND NOT t.ai_ignored
+        AND (${IS_CHECK_LANE} OR a.enabled)
         AND (p.auto_run OR t.run_requested_at IS NOT NULL)
         AND p.archived_at IS NULL
         AND t.completed_at IS NULL AND t.archived_at IS NULL AND t.split_at IS NULL AND NOT l.is_done
@@ -215,7 +224,7 @@ export async function dropRunRequests(db: DB, where: { todoId: string } | { proj
 export interface WorkTodo extends Omit<StationTodo, '__typename'> {
   projectName: string;
   laneName: string | null;
-  /** How many failures its lane allows. Null where no agent works the lane. */
+  /** How many failures its lane allows. Null where neither an agent nor a check works the lane. */
   maxAttempts: number | null;
   /** Its last finished run. */
   lastRunId: string | null;
@@ -289,7 +298,7 @@ export async function workStates(
         SELECT
           t.id, t.title, t.project_id, p.name AS project_name, t.lane_id, t.ai_ignored, t.position, t.created_at, p.auto_run,
           t.run_requested_at IS NOT NULL AS run_requested, t.split_at IS NOT NULL AS split,
-          l.name AS lane_name, l.position AS lane_position, l.agent_id IS NOT NULL AS has_agent,
+          l.name AS lane_name, l.position AS lane_position, (l.agent_id IS NOT NULL OR ${IS_CHECK_LANE}) AS has_agent,
           a.name AS agent_name, coalesce(a.enabled, true) AS agent_enabled,
           l.max_attempts,
           ${arrivedIn(sql`t.id`, sql`l.id`, sql`t.created_at`)} AS arrived

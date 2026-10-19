@@ -124,7 +124,7 @@ domain.
 | `AI_ENABLED` | — | Set to `false` to remove AI entirely: no MCP endpoint, no API keys, no agents, no switch in Settings. Otherwise an admin turns it on in Settings. |
 | `RUNNER_CONCURRENCY` | `2` | The most runs the runner works at once. |
 | `RUNNER_POLL_SECONDS` | `5` | How long the runner waits when nothing is ready. |
-| `RUNNER_ALLOW_STDIO` | `false` | Let the runner spawn MCP servers that are commands. |
+| `RUNNER_ALLOW_STDIO` | `false` | Let the runner spawn MCP servers that are commands, and run check lanes' commands. |
 | `RUNNER_KEY` | made up at boot | Only for a second runner on another host (`runner/`, with `TELOS_URL`): set the same value on both. |
 
 ### Signing in
