@@ -92,20 +92,37 @@ export function systemPromptFor(assignment: Assignment, instructions: string | n
 }
 
 /**
+ * What a reviewer is told in place of the report: the work is what it rules
+ * on. LLM judges lean toward the account in front of them, and toward their
+ * own model's writing, so telos leaves the worker's report out (`reviews`).
+ */
+export const REVIEW_NOTE = `You are ruling on the work itself. The report of the agent that did it is left out on purpose:
+check what is there, with your tools and in what has been made for it, not what anyone says was done.`;
+
+/**
  * What the agent is asked: the todo, its criteria, and what has been said.
  * `why` is why it came back to this lane — a reviewer's FAIL, or what a person
- * said moving it — and a person's notes come last, as the latest word.
+ * said moving it — and a person's notes come last, as the latest word. A lane
+ * that reviews work is not sent the report (telos leaves it out), and is told
+ * why; every lane is told what has been made for the todo, as where to look.
  *
  * @param assignment What telos said about the run.
  * @returns The user message.
  */
 export function assignmentPrompt(assignment: Assignment): string {
   const standing = assignment.notes.filter((note) => note !== assignment.why);
+  const ruling = assignment.ruling !== assignment.why ? assignment.ruling : null;
+  const made = assignment.artifacts.map(
+    (artifact) => `- ${artifact.action} ${artifact.location}${artifact.title ? ` (${artifact.title})` : ''}`,
+  );
   return [
     `Todo: ${assignment.title}`,
     assignment.brief ? `\n\n${assignment.brief}` : '',
     assignment.acceptance ? `\n\nDone when:\n${assignment.acceptance}` : '',
+    assignment.reviews ? `\n\n${REVIEW_NOTE}` : '',
     assignment.report ? `\n\nWhat the last agent reported:\n${assignment.report}` : '',
+    made.length ? `\n\nWhat has been made for this todo, the newest first:\n${made.join('\n')}` : '',
+    ruling ? `\n\nThe last ruling on this todo:\n${ruling}` : '',
     assignment.why ? `\n\nWhy this came back:\n${assignment.why}` : '',
     standing.length
       ? `\n\nNotes on this todo, to take into account:\n${standing.map((note) => `- ${note}`).join('\n')}`

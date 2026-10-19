@@ -2,8 +2,8 @@ import { MockedProvider } from '@apollo/client/testing';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { UpdateLaneAgentDocument } from '@/lib/graphql';
-import { LaneAgentDialog, toDraft, toLaneAgentSet } from '../lane-agent-dialog';
+import { AgentDefaultsDocument, UpdateLaneAgentDocument } from '@/lib/graphql';
+import { LaneAgentDialog, sameModelReviews, toDraft, toLaneAgentSet } from '../lane-agent-dialog';
 
 const LANES = [
   { id: 'l1', name: 'Doing', position: 0, isDone: false },
@@ -140,5 +140,117 @@ describe('LaneAgentDialog', () => {
         maxAttempts: 3,
       },
     });
+  });
+});
+
+// Doing works a todo and passes it to Review; Review fails it back to Doing.
+const LOOP_LANES = [
+  { id: 'l1', name: 'Doing', position: 0, isDone: false },
+  { id: 'l2', name: 'Review', position: 1, isDone: false },
+  { id: 'l3', name: 'Done', position: 2, isDone: true },
+];
+const DOING = settings({ id: 'l1', agentId: 'worker', onSuccessLaneId: 'l2' });
+const REVIEW = settings({ id: 'l2', agentId: 'reviewer', onSuccessLaneId: 'l3', onFailureLaneId: 'l1' });
+
+describe('a review loop on one model', () => {
+  const models: Record<string, string | null> = { worker: 'qwen3:14b', reviewer: 'qwen3:14b', other: 'llama3:8b' };
+  const modelOf = (agentId: string) => models[agentId] ?? null;
+
+  it('is found from the reviewer’s side and from the worker’s', () => {
+    const found = [{ reviewer: 'Review', worker: 'Doing', model: 'qwen3:14b' }];
+    expect(sameModelReviews('l2', toDraft(REVIEW), [DOING, REVIEW], LOOP_LANES, modelOf)).toEqual(found);
+    expect(sameModelReviews('l1', toDraft(DOING), [DOING, REVIEW], LOOP_LANES, modelOf)).toEqual(found);
+  });
+
+  it('follows the form rather than what is saved', () => {
+    const draft = { ...toDraft(REVIEW), agentId: 'other' };
+    expect(sameModelReviews('l2', draft, [DOING, REVIEW], LOOP_LANES, modelOf)).toEqual([]);
+    const unhooked = { ...toDraft(REVIEW), onFailureLaneId: 'none' };
+    expect(sameModelReviews('l2', unhooked, [DOING, REVIEW], LOOP_LANES, modelOf)).toEqual([]);
+  });
+
+  it('is no loop when the failure route goes to a lane that does not feed this one', () => {
+    const elsewhere = settings({ id: 'l1', agentId: 'worker', onSuccessLaneId: 'l3' });
+    expect(sameModelReviews('l2', toDraft(REVIEW), [elsewhere, REVIEW], LOOP_LANES, modelOf)).toEqual([]);
+  });
+
+  it('says nothing about a lane with no model to compare', () => {
+    expect(sameModelReviews('l2', toDraft(REVIEW), [DOING, REVIEW], LOOP_LANES, () => null)).toEqual([]);
+  });
+});
+
+describe('LaneAgentDialog on a review loop', () => {
+  const RESOLVED = {
+    __typename: 'ResolvedAgentSettings',
+    baseUrl: '',
+    model: 'qwen3:14b',
+    temperature: 0.7,
+    maxTokens: 0,
+    contextLength: 0,
+    maxToolIterations: 20,
+    toolDiscovery: false,
+    toolSelectModel: '',
+    reasoningEffort: '',
+    requestTimeoutSeconds: null,
+    maxRetries: 0,
+  };
+  const defaults = {
+    request: { query: AgentDefaultsDocument },
+    result: {
+      data: {
+        agentDefaults: {
+          __typename: 'AgentDefaults',
+          id: 'u1',
+          baseUrl: null,
+          model: 'qwen3:14b',
+          temperature: null,
+          maxTokens: null,
+          contextLength: null,
+          maxToolIterations: null,
+          toolDiscovery: null,
+          toolSelectModel: null,
+          reasoningEffort: null,
+          requestTimeoutSeconds: null,
+          maxRetries: null,
+          hasApiKey: false,
+          resolved: RESOLVED,
+          builtIn: { ...RESOLVED, model: '' },
+        },
+      },
+    },
+  };
+
+  function renderReview(agents: Array<{ id: string; name: string; model: string | null }>) {
+    render(
+      <MockedProvider mocks={[defaults]}>
+        <LaneAgentDialog
+          open
+          onOpenChange={() => {}}
+          lane={LOOP_LANES[1]}
+          lanes={LOOP_LANES}
+          settings={REVIEW}
+          laneAgents={[DOING, REVIEW]}
+          agents={agents}
+        />
+      </MockedProvider>,
+    );
+  }
+
+  it('warns when the reviewer inherits the model the worker names', async () => {
+    renderReview([
+      { id: 'worker', name: 'Worker', model: 'qwen3:14b' },
+      { id: 'reviewer', name: 'Reviewer', model: null },
+    ]);
+    expect(await screen.findByText('The reviewer uses the worker’s model')).toBeInTheDocument();
+    expect(screen.getByText(/Review rules on Doing’s work with qwen3:14b/)).toBeInTheDocument();
+  });
+
+  it('says nothing when the two use different models', async () => {
+    renderReview([
+      { id: 'worker', name: 'Worker', model: 'qwen3:14b' },
+      { id: 'reviewer', name: 'Reviewer', model: 'llama3:8b' },
+    ]);
+    expect(await screen.findByDisplayValue('Reviewer')).toBeInTheDocument();
+    expect(screen.queryByText('The reviewer uses the worker’s model')).not.toBeInTheDocument();
   });
 });

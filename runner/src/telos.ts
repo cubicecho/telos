@@ -91,9 +91,23 @@ export interface Assignment {
   title: string;
   brief: string | null;
   acceptance: string | null;
+  /** The last work report; telos leaves it out for a lane that reviews work. */
   report: string | null;
   why: string | null;
   notes: string[];
+  /** Whether the lane reviews work, and so rules on the work rather than on a report of it. */
+  reviews: boolean;
+  /** The last ruling on the todo, from any lane. */
+  ruling: string | null;
+  /** What has been made for the todo, newest first. */
+  artifacts: AssignedArtifact[];
+}
+
+/** Something made for a todo, as a run is told of it. */
+export interface AssignedArtifact {
+  location: string;
+  action: string;
+  title: string | null;
 }
 
 export interface Claim {
@@ -225,7 +239,8 @@ const CLAIM = `mutation ($todoId: ID!, $laneId: ID!) {
     check { command timeoutSeconds }
     assignment {
       projectName projectDescription projectContext laneName
-      title brief acceptance report why notes
+      title brief acceptance report why notes reviews ruling
+      artifacts { location action title }
     }
   }
 }`;

@@ -230,6 +230,7 @@ export function Board({
           lane={agentLane}
           lanes={lanes}
           settings={laneAgents.get(agentLane.id) ?? null}
+          laneAgents={laneAgentsQuery.data?.lanes ?? []}
           agents={agents}
         />
       ) : null}

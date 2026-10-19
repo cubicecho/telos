@@ -34,7 +34,7 @@ const MAX_LOCATION = 2000;
 const MAX_LABEL = 200;
 const MAX_MEDIA_TYPE = 200;
 /** The scheme the runner files a run's notes under. Not a client's to claim. */
-const NOTE_LOCATION = 'telos:note/';
+export const NOTE_LOCATION = 'telos:note/';
 
 /**
  * `value` trimmed, or BAD_USER_INPUT when it is empty or longer than `limit`.

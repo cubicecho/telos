@@ -1,15 +1,16 @@
-import { useMutation } from '@apollo/client';
+import { useMutation, useQuery } from '@apollo/client';
 import { useEffect, useMemo } from 'react';
 import { Text } from 'react-native';
 import type { LaneAgentFieldsFragment } from '@/__generated__/graphql';
 import { useAppForm } from '@/components/app-form';
 import { DialogLayout } from '@/components/dialog-layout';
 import type { LaneSummary } from '@/components/domain/lane/lane-badge';
+import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
 import { numberRule } from '@/lib/agents';
 import { describeError } from '@/lib/errors';
-import { UpdateLaneAgentDocument } from '@/lib/graphql';
+import { AgentDefaultsDocument, UpdateLaneAgentDocument } from '@/lib/graphql';
 
 /** "No agent" and "stay here", as a select can hold them: radix refuses an empty value. */
 const NONE = 'none';
@@ -41,6 +42,8 @@ const DEFAULT_MAX_ATTEMPTS = 3;
 export interface LaneAgentChoice {
   id: string;
   name: string;
+  /** Its own model; null inherits the account's. */
+  model?: string | null;
 }
 
 export interface LaneAgentDraft {
@@ -101,6 +104,57 @@ export function toLaneAgentSet(value: LaneAgentDraft) {
   };
 }
 
+/** Two lanes in a review loop that work with one model. */
+export interface SameModelReview {
+  /** The lane that rules on the work. */
+  reviewer: string;
+  /** The lane whose work it rules on. */
+  worker: string;
+  model: string;
+}
+
+/**
+ * Where the lane being edited sits in a review loop whose two ends use the
+ * same model. A lane reviews work when its failure route goes back to a lane
+ * whose success route leads to it: the rule `assignmentFor` (server
+ * `runs/resolvers.ts`) uses to keep the worker's report from it. A judge leans
+ * toward its own model's work, so the loop is worth a warning, not a refusal.
+ *
+ * @param laneId - The lane being edited.
+ * @param draft - Its form's values, which stand in for its saved routes.
+ * @param laneAgents - Every lane's agent and routes, as saved.
+ * @param lanes - The board's lanes, for their names.
+ * @param modelOf - The model an agent runs with, its own or the account's; null for none.
+ * @returns The loops, the edited lane as reviewer first; none when the models differ.
+ */
+export function sameModelReviews(
+  laneId: string,
+  draft: LaneAgentDraft,
+  laneAgents: readonly LaneAgentFieldsFragment[],
+  lanes: readonly LaneSummary[],
+  modelOf: (agentId: string) => string | null,
+): SameModelReview[] {
+  const routes = new Map<string, Pick<LaneAgentFieldsFragment, 'agentId' | 'onSuccessLaneId' | 'onFailureLaneId'>>(
+    laneAgents.map((row) => [row.id, row]),
+  );
+  routes.set(laneId, toLaneAgentSet(draft));
+  const nameOf = (id: string) => lanes.find((lane) => lane.id === id)?.name ?? '';
+  const modelIn = (id: string) => {
+    const agentId = routes.get(id)?.agentId;
+    return agentId ? modelOf(agentId) : null;
+  };
+  // The edited lane as the reviewer, and as the worker its success route feeds.
+  const reviewers = [laneId, routes.get(laneId)?.onSuccessLaneId].filter((id): id is string => !!id);
+  return reviewers.flatMap((reviewer) => {
+    const worker = routes.get(reviewer)?.onFailureLaneId;
+    if (!worker || routes.get(worker)?.onSuccessLaneId !== reviewer || ![reviewer, worker].includes(laneId)) {
+      return [];
+    }
+    const model = modelIn(reviewer);
+    return model && model === modelIn(worker) ? [{ reviewer: nameOf(reviewer), worker: nameOf(worker), model }] : [];
+  });
+}
+
 /**
  * A lane's agent: which agent works the todos that arrive in the lane, or the
  * check command that rules on them instead, and where each goes when its run
@@ -115,6 +169,7 @@ export function LaneAgentDialog({
   lane,
   lanes,
   settings,
+  laneAgents = [],
   agents,
 }: {
   open: boolean;
@@ -122,9 +177,14 @@ export function LaneAgentDialog({
   lane: LaneSummary;
   lanes: readonly LaneSummary[];
   settings: LaneAgentFieldsFragment | null;
+  /** Every lane's agent and routes, to tell whether this one is in a review loop. */
+  laneAgents?: readonly LaneAgentFieldsFragment[];
   agents: readonly LaneAgentChoice[];
 }) {
   const [updateLane, { error }] = useMutation(UpdateLaneAgentDocument);
+  // What an agent with no model of its own runs with.
+  const defaultModel = useQuery(AgentDefaultsDocument).data?.agentDefaults.resolved.model || null;
+  const modelOf = (agentId: string) => agents.find((agent) => agent.id === agentId)?.model || defaultModel;
   const initial = useMemo(() => toDraft(settings), [settings]);
   const form = useAppForm({
     defaultValues: initial,
@@ -242,6 +302,18 @@ export function LaneAgentDialog({
                     </form.AppField>
                   </>
                 )
+              }
+            </form.Subscribe>
+            <form.Subscribe selector={(state) => state.values}>
+              {(values) =>
+                sameModelReviews(lane.id, values, laneAgents, lanes, modelOf).map((loop) => (
+                  <Alert
+                    key={`${loop.reviewer}-${loop.worker}`}
+                    variant="warning"
+                    title="The reviewer uses the worker’s model"
+                    description={`${loop.reviewer} rules on ${loop.worker}’s work with ${loop.model}, the model that did it. A model tends to favour its own work, so a different model on one of them makes the review more independent.`}
+                  />
+                ))
               }
             </form.Subscribe>
           </Form>
