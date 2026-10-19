@@ -151,6 +151,8 @@ export interface RunResult {
   promptTokens?: number;
   completionTokens?: number;
   totalTokens?: number;
+  /** How many of `promptTokens` the endpoint served from its prompt cache. */
+  cachedInputTokens?: number;
   todos?: ProposedTodo[];
   refine?: RefinedTodo | null;
   events?: RunEvent[];
@@ -173,6 +175,8 @@ export interface RunUsage {
   promptTokens: number;
   completionTokens: number;
   totalTokens: number;
+  /** How many of `promptTokens` came from the endpoint's prompt cache. */
+  cachedInputTokens?: number;
 }
 
 /** What a heartbeat carries besides the lease: what happened since the last one. */

@@ -1029,6 +1029,28 @@ describe('what a run shows as it goes, and leaves behind', () => {
     expect(row).toMatchObject({ status: 'stopped', totalTokens: 120, promptTokens: 100 });
   });
 
+  it('keeps how much of the prompt came from the cache, and nothing when the endpoint never said', async () => {
+    const silent = await board.addTodo('Write it');
+    const quiet = await claim(silent);
+    await runner.expectOk(HEARTBEAT, {
+      id: quiet.runId,
+      usage: { promptTokens: 100, completionTokens: 20, totalTokens: 120 },
+    });
+    await finish(quiet.runId, { status: 'OK', output: 'Wrote it.', promptTokens: 100 });
+    expect((await runsOf(silent))[0].cachedInputTokens).toBeNull();
+
+    const cached = await board.addTodo('Write it again');
+    const { runId } = await claim(cached);
+    await runner.expectOk(HEARTBEAT, {
+      id: runId,
+      usage: { promptTokens: 100, completionTokens: 20, totalTokens: 120, cachedInputTokens: 60 },
+    });
+    expect((await runsOf(cached))[0].cachedInputTokens).toBe(60);
+    // A finish that says nothing of the cache keeps what the heartbeat said.
+    await finish(runId, { status: 'OK', output: 'Wrote it.' });
+    expect((await runsOf(cached))[0].cachedInputTokens).toBe(60);
+  });
+
   it('takes the prompt from the finish when no heartbeat carried it', async () => {
     const todoId = await board.addTodo('Write it');
     const { runId } = await claim(todoId);

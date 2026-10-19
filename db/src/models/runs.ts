@@ -71,6 +71,9 @@ export const runs = pgTable(
     promptTokens: integer('prompt_tokens').notNull().default(0),
     completionTokens: integer('completion_tokens').notNull().default(0),
     totalTokens: integer('total_tokens').notNull().default(0),
+    // How many of `promptTokens` the endpoint served from its prompt cache.
+    // Null when it never said: a zero is a miss, and silence is not one.
+    cachedInputTokens: integer('cached_input_tokens'),
     // What the run did as it went, appended by each heartbeat and the finish.
     // Capped (runs/resolvers.ts), so a chatty agent cannot grow a row forever.
     events: jsonb('events').$type<RunEvent[]>().notNull().default([]),
