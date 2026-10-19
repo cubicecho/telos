@@ -1,3 +1,10 @@
+# [7.2.0](https://github.com/cubicecho/telos/compare/v7.1.0...v7.2.0) (2026-10-19)
+
+
+### Features
+
+* check lanes that pass or fail on a command's exit code ([c01d21b](https://github.com/cubicecho/telos/commit/c01d21b2720dba2152d4eab42217e9f68f203192)), closes [#106](https://github.com/cubicecho/telos/issues/106)
+
 # [7.1.0](https://github.com/cubicecho/telos/compare/v7.0.0...v7.1.0) (2026-10-18)
 
 
