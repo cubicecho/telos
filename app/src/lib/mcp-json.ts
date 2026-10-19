@@ -10,31 +10,40 @@ import { slugRule } from '@/lib/mcp-servers';
 // A pasted `.mcp.json` as rows to create. The reading and the checking are the
 // pool's (`fromMcpServersJson`, `validateServerConfig`, `validateServers`), the
 // same code the runner connects with. This file only maps those rows onto
-// telos's: the slug rule an account's servers keep, and headers and env split
-// off as secrets, which no create mutation carries.
+// telos's: the slug rule an account's servers keep, headers split off as
+// secrets, which no create mutation carries, and stdio servers listed as what
+// telos does not run.
 
-/** A header or environment variable a pasted server comes with, set once the row exists. */
+/** A header a pasted server comes with, set once the row exists. */
 export interface McpServerSecret {
   kind: McpSecretKind;
   name: string;
   value: string;
 }
 
+/** What a create of a pasted server sends. */
+type PastedValues = Omit<CreateMcpServerInput, 'id'>;
+
 /** One server found in a paste. */
 export interface PastedServer {
   /** Its key in the paste, which becomes its slug. */
   key: string;
-  /** Whether the runner would start it as a process, rather than reach a URL. */
+  /** Whether it is a command to start (stdio), which telos does not run. */
   stdio: boolean;
-  /** What the create sends: everything but the secrets. */
-  values: Omit<CreateMcpServerInput, 'id'>;
-  /** Its headers or env, for `setMcpServerSecret` after the create. */
+  /** What it reaches: its URL, or for a stdio server the command line it gives. */
+  target: string;
+  /** What the create sends: everything but the secrets. Null for a stdio server, which is never created. */
+  values: PastedValues | null;
+  /** Its headers, for `setMcpServerSecret` after the create. */
   secrets: McpServerSecret[];
   /** Why it cannot be added. Empty means it can. */
   errors: string[];
   /** What it would be added without: a secret whose value is still a `${VAR}` placeholder. */
   warnings: string[];
 }
+
+/** A pasted server that can be added: no errors, and so values to create. */
+export type AddableServer = PastedServer & { values: PastedValues };
 
 /** What a paste holds. */
 export interface PastedServers {
@@ -46,19 +55,14 @@ export interface PastedServers {
 export interface ReadMcpJsonOptions {
   /** The slugs the account's servers already have. */
   taken: string[];
-  /**
-   * Whether a command the runner would spawn may be added. Off, a stdio server
-   * is listed with the reason it is not offered, so adding one is a choice made
-   * on purpose rather than a side effect of pasting a whole file.
-   */
-  allowStdio: boolean;
 }
 
 const PLACEHOLDER = /\$\{[A-Za-z_][A-Za-z0-9_]*(?::-[^}]*)?\}/;
 const NAMESPACE_ERROR = 'cannot namespace tool names';
 
-/** Said on a stdio server while commands are not allowed. */
-export const STDIO_REFUSED = 'Starts a command on the runner’s host. Allow commands to add it.';
+/** Said on a stdio server, which is listed so that a paste of a whole file says what it left out. */
+export const STDIO_UNSUPPORTED =
+  'Not supported: this is a command (stdio) server, and telos only reaches MCP servers at a URL. Use its HTTP endpoint, if it has one.';
 
 /**
  * The servers a pasted `mcpServers` block describes, checked against the
@@ -70,10 +74,10 @@ export const STDIO_REFUSED = 'Starts a command on the runner’s host. Allow com
  * by hand rather than stored as the literal text.
  *
  * @param text - What was pasted.
- * @param options - The account's slugs, and whether commands may be added.
+ * @param options - The account's slugs.
  * @returns The servers in the order the paste lists them, or why none could be read.
  */
-export function readMcpJson(text: string, { taken, allowStdio }: ReadMcpJsonOptions): PastedServers {
+export function readMcpJson(text: string, { taken }: ReadMcpJsonOptions): PastedServers {
   if (text.trim() === '') return { servers: [], error: null };
   let rows: McpServerConfig[];
   try {
@@ -82,7 +86,17 @@ export function readMcpJson(text: string, { taken, allowStdio }: ReadMcpJsonOpti
     return { servers: [], error: cause instanceof Error ? cause.message : String(cause) };
   }
   const setErrors = listErrors(rows);
-  return { servers: rows.map((row) => toPasted(row, taken, allowStdio, setErrors.get(row.id) ?? [])), error: null };
+  return { servers: rows.map((row) => toPasted(row, taken, setErrors.get(row.id) ?? [])), error: null };
+}
+
+/**
+ * Whether a pasted server can be added: it has no errors, and so values to create.
+ *
+ * @param server - One server from `readMcpJson`.
+ * @returns Whether it can.
+ */
+export function isAddable(server: PastedServer): server is AddableServer {
+  return server.errors.length === 0 && server.values !== null;
 }
 
 /**
@@ -102,42 +116,36 @@ function listErrors(rows: McpServerConfig[]): Map<string, string[]> {
   return byRow;
 }
 
-function toPasted(row: McpServerConfig, taken: string[], allowStdio: boolean, setErrors: string[]): PastedServer {
+function toPasted(row: McpServerConfig, taken: string[], setErrors: string[]): PastedServer {
+  if (row.transport === 'stdio') {
+    // Nothing else about it matters: no fix to it would make it one telos runs.
+    const target = [row.command, ...(row.args ?? [])].join(' ').trim();
+    return { key: row.id, stdio: true, target, values: null, secrets: [], errors: [STDIO_UNSUPPORTED], warnings: [] };
+  }
   const slugError = slugRule(taken)({ value: row.id });
   const own = validateServerConfig(row).filter((error) => !(slugError && error.includes(NAMESPACE_ERROR)));
   const errors = [...(slugError ? [slugError] : []), ...own, ...setErrors];
-  const stdio = row.transport === 'stdio';
-  if (stdio && !allowStdio) errors.push(STDIO_REFUSED);
 
-  const pairs: [McpSecretKind, Record<string, string> | null | undefined][] = stdio
-    ? [[McpSecretKind.Env, row.env]]
-    : [[McpSecretKind.Header, row.transport === 'http' ? row.headers : null]];
   const secrets: McpServerSecret[] = [];
   const warnings: string[] = [];
-  for (const [kind, record] of pairs) {
-    for (const [name, value] of Object.entries(record ?? {})) {
-      if (typeof value === 'string' && PLACEHOLDER.test(value)) {
-        warnings.push(`${name} is still ${value}: set it under Secrets once it is added.`);
-      } else if (typeof value === 'string') {
-        secrets.push({ kind, name, value });
-      }
+  for (const [name, value] of Object.entries(row.headers ?? {})) {
+    if (typeof value === 'string' && PLACEHOLDER.test(value)) {
+      warnings.push(`${name} is still ${value}: set it under Secrets once it is added.`);
+    } else if (typeof value === 'string') {
+      secrets.push({ kind: McpSecretKind.Header, name, value });
     }
   }
 
-  return { key: row.id, stdio, values: toValues(row), secrets, errors, warnings };
+  return { key: row.id, stdio: false, target: row.url, values: toValues(row), secrets, errors, warnings };
 }
 
-/** The create's values for a pool row: its connection, and the defaults for what a paste cannot say. */
-function toValues(row: McpServerConfig): Omit<CreateMcpServerInput, 'id'> {
-  const stdio = row.transport === 'stdio';
+/** The create's values for a pool row: its URL, and the defaults for what a paste cannot say. */
+function toValues(row: Extract<McpServerConfig, { transport: 'http' }>): PastedValues {
   return {
     slug: row.id,
     name: row.label || row.id,
     enabled: row.enabled,
-    url: stdio ? null : row.url,
-    command: stdio ? row.command : null,
-    args: stdio ? (row.args ?? []) : [],
-    cwd: stdio ? (row.cwd ?? null) : null,
+    url: row.url,
     connectTimeoutMs: null,
     callTimeoutMs: null,
     idleTimeoutMs: null,

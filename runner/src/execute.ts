@@ -180,7 +180,8 @@ export class EventFeed {
 export interface ExecuteOptions {
   telos: Telos;
   telosUrl: string;
-  allowStdio: boolean;
+  /** Whether a check lane's command may run here (RUNNER_ALLOW_CHECKS). */
+  allowChecks: boolean;
   heartbeatMs?: number;
   /** Stops the run from outside, as a shutdown does. */
   signal?: AbortSignal;
@@ -273,7 +274,6 @@ export async function execute(claim: Claim, options: ExecuteOptions): Promise<Ru
       }
       pool = await (options.open ?? openTools)(agentClaim, {
         telosUrl: options.telosUrl,
-        allowStdio: options.allowStdio,
         onNotice: (text) => {
           feed.push({ kind: 'notice', text });
           log(text);
@@ -330,9 +330,9 @@ async function check(
   options: ExecuteOptions,
   run: { signal: AbortSignal; feed: EventFeed },
 ): Promise<RunResult> {
-  // A user's shell command on this host is the same risk as a stdio MCP
-  // server, so it runs only where those may.
-  if (!options.allowStdio) throw new Error(CHECKS_OFF);
+  // A user's shell command on this host, with this process's rights: only
+  // where the host has said every user with AI on may run one.
+  if (!options.allowChecks) throw new Error(CHECKS_OFF);
   run.feed.push({ kind: 'notice', name: 'check', text: `Running ${claimed.command}` });
   const outcome = await runCheck(claimed, { ...options.checks, signal: run.signal });
   if (run.signal.aborted) throw run.signal.reason;

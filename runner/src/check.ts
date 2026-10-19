@@ -13,7 +13,7 @@ import type { CheckResult, ClaimedCheck } from './telos.ts';
 /** Why a check is refused on a runner that does not run users' commands. */
 export const CHECKS_OFF =
   'This runner does not run check commands. A check is a shell command on the runner’s host, ' +
-  'so it runs only where RUNNER_ALLOW_STDIO=true says every user with AI on may run one.';
+  'so it runs only where RUNNER_ALLOW_CHECKS=true says every user with AI on may run one.';
 
 export interface CheckOptions {
   /** Stops the command: telos asked, or the runner is shutting down. */

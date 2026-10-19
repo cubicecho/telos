@@ -12,12 +12,12 @@ export interface RunnerConfig {
   /** The most runs this process works at once, across every user. */
   concurrency: number;
   /**
-   * Whether an agent may name an MCP server to spawn as a command, and a check
-   * lane may run its command. Off by default: agents and lanes belong to the
-   * board's users, and a command runs on this host with this process's rights.
-   * Turn it on only when every user with AI on is someone you would hand a shell.
+   * Whether a check lane may run its command. Off by default: lanes belong to
+   * the board's users, and a check is a line of shell on this host with this
+   * process's rights. Turn it on only when every user with AI on is someone you
+   * would hand a shell.
    */
-  allowStdio: boolean;
+  allowChecks: boolean;
 }
 
 /**
@@ -35,6 +35,30 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env): RunnerConfig |
     runnerKey,
     pollMs: Math.max(1, Number(env.RUNNER_POLL_SECONDS) || 5) * 1000,
     concurrency: Math.max(1, Number(env.RUNNER_CONCURRENCY) || 2),
-    allowStdio: env.RUNNER_ALLOW_STDIO === 'true',
+    allowChecks: env.RUNNER_ALLOW_CHECKS === 'true',
   };
+}
+
+/**
+ * What the runner says about its settings as it starts: a switch that lets
+ * users run commands here, and a setting it no longer reads. Neither stops it.
+ * An old `RUNNER_ALLOW_STDIO` is said rather than refused, since a compose file
+ * of an earlier release sets it (to false) whether or not anyone chose to.
+ *
+ * @param config The settings read.
+ * @param env The environment they were read from.
+ * @returns One line for each, to warn with.
+ */
+export function configWarnings(config: RunnerConfig, env: NodeJS.ProcessEnv = process.env): string[] {
+  const warnings: string[] = [];
+  if (env.RUNNER_ALLOW_STDIO?.trim()) {
+    warnings.push(
+      '⚠️  RUNNER_ALLOW_STDIO is no longer read: telos does not run stdio MCP servers, only ones at a URL. ' +
+        'Check lanes have their own switch, RUNNER_ALLOW_CHECKS. Remove RUNNER_ALLOW_STDIO.',
+    );
+  }
+  if (config.allowChecks) {
+    warnings.push('⚠️  RUNNER_ALLOW_CHECKS is on: check lanes may run shell commands on this host.');
+  }
+  return warnings;
 }

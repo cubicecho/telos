@@ -25,9 +25,6 @@ const SERVER = {
   slug: 'docs',
   name: 'Docs',
   url: 'http://localhost:8080/mcp',
-  command: null,
-  args: [],
-  cwd: null,
   connectTimeoutMs: null,
   callTimeoutMs: null,
   idleTimeoutMs: null,
@@ -39,7 +36,6 @@ const SERVER = {
   checkError: null,
   tools: [],
   headerNames: [],
-  envNames: [],
 };
 
 const AGENT = {
@@ -125,10 +121,7 @@ describe('McpServerManager', () => {
       id: 'id-1',
       slug: 'files',
       name: 'Files',
-      url: null,
-      command: 'npx',
-      args: ['-y', 'files-mcp'],
-      cwd: '/srv/files',
+      url: 'https://files.example/mcp',
       connectTimeoutMs: 120_000,
       callTimeoutMs: null,
       idleTimeoutMs: 0,
@@ -147,9 +140,8 @@ describe('McpServerManager', () => {
     await user.click(screen.getByRole('button', { name: 'New server' }));
     await user.type(screen.getByLabelText('Name'), 'Files');
     await user.type(screen.getByLabelText('Slug'), 'files');
-    await user.type(screen.getByLabelText('Or a command (stdio)'), 'npx');
-    await user.type(screen.getByLabelText('Arguments'), '-y\nfiles-mcp');
-    await user.type(screen.getByLabelText('Working directory'), '/srv/files');
+    expect(screen.queryByLabelText(/command/i)).not.toBeInTheDocument();
+    await user.type(screen.getByLabelText('URL'), 'https://files.example/mcp');
     await user.type(screen.getByLabelText('Connect (s)'), '120');
     await user.type(screen.getByLabelText('Idle (s)'), '0');
     await user.type(screen.getByLabelText('Hidden tools'), 'recall');
@@ -161,7 +153,7 @@ describe('McpServerManager', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
 
-  it('will not save a slug another server has, telos’s own, or a server with nowhere to reach', async () => {
+  it('will not save a slug another server has, telos’s own, or a server without a URL', async () => {
     const user = userEvent.setup();
     manager([servers([SERVER]), agents([])]);
 
@@ -175,7 +167,9 @@ describe('McpServerManager', () => {
     await user.type(screen.getByLabelText('Slug'), 'files');
     await user.click(screen.getByRole('button', { name: 'Create server' }));
 
-    expect(await screen.findByText('A server needs a URL or a command.')).toBeInTheDocument();
+    expect(await screen.findByText('A server needs a URL.')).toBeInTheDocument();
+    await user.type(screen.getByLabelText('URL'), 'npx files-mcp');
+    expect(await screen.findByText('An http or https URL.')).toBeInTheDocument();
     await user.type(screen.getByLabelText('Connect (s)'), '0');
     expect(await screen.findByText('More than 0.')).toBeInTheDocument();
     expect(screen.getByRole('dialog')).toBeInTheDocument();
@@ -207,10 +201,10 @@ describe('McpServerManager', () => {
   it('sets and removes secrets by name, never showing a value', async () => {
     const user = userEvent.setup();
     const set = vi.fn(() => ({
-      data: { setMcpServerSecret: { __typename: 'McpServer', id: 's1', headerNames: ['Authorization'], envNames: [] } },
+      data: { setMcpServerSecret: { __typename: 'McpServer', id: 's1', headerNames: ['Authorization'] } },
     }));
     const remove = vi.fn(() => ({
-      data: { setMcpServerSecret: { __typename: 'McpServer', id: 's1', headerNames: [], envNames: [] } },
+      data: { setMcpServerSecret: { __typename: 'McpServer', id: 's1', headerNames: [] } },
     }));
     manager([
       servers([SERVER]),
@@ -233,7 +227,8 @@ describe('McpServerManager', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Secrets' }));
     expect(screen.getByText('None set.')).toBeInTheDocument();
-    await user.type(screen.getByLabelText('Name'), 'Authorization');
+    expect(screen.queryByLabelText('Kind')).not.toBeInTheDocument();
+    await user.type(screen.getByLabelText('Header'), 'Authorization');
     await user.type(screen.getByLabelText('Value'), 'Bearer abc');
     await user.click(screen.getByRole('button', { name: 'Set secret' }));
 
@@ -299,53 +294,36 @@ describe('McpServerManager', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('connect ECONNREFUSED');
   });
 
-  it('adds the servers a pasted .mcp.json holds, setting headers and env as secrets', async () => {
+  it('adds the servers a pasted .mcp.json holds, setting headers as secrets and listing stdio ones as unsupported', async () => {
     const user = userEvent.setup();
-    const base = { connectTimeoutMs: null, callTimeoutMs: null, idleTimeoutMs: null, hiddenTools: [], hooks: [] };
     const web = {
       id: 'id-1',
       slug: 'web',
       name: 'web',
       enabled: true,
       url: 'https://web.example/mcp',
-      command: null,
-      args: [],
-      cwd: null,
-      ...base,
-    };
-    const files = {
-      id: 'id-1',
-      slug: 'files',
-      name: 'files',
-      enabled: true,
-      url: null,
-      command: 'npx',
-      args: ['files-mcp'],
-      cwd: null,
-      ...base,
+      connectTimeoutMs: null,
+      callTimeoutMs: null,
+      idleTimeoutMs: null,
+      hiddenTools: [],
+      hooks: [],
     };
     const createWeb = vi.fn(() => ({ data: { createMcpServer: { ...SERVER, ...web } } }));
-    const createFiles = vi.fn(() => ({ data: { createMcpServer: { ...SERVER, ...files } } }));
     const header = vi.fn(() => ({
-      data: {
-        setMcpServerSecret: { __typename: 'McpServer', id: 'id-1', headerNames: ['Authorization'], envNames: [] },
-      },
+      data: { setMcpServerSecret: { __typename: 'McpServer', id: 'id-1', headerNames: ['Authorization'] } },
     }));
-    const env = vi.fn(() => ({
-      data: { setMcpServerSecret: { __typename: 'McpServer', id: 'id-1', headerNames: [], envNames: ['TOKEN'] } },
-    }));
-    const secret = (kind: string, name: string, value: string, result: () => unknown) => ({
-      request: { query: SetMcpServerSecretDocument, variables: { id: 'id-1', kind, name, value } },
-      result,
-    });
     manager([
       servers([SERVER]),
       agents([]),
       { request: { query: CreateMcpServerDocument, variables: { values: web } }, result: createWeb },
-      secret('HEADER', 'Authorization', 'Bearer abc', header),
-      { request: { query: CreateMcpServerDocument, variables: { values: files } }, result: createFiles },
-      secret('ENV', 'TOKEN', 't0k', env),
-      servers([SERVER, { ...SERVER, ...web }, { ...SERVER, ...files }]),
+      {
+        request: {
+          query: SetMcpServerSecretDocument,
+          variables: { id: 'id-1', kind: 'HEADER', name: 'Authorization', value: 'Bearer abc' },
+        },
+        result: header,
+      },
+      servers([SERVER, { ...SERVER, ...web }]),
     ]);
 
     await user.click(await screen.findByRole('button', { name: 'Paste .mcp.json' }));
@@ -363,26 +341,22 @@ describe('McpServerManager', () => {
 
     const dialog = screen.getByRole('dialog');
     expect(within(dialog).getByRole('checkbox', { name: 'Add web' })).toBeChecked();
+    // Both commands, `files` and the empty one, are listed as what telos does not run, and cannot be picked.
     expect(within(dialog).getByRole('checkbox', { name: 'Add files' })).toBeDisabled();
-    // Both commands, `files` and the empty one, wait on the switch.
-    expect(
-      within(dialog).getAllByText('Starts a command on the runner’s host. Allow commands to add it.'),
-    ).toHaveLength(2);
+    expect(within(dialog).getByRole('checkbox', { name: 'Add no good' })).toBeDisabled();
+    expect(within(dialog).getAllByText(/^Not supported: this is a command \(stdio\) server/)).toHaveLength(2);
+    expect(within(dialog).getByText('npx files-mcp')).toBeInTheDocument();
     expect(within(dialog).getByRole('checkbox', { name: 'Add docs' })).toBeDisabled();
     expect(within(dialog).getByText('Another of your servers has that slug.')).toBeInTheDocument();
-    expect(within(dialog).getByRole('checkbox', { name: 'Add no good' })).toBeDisabled();
-    expect(within(dialog).getByText('needs a command')).toBeInTheDocument();
-    expect(within(dialog).getByRole('button', { name: 'Add 1 server' })).toBeEnabled();
+    // There is no switch to let a command in.
+    expect(within(dialog).queryByRole('switch')).not.toBeInTheDocument();
 
-    await user.click(within(dialog).getByRole('switch', { name: 'Allow commands (stdio)' }));
-    expect(within(dialog).getByRole('checkbox', { name: 'Add files' })).toBeChecked();
-    await user.click(within(dialog).getByRole('button', { name: 'Add 2 servers' }));
+    expect(within(dialog).getByRole('checkbox', { name: 'Add files' })).not.toBeChecked();
+    await user.click(within(dialog).getByRole('button', { name: 'Add 1 server' }));
 
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-    expect(createWeb).toHaveBeenCalled();
+    expect(createWeb).toHaveBeenCalledTimes(1);
     expect(header).toHaveBeenCalled();
-    expect(createFiles).toHaveBeenCalled();
-    expect(env).toHaveBeenCalled();
   });
 
   it('says which pasted server failed and how far it got, and stays open', async () => {
@@ -393,9 +367,6 @@ describe('McpServerManager', () => {
       name: 'web',
       enabled: true,
       url: 'https://web.example/mcp',
-      command: null,
-      args: [],
-      cwd: null,
       connectTimeoutMs: null,
       callTimeoutMs: null,
       idleTimeoutMs: null,

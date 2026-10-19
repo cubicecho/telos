@@ -1,4 +1,4 @@
-import { readConfig } from './config.ts';
+import { configWarnings, readConfig } from './config.ts';
 import { runLoop } from './loop.ts';
 import { createTelos } from './telos.ts';
 
@@ -30,7 +30,6 @@ for (const signal of ['SIGTERM', 'SIGINT'] as const) {
 }
 
 console.log(`🤖 Telos runner working ${config.telosUrl}, ${config.concurrency} at a time`);
-if (config.allowStdio)
-  console.warn('⚠️  RUNNER_ALLOW_STDIO is on: agents and check lanes may run commands on this host.');
+for (const warning of configWarnings(config)) console.warn(warning);
 await runLoop({ ...config, telos }, stop.signal);
 process.exit(0);

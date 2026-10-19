@@ -105,11 +105,11 @@ export function createSchema(db: DB, options: SchemaOptions) {
     // Nor does the instance's settings row, which belongs to no user.
     //
     // An agent's API key is write-only: `setAgentApiKey` stores it and only
-    // the runner's `claimRun` reads it back. An MCP server's headers and env
+    // the runner's `claimRun` reads it back. An MCP server's headers
     // are the same, through `setMcpServerSecret`. With AI off, the agent
     // machinery is not in the schema at all.
     exclude: options.ai
-      ? { tables: [...AUTH_TABLES, ...SERVER_TABLES], columns: { agents: ['apiKey'], mcpServers: ['headers', 'env'] } }
+      ? { tables: [...AUTH_TABLES, ...SERVER_TABLES], columns: { agents: ['apiKey'], mcpServers: ['headers'] } }
       : { tables: [...AUTH_TABLES, ...SERVER_TABLES, ...AI_TABLES], columns: { lanes: AI_LANE_COLUMNS } },
   });
 

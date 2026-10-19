@@ -56,12 +56,12 @@ export async function runLoop(options: LoopOptions, signal: AbortSignal): Promis
   const log = options.log ?? console.log;
   while (!signal.aborted) {
     try {
-      await takeTests(options.telos, options.allowStdio, log);
+      await takeTests(options.telos, log);
     } catch (error) {
       log(`[runner] asking telos for MCP tests failed: ${error instanceof Error ? error.message : String(error)}`);
     }
     try {
-      await takeSessionDeletes(options.telos, options.allowStdio, log);
+      await takeSessionDeletes(options.telos, log);
     } catch (error) {
       log(
         `[runner] asking telos for deleted sessions failed: ${error instanceof Error ? error.message : String(error)}`,

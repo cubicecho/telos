@@ -1,6 +1,6 @@
 import { probe } from '@cubicecho/agent-mcp-pool';
 import type { ProbeResult, RunnerProbe, Telos } from './telos.ts';
-import { readServers, serverConfig } from './tools.ts';
+import { readServers, serverConfig, unreachable } from './tools.ts';
 
 // "Test this MCP server" from the account's list of them, made here: the runner is where
 // an agent's tools are reached from, so a server that answers the runner is
@@ -13,28 +13,15 @@ export const PROBE_TIMEOUT_MS = 10_000;
  * Connects to one server, lists its tools and hangs up.
  *
  * @param test The test telos handed over.
- * @param allowStdio Whether commands may be spawned.
  * @param dial Makes the connection; `probe` unless a test says otherwise.
  * @returns What was found.
  */
-export async function testServer(
-  test: RunnerProbe,
-  allowStdio: boolean,
-  dial: typeof probe = probe,
-): Promise<ProbeResult> {
+export async function testServer(test: RunnerProbe, dial: typeof probe = probe): Promise<ProbeResult> {
   const [row] = readServers(`[${test.server}]`);
   if (!row) return { ok: false, tools: [], error: 'The server row could not be read.' };
   const notices: string[] = [];
-  const config = serverConfig(row, allowStdio, (text) => notices.push(text));
-  if (!config) {
-    return {
-      ok: false,
-      tools: [],
-      error: row.command
-        ? 'This runner does not run commands: its host has not set RUNNER_ALLOW_STDIO.'
-        : 'The server has no URL or command this runner can use.',
-    };
-  }
+  const config = serverConfig(row, (text) => notices.push(text));
+  if (!config) return { ok: false, tools: [], error: unreachable(row) };
   // A server given longer to connect is given it here too, or one slow to start
   // would fail every test and still work in a run.
   const found = await dial(config, 'telos-runner', { timeoutMs: config.connectTimeoutMs ?? PROBE_TIMEOUT_MS });
@@ -51,19 +38,17 @@ export async function testServer(
  * Nothing waits on them: a test must not hold up the board's work.
  *
  * @param telos The runner's client.
- * @param allowStdio Whether commands may be spawned.
  * @param log Told when a report does not reach telos.
  * @param dial Makes the connection.
  * @returns The tests under way.
  */
 export async function takeTests(
   telos: Telos,
-  allowStdio: boolean,
   log: (text: string) => void,
   dial: typeof probe = probe,
 ): Promise<Array<Promise<void>>> {
   return (await telos.probes()).map((test) =>
-    testServer(test, allowStdio, dial)
+    testServer(test, dial)
       .then((result) => telos.finishProbe(test.id, result))
       .catch((error) =>
         log(`[runner] reporting an MCP test failed: ${error instanceof Error ? error.message : String(error)}`),

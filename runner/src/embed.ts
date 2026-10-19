@@ -1,4 +1,4 @@
-import { readConfig } from './config.ts';
+import { configWarnings, readConfig } from './config.ts';
 import { runLoop } from './loop.ts';
 import { createTelos } from './telos.ts';
 
@@ -17,20 +17,16 @@ export interface EmbeddedRunner {
  *
  * @param options.telosUrl Where the server is listening.
  * @param options.runnerKey The key the server accepts as x-runner-key.
- * @param options.env Where the tuning settings (concurrency, poll, stdio) are read from.
+ * @param options.env Where the tuning settings (concurrency, poll, checks) are read from.
  * @returns A handle to stop it.
  */
 export function startRunner(options: { telosUrl: string; runnerKey: string; env?: NodeJS.ProcessEnv }): EmbeddedRunner {
-  const config = readConfig({
-    ...(options.env ?? process.env),
-    TELOS_URL: options.telosUrl,
-    RUNNER_KEY: options.runnerKey,
-  });
+  const env = options.env ?? process.env;
+  const config = readConfig({ ...env, TELOS_URL: options.telosUrl, RUNNER_KEY: options.runnerKey });
   // readConfig is only null without a key, and one was just given.
   if (!config) throw new Error('startRunner needs a runner key');
   const abort = new AbortController();
-  if (config.allowStdio)
-    console.warn('⚠️  RUNNER_ALLOW_STDIO is on: agents and check lanes may run commands on this host.');
+  for (const warning of configWarnings(config, env)) console.warn(warning);
   const done = runLoop({ ...config, telos: createTelos(config) }, abort.signal);
   return {
     stop() {

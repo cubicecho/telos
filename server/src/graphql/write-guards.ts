@@ -392,7 +392,7 @@ const isStrings = (value: unknown) => Array.isArray(value) && value.every((entry
  */
 async function assertServersSound(tx: DB, userId: string, rows: Row[], inserting: boolean): Promise<void> {
   for (const row of rows) {
-    const { slug, url, command } = row;
+    const { slug, url } = row;
     if ('slug' in row) {
       if (typeof slug !== 'string' || slug.length > SLUG_CHARS || SERVER_SLUG.test(slug) === false) {
         throw badServer('A slug is letters, digits, dashes and underscores, such as "docs": tools are named under it.');
@@ -401,25 +401,22 @@ async function assertServersSound(tx: DB, userId: string, rows: Row[], inserting
         throw badServer(`"${TELOS_SLUG}" is the board's own tools, which every agent has. Pick another slug.`);
       }
     }
-    if (typeof url === 'string') {
+    // A URL is the only way to reach a server: telos does not spawn stdio
+    // servers, so there is no command to give instead.
+    if (inserting || 'url' in row) {
+      if (typeof url !== 'string' || url.trim() === '') {
+        throw badServer('An MCP server needs a URL. Telos reaches servers over HTTP, and does not run stdio ones.');
+      }
       const protocol = URL.canParse(url) ? new URL(url).protocol : '';
       if (protocol !== 'http:' && protocol !== 'https:') {
         throw badServer('The URL must be http or https.');
       }
     }
-    if (inserting && typeof url !== 'string' && (typeof command !== 'string' || command.trim() === '')) {
-      throw badServer('Give the server a URL or a command.');
-    }
-    for (const key of ['args', 'hiddenTools']) {
-      if (key in row && isStrings(row[key]) === false) {
-        throw badServer(`${key} is a list of strings.`);
-      }
+    if ('hiddenTools' in row && isStrings(row.hiddenTools) === false) {
+      throw badServer('hiddenTools is a list of strings.');
     }
     if ('hooks' in row && Array.isArray(row.hooks) === false) {
       throw badServer('hooks is a list.');
-    }
-    if ('cwd' in row && row.cwd !== null && (typeof row.cwd !== 'string' || row.cwd.trim() === '')) {
-      throw badServer("A working directory is a path, or null for the runner's own.");
     }
     for (const [key, least] of [
       ['connectTimeoutMs', 1],

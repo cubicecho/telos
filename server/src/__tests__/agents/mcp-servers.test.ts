@@ -12,25 +12,25 @@ import { type Board, createBoard, FINISH, runnerClient } from '../board.ts';
 import { createClient, createTestDb, type TestClient, type TestDb } from '../helpers.ts';
 
 // The account's MCP servers: one row per server however many agents use it,
-// an agent naming the ones it may reach by slug, and the headers and env kept
-// where only the runner reads them.
+// an agent naming the ones it may reach by slug, and the headers kept where
+// only the runner reads them. Every server is a URL: telos runs no stdio ones.
 
 let db: TestDb;
 let board: Board;
 let runner: TestClient;
 
 const CREATE = `mutation ($values: CreateMcpServerInput!) {
-  createMcpServer(values: $values) { id slug name url command args hiddenTools hooks enabled headerNames envNames }
+  createMcpServer(values: $values) { id slug name url hiddenTools hooks enabled headerNames }
 }`;
 const UPDATE = `mutation ($id: UUID!, $set: UpdateMcpServerInput!) {
   updateMcpServer(set: $set, where: { id: { eq: $id } }) { id slug enabled }
 }`;
 const DELETE = `mutation ($id: UUID!) { deleteMcpServer(where: { id: { eq: $id } }) { id } }`;
 const LIST = `query {
-  mcpServers(orderBy: { slug: { direction: asc, priority: 1 } }) { id slug headerNames envNames }
+  mcpServers(orderBy: { slug: { direction: asc, priority: 1 } }) { id slug headerNames }
 }`;
 const SECRET = `mutation ($id: ID!, $kind: McpSecretKind!, $name: String!, $value: String) {
-  setMcpServerSecret(id: $id, kind: $kind, name: $name, value: $value) { id headerNames envNames }
+  setMcpServerSecret(id: $id, kind: $kind, name: $name, value: $value) { id headerNames }
 }`;
 const SET_AGENT = `mutation ($id: UUID!, $set: UpdateAgentInput!) {
   updateAgent(set: $set, where: { id: { eq: $id } }) { id mcpServerSlugs }
@@ -64,32 +64,37 @@ async function nameServers(slugs: string[] | null): Promise<void> {
 
 describe('the registry', () => {
   it('keeps a server, and shows the names of its secrets but never the values', async () => {
-    const id = await addServer('docs', { args: [], hiddenTools: ['forget'] });
-    await board.person.expectOk(SECRET, { id, kind: 'HEADER', name: 'Authorization', value: 'Bearer s3' });
+    const id = await addServer('docs', { hiddenTools: ['forget'] });
+    await board.person.expectOk(SECRET, { id, kind: 'HEADER', name: 'X-Team', value: 'core' });
     const { setMcpServerSecret } = await board.person.expectOk(SECRET, {
       id,
-      kind: 'ENV',
-      name: 'API_TOKEN',
-      value: 't0p',
+      kind: 'HEADER',
+      name: 'Authorization',
+      value: 'Bearer s3',
     });
-    expect(setMcpServerSecret).toEqual({ id, headerNames: ['Authorization'], envNames: ['API_TOKEN'] });
+    expect(setMcpServerSecret).toEqual({ id, headerNames: ['Authorization', 'X-Team'] });
     expect((await board.person.expectOk(LIST)).mcpServers).toEqual([
-      { id, slug: 'docs', headerNames: ['Authorization'], envNames: ['API_TOKEN'] },
+      { id, slug: 'docs', headerNames: ['Authorization', 'X-Team'] },
     ]);
 
-    // Neither column is in the schema to ask for, or to state on a write.
-    for (const field of ['headers', 'env']) {
-      const read = await board.person.run(`query { mcpServers { ${field} } }`);
-      expect(read.errors?.[0]?.message).toMatch(/Cannot query field/);
-      const written = await board.person.run(UPDATE, { id, set: { [field]: { A: 'b' } } });
-      expect(written.errors?.[0]?.message).toMatch(/not defined/);
-    }
+    // The column is not in the schema to ask for, or to state on a write.
+    const read = await board.person.run('query { mcpServers { headers } }');
+    expect(read.errors?.[0]?.message).toMatch(/Cannot query field/);
+    const written = await board.person.run(UPDATE, { id, set: { headers: { A: 'b' } } });
+    expect(written.errors?.[0]?.message).toMatch(/not defined/);
 
     // A null value takes one away.
     await board.person.expectOk(SECRET, { id, kind: 'HEADER', name: 'Authorization', value: null });
     const [row] = await db.select().from(dbSchema.mcpServers).where(eq(dbSchema.mcpServers.id, id));
-    expect(row.headers).toEqual({});
-    expect(row.env).toEqual({ API_TOKEN: 't0p' });
+    expect(row.headers).toEqual({ 'X-Team': 'core' });
+  });
+
+  it('keeps no environment variables, since it runs no commands', async () => {
+    const id = await addServer('docs');
+    const env = await board.person.run(SECRET, { id, kind: 'ENV', name: 'API_TOKEN', value: 't0p' });
+    expect(env.errors?.[0]?.message).toMatch(/does not exist in "McpSecretKind" enum/);
+    const names = await board.person.run('query { mcpServers { envNames } }');
+    expect(names.errors?.[0]?.message).toMatch(/Cannot query field/);
   });
 
   it('refuses a secret whose name could not be sent', async () => {
@@ -97,8 +102,7 @@ describe('the registry', () => {
     for (const [kind, name] of [
       ['HEADER', 'Bad Name'],
       ['HEADER', ''],
-      ['ENV', '1TOKEN'],
-      ['ENV', 'API-TOKEN'],
+      ['HEADER', 'X:Key'],
     ]) {
       expect((await board.person.expectError(SECRET, { id, kind, name, value: 'x' })).code).toBe('BAD_USER_INPUT');
     }
@@ -110,14 +114,26 @@ describe('the registry', () => {
     expect((await refused({ slug: 'my docs' })).message).toMatch(/slug is letters/);
     expect((await refused({ slug: 'telos' })).message).toMatch(/board's own tools/);
     expect((await refused({ url: 'file:///etc/passwd' })).message).toMatch(/http or https/);
-    expect((await refused({ url: null })).message).toMatch(/URL or a command/);
-    expect((await refused({ args: [1] })).message).toMatch(/list of strings/);
-    expect((await refused({ cwd: ' ' })).message).toMatch(/working directory is a path/);
+    expect((await refused({ url: ' ' })).message).toMatch(/needs a URL/);
+    // Without one at all, the API itself refuses it: a URL is required.
+    expect((await refused({ url: undefined })).message).toMatch(/"url" of required type "String!" was not provided/);
+    expect((await refused({ url: null })).message).toMatch(/not to be null/);
+    expect((await refused({ hiddenTools: [1] })).message).toMatch(/list of strings/);
     expect((await refused({ connectTimeoutMs: 0 })).message).toMatch(/connectTimeoutMs is a whole number/);
     expect((await refused({ callTimeoutMs: -5 })).message).toMatch(/callTimeoutMs is a whole number/);
     expect((await refused({ idleTimeoutMs: -1 })).message).toMatch(/idleTimeoutMs is a whole number/);
     await addServer('docs');
     expect((await refused({})).message).toMatch(/already have an MCP server with the slug "docs"/);
+  });
+
+  it('refuses a command where a server is given, and an edit that takes its URL away', async () => {
+    const stdio = await board.person.run(CREATE, {
+      values: { slug: 'files', name: 'Files', url: 'http://files.test/mcp', command: 'npx' },
+    });
+    expect(stdio.errors?.[0]?.message).toMatch(/"command" is not defined/);
+    const id = await addServer('docs');
+    expect((await board.person.expectError(UPDATE, { id, set: { url: null } })).message).toMatch(/needs a URL/);
+    expect((await board.person.expectError(UPDATE, { id, set: { url: '' } })).message).toMatch(/needs a URL/);
   });
 
   it("is the owner's alone, and not for AI to read or write", async () => {
@@ -126,7 +142,9 @@ describe('the registry', () => {
     expect((await other.person.expectOk(LIST)).mcpServers).toEqual([]);
     expect((await other.person.expectOk(UPDATE, { id, set: { enabled: false } })).updateMcpServer).toBeNull();
     expect((await other.person.expectOk(DELETE, { id })).deleteMcpServer).toBeNull();
-    expect((await other.person.expectError(SECRET, { id, kind: 'ENV', name: 'A', value: 'b' })).code).toBe('NOT_FOUND');
+    expect((await other.person.expectError(SECRET, { id, kind: 'HEADER', name: 'A', value: 'b' })).code).toBe(
+      'NOT_FOUND',
+    );
     // The same slug is free in another account.
     await other.person.expectOk(CREATE, { values: { slug: 'docs', name: 'Docs', url: 'http://docs.test' } });
 
@@ -136,8 +154,8 @@ describe('the registry', () => {
     });
     expect((await key.expectOk(LIST)).mcpServers).toEqual([]);
     expect((await key.expectError(UPDATE, { id, set: { enabled: false } })).code).toBe('FORBIDDEN');
-    expect((await key.expectError(SECRET, { id, kind: 'ENV', name: 'A', value: 'b' })).code).toBe('FORBIDDEN');
-    expect((await runner.expectError(SECRET, { id, kind: 'ENV', name: 'A', value: 'b' })).code).toBe('FORBIDDEN');
+    expect((await key.expectError(SECRET, { id, kind: 'HEADER', name: 'A', value: 'b' })).code).toBe('FORBIDDEN');
+    expect((await runner.expectError(SECRET, { id, kind: 'HEADER', name: 'A', value: 'b' })).code).toBe('FORBIDDEN');
   });
 
   it('does not let a client say what a test found', async () => {
@@ -152,7 +170,7 @@ describe("an agent's servers", () => {
   beforeEach(async () => {
     await addServer('zeta');
     await addServer('alpha', { hooks: [{ id: 'recall', on: 'beforeTurn', tool: 'recall' }] });
-    await addServer('mid', { url: null, command: 'npx', args: ['-y', 'mid-server'] });
+    await addServer('mid');
   });
 
   it('are every server when it names none, in slug order, with their secrets', async () => {
@@ -167,20 +185,18 @@ describe("an agent's servers", () => {
         headers: { 'X-Key': 's3' },
         hooks: [{ id: 'recall', on: 'beforeTurn', tool: 'recall' }],
       },
-      { id: 'mid', name: 'mid', command: 'npx', args: ['-y', 'mid-server'] },
+      { id: 'mid', name: 'mid', url: 'http://mid.test/mcp' },
       { id: 'zeta', name: 'zeta', url: 'http://zeta.test/mcp' },
     ]);
     expect(notices).toEqual([]);
   });
 
-  it('carry where a command runs and how long a server is given, when those are set', async () => {
+  it('carry how long a server is given, when that is set', async () => {
     const [mid] = await db.select().from(dbSchema.mcpServers).where(eq(dbSchema.mcpServers.slug, 'mid'));
-    const set = { cwd: '/srv/mid', connectTimeoutMs: 120_000, callTimeoutMs: 90_000, idleTimeoutMs: 0 };
+    const set = { connectTimeoutMs: 120_000, callTimeoutMs: 90_000, idleTimeoutMs: 0 };
     await board.person.expectOk(UPDATE, { id: mid.id, set });
     await nameServers(['mid']);
-    expect((await claimed()).servers).toEqual([
-      { id: 'mid', name: 'mid', command: 'npx', args: ['-y', 'mid-server'], ...set },
-    ]);
+    expect((await claimed()).servers).toEqual([{ id: 'mid', name: 'mid', url: 'http://mid.test/mcp', ...set }]);
   });
 
   it('are none when its list is empty', async () => {
@@ -233,94 +249,161 @@ describe("an agent's servers", () => {
   });
 });
 
-describe('the migration', () => {
+describe('the migrations', () => {
   const drizzleFolder = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../../db/drizzle');
+  const folders = readdirSync(drizzleFolder).sort();
+
+  /** Applies the migrations before the one named by `suffix`, or all of them without one. */
+  async function migrateUpTo(old: ReturnType<typeof drizzle>, suffix?: string): Promise<void> {
+    const at = suffix ? folders.findIndex((folder) => folder.endsWith(suffix)) : folders.length;
+    expect(at).toBeGreaterThan(0);
+    const some = mkdtempSync(path.join(tmpdir(), 'telos-migrations-'));
+    try {
+      for (const folder of folders.slice(0, at)) {
+        cpSync(path.join(drizzleFolder, folder), path.join(some, folder), { recursive: true });
+      }
+      await migrate(old as never, { migrationsFolder: some });
+    } finally {
+      rmSync(some, { recursive: true, force: true });
+    }
+  }
 
   it("lifts each agent's servers into the registry, merging the same ones and keeping its selection", async () => {
     // The schema as it was just before, built from the migrations ahead of this one.
-    const folders = readdirSync(drizzleFolder).sort();
-    const at = folders.findIndex((folder) => folder.endsWith('_mcp_servers'));
-    expect(at).toBeGreaterThan(0);
-    const before = mkdtempSync(path.join(tmpdir(), 'telos-migrations-'));
-    try {
-      for (const folder of folders.slice(0, at)) {
-        cpSync(path.join(drizzleFolder, folder), path.join(before, folder), { recursive: true });
-      }
-      const old = drizzle({ client: new PGlite('memory://') });
-      await migrate(old as never, { migrationsFolder: before });
+    const old = drizzle({ client: new PGlite('memory://') });
+    await migrateUpTo(old, '_mcp_servers');
 
-      const memory = { url: 'http://memory.test/mcp', headers: { Authorization: 'Bearer s3' } };
-      const agents: Array<[string, string, unknown]> = [
-        ['a@example.com', 'First', [{ id: 'f0e1d2c3-0000-4000-8000-000000000001', name: 'Team Memory', ...memory }]],
+    const memory = { url: 'http://memory.test/mcp', headers: { Authorization: 'Bearer s3' } };
+    const agents: Array<[string, string, unknown]> = [
+      ['a@example.com', 'First', [{ id: 'f0e1d2c3-0000-4000-8000-000000000001', name: 'Team Memory', ...memory }]],
+      [
+        'a@example.com',
+        'Second',
         [
-          'a@example.com',
-          'Second',
-          [
-            // The same server under another id and name, a hand-written id, and a row nothing could use.
-            { id: 'f0e1d2c3-0000-4000-8000-000000000002', name: 'Memory again', ...memory },
-            { id: 'docs', command: 'npx', args: ['docs-server'], env: { TOKEN: 't' }, hiddenTools: ['wipe'] },
-            { id: 'f0e1d2c3-0000-4000-8000-000000000003', name: 'Blank' },
-          ],
+          // The same server under another id and name, a hand-written id, and a row nothing could use.
+          { id: 'f0e1d2c3-0000-4000-8000-000000000002', name: 'Memory again', ...memory },
+          { id: 'docs', command: 'npx', args: ['docs-server'], env: { TOKEN: 't' }, hiddenTools: ['wipe'] },
+          { id: 'f0e1d2c3-0000-4000-8000-000000000003', name: 'Blank' },
         ],
-        ['a@example.com', 'Third', []],
-        // Another account's server of the same definition is its own row.
-        ['b@example.com', 'Theirs', [{ id: 'f0e1d2c3-0000-4000-8000-000000000004', name: 'Team Memory', ...memory }]],
-        // An unnamed uuid row, and a hand-written id the board's own door has.
+      ],
+      ['a@example.com', 'Third', []],
+      // Another account's server of the same definition is its own row.
+      ['b@example.com', 'Theirs', [{ id: 'f0e1d2c3-0000-4000-8000-000000000004', name: 'Team Memory', ...memory }]],
+      // An unnamed uuid row, and a hand-written id the board's own door has.
+      [
+        'b@example.com',
+        'Odd',
         [
-          'b@example.com',
-          'Odd',
-          [
-            { id: 'f0e1d2c3-0000-4000-8000-000000000005', url: 'http://x.test' },
-            { id: 'telos', url: 'http://y.test' },
-          ],
+          { id: 'f0e1d2c3-0000-4000-8000-000000000005', url: 'http://x.test' },
+          { id: 'telos', url: 'http://y.test' },
         ],
-      ];
-      for (const [email, name, servers] of agents) {
-        await old.execute(sql`INSERT INTO users (email) VALUES (${email}) ON CONFLICT DO NOTHING`);
-        await old.execute(sql`
-          INSERT INTO agents (user_id, name, base_url, model, mcp_servers, created_at)
-          SELECT id, ${name}, 'http://llm.test/v1', 'tiny', ${JSON.stringify(servers)}::jsonb,
-            now() + ${agents.findIndex((row) => row[1] === name)} * interval '1 second'
-          FROM users WHERE email = ${email}
-        `);
-      }
-
-      await migrate(old as never, { migrationsFolder: drizzleFolder });
-
-      const lifted = await old.execute(sql`
-        SELECT u.email, a.name, a.mcp_server_slugs AS slugs FROM agents a JOIN users u ON u.id = a.user_id ORDER BY a.created_at
+      ],
+    ];
+    for (const [email, name, servers] of agents) {
+      await old.execute(sql`INSERT INTO users (email) VALUES (${email}) ON CONFLICT DO NOTHING`);
+      await old.execute(sql`
+        INSERT INTO agents (user_id, name, base_url, model, mcp_servers, created_at)
+        SELECT id, ${name}, 'http://llm.test/v1', 'tiny', ${JSON.stringify(servers)}::jsonb,
+          now() + ${agents.findIndex((row) => row[1] === name)} * interval '1 second'
+        FROM users WHERE email = ${email}
       `);
-      expect(lifted.rows).toEqual([
-        { email: 'a@example.com', name: 'First', slugs: ['team_memory'] },
-        { email: 'a@example.com', name: 'Second', slugs: ['team_memory', 'docs'] },
-        { email: 'a@example.com', name: 'Third', slugs: [] },
-        { email: 'b@example.com', name: 'Theirs', slugs: ['team_memory'] },
-        { email: 'b@example.com', name: 'Odd', slugs: ['server', 'server_2'] },
-      ]);
-      const servers = await old.execute(sql`
-        SELECT u.email, s.slug, s.name, s.url, s.command, s.args, s.headers, s.env, s.hidden_tools, s.enabled
-        FROM mcp_servers s JOIN users u ON u.id = s.user_id ORDER BY u.email, s.slug
-      `);
-      expect(servers.rows).toEqual([
-        {
-          email: 'a@example.com',
-          slug: 'docs',
-          name: 'docs',
-          url: null,
-          command: 'npx',
-          args: ['docs-server'],
-          headers: {},
-          env: { TOKEN: 't' },
-          hidden_tools: ['wipe'],
-          enabled: true,
-        },
-        expect.objectContaining({ email: 'a@example.com', slug: 'team_memory', name: 'Team Memory', ...memory }),
-        expect.objectContaining({ email: 'b@example.com', slug: 'server', url: 'http://x.test' }),
-        expect.objectContaining({ email: 'b@example.com', slug: 'server_2', url: 'http://y.test' }),
-        expect.objectContaining({ email: 'b@example.com', slug: 'team_memory', name: 'Team Memory', ...memory }),
-      ]);
-    } finally {
-      rmSync(before, { recursive: true, force: true });
     }
+
+    // Up to the registry as it stood while it still held stdio servers.
+    await migrateUpTo(old, '_no_stdio_mcp');
+
+    const lifted = await old.execute(sql`
+      SELECT u.email, a.name, a.mcp_server_slugs AS slugs FROM agents a JOIN users u ON u.id = a.user_id ORDER BY a.created_at
+    `);
+    expect(lifted.rows).toEqual([
+      { email: 'a@example.com', name: 'First', slugs: ['team_memory'] },
+      { email: 'a@example.com', name: 'Second', slugs: ['team_memory', 'docs'] },
+      { email: 'a@example.com', name: 'Third', slugs: [] },
+      { email: 'b@example.com', name: 'Theirs', slugs: ['team_memory'] },
+      { email: 'b@example.com', name: 'Odd', slugs: ['server', 'server_2'] },
+    ]);
+    const servers = await old.execute(sql`
+      SELECT u.email, s.slug, s.name, s.url, s.command, s.args, s.headers, s.env, s.hidden_tools, s.enabled
+      FROM mcp_servers s JOIN users u ON u.id = s.user_id ORDER BY u.email, s.slug
+    `);
+    expect(servers.rows).toEqual([
+      {
+        email: 'a@example.com',
+        slug: 'docs',
+        name: 'docs',
+        url: null,
+        command: 'npx',
+        args: ['docs-server'],
+        headers: {},
+        env: { TOKEN: 't' },
+        hidden_tools: ['wipe'],
+        enabled: true,
+      },
+      expect.objectContaining({ email: 'a@example.com', slug: 'team_memory', name: 'Team Memory', ...memory }),
+      expect.objectContaining({ email: 'b@example.com', slug: 'server', url: 'http://x.test' }),
+      expect.objectContaining({ email: 'b@example.com', slug: 'server_2', url: 'http://y.test' }),
+      expect.objectContaining({ email: 'b@example.com', slug: 'team_memory', name: 'Team Memory', ...memory }),
+    ]);
+  });
+
+  it('removes stdio servers, their secrets and the slugs naming them, and keeps every URL', async () => {
+    const old = drizzle({ client: new PGlite('memory://') });
+    await migrateUpTo(old, '_no_stdio_mcp');
+    for (const email of ['a@example.com', 'b@example.com']) {
+      await old.execute(sql`INSERT INTO users (email) VALUES (${email})`);
+    }
+    const server = (email: string, slug: string, url: string | null, command: string | null) => sql`
+      INSERT INTO mcp_servers (user_id, slug, name, url, command, args, headers, env)
+      SELECT id, ${slug}, ${slug}, ${url}, ${command}, '["-y"]'::jsonb, '{"Authorization":"Bearer s3"}'::jsonb,
+        '{"TOKEN":"t"}'::jsonb
+      FROM users WHERE email = ${email}
+    `;
+    await old.execute(server('a@example.com', 'docs', 'http://docs.test/mcp', null));
+    await old.execute(server('a@example.com', 'files', null, 'npx'));
+    await old.execute(server('a@example.com', 'both', 'http://both.test/mcp', 'npx'));
+    // Another account's server of the same slug is a URL, and stays named.
+    await old.execute(server('b@example.com', 'files', 'http://files.test/mcp', null));
+    const agent = (email: string, name: string, slugs: string[] | null, order: number) => sql`
+      INSERT INTO agents (user_id, name, base_url, model, mcp_server_slugs, created_at)
+      SELECT id, ${name}, 'http://llm.test/v1', 'tiny', ${slugs === null ? null : JSON.stringify(slugs)}::jsonb,
+        now() + ${order} * interval '1 second'
+      FROM users WHERE email = ${email}
+    `;
+    await old.execute(agent('a@example.com', 'Every', null, 0));
+    await old.execute(agent('a@example.com', 'Some', ['files', 'docs', 'gone', 'both'], 1));
+    await old.execute(agent('a@example.com', 'Only', ['files'], 2));
+    await old.execute(agent('b@example.com', 'Theirs', ['files'], 3));
+
+    await migrateUpTo(old);
+
+    const servers = await old.execute(sql`
+      SELECT u.email, s.slug, s.url, s.headers FROM mcp_servers s JOIN users u ON u.id = s.user_id
+      ORDER BY u.email, s.slug
+    `);
+    const headers = { Authorization: 'Bearer s3' };
+    expect(servers.rows).toEqual([
+      { email: 'a@example.com', slug: 'both', url: 'http://both.test/mcp', headers },
+      { email: 'a@example.com', slug: 'docs', url: 'http://docs.test/mcp', headers },
+      { email: 'b@example.com', slug: 'files', url: 'http://files.test/mcp', headers },
+    ]);
+    const columns = await old.execute(sql`
+      SELECT column_name FROM information_schema.columns
+      WHERE table_name = 'mcp_servers' AND column_name IN ('command', 'args', 'cwd', 'env')
+    `);
+    expect(columns.rows).toEqual([]);
+
+    // A list loses the slug and keeps the rest in order; one with nothing left names none.
+    const lists = await old.execute(sql`SELECT name, mcp_server_slugs AS slugs FROM agents ORDER BY created_at`);
+    expect(lists.rows).toEqual([
+      { name: 'Every', slugs: null },
+      { name: 'Some', slugs: ['docs', 'gone', 'both'] },
+      { name: 'Only', slugs: [] },
+      { name: 'Theirs', slugs: ['files'] },
+    ]);
+
+    // And a row without a URL cannot be written again.
+    await expect(
+      old.execute(sql`INSERT INTO mcp_servers (user_id, slug, name) SELECT id, 'x', 'x' FROM users LIMIT 1`),
+    ).rejects.toThrow();
   });
 });

@@ -13,13 +13,14 @@ export interface ReadyTodo {
 export interface McpServerRow {
   id: string;
   name?: string;
+  /** Where the server is: telos reaches MCP servers over HTTP only. */
   url?: string;
-  command?: string;
-  args?: string[];
-  /** Where a command runs. Absent, this process's own directory. */
-  cwd?: string;
+  /**
+   * A stdio server's command, which only a telos from before stdio servers were
+   * removed would send. Never run: read only to say why the server is left out.
+   */
+  command?: unknown;
   headers?: Record<string, string>;
-  env?: Record<string, string>;
   /** Overrides of the pool's limits, in milliseconds. Absent, the pool's. */
   connectTimeoutMs?: number;
   callTimeoutMs?: number;

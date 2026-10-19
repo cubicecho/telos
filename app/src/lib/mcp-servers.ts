@@ -1,18 +1,13 @@
 import type { CreateMcpServerInput, McpServerFieldsFragment } from '@/__generated__/graphql';
 
-// An MCP server as its form holds it, and back. Lists are typed a line each,
-// since an argument may itself contain spaces, and hooks as the JSON the
-// runner reads, which it checks: a hook it cannot use is said on the run.
+// An MCP server as its form holds it, and back. Every server is a URL: telos
+// does not run stdio servers. Lists are typed a line each, and hooks as the
+// JSON the runner reads, which it checks: a hook it cannot use is said on the run.
 
 export interface McpServerDraft {
   slug: string;
   name: string;
   url: string;
-  command: string;
-  /** One argument per line. */
-  args: string;
-  /** Where a command runs; blank for the runner's own directory. */
-  cwd: string;
   /** Seconds, typed; blank for the runner's default. */
   connectTimeout: string;
   callTimeout: string;
@@ -45,8 +40,6 @@ const fromLines = (value: string) =>
     .map((line) => line.trim())
     .filter(Boolean);
 
-const orNull = (value: string) => (value.trim() === '' ? null : value.trim());
-
 const MS_PER_SECOND = 1000;
 
 /** Milliseconds as the seconds the form shows, or blank for none. */
@@ -67,9 +60,6 @@ export function toServerDraft(server: McpServerFieldsFragment | null): McpServer
     slug: server?.slug ?? '',
     name: server?.name ?? '',
     url: server?.url ?? '',
-    command: server?.command ?? '',
-    args: lines(server?.args),
-    cwd: server?.cwd ?? '',
     connectTimeout: toSeconds(server?.connectTimeoutMs),
     callTimeout: toSeconds(server?.callTimeoutMs),
     idleTimeout: toSeconds(server?.idleTimeoutMs),
@@ -82,17 +72,14 @@ export function toServerDraft(server: McpServerFieldsFragment | null): McpServer
  * What a create or an update sends. Every column the form edits is stated, so
  * an edit can clear one.
  *
- * @param draft - The form, already checked by `hooksRule` and `slugRule`.
+ * @param draft - The form, already checked by `urlRule`, `hooksRule` and `slugRule`.
  * @returns The values.
  */
 export function fromServerDraft(draft: McpServerDraft): Omit<CreateMcpServerInput, 'id'> {
   return {
     slug: draft.slug.trim(),
     name: draft.name.trim() || draft.slug.trim(),
-    url: orNull(draft.url),
-    command: orNull(draft.command),
-    args: fromLines(draft.args),
-    cwd: orNull(draft.cwd),
+    url: draft.url.trim(),
     connectTimeoutMs: toMs(draft.connectTimeout),
     callTimeoutMs: toMs(draft.callTimeout),
     idleTimeoutMs: toMs(draft.idleTimeout),
@@ -117,6 +104,18 @@ export function slugRule(taken: string[]) {
     if (taken.includes(slug)) return 'Another of your servers has that slug.';
     return undefined;
   };
+}
+
+/**
+ * A validator for a server's URL: telos reaches MCP servers over HTTP only, so
+ * every server has one.
+ */
+export function urlRule({ value }: { value: string }): string | undefined {
+  const url = value.trim();
+  if (url === '') return 'A server needs a URL.';
+  const protocol = URL.canParse(url) ? new URL(url).protocol : '';
+  if (protocol !== 'http:' && protocol !== 'https:') return 'An http or https URL.';
+  return undefined;
 }
 
 /**
