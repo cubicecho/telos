@@ -54,6 +54,13 @@ export const lanes = pgTable(
     // it up and leaves it for a person. The count starts over whenever a
     // person moves it.
     maxAttempts: integer('max_attempts').notNull().default(3),
+    // A check lane: a shell command the runner runs instead of an agent, whose
+    // exit code is the verdict (0 passes, anything else fails). A lane has an
+    // agent or a check, never both, and only a person sets it (write-guards.ts).
+    checkCommand: text('check_command'),
+    // How long the command may run before it is killed and fails. Null is the
+    // runner's default.
+    checkTimeoutSeconds: integer('check_timeout_seconds'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -65,6 +72,7 @@ export const lanes = pgTable(
     index('idx_lanes_on_failure_lane_id').on(t.onFailureLaneId),
     check('ck_lanes_wip_limit', sql`${t.wipLimit} > 0`),
     check('ck_lanes_max_attempts', sql`${t.maxAttempts} >= 0`),
+    check('ck_lanes_check_timeout', sql`${t.checkTimeoutSeconds} IS NULL OR ${t.checkTimeoutSeconds} > 0`),
     // At most one done lane per project — "done" has to name a single column
     // for the checkbox to know where to send a todo it ticks.
     uniqueIndex('uq_lanes_project_done').on(t.projectId).where(sql`is_done`),

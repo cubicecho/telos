@@ -3,6 +3,7 @@ import { and, asc, desc, eq, ne, sql } from 'drizzle-orm';
 import { extendSchema, type GraphQLSchema, parse } from 'graphql';
 import type {
   ArtifactInput,
+  CheckResultInput,
   MutationResolvers,
   ProposedTodoInput,
   QueryResolvers,
@@ -16,6 +17,7 @@ import { runnerAgent } from '../agents/mcp-servers.ts';
 import { requireAuth } from '../auth/resolvers.ts';
 import { findDoneLaneId, findNewTodoLaneId } from '../board/lanes.ts';
 import type { Actor, Context } from '../core/context.ts';
+import { LANE_CHECK_DEFAULTS } from '../core/defaults.ts';
 import { RunEventKindEnum, RunOutcomeEnum, withEnums } from '../core/enums.ts';
 import { conflict, forbidden, notFound } from '../core/errors.ts';
 import { attachResolvers } from '../graphql/attach-resolvers.ts';
@@ -92,6 +94,14 @@ const RUNS_SDL = parse(`
     maxRetries: Int
   }
 
+  "A check lane's command, which the runner runs in place of an agent. Only ever handed to the runner."
+  type RunnerCheck {
+    "A line of shell. Its exit code is the verdict: 0 passes, anything else fails."
+    command: String!
+    "How long it may run before it is killed and fails. Null is the runner's default."
+    timeoutSeconds: Int
+  }
+
   "Everything an agent is told about the todo it is working, and where."
   type RunAssignment {
     projectName: String!
@@ -120,7 +130,10 @@ const RUNS_SDL = parse(`
     turn: Int!
     "Whether no agent has worked the todo before: its hooks' session opens with this run."
     opensSession: Boolean!
-    agent: RunnerAgent!
+    "The lane's agent. Null for a check lane, which has \`check\` instead."
+    agent: RunnerAgent
+    "The lane's check. Null for an agent's lane."
+    check: RunnerCheck
     assignment: RunAssignment!
   }
 
@@ -178,6 +191,15 @@ const RUNS_SDL = parse(`
     sizeBytes: Int
   }
 
+  "What a check's command did. The server reads the verdict off it: exit 0 passes, anything else fails."
+  input CheckResultInput {
+    "Null when the command did not exit by itself: it was killed, or never started."
+    exitCode: Int
+    timedOut: Boolean!
+    "The end of what it printed, stdout and stderr together."
+    output: String!
+  }
+
   "What a run came to."
   input RunResultInput {
     status: RunOutcome!
@@ -197,6 +219,8 @@ const RUNS_SDL = parse(`
     prompt: RunPromptInput
     "What the run left behind."
     artifacts: [ArtifactInput!]
+    "What a check lane's command did. Only a check run reports it, and it is the verdict."
+    check: CheckResultInput
   }
 
   extend type Query {
@@ -255,6 +279,51 @@ function verdictOf(output: string | null): 'pass' | 'fail' | 'none' {
     return 'fail';
   }
   return PASSES.test(output) ? 'pass' : 'none';
+}
+
+/**
+ * What a check run rules, and the verdict note that says why: the first word
+ * is PASS or FAIL, as a reviewer's is, then the command and the end of what it
+ * printed, which is what the next run is shown when the todo comes back.
+ *
+ * @param command - What the lane ran.
+ * @param check - What the runner says it did; absent, it did not say, which fails.
+ * @returns The verdict and the note's body.
+ */
+export function checkVerdict(
+  command: string,
+  check: CheckResultInput | null | undefined,
+): { verdict: 'pass' | 'fail'; body: string } {
+  const passed = check?.exitCode === 0 && !check.timedOut;
+  const what = !check
+    ? 'reported no result'
+    : check.timedOut
+      ? 'ran out of time and was stopped'
+      : check.exitCode === null || check.exitCode === undefined
+        ? 'did not exit by itself'
+        : `exited with code ${check.exitCode}`;
+  const output = keepEnd(check?.output?.trimEnd() ?? '', LANE_CHECK_DEFAULTS.outputChars);
+  const block = fenceFor(output, 3);
+  const shown = output ? `\n\n${block}text\n${output}\n${block}` : '\n\nIt printed nothing.';
+  const inline = fenceFor(command, 1);
+  const pad = inline.length > 1 ? ' ' : '';
+  return {
+    verdict: passed ? 'pass' : 'fail',
+    body: `${passed ? 'PASS' : 'FAIL'}: the check ${inline}${pad}${command}${pad}${inline} ${what}.${shown}`,
+  };
+}
+
+/**
+ * A Markdown fence for `text`: longer than any run of backticks in it, so what
+ * a command printed cannot close its own block.
+ *
+ * @param text - What the fence holds.
+ * @param least - The shortest fence.
+ * @returns The backticks.
+ */
+function fenceFor(text: string, least: number): string {
+  const longest = Math.max(0, ...[...text.matchAll(/`+/g)].map((run) => run[0].length));
+  return '`'.repeat(Math.max(least, longest + 1));
 }
 
 /**
@@ -614,7 +683,7 @@ async function finish(context: Context, runId: string, result: RunResultInput): 
     if (run.status !== 'running') {
       throw conflict('That run has already finished.');
     }
-    const output = result.output?.trim() || null;
+    let output = result.output?.trim() || null;
 
     if (result.status === 'stopped' || run.cancelRequestedAt || aiOff || !todo) {
       // A run stopped by a switch keeps nothing it said after the switch.
@@ -639,9 +708,13 @@ async function finish(context: Context, runId: string, result: RunResultInput): 
     // todo is the todo said again, so it is read as a refine; a reply that
     // both refines and splits fails, as there is no telling which it meant.
     const ok = result.status === 'ok';
-    const verdict = ok ? verdictOf(output) : 'none';
-    const proposed = (result.todos ?? []).filter((todo) => todo.title?.trim());
-    const refined = refinementOf(result.refine);
+    // A check run is ruled by its command's exit code, never by what was
+    // said, and it neither refines nor splits: it has no agent to do either.
+    const checked = run.checkCommand != null && ok ? checkVerdict(run.checkCommand, result.check) : null;
+    if (checked) output = checked.body;
+    const verdict = checked ? checked.verdict : ok ? verdictOf(output) : 'none';
+    const proposed = checked ? [] : (result.todos ?? []).filter((todo) => todo.title?.trim());
+    const refined = checked ? null : refinementOf(result.refine);
     const mixed = ok && verdict !== 'fail' && refined !== null && proposed.length > 0;
     const passed = ok && verdict !== 'fail' && !mixed;
     const pieces = passed && proposed.length > 1 ? proposed : [];
@@ -693,7 +766,9 @@ async function finish(context: Context, runId: string, result: RunResultInput): 
     } else if (targetId && targetId !== todo.laneId) {
       await moveOn(tx, actor, todo, targetId, {
         noteId: note?.id ?? null,
-        reason: passed ? null : verdict === 'fail' ? 'The review failed.' : error,
+        // A failed check's note is the reason: the next run is shown the
+        // command and what it printed, not a line saying a review failed.
+        reason: passed ? null : checked ? null : verdict === 'fail' ? 'The review failed.' : error,
       });
     }
 
@@ -811,14 +886,19 @@ export function applyRunsExtension(schema: GraphQLSchema): GraphQLSchema {
 
         const [todo] = await tx.select().from(dbSchema.todos).where(eq(dbSchema.todos.id, args.todoId));
         const [project] = await tx.select().from(dbSchema.projects).where(eq(dbSchema.projects.id, todo.projectId));
-        const [agent] = await tx.select().from(dbSchema.agents).where(eq(dbSchema.agents.id, lane.agentId));
-        const handed = await runnerAgent(tx, agent);
         // Counted before this run is written. The todo is the session its
         // agents' hooks file things under.
         const turn = await tx.$count(dbSchema.runs, eq(dbSchema.runs.todoId, todo.id));
+        // A check lane's run has no agent: the runner runs its command, and
+        // the run keeps the command as it was, whatever the lane says later.
+        const check: string | null = lane.checkCommand;
+        const [agent] = check
+          ? []
+          : await tx.select().from(dbSchema.agents).where(eq(dbSchema.agents.id, lane.agentId));
+        const handed = agent ? await runnerAgent(tx, agent) : null;
         // Asked of the sessions and not of `turn`: retention prunes runs, and a
         // todo whose runs are gone has still had its session opened.
-        const opensSession = await openSession(tx, todo, agent.id);
+        const opensSession = agent ? await openSession(tx, todo, agent.id) : false;
         const [run] = await tx
           .insert(dbSchema.runs)
           .values({
@@ -826,8 +906,9 @@ export function applyRunsExtension(schema: GraphQLSchema): GraphQLSchema {
             projectId: todo.projectId,
             todoId: todo.id,
             laneId: lane.id,
-            agentId: agent.id,
-            model: handed.resolvedModel,
+            agentId: agent?.id ?? null,
+            model: handed?.resolvedModel ?? null,
+            checkCommand: check,
             leaseExpiresAt: leaseFromNow(),
           })
           .returning();
@@ -842,6 +923,7 @@ export function applyRunsExtension(schema: GraphQLSchema): GraphQLSchema {
           turn,
           opensSession,
           agent: handed,
+          check: check ? { command: check, timeoutSeconds: lane.checkTimeoutSeconds } : null,
           assignment: await assignmentFor(tx, todo, lane, project),
         };
       });

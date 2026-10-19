@@ -113,6 +113,8 @@ async function resolveRun(db: DB, runId: string): Promise<Actor> {
         eq(dbSchema.runs.status, 'running'),
         gt(dbSchema.runs.leaseExpiresAt, new Date()),
         isNull(dbSchema.runs.cancelRequestedAt),
+        // A check run has no agent, so its token opens nothing.
+        isNull(dbSchema.runs.checkCommand),
         eq(dbSchema.users.aiEnabled, true),
         eq(dbSchema.projects.aiEnabled, true),
         eq(dbSchema.todos.aiIgnored, false),

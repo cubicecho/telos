@@ -30,6 +30,7 @@ for (const signal of ['SIGTERM', 'SIGINT'] as const) {
 }
 
 console.log(`🤖 Telos runner working ${config.telosUrl}, ${config.concurrency} at a time`);
-if (config.allowStdio) console.warn('⚠️  RUNNER_ALLOW_STDIO is on: agents may spawn commands on this host.');
+if (config.allowStdio)
+  console.warn('⚠️  RUNNER_ALLOW_STDIO is on: agents and check lanes may run commands on this host.');
 await runLoop({ ...config, telos }, stop.signal);
 process.exit(0);
