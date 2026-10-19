@@ -1,9 +1,9 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "3bb97972-afc3-4db3-be88-14f3cac5d8a1",
+  "id": "dd907c3c-1ef6-4654-abbd-ff898dcb73d0",
   "prevIds": [
-    "108c7482-955d-4ba9-9b93-e7a2a8bf3e00"
+    "e60955c7-7af9-4960-8ec7-d435a5c66dad"
   ],
   "ddl": [
     {
@@ -2016,6 +2016,32 @@
       "table": "lanes"
     },
     {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "check_command",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "lanes"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "check_timeout_seconds",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "lanes"
+    },
+    {
       "type": "timestamp with time zone",
       "typeSchema": null,
       "notNull": true,
@@ -2726,6 +2752,19 @@
       "generated": null,
       "identity": null,
       "name": "model",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "runs"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "check_command",
       "entityType": "columns",
       "schema": "public",
       "table": "runs"
@@ -6196,6 +6235,13 @@
     {
       "value": "\"max_attempts\" >= 0",
       "name": "ck_lanes_max_attempts",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "lanes"
+    },
+    {
+      "value": "\"check_timeout_seconds\" IS NULL OR \"check_timeout_seconds\" > 0",
+      "name": "ck_lanes_check_timeout",
       "entityType": "checks",
       "schema": "public",
       "table": "lanes"
