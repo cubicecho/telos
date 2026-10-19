@@ -11,6 +11,7 @@ import {
   seedMissingLanes,
 } from '../board/lanes.ts';
 import { type Context, isAiActor } from '../core/context.ts';
+import { LANE_CHECK_DEFAULTS } from '../core/defaults.ts';
 import { badInput, forbidden, notFound } from '../core/errors.ts';
 import { DOOR_TOOL_NAMES } from '../mcp/door.ts';
 import { cancelRunsUnder } from '../runs/ready.ts';
@@ -303,6 +304,70 @@ async function assertArchiveOnSuccessFits(tx: DB, userId: string): Promise<void>
   );
 }
 
+/** The lane columns that make it a check lane: a shell command the runner runs. */
+const CHECK_COLUMNS = ['checkCommand', 'checkTimeoutSeconds'];
+
+/**
+ * A check command is a shell command that runs on the runner's host with the
+ * runner's rights, so only a person states it: never an API key, a run or the
+ * runner. The actor lock already keeps them off lane writes; this holds the
+ * rule on the column itself, whatever path a write takes to it.
+ */
+function assertCheckFromPerson(args: Parameters<typeof writtenRows>[0], context: Context): void {
+  if (!states(args, ...CHECK_COLUMNS) || context.actor.kind === 'user') return;
+  throw forbidden("Only a person can set a lane's check command.");
+}
+
+/**
+ * A check command is a line of shell, or null for no check; a blank one is
+ * read as null. Its time limit is a whole number of seconds, or null for the
+ * runner's default. Rows are tidied in place.
+ */
+function assertCheckSound(rows: Row[]): void {
+  const { maxCommandChars, maxTimeoutSeconds } = LANE_CHECK_DEFAULTS;
+  for (const row of rows) {
+    if ('checkCommand' in row && row.checkCommand !== null) {
+      if (typeof row.checkCommand !== 'string') throw badInput('A check command is text, or null for no check.');
+      const command = row.checkCommand.trim();
+      if (command.length > maxCommandChars) {
+        throw badInput(`A check command is at most ${maxCommandChars} characters. Put a longer one in a script.`);
+      }
+      row.checkCommand = command === '' ? null : command;
+    }
+    const timeout = row.checkTimeoutSeconds;
+    if (
+      'checkTimeoutSeconds' in row &&
+      timeout !== null &&
+      (Number.isInteger(timeout) === false || (timeout as number) < 1 || (timeout as number) > maxTimeoutSeconds)
+    ) {
+      throw badInput(`A check's time limit is 1 to ${maxTimeoutSeconds} seconds, or null for the runner's default.`);
+    }
+  }
+}
+
+/**
+ * A check lane has no agent, since its command is the verdict, and works one
+ * todo at a time: until each todo has a workspace of its own, every check runs
+ * in the runner's one directory. Checked after the write, over the caller's
+ * lanes, so the message says what to change.
+ */
+async function assertCheckLanesFit(tx: DB, userId: string): Promise<void> {
+  const rows = resultRows<{ name: string; agent: boolean }>(
+    await tx.execute(sql`
+      SELECT l.name, l.agent_id IS NOT NULL AS agent FROM lanes l
+      WHERE l.user_id = ${userId} AND l.check_command IS NOT NULL AND (l.agent_id IS NOT NULL OR l.wip_limit <> 1)
+      LIMIT 1
+    `),
+  );
+  if (rows.length === 0) return;
+  const [lane] = rows;
+  throw badInput(
+    lane.agent
+      ? `"${lane.name}" can have an agent or a check command, not both. Clear one of them.`
+      : `"${lane.name}" runs a check, which works one todo at a time. Set its WIP limit to 1.`,
+  );
+}
+
 /**
  * Which lane means done is `setDoneLane`'s to decide: moving the flag has to
  * move the todos with it, and a generated write would leave the board saying one
@@ -429,6 +494,8 @@ export const onWrite: NonNullable<BuildSchemaConfig['onWrite']> = {
   lanes: {
     before: async ({ args, context, tx }: WriteHookPayload) => {
       assertDoneFlagUntouched(args);
+      assertCheckFromPerson(args, context as Context);
+      assertCheckSound(writtenRows(args));
       // Deleting a lane moves its todos (see `after`), which is history.
       await stampActor(tx, (context as Context).actor);
       await assertForeignKeysOwned(tx, context as Context, writtenRows(args), FOREIGN_KEYS.lanes);
@@ -441,6 +508,7 @@ export const onWrite: NonNullable<BuildSchemaConfig['onWrite']> = {
       const userId = requireAuth(context as Context);
       if (states(args, 'onSuccessLaneId', 'onFailureLaneId')) await assertRoutesInProject(tx, userId);
       if (states(args, 'archiveOnSuccess', 'onSuccessLaneId')) await assertArchiveOnSuccessFits(tx, userId);
+      if (states(args, 'agentId', 'wipLimit', ...CHECK_COLUMNS)) await assertCheckLanesFit(tx, userId);
       await assertEveryProjectHasLanes(tx, userId);
       await realignLanes(tx, userId);
       await assertCompletionMatchesLane(tx, userId);

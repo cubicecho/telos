@@ -35,7 +35,7 @@ export interface RunEvent {
   text?: string | null;
 }
 
-// One agent working one todo in one lane. Written only by the server — the
+// One agent, or one check command, working one todo in one lane. Written only by the server — the
 // runner claims, renews and finishes a run through runs/resolvers.ts, and a
 // person can only ask for one to stop — so it is read-only through the API.
 export const runs = pgTable(
@@ -56,6 +56,9 @@ export const runs = pgTable(
     agentId: uuid('agent_id').references(() => agents.id, { onDelete: 'set null' }),
     // The agent's model when the run was claimed: the agent can change after.
     model: text('model'),
+    // The command a check lane's run ran, as the lane said when it was claimed.
+    // Null for an agent's run.
+    checkCommand: text('check_command'),
     // What the agent was told, exactly, as the runner built it. Reported once,
     // at the run's first heartbeat, so a live run shows it too.
     systemPrompt: text('system_prompt'),

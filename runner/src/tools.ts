@@ -1,5 +1,5 @@
 import { McpPool, type McpServerConfig, type ToolHook, validateHooks } from '@cubicecho/agent-mcp-pool';
-import type { Claim, McpServerRow } from './telos.ts';
+import type { AgentClaim, McpServerRow } from './telos.ts';
 
 // The MCP servers one run may reach: those of the account's the agent names
 // (telos works that out, and sends them in slug order), plus telos itself, which
@@ -104,7 +104,7 @@ export function readServers(json: string): McpServerRow[] {
  * @returns The run's pool. Close it with `shutdown()`.
  */
 export async function openTools(
-  claim: Claim,
+  claim: AgentClaim,
   options: { telosUrl: string; allowStdio: boolean; onNotice?: (text: string) => void },
 ): Promise<McpPool> {
   const configs: McpServerConfig[] = [

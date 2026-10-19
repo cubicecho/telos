@@ -4,9 +4,8 @@ import type { Actor } from '../core/context.ts';
 
 // The MCP door's tools, read from mcp/door.graphql: the one list the door serves
 // (mcp/endpoint.ts), Settings shows a switch for per key (auth/api-keys.ts) and
-// per agent (`agents.tools_off`), and the actor lock holds a key or a run to
-// (ai/actor-lock.ts). A tool is an
-// operation in that file and nothing else, so this is never a second list to
+// per agent (`agents.tools_off`), and the permissions map holds a key or a run
+// to (graphql/permissions.ts). A tool is an operation in that file and nothing else, so this is never a second list to
 // keep in step with it.
 
 /** Where the door's operations are. */

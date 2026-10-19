@@ -135,7 +135,7 @@ describe('todo history', () => {
   });
 
   it('says when an API key made the change, and which key', async () => {
-    // A key edits nothing through generated CRUD (actor-lock.ts); withdrawing
+    // A key edits nothing through generated CRUD (graphql/permissions.ts); withdrawing
     // a request is the one change to a todo it can make.
     const keyId = randomUUID();
     const key = await asKey(keyId);

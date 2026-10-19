@@ -3,7 +3,7 @@ import { sql } from 'drizzle-orm';
 import { extendSchema, type GraphQLSchema, parse } from 'graphql';
 import type { QueryResolvers } from '../../__generated__/resolvers.ts';
 import { aiAllowed } from '../ai/gate.ts';
-import { requireSession } from '../auth/resolvers.ts';
+import { requireAuth } from '../auth/resolvers.ts';
 import { loadOwnedProject } from '../core/owned.ts';
 import { attachResolvers } from '../graphql/attach-resolvers.ts';
 import { failuresSinceTouched } from '../runs/ready.ts';
@@ -79,7 +79,7 @@ async function readMarks(db: DB, userId: string, projectId: string, runs: boolea
         ) AS notes,
         last.id AS run_id, last.status, last.verdict, coalesce(last.error, last.output) AS reason,
         CASE WHEN ${runs} THEN ${failuresSinceTouched(sql`t.id`)} ELSE 0 END AS attempts,
-        CASE WHEN ${runs} AND l.agent_id IS NOT NULL THEN l.max_attempts END AS max_attempts
+        CASE WHEN ${runs} AND (l.agent_id IS NOT NULL OR l.check_command IS NOT NULL) THEN l.max_attempts END AS max_attempts
       FROM todos t
       LEFT JOIN lanes l ON l.id = t.lane_id
       LEFT JOIN LATERAL (
@@ -124,9 +124,9 @@ export function applyCardMarksExtension(schema: GraphQLSchema, options: { ai: bo
 
   queries.cardMarks = async (_parent, args, context) => {
     // A person's, like the board it is drawn on.
-    const userId = requireSession(context);
+    const userId = requireAuth(context);
     const db = context.db;
-    const project = await loadOwnedProject(db, userId, args.projectId);
+    const project = await loadOwnedProject(context, args.projectId);
 
     const runs = options.ai && project.aiEnabled && (await aiAllowed(context));
     const rows = await readMarks(db, userId, project.id, runs);

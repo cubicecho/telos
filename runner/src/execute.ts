@@ -18,13 +18,24 @@ import {
   RECORD_ARTIFACT_DEFINITION,
   splitToolName,
 } from './artifacts.ts';
+import { CHECKS_OFF, type CheckOptions, runCheck } from './check.ts';
 import { assignmentPrompt, readReply, systemPromptFor } from './prompts.ts';
 import { type ResolvedRunAgent, resolveAgent, unrunnable } from './spec.ts';
-import type { Beat, Claim, RunEvent, RunPrompt, RunResult, RunUsage, Telos } from './telos.ts';
+import type {
+  AgentClaim,
+  Beat,
+  Claim,
+  ClaimedCheck,
+  RunEvent,
+  RunPrompt,
+  RunResult,
+  RunUsage,
+  Telos,
+} from './telos.ts';
 import { openTools, TELOS_SERVER } from './tools.ts';
 
-// One run, start to finish: open the agent's tools, run the loop, keep the
-// lease, and tell telos what came of it. What happens to the todo is not
+// One run, start to finish: open the agent's tools, run the loop (or, in a
+// check lane, run its command), keep the lease, and tell telos what came of it. What happens to the todo is not
 // decided here — finishRun reads the result against the lane.
 
 /**
@@ -175,6 +186,8 @@ export interface ExecuteOptions {
   signal?: AbortSignal;
   /** Opens the run's tools; `openTools` unless a test says otherwise. */
   open?: typeof openTools;
+  /** Where and with what a check's command runs, for a test: the runner's own directory and a minimal environment otherwise. */
+  checks?: Omit<CheckOptions, 'signal'>;
   log?: (text: string) => void;
 }
 
@@ -244,24 +257,30 @@ export async function execute(claim: Claim, options: ExecuteOptions): Promise<Ru
     vars: { todoId: claim.todoId, runId: claim.runId, lane: claim.assignment.laneName },
   };
   try {
-    // What the agent leaves blank comes from its account's defaults. One that
-    // resolves to nowhere fails here, before any tool is opened for it.
-    const resolved = resolveAgent(claim.agent.defaults, claim.agent);
-    const cannot = unrunnable(resolved.config, claim.agent.name);
-    if (cannot) throw new Error(cannot);
-    for (const warning of resolved.warnings) {
-      feed.push({ kind: 'notice', text: `A setting was left out: ${warning}` });
-      log(warning);
+    if (claim.check) {
+      result = await check(claim.check, options, { signal: stop.signal, feed });
+    } else {
+      if (!claim.agent) throw new Error('Telos handed over a run with neither an agent nor a check.');
+      const agentClaim: AgentClaim = { ...claim, agent: claim.agent };
+      // What the agent leaves blank comes from its account's defaults. One that
+      // resolves to nowhere fails here, before any tool is opened for it.
+      const resolved = resolveAgent(claim.agent.defaults, claim.agent);
+      const cannot = unrunnable(resolved.config, claim.agent.name);
+      if (cannot) throw new Error(cannot);
+      for (const warning of resolved.warnings) {
+        feed.push({ kind: 'notice', text: `A setting was left out: ${warning}` });
+        log(warning);
+      }
+      pool = await (options.open ?? openTools)(agentClaim, {
+        telosUrl: options.telosUrl,
+        allowStdio: options.allowStdio,
+        onNotice: (text) => {
+          feed.push({ kind: 'notice', text });
+          log(text);
+        },
+      });
+      result = await work(agentClaim, pool, resolved, { signal: stop.signal, log, feed, artifacts, hookContext });
     }
-    pool = await (options.open ?? openTools)(claim, {
-      telosUrl: options.telosUrl,
-      allowStdio: options.allowStdio,
-      onNotice: (text) => {
-        feed.push({ kind: 'notice', text });
-        log(text);
-      },
-    });
-    result = await work(claim, pool, resolved, { signal: stop.signal, log, feed, artifacts, hookContext });
   } catch (error) {
     result = stop.signal.aborted ? { status: 'stopped' } : { status: 'error', error: messageOf(error) };
   } finally {
@@ -299,6 +318,28 @@ export async function execute(claim: Claim, options: ExecuteOptions): Promise<Ru
 }
 
 /**
+ * A check lane's run: its command, and what it did, for telos to rule on.
+ *
+ * @param claimed The lane's command and time limit.
+ * @param options Whether this runner runs users' commands, and where.
+ * @param run The run's stop signal, and its feed.
+ * @returns The result to report.
+ */
+async function check(
+  claimed: ClaimedCheck,
+  options: ExecuteOptions,
+  run: { signal: AbortSignal; feed: EventFeed },
+): Promise<RunResult> {
+  // A user's shell command on this host is the same risk as a stdio MCP
+  // server, so it runs only where those may.
+  if (!options.allowStdio) throw new Error(CHECKS_OFF);
+  run.feed.push({ kind: 'notice', name: 'check', text: `Running ${claimed.command}` });
+  const outcome = await runCheck(claimed, { ...options.checks, signal: run.signal });
+  if (run.signal.aborted) throw run.signal.reason;
+  return { status: 'ok', check: outcome };
+}
+
+/**
  * The pool's hooks as agent-core runs them, failures logged.
  *
  * @param pool The run's servers.
@@ -327,7 +368,7 @@ interface WorkOptions {
  * @returns The result to report.
  */
 async function work(
-  claim: Claim,
+  claim: AgentClaim,
   pool: McpPool,
   { config }: ResolvedRunAgent,
   options: WorkOptions,

@@ -19,6 +19,9 @@ export interface TemplateLane {
   archiveOnSuccess?: boolean;
   wipLimit?: number;
   maxAttempts?: number;
+  /** A check lane's command, in place of an agent. Dropped when AI applies the template. */
+  checkCommand?: string | null;
+  checkTimeoutSeconds?: number | null;
 }
 
 // A board saved to start new projects from: its lanes, in order, with their

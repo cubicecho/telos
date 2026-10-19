@@ -65,7 +65,7 @@ export function applyArtifactsExtension(schema: GraphQLSchema): GraphQLSchema {
         'A run records what it made with its own record_artifact tool, which the runner checks. This one is for work done outside a run.',
       );
     }
-    const todo = await loadAiTodo(context.db, userId, args.todoId);
+    const todo = await loadAiTodo(context, args.todoId);
     const location = requireShortText(args.location, 'location', MAX_LOCATION);
     if (location.startsWith(NOTE_LOCATION)) {
       throw badInput(`A location under ${NOTE_LOCATION} is a note on the todo. Use add_todo_note to leave one.`);
