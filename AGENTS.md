@@ -63,7 +63,7 @@ telos/
 │       ├── auth/            # Who the caller is and how they sign in: better-auth, actor
 │       │                    #   (resolveActor), abilities (defineAbilitiesFor), endpoints, throttle, rate-limit, email, api-keys,
 │       │                    #   provider-tokens (OIDC access tokens as bearers), credential-expiry
-│       ├── sso/             # Pairing with an OIDC provider from the app: settings, pairing, resolvers
+│       ├── sso/             # Pairing with an OIDC provider from the app: settings, pairing, device-client, resolvers
 │       ├── instance/        # The instance's settings row: its AI switch, and its admins
 │       ├── ai/              # Whether AI may act, and what it sees and writes: gate, switches,
 │       │                    #   reach, reads, setup, status, requests, account-activity
@@ -235,8 +235,14 @@ is built with the auth instance (`authHost.providerTokens()`), so a new pairing
 never trusts the last provider's keys. `http/protected-resource.ts` serves RFC
 9728 metadata at `/.well-known/oauth-protected-resource`, and a refused bearer
 gets a `WWW-Authenticate` challenge on its 200 (GraphQL never answers 401).
-`OIDC_API_AUDIENCE` and `OIDC_DEVICE_CLIENT_ID` are environment only, for a
-paired provider too.
+`OIDC_API_AUDIENCE` is environment only. The device client
+(`authConfig.sso.deviceClientId`) is `OIDC_DEVICE_CLIENT_ID`, else the public
+client pairing registers with the same setup token when discovery offers the
+device flow (`sso/pairing.ts`), told to device apps only while its RFC 7592
+registration lists the device code grant (`sso/device-client.ts`, asked at most
+every `AUTH_DEFAULTS.deviceClientCheckSeconds`): heautou holds it back until its
+admin turns it on. Pairing also registers `client_uri: serverUrl()`, under
+which the RFC 9728 metadata is how heautou finds the API to offer its admin.
 
 **The auth instance is swappable; never hold one from boot.** better-auth fixes
 its plugins at creation, and the OIDC provider is one, so pairing a provider

@@ -122,7 +122,7 @@ domain.
 | `OIDC_CLIENT_AUTH` | `client_secret_basic` | How the secret is sent: `client_secret_basic` (heautou's default) or `client_secret_post`. |
 | `OIDC_NAME` | `SSO` | The provider's name on the login button ("Sign in with …"). |
 | `OIDC_API_AUDIENCE` | `<SERVER_URL>/graphql` | Telos's API identifier at the provider: the `aud` a provider access token must carry to be accepted as a bearer. |
-| `OIDC_DEVICE_CLIENT_ID` | — | The public client device apps (Home Assistant) use at the provider for the device flow. Telos only tells them its name, in `authConfig.sso.deviceClientId`. |
+| `OIDC_DEVICE_CLIENT_ID` | — | The public client device apps (Home Assistant) use at the provider for the device flow. Telos only tells them its name, in `authConfig.sso.deviceClientId`. Pairing registers one for you; set this to use another. |
 | `AI_ENABLED` | — | Set to `false` to remove AI entirely: no MCP endpoint, no API keys, no agents, no switch in Settings. Otherwise an admin turns it on in Settings. |
 | `RUNNER_CONCURRENCY` | `2` | The most runs the runner works at once. |
 | `RUNNER_POLL_SECONDS` | `5` | How long the runner waits when nothing is ready. |
@@ -151,11 +151,16 @@ pairing is one paste:
 
 1. In heautou, make a setup URL for Telos and choose which groups may sign in.
    It looks like `https://<heautou>/oidc#setup=<token>&name=heautou`, and works
-   once, for a short while.
+   for a short while.
 2. On a new instance, open the login page's **Set up sign-in** tab and paste it.
    Once anyone has an account, an admin does this in **Settings → Sign-in**.
 3. The login page shows "Sign in with heautou" at once, with no restart. On a
    new instance, the first account to sign in becomes the admin.
+4. Back in heautou, the pairing dialog offers **Device sign-in** (a client
+   Telos registered for Home Assistant and other device apps) and **Telos's
+   API** (`<SERVER_URL>/graphql`, found in Telos's
+   `/.well-known/oauth-protected-resource`). Leave both on and choose
+   **Finish**, and device apps can sign in with no further setup.
 
 Telos registers itself with the provider and keeps the client it gets back in
 the database. **Disconnect** in Settings deletes that client at the provider
@@ -194,9 +199,13 @@ A live board opened with such a token ends, with `UNAUTHENTICATED`, when the
 token expires, and the app reconnects with a fresh one. A client can find the
 provider and the audience at `GET /.well-known/oauth-protected-resource`
 (RFC 9728), and a refused bearer is answered with a `WWW-Authenticate`
-challenge pointing there. The device client is set with
-`OIDC_DEVICE_CLIENT_ID`; both settings are environment only, for a paired
-provider too.
+challenge pointing there. After pairing with heautou, finishing the pairing
+there sets up both the device client and the API. Telos registers the device
+client with the same setup URL whenever the provider offers the device flow,
+and tells device apps about it only once the provider has turned it on (it
+checks the registration at most once a minute). `OIDC_DEVICE_CLIENT_ID` names
+another client instead; with another provider, or with `OIDC_ISSUER`, register
+the device client and the API there by hand.
 
 ## AI
 

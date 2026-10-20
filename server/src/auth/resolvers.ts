@@ -1,11 +1,12 @@
 import type { DB } from '@telos/db';
 import { extendSchema, GraphQLError, type GraphQLSchema, parse } from 'graphql';
 import type { QueryResolvers } from '../../__generated__/resolvers.ts';
-import { oidcDeviceClientId, secureLocalNet } from '../core/config.ts';
+import { secureLocalNet } from '../core/config.ts';
 import type { Context } from '../core/context.ts';
 import { attachResolvers } from '../graphql/attach-resolvers.ts';
 import { SSO_START_PATH } from '../http/sso.ts';
 import { instanceAiOn } from '../instance/settings.ts';
+import { deviceClientId } from '../sso/device-client.ts';
 import { effectiveOidc } from '../sso/settings.ts';
 import { sendsMagicLinks } from './better-auth.ts';
 
@@ -33,7 +34,7 @@ const AUTH_SDL = parse(`
     name: String!
     "Where the button sends the browser, on the API's origin. A path, not a URL: the app prefixes the API's address, which in development it works out from the page's own host."
     signInPath: String!
-    "The public client a device app (Home Assistant) uses at the provider for the device flow (OIDC_DEVICE_CLIENT_ID), or null when none is set. Its access tokens, issued for this server's API audience, are accepted as a bearer."
+    "The public client a device app (Home Assistant) uses at the provider for the device flow: OIDC_DEVICE_CLIENT_ID, else the one pairing registered once the provider has turned its device flow on, else null. Its access tokens, issued for this server's API audience, are accepted as a bearer."
     deviceClientId: String
   }
 
@@ -68,7 +69,7 @@ export function requireAuth(ctx: Context): string {
  */
 export async function ssoProvider(db: DB) {
   const { config } = await effectiveOidc(db);
-  return config ? { name: config.name, signInPath: SSO_START_PATH, deviceClientId: oidcDeviceClientId() } : null;
+  return config ? { name: config.name, signInPath: SSO_START_PATH, deviceClientId: await deviceClientId(db) } : null;
 }
 
 /**
