@@ -35,6 +35,11 @@ export interface AuthSettings {
   oidcClientAuth: 'client_secret_basic' | 'client_secret_post';
   /** How long pairing waits on the provider before calling it unreachable. */
   oidcPairingTimeoutMs: number;
+  /**
+   * How long the answer to "has the provider turned the paired device client's device flow on?" is kept before
+   * asking again. `authConfig` is read signed out, so this bounds how often that asks the provider.
+   */
+  deviceClientCheckSeconds: number;
   /** How far a provider access token's `exp`, `iat` and `nbf` may be off from this server's clock. */
   providerTokenClockToleranceSeconds: number;
   /** How long fetching the provider's discovery document or keys may take before a token is refused. */
@@ -50,6 +55,7 @@ export const AUTH_DEFAULTS: Readonly<AuthSettings> = Object.freeze({
   // The default the OIDC spec names.
   oidcClientAuth: 'client_secret_basic',
   oidcPairingTimeoutMs: 10_000,
+  deviceClientCheckSeconds: 60,
   providerTokenClockToleranceSeconds: 30,
   providerTokenFetchTimeoutMs: 5000,
 });

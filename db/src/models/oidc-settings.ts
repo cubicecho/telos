@@ -19,6 +19,12 @@ export const oidcSettings = pgTable(
     // RFC 7592: what updates or deletes the registration at the provider.
     registrationAccessToken: text('registration_access_token'),
     registrationClientUri: text('registration_client_uri'),
+    // The public client registered beside it for device apps (Home Assistant)
+    // to use the device flow with, and what reads or deletes it (RFC 7592).
+    // Null when the provider registered none.
+    deviceClientId: text('device_client_id'),
+    deviceRegistrationAccessToken: text('device_registration_access_token'),
+    deviceRegistrationClientUri: text('device_registration_client_uri'),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [check('oidc_settings_singleton', sql`${t.id} = 'oidc'`)],
