@@ -1,3 +1,10 @@
+# [8.1.0](https://github.com/cubicecho/telos/compare/v8.0.0...v8.1.0) (2026-10-20)
+
+
+### Features
+
+* **auth:** accept OIDC provider access tokens as a person's bearer ([e674a92](https://github.com/cubicecho/telos/commit/e674a92bf6a26f64bea8587c2ed123ed95e1f5d5))
+
 # [8.0.0](https://github.com/cubicecho/telos/compare/v7.5.0...v8.0.0) (2026-10-19)
 
 
