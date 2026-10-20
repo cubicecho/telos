@@ -28,7 +28,7 @@ they go next.
 
 | Actor | Is | Reaches telos through | May change |
 |---|---|---|---|
-| `user` | A signed-in person | A session on `/graphql` | Everything they own, including every switch, agent, key, lane and MCP server |
+| `user` | A signed-in person | A session on `/graphql`, or an access token the OIDC provider issued for the API (a device app such as Home Assistant), mapped through the person's `accounts` row | Everything they own, including every switch, agent, key, lane and MCP server |
 | `apiKey` | An MCP client acting for a person | `/mcp` (or `/graphql`) with an API key | `AI_MUTATIONS` (`graphql/permissions.ts`) on projects and todos AI can see, less the tools its owner switched off (`door.ts`) |
 | `agent` | A run, while it is live | `/mcp` with the run token | Notes on its own todo; the todos under it and those its todo's runs made, in its own project (`run-reach.ts`). Its own todo only through its reply's outcome, which `finishRun` applies: a refine rewrites title, brief and acceptance. Never its own todo's lane, completion or dependencies directly |
 | `system` | The runner, or the server itself | `x-runner-key` | `RUNNER_MUTATIONS` only: claim, heartbeat and finish a run |

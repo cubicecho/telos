@@ -54,3 +54,14 @@ export function forbidden(message: string): GraphQLError {
 export function rateLimited(message: string, retryAfter: number): GraphQLError {
   return new GraphQLError(message, { extensions: { code: 'TOO_MANY_REQUESTS', retryAfter } });
 }
+
+/**
+ * The message of anything caught, for a log line. Never for a client: a caught
+ * error reaches one only through a coded error with a message written for it.
+ *
+ * @param error - Whatever was thrown.
+ * @returns `error.message` for an Error, otherwise `String(error)`.
+ */
+export function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}

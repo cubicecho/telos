@@ -11,7 +11,9 @@ export const UNKNOWN_IP = 'unknown';
 /**
  * Who is asking.
  *
- * - `user`: a person, signed in with a session.
+ * - `user`: a person, signed in with a session, or with an access token the
+ *   OIDC provider issued for this API (auth/provider-tokens.ts). The two are
+ *   the same caller: one kind, one set of rules.
  * - `apiKey`: an external client (an MCP host) holding one of a user's keys.
  *   It acts for that user, but only through the AI door, and only with the
  *   tools its owner left switched on for it.
@@ -36,6 +38,13 @@ export interface Actor {
   toolsOff?: ReadonlySet<string> | undefined;
   /** The run, for an `agent` actor. */
   runId?: string | undefined;
+  /**
+   * When the credential stops being good, for a `user` on a provider access
+   * token: a live board is ended then (auth/credential-expiry.ts), so the
+   * client comes back with a fresh one. Absent for a session, which is
+   * looked up afresh on every request instead.
+   */
+  expiresAt?: Date | undefined;
 }
 
 /**

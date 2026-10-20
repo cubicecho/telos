@@ -7,7 +7,15 @@ import { db } from '@telos/db';
 import { type EmbeddedRunner, startRunner } from '@telos/runner/embed';
 import { migrate } from 'drizzle-orm/postgres-js/migrator';
 import { createAuthHost } from './auth/auth-host.ts';
-import { appUrl, oidcRedirectUri, runnerKey, secureLocalNet, serverUrl, smtpConfigured } from './core/config.ts';
+import {
+  appUrl,
+  oidcApiAudience,
+  oidcRedirectUri,
+  runnerKey,
+  secureLocalNet,
+  serverUrl,
+  smtpConfigured,
+} from './core/config.ts';
 import { ai, schema } from './graphql/schema.ts';
 import { createApp } from './http/app.ts';
 import { stopOnSignals } from './http/shutdown.ts';
@@ -63,7 +71,10 @@ const httpServer = app.listen(PORT, '0.0.0.0', () => {
   }
   console.log(`[auth] links point at ${appUrl()}; OIDC redirects at ${serverUrl()}`);
   const oidc = authHost.oidc();
-  if (oidc) console.log(`[auth] sign-in with ${oidc.name} (${oidc.issuer}); redirect URI ${oidcRedirectUri()}`);
+  if (oidc) {
+    console.log(`[auth] sign-in with ${oidc.name} (${oidc.issuer}); redirect URI ${oidcRedirectUri()}`);
+    console.log(`[auth] ${oidc.name}'s access tokens for ${oidcApiAudience()} are accepted as a bearer`);
+  }
   if (secureLocalNet()) {
     console.warn('[auth] SECURE_LOCAL_NET is on: any email signs in without a link. Private networks only.');
   } else if (!smtpConfigured() && !oidc) {

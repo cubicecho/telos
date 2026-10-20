@@ -121,6 +121,8 @@ domain.
 | `OIDC_CLIENT_SECRET` | — | The client's secret. Leave it unset for a public client. |
 | `OIDC_CLIENT_AUTH` | `client_secret_basic` | How the secret is sent: `client_secret_basic` (heautou's default) or `client_secret_post`. |
 | `OIDC_NAME` | `SSO` | The provider's name on the login button ("Sign in with …"). |
+| `OIDC_API_AUDIENCE` | `<SERVER_URL>/graphql` | Telos's API identifier at the provider: the `aud` a provider access token must carry to be accepted as a bearer. |
+| `OIDC_DEVICE_CLIENT_ID` | — | The public client device apps (Home Assistant) use at the provider for the device flow. Telos only tells them its name, in `authConfig.sso.deviceClientId`. |
 | `AI_ENABLED` | — | Set to `false` to remove AI entirely: no MCP endpoint, no API keys, no agents, no switch in Settings. Otherwise an admin turns it on in Settings. |
 | `RUNNER_CONCURRENCY` | `2` | The most runs the runner works at once. |
 | `RUNNER_POLL_SECONDS` | `5` | How long the runner waits when nothing is ready. |
@@ -173,6 +175,28 @@ from the app:
 Someone signing in this way gets the account with the email address the
 provider vouches for, or a new one if there is none. Setting only one of
 `OIDC_ISSUER` and `OIDC_CLIENT_ID` stops the server at boot.
+
+### Apps that sign in without a browser (Home Assistant)
+
+A device app signs in at the provider instead, with the OAuth device flow, and
+calls the API with the provider's access token as `Authorization: Bearer`.
+Telos accepts it as the person, exactly as a session, live boards included,
+when:
+
+- it is a JWT access token (`typ: at+jwt`, RFC 9068) from the provider in
+  effect, signed with a key in its JWKS by an asymmetric algorithm;
+- its `aud` includes `OIDC_API_AUDIENCE` (default `<SERVER_URL>/graphql`), so
+  register that audience as an API (resource) at the provider; and
+- its `sub` is someone who has signed in to Telos through the provider in a
+  browser at least once. Tokens are never matched to an account by email.
+
+A live board opened with such a token ends, with `UNAUTHENTICATED`, when the
+token expires, and the app reconnects with a fresh one. A client can find the
+provider and the audience at `GET /.well-known/oauth-protected-resource`
+(RFC 9728), and a refused bearer is answered with a `WWW-Authenticate`
+challenge pointing there. The device client is set with
+`OIDC_DEVICE_CLIENT_ID`; both settings are environment only, for a paired
+provider too.
 
 ## AI
 

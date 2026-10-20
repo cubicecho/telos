@@ -6,6 +6,7 @@ import { instanceAiOn } from '../instance/settings.ts';
 import { runToolsOff } from '../mcp/door.ts';
 import { readRunToken, runnerKeyMatches } from '../runs/tokens.ts';
 import type { Auth } from './better-auth.ts';
+import { looksLikeJwt, type ProviderTokens, userForSubject } from './provider-tokens.ts';
 
 // Who a request is: a person on a session, an MCP client on a key, an agent on
 // a run token, the runner, or nobody. Every door asks this, through the context
@@ -18,6 +19,11 @@ export interface ActorOptions {
   ai: boolean;
   /** The runner's key (config.ts `runnerKey`). Unset, nobody is the system principal. */
   runnerKey?: string | null | undefined;
+  /**
+   * Checks the OIDC provider's access tokens (auth-host.ts `providerTokens`).
+   * Null or unset, there is no provider, and a JWT bearer is nobody.
+   */
+  providerTokens?: ProviderTokens | null | undefined;
 }
 
 /**
@@ -34,6 +40,12 @@ export interface ActorOptions {
  *   tools its agent has off for runs, or the default for a run.
  * - `x-api-key`: an MCP client, while its owner has AI on. It carries the
  *   tools its owner switched off for it.
+ *
+ * - `Authorization: Bearer <session>`: a person, on a better-auth session.
+ * - `Authorization: Bearer <JWT>`: a person, on an access token the OIDC
+ *   provider issued for this API, while there is a provider. It is the
+ *   Telos account that signed in through that provider with the token's
+ *   `sub`, and carries the token's expiry.
  *
  * A credential that fails any check is anonymous rather than an error, so the
  * caller gets UNAUTHENTICATED from the first field that needs a user.
@@ -66,12 +78,33 @@ export async function resolveActor(auth: Auth, db: DB, headers: Headers, options
 
   // Case-sensitive on purpose: it is what the client sends, and the bearer
   // plugin would otherwise be the only thing deciding what counts.
-  if (headers.get('authorization')?.startsWith('Bearer ')) {
+  const authorization = headers.get('authorization');
+  if (authorization?.startsWith('Bearer ')) {
+    const bearer = authorization.slice('Bearer '.length).trim();
+    // A session token has no dots, so a JWT never costs a session lookup.
+    if (looksLikeJwt(bearer)) return resolveProviderToken(db, bearer, options.providerTokens);
     const session = await auth.api.getSession({ headers }).catch(() => null);
     if (session) return { kind: 'user', userId: session.user.id };
   }
 
   return ANONYMOUS;
+}
+
+/**
+ * The person a provider access token is for: verified, then mapped through
+ * the `accounts` row their browser sign-in left, never by email.
+ *
+ * @param db The database.
+ * @param token The bearer.
+ * @param tokens The provider's verifier, or nothing with no provider.
+ * @returns A `user` actor carrying the token's expiry, or anonymous.
+ */
+async function resolveProviderToken(db: DB, token: string, tokens: ProviderTokens | null | undefined): Promise<Actor> {
+  if (!tokens) return ANONYMOUS;
+  const verified = await tokens.verify(token);
+  if (!verified) return ANONYMOUS;
+  const userId = await userForSubject(db, verified.sub);
+  return userId ? { kind: 'user', userId, expiresAt: verified.expiresAt } : ANONYMOUS;
 }
 
 /**

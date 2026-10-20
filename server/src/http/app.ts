@@ -10,6 +10,7 @@ import { HTTP_DEFAULTS } from '../core/defaults.ts';
 import { createContextFactory } from '../graphql/context-factory.ts';
 import { createGraphQLHandler } from '../graphql/handler.ts';
 import { mountMcp } from '../mcp/endpoint.ts';
+import { mountProtectedResource } from './protected-resource.ts';
 import { mountSso } from './sso.ts';
 import { createStaticHandler } from './static.ts';
 
@@ -43,7 +44,8 @@ export interface BuiltApp {
 }
 
 /**
- * Builds the Express app: /graphql, /mcp, the OIDC redirects, /healthz and the
+ * Builds the Express app: /graphql, /mcp, the OIDC redirects, the
+ * protected-resource metadata, /healthz and the
  * web client. It does not listen, migrate or start timers, so a test builds the
  * same app production runs and drives it over HTTP.
  *
@@ -65,7 +67,7 @@ export function createApp({
   app.use(cors());
   const contextFor = createContextFactory(db, authHost, limiter, { ai, runnerKey: runnerKey() });
 
-  const graphql = createGraphQLHandler(schema, contextFor);
+  const graphql = createGraphQLHandler(schema, contextFor, authHost);
   // Yoga reads a body Express already parsed, so this is where the size cap goes. Over it: 413.
   app.use(graphql.graphqlEndpoint, express.json({ limit: HTTP_DEFAULTS.bodyLimit }));
   // `all`, not `use`: a mounted `use` strips the path, and Yoga matches graphqlEndpoint itself.
@@ -74,6 +76,8 @@ export function createApp({
   const mcp = mountMcp(app, { ai, db, schema, contextFor, version });
   // Always mounted: a provider can be paired while the server runs.
   mountSso(app, authHost);
+  // Where a device app learns which provider issues tokens for this API (RFC 9728).
+  mountProtectedResource(app, authHost);
   app.get('/healthz', (_req, res) => {
     res.json({ ok: true });
   });
