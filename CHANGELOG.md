@@ -1,3 +1,10 @@
+# [8.2.0](https://github.com/cubicecho/telos/compare/v8.1.0...v8.2.0) (2026-10-20)
+
+
+### Features
+
+* **sso:** register a device client when pairing with a provider ([edec955](https://github.com/cubicecho/telos/commit/edec955c984d8fd356870240e67c247766bf674d))
+
 # [8.1.0](https://github.com/cubicecho/telos/compare/v8.0.0...v8.1.0) (2026-10-20)
 
 
