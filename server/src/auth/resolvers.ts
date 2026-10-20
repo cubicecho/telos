@@ -1,7 +1,7 @@
 import type { DB } from '@telos/db';
 import { extendSchema, GraphQLError, type GraphQLSchema, parse } from 'graphql';
 import type { QueryResolvers } from '../../__generated__/resolvers.ts';
-import { secureLocalNet } from '../core/config.ts';
+import { oidcDeviceClientId, secureLocalNet } from '../core/config.ts';
 import type { Context } from '../core/context.ts';
 import { attachResolvers } from '../graphql/attach-resolvers.ts';
 import { SSO_START_PATH } from '../http/sso.ts';
@@ -33,6 +33,8 @@ const AUTH_SDL = parse(`
     name: String!
     "Where the button sends the browser, on the API's origin. A path, not a URL: the app prefixes the API's address, which in development it works out from the page's own host."
     signInPath: String!
+    "The public client a device app (Home Assistant) uses at the provider for the device flow (OIDC_DEVICE_CLIENT_ID), or null when none is set. Its access tokens, issued for this server's API audience, are accepted as a bearer."
+    deviceClientId: String
   }
 
   extend type Query {
@@ -40,12 +42,20 @@ const AUTH_SDL = parse(`
   }
 `);
 
+/**
+ * The signed-out refusal: no session, an expired one, or a provider token that
+ * is not good. The app drops its session on it and goes to the login page; a
+ * device app fetches a fresh token.
+ *
+ * @param message What the caller is told.
+ * @returns An UNAUTHENTICATED error.
+ */
+export function unauthenticated(message = 'Unauthenticated'): GraphQLError {
+  return new GraphQLError(message, { extensions: { code: 'UNAUTHENTICATED' } });
+}
+
 export function requireAuth(ctx: Context): string {
-  if (!ctx.userId) {
-    throw new GraphQLError('Unauthenticated', {
-      extensions: { code: 'UNAUTHENTICATED' },
-    });
-  }
+  if (!ctx.userId) throw unauthenticated();
   return ctx.userId;
 }
 
@@ -58,7 +68,7 @@ export function requireAuth(ctx: Context): string {
  */
 export async function ssoProvider(db: DB) {
   const { config } = await effectiveOidc(db);
-  return config ? { name: config.name, signInPath: SSO_START_PATH } : null;
+  return config ? { name: config.name, signInPath: SSO_START_PATH, deviceClientId: oidcDeviceClientId() } : null;
 }
 
 /**

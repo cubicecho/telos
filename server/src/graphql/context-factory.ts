@@ -11,14 +11,15 @@ import { createLoaders } from './loaders.ts';
  * use this one, so a caller is the same actor whichever it came through.
  * Loaders are built per request: their batching is only ever valid within one
  * request, and their cache must not outlive it. The auth instance is asked for
- * per request too, since pairing an OIDC provider replaces it (auth-host.ts).
+ * per request too, since pairing an OIDC provider replaces it (auth-host.ts),
+ * and so is the provider's access-token verifier, which is replaced with it.
  * The limiter is one per process, shared by every request, so the sign-in
  * throttle counts across them.
  */
 export function createContextFactory(db: DB, authHost: AuthHost, limiter: RateLimiter, options: ActorOptions) {
   return async (headers: Headers, ip: string = UNKNOWN_IP): Promise<Context> => {
     const auth = authHost.current();
-    const actor = await resolveActor(auth, db, headers, options);
+    const actor = await resolveActor(auth, db, headers, { ...options, providerTokens: authHost.providerTokens() });
     return {
       db,
       auth,

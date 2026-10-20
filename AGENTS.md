@@ -55,12 +55,14 @@ telos/
 │       ├── core/            # What every folder reads, about no one concept: config, defaults,
 │       │                    #   errors, context, enums, preflight (imported first), owned()
 │       ├── http/            # Express-side pieces: the SPA (static.ts), the OIDC redirects
-│       │                    #   (sso.ts), Express headers as fetch Headers (headers.ts)
+│       │                    #   (sso.ts), RFC 9728 metadata (protected-resource.ts),
+│       │                    #   Express headers as fetch Headers (headers.ts)
 │       ├── graphql/         # The served schema and its rules: build-schema, schema, tenancy,
 │       │                    #   permissions (who calls which root field), write-guards, loaders, the context factory both doors share,
 │       │                    #   the /graphql handler, and subscriptions
 │       ├── auth/            # Who the caller is and how they sign in: better-auth, actor
-│       │                    #   (resolveActor), abilities (defineAbilitiesFor), endpoints, throttle, rate-limit, email, api-keys
+│       │                    #   (resolveActor), abilities (defineAbilitiesFor), endpoints, throttle, rate-limit, email, api-keys,
+│       │                    #   provider-tokens (OIDC access tokens as bearers), credential-expiry
 │       ├── sso/             # Pairing with an OIDC provider from the app: settings, pairing, resolvers
 │       ├── instance/        # The instance's settings row: its AI switch, and its admins
 │       ├── ai/              # Whether AI may act, and what it sees and writes: gate, switches,
@@ -210,10 +212,31 @@ in, and preflight refuses it with a public `APP_URL`. Every sign-in step's
 only when `TRUST_PROXY` is) and by address; the limiter is one per process, on
 the context. A bad link or one-time token is `BAD_USER_INPUT`, never
 `UNAUTHENTICATED`, which the app drops its session on. Every request resolves to
-an `actor` (`context.ts`): `user` for a session, `apiKey` for an MCP client,
+an `actor` (`context.ts`): `user` for a session or a provider access token, `apiKey` for an MCP client,
 `agent` for a run token, `system` for the runner, `anonymous` for nobody.
 `ctx.userId` is always `ctx.actor.userId` — null for `system`, so generated
 CRUD refuses the runner outright.
+
+**A provider access token is a person, as a session is.** A device app (Home
+Assistant) runs the device flow at the OIDC provider and sends its access token
+as `Authorization: Bearer`. `resolveActor` sends a bearer with a JWT's shape to
+`auth/provider-tokens.ts` (a session token has no dots), which accepts it only
+while a provider is in effect: signed with a key from the provider's JWKS by an
+asymmetric algorithm it advertises (`PROVIDER_TOKEN_ALGORITHMS`; never `none`
+or HS*), `iss` the provider's, `aud` including `OIDC_API_AUDIENCE`, `typ`
+`at+jwt`, inside `AUTH_DEFAULTS.providerTokenClockToleranceSeconds`. Its `sub`
+becomes a user only through the `accounts` row for `OIDC_PROVIDER_ID`
+(`userForSubject`), **never by email**: no row is anonymous, so the person signs
+in through the browser once first. The actor is `{ kind: 'user', userId,
+expiresAt }`, so every rule treats it as a session; `expiresAt` is what ends a
+live board (`auth/credential-expiry.ts`: one UNAUTHENTICATED result, then the
+stream completes, and the client reconnects with a fresh token). The verifier
+is built with the auth instance (`authHost.providerTokens()`), so a new pairing
+never trusts the last provider's keys. `http/protected-resource.ts` serves RFC
+9728 metadata at `/.well-known/oauth-protected-resource`, and a refused bearer
+gets a `WWW-Authenticate` challenge on its 200 (GraphQL never answers 401).
+`OIDC_API_AUDIENCE` and `OIDC_DEVICE_CLIENT_ID` are environment only, for a
+paired provider too.
 
 **The auth instance is swappable; never hold one from boot.** better-auth fixes
 its plugins at creation, and the OIDC provider is one, so pairing a provider

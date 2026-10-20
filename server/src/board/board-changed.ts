@@ -1,6 +1,7 @@
 import { extendSchema, type GraphQLSchema, parse } from 'graphql';
 import type { SubscriptionResolvers } from '../../__generated__/resolvers.ts';
-import { requireAuth } from '../auth/resolvers.ts';
+import { CREDENTIAL_EXPIRED, untilCredentialExpires } from '../auth/credential-expiry.ts';
+import { requireAuth, unauthenticated } from '../auth/resolvers.ts';
 import { forbidden } from '../core/errors.ts';
 import { loadOwnedProject } from '../core/owned.ts';
 import { attachResolvers } from '../graphql/attach-resolvers.ts';
@@ -44,9 +45,15 @@ export function applyBoardChangesExtension(schema: GraphQLSchema): GraphQLSchema
 
       const events = boardEventsFor(context.db);
       await events.listening();
-      return events.watch(userId, project.id);
+      // A person on a provider access token is heard until it expires, then
+      // told so and the stream completes; a session's stream runs on.
+      return untilCredentialExpires(context.actor, events.watch(userId, project.id));
     },
-    resolve: (change: BoardChange) => ({ projectId: change.projectId, table: change.table }),
+    resolve: (change: BoardChange | typeof CREDENTIAL_EXPIRED) => {
+      if (change === CREDENTIAL_EXPIRED)
+        throw unauthenticated('Your access token expired. Reconnect with a fresh one.');
+      return { projectId: change.projectId, table: change.table };
+    },
   };
 
   return attachResolvers(extendedSchema, { Subscription: fields });

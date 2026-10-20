@@ -1,13 +1,15 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
+import * as dbSchema from '@telos/db/schema';
+import { eq } from 'drizzle-orm';
 import express from 'express';
 import { exportJWK, generateKeyPair, SignJWT } from 'jose';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { resolveActor } from '../../auth/actor.ts';
 import { fixedAuthHost } from '../../auth/auth-host.ts';
 import { type Auth, createAuth } from '../../auth/better-auth.ts';
-import type { OidcConfig } from '../../core/config.ts';
+import { OIDC_PROVIDER_ID, type OidcConfig } from '../../core/config.ts';
 import { mountSso, SSO_START_PATH } from '../../http/sso.ts';
 import { createClient, createTestDb, createUser, type TestDb } from '../helpers.ts';
 
@@ -16,7 +18,7 @@ import { createClient, createTestDb, createUser, type TestDb } from '../helpers.
 // in a Basic header, PKCE, and a signed id token carrying the nonce.
 
 const VERIFY = `mutation ($token: String!) { verifyOneTimeToken(token: $token) { token userId } }`;
-const CONFIG = `{ authConfig { sso { name signInPath } } }`;
+const CONFIG = `{ authConfig { sso { name signInPath deviceClientId } } }`;
 const CLIENT_ID = 'telos';
 const CLIENT_SECRET = 'telos-secret';
 
@@ -200,6 +202,10 @@ describe('OIDC sign-in', () => {
     expect(result.errors).toBeUndefined();
     const session = (result.data as { verifyOneTimeToken: { token: string; userId: string } }).verifyOneTimeToken;
     expect(await whoIs(session.token)).toBe(session.userId);
+    // The provider's `sub` is what an access token from it is mapped back
+    // through (auth/provider-tokens.ts `userForSubject`).
+    const [account] = await db.select().from(dbSchema.accounts).where(eq(dbSchema.accounts.userId, session.userId));
+    expect(account).toMatchObject({ providerId: OIDC_PROVIDER_ID, accountId: provider.profile.sub });
 
     // Spent.
     expect((await verify(token)).errors).toBeDefined();
@@ -248,6 +254,14 @@ describe('authConfig.sso', () => {
     process.env.OIDC_CLIENT_ID = CLIENT_ID;
     process.env.OIDC_NAME = 'heautou';
     const data = await createClient(db, null, { auth }).expectOk(CONFIG);
-    expect(data.authConfig.sso).toEqual({ name: 'heautou', signInPath: SSO_START_PATH });
+    expect(data.authConfig.sso).toEqual({ name: 'heautou', signInPath: SSO_START_PATH, deviceClientId: null });
+  });
+
+  it('names the client device apps use, when one is set', async () => {
+    process.env.OIDC_ISSUER = provider.issuer;
+    process.env.OIDC_CLIENT_ID = CLIENT_ID;
+    process.env.OIDC_DEVICE_CLIENT_ID = 'telos-devices';
+    const data = await createClient(db, null, { auth }).expectOk(CONFIG);
+    expect(data.authConfig.sso.deviceClientId).toBe('telos-devices');
   });
 });
