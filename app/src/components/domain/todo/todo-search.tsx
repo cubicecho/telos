@@ -2,8 +2,7 @@ import { useQuery } from '@apollo/client';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Platform, Text } from 'react-native';
-import { Command, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { CommandDialog, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { LoadState } from '@/components/ui/load-failure';
 import { SearchTodosDocument } from '@/lib/graphql';
 import { cn } from '@/lib/utils';
@@ -65,50 +64,57 @@ export function TodoSearch({ open, onOpenChange }: { open: boolean; onOpenChange
 
   return (
     <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="gap-3 sm:max-w-xl">
-          <DialogHeader>
-            <DialogTitle>Find a todo</DialogTitle>
-            <DialogDescription>By title or description, in every project.</DialogDescription>
-          </DialogHeader>
-          {/* The server has already matched title and notes, so the list is drawn as it came back
-              rather than filtered again by the words as typed. */}
-          <Command label="Search todos" shouldFilter={false} className="bg-transparent">
-            <CommandInput autoFocus value={text} onValueChange={setText} placeholder="Search todos" />
-            {asked === '' ? null : (
-              <LoadState
-                query={query}
-                what="todos"
-                count={found.length}
-                emptySlot={<Text className="text-foreground/60 text-sm">Nothing matches “{asked}”.</Text>}
-              />
-            )}
-            {found.length === 0 ? null : (
-              <CommandList label="Todos found" className="max-h-96">
-                {found.map((todo) => (
-                  <CommandItem
-                    key={todo.id}
-                    value={todo.id}
-                    onSelect={() => pick(todo)}
-                    className="flex-col items-start gap-0 px-3 py-2"
-                  >
-                    <Text
-                      numberOfLines={1}
-                      className={cn('text-foreground text-sm', todo.completedAt && 'text-foreground/60 line-through')}
-                    >
-                      {todo.title}
-                    </Text>
-                    <Text numberOfLines={1} className="text-foreground/60 text-xs">
-                      {todo.project?.name ?? 'No project'}
-                      {todo.lane ? ` · ${todo.lane.name}` : ''}
-                    </Text>
-                  </CommandItem>
-                ))}
-              </CommandList>
-            )}
-          </Command>
-        </DialogContent>
-      </Dialog>
+      {/* A palette: the search row runs edge to edge, so the dialog is named rather than titled.
+          The server has already matched title and notes, so the list is drawn as it came back
+          rather than filtered again by the words as typed. */}
+      <CommandDialog
+        open={open}
+        onOpenChange={onOpenChange}
+        title="Find a todo"
+        description="By title or description, in every project."
+        label="Search todos"
+        shouldFilter={false}
+        className="sm:max-w-xl"
+      >
+        <CommandInput
+          autoFocus
+          value={text}
+          onValueChange={setText}
+          placeholder="Find a todo by title or description"
+        />
+        {asked === '' ? null : (
+          <LoadState
+            query={query}
+            what="todos"
+            count={found.length}
+            className="px-3 py-2"
+            emptySlot={<Text className="text-foreground/60 text-sm">Nothing matches “{asked}”.</Text>}
+          />
+        )}
+        {found.length === 0 ? null : (
+          <CommandList label="Todos found" className="max-h-96">
+            {found.map((todo) => (
+              <CommandItem
+                key={todo.id}
+                value={todo.id}
+                onSelect={() => pick(todo)}
+                className="flex-col items-start gap-0 px-3 py-2"
+              >
+                <Text
+                  numberOfLines={1}
+                  className={cn('text-foreground text-sm', todo.completedAt && 'text-foreground/60 line-through')}
+                >
+                  {todo.title}
+                </Text>
+                <Text numberOfLines={1} className="text-foreground/60 text-xs">
+                  {todo.project?.name ?? 'No project'}
+                  {todo.lane ? ` · ${todo.lane.name}` : ''}
+                </Text>
+              </CommandItem>
+            ))}
+          </CommandList>
+        )}
+      </CommandDialog>
       {picked ? (
         <TodoFormDialog key={picked.id} open onOpenChange={(next) => !next && setPicked(null)} todo={picked} />
       ) : null}
