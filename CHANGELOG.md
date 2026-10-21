@@ -1,3 +1,10 @@
+## [8.2.1](https://github.com/cubicecho/telos/compare/v8.2.0...v8.2.1) (2026-10-21)
+
+
+### Bug Fixes
+
+* **app:** draw find-a-todo as cubeui's CommandDialog ([5dfc3ea](https://github.com/cubicecho/telos/commit/5dfc3ea36ea777915ea712fc88b0e6c8fd25ad4a)), closes [#120](https://github.com/cubicecho/telos/issues/120)
+
 # [8.2.0](https://github.com/cubicecho/telos/compare/v8.1.0...v8.2.0) (2026-10-20)
 
 
