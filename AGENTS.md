@@ -282,7 +282,7 @@ and answers NOT_FOUND for what AI cannot see. What it writes:
 `AI_MUTATIONS` — projects (create and rename, nothing else:
 `holdAiProjectWrite`), todos (create, edit, move, retry, run, stop a run,
 dependencies, archive, restore, delete), notes, artifacts and board
-templates. Still a person's: the AI switches, auto-run, agents and their keys
+templates. Still a person's: the AI switches, auto-run, the project prompt, agents and their keys
 and MCP servers, API keys, lanes and their agents and check commands, the project's new-todo lane, bulk mutations, and archiving
 or deleting a project. A new mutation is closed to AI until it is added there.
 The MCP door (`mcp/endpoint.ts`) serves only the operations written in `mcp/door.graphql`,
@@ -378,7 +378,14 @@ archives it in one write, as the run. It is that or a success route, never
 both; the lane write guard (`assertArchiveOnSuccessFits`) holds it and says
 what to change. `assignmentFor` in `runs/resolvers.ts` assembles what a run is
 handed; the runner adds the agent's instructions and one standing protocol
-(`STANDING_SYSTEM` in `runner/src/prompts.ts`).
+(`STANDING_SYSTEM` in `runner/src/prompts.ts`). A project's prompt
+(`projects.prompt`) is its standing instructions to every agent working its
+todos — where artifacts go, the repo's conventions — kept apart from the
+description, which is for people. It goes in the system prompt under its own
+heading, after where the run is and before the agent's instructions, and only
+when there is one. Like an agent's instructions it is a person's to write
+(`AI_PROJECT_COLUMNS` leaves it out), and the app's project form asks for it only
+while `useAi().on`.
 The runner (`@telos/runner`, which never
 imports `@telos/db`) runs inside the server's process: `index.ts` starts it
 with `startRunner` whenever AI is included, handing it a key made up at boot

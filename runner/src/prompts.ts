@@ -69,9 +69,15 @@ The todo is then done when they all are. Order them so none depends on a later o
 Never both refine and split: a reply with both fails. You cannot edit, move or finish this todo
 with tools; what your reply says is what happens to it.`;
 
+/** What heads the project prompt in a run's system prompt. */
+export const PROJECT_PROMPT_HEADING = "This project's instructions, for every agent working its todos:";
+
 /**
- * The system prompt for a run: where it is, who the agent is and what it does
- * (its own instructions), then the standing protocol every agent shares.
+ * The system prompt for a run: where it is, what its project asks of every
+ * agent working there (the project prompt, a person's own), who the agent is
+ * and what it does (its own instructions), then the standing protocol every
+ * agent shares. The project prompt comes before the agent's instructions, so
+ * those sit right above the protocol that points back at them.
  *
  * @param assignment - What telos said about the run.
  * @param instructions - The agent's own instructions, if it has any.
@@ -85,7 +91,10 @@ export function systemPromptFor(assignment: Assignment, instructions: string | n
   ]
     .join('')
     .trim();
-  return [where, instructions, STANDING_SYSTEM]
+  const projectPrompt = assignment.projectPrompt?.trim()
+    ? `${PROJECT_PROMPT_HEADING}\n${assignment.projectPrompt.trim()}`
+    : null;
+  return [where, projectPrompt, instructions, STANDING_SYSTEM]
     .map((layer) => (layer ?? '').trim())
     .filter(Boolean)
     .join('\n\n');

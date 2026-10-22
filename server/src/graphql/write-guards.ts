@@ -148,7 +148,7 @@ function assertAiSwitchUntouched(args: Parameters<typeof writtenRows>[0]): void 
   }
 }
 
-/** What of a project an AI caller may state. The rest is a person's: its switches, and archiving it. */
+/** What of a project an AI caller may state. The rest is a person's: its switches, its prompt, and archiving it. */
 const AI_PROJECT_COLUMNS = new Set(['id', 'name', 'description', 'context']);
 
 /**

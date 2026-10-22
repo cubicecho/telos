@@ -108,6 +108,8 @@ const RUNS_SDL = parse(`
     projectName: String!
     projectDescription: String
     projectContext: String
+    "The project's standing instructions to every agent working its todos. Only a person writes them."
+    projectPrompt: String
     laneName: String!
     title: String!
     brief: String
@@ -452,6 +454,7 @@ async function assignmentFor(tx: AnyRow, todo: AnyRow, lane: AnyRow, project: An
     projectName: project.name,
     projectDescription: project.description,
     projectContext: project.context,
+    projectPrompt: project.prompt,
     laneName: lane.name,
     title: todo.title,
     brief: todo.notes,

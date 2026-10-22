@@ -152,7 +152,8 @@ the site.
 - **Account:** you, and everything you own. It has its own AI switch and the agent
   defaults new agents start from. Owner: `users`.
 - **Project:** a set of lanes and the todos in them. It has its own AI switch, auto-run,
-  a description and context every agent working in it is given, and a new-todo lane.
+  a description and context every agent working in it is given, a prompt (standing
+  instructions to those agents, a person's only), and a new-todo lane.
   Owner: `projects`.
 - **Lane:** a column in a project. A lane can have an agent that works the todos in it,
   routes that say where they go next, a WIP limit and max attempts.

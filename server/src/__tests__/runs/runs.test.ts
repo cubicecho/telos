@@ -131,11 +131,16 @@ describe('claimRun', () => {
     await board.person.expectOk(
       `mutation { createTodoNote(values: { todoId: "${todoId}", body: "Mind the tone." }) { id } }`,
     );
+    await board.person.expectOk(
+      `mutation ($id: UUID!) { updateProject(set: { prompt: "Keep artifacts in /srv/p." }, where: { id: { eq: $id } }) { id } }`,
+      { id: board.projectId },
+    );
     const claimed = await claim(todoId);
     expect(claimed.agent).toMatchObject({ name: 'Worker', apiKey: 'sk-secret', model: 'tiny', mcpServers: '[]' });
     expect(claimed.assignment).toMatchObject({
       projectName: 'P',
       projectContext: 'A test board.',
+      projectPrompt: 'Keep artifacts in /srv/p.',
       laneName: 'To do',
       title: 'Write it',
       brief: 'The brief.',

@@ -88,6 +88,8 @@ export interface Assignment {
   projectName: string;
   projectDescription: string | null;
   projectContext: string | null;
+  /** The project's standing instructions to its agents, a person's own. */
+  projectPrompt: string | null;
   laneName: string;
   title: string;
   brief: string | null;
@@ -243,7 +245,7 @@ const CLAIM = `mutation ($todoId: ID!, $laneId: ID!) {
     agent { ${AGENT_FIELDS} }
     check { command timeoutSeconds }
     assignment {
-      projectName projectDescription projectContext laneName
+      projectName projectDescription projectContext projectPrompt laneName
       title brief acceptance report why notes reviews ruling
       artifacts { location action title }
     }

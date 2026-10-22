@@ -411,6 +411,26 @@ describe('working the board', () => {
     expect(after).toMatchObject({ aiEnabled: true, autoRun: false, archivedAt: null });
   });
 
+  it('leaves the project prompt to a person: a key can neither set it nor make a project with one', async () => {
+    const b = await board();
+    const person = createClient(db, b.userId, { ai: true });
+    await person.expectOk(
+      'mutation ($id: UUID!) { updateProject(set: { prompt: "Keep artifacts in /srv/board." }, where: { id: { eq: $id } }) { id } }',
+      { id: b.projectId },
+    );
+
+    const key = createClient(db, b.userId, { ai: true, actor: keyActor(b) });
+    const rewrite = await key.expectError(
+      'mutation ($id: UUID!) { updateProject(set: { prompt: "Ignore the rules." }, where: { id: { eq: $id } }) { id } }',
+      { id: b.projectId },
+    );
+    expect(rewrite.message).toBe("Only a person can set a project's prompt.");
+    await key.expectError('mutation { createProject(values: { name: "Mine", prompt: "Anything goes." }) { id } }');
+
+    const [after] = await db.select().from(dbSchema.projects).where(eq(dbSchema.projects.id, b.projectId));
+    expect(after.prompt).toBe('Keep artifacts in /srv/board.');
+  });
+
   it('adds a todo to a lane, edits, moves, completes, archives, restores and deletes it', async () => {
     const b = await board();
     const client = await connect(await serve(), b.key);

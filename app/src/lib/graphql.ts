@@ -99,6 +99,7 @@ export const ProjectDocument = graphql(`
       id
       name
       description
+      prompt
       createdAt
       todoCount
       openTodoCount
@@ -833,6 +834,7 @@ export const UpdateProjectDocument = graphql(`
       id
       name
       description
+      prompt
     }
   }
 `);
