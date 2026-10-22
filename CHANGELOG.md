@@ -1,3 +1,11 @@
+# [8.3.0](https://github.com/cubicecho/telos/compare/v8.2.1...v8.3.0) (2026-10-22)
+
+
+### Features
+
+* **ai:** add a global context and let people edit project context ([9d4e50a](https://github.com/cubicecho/telos/commit/9d4e50a1c3cb352131f3a76fe645a81a8fd1cdea))
+* **projects:** add a project prompt handed to agents ([c660f73](https://github.com/cubicecho/telos/commit/c660f7383d635c1f9e87672c73ac739c55f32059))
+
 ## [8.2.1](https://github.com/cubicecho/telos/compare/v8.2.0...v8.2.1) (2026-10-21)
 
 
