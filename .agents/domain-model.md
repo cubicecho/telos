@@ -149,10 +149,14 @@ the site.
 
 - **Instance:** one telos installation. Its admin can switch AI off for everyone on it.
   Owner: `server/src/instance.ts`.
-- **Account:** you, and everything you own. It has its own AI switch and the agent
-  defaults new agents start from. Owner: `users`.
+- **Account:** you, and everything you own. It has its own AI switch, the agent
+  defaults new agents start from, and a global context every agent is given whichever
+  project it works in (a person edits it in Settings; AI may keep it up to date).
+  Owner: `users`.
 - **Project:** a set of lanes and the todos in them. It has its own AI switch, auto-run,
-  a description and context every agent working in it is given, and a new-todo lane.
+  a description and context every agent working in it is given (the context a person
+  or AI may keep up to date), a prompt (standing instructions to those agents, a
+  person's only), and a new-todo lane.
   Owner: `projects`.
 - **Lane:** a column in a project. A lane can have an agent that works the todos in it,
   routes that say where they go next, a WIP limit and max attempts.
@@ -277,8 +281,8 @@ the site.
   renewing that. Owner: `server/src/resolvers/runs.ts`.
 - **Run token, run reach:** what a run's `/mcp` calls may touch: notes on its own todo,
   and the todos under it and those its runs made. Owner: `run-reach.ts`.
-- **What a run is handed:** its todo, with the project's text, its last report, why it
-  came back and its thread. Owner: `assignmentFor`, the runner's `Assignment` (the word
+- **What a run is handed:** its todo, with the account's global context, the project's
+  text, its last report, why it came back and its thread. Owner: `assignmentFor`, the runner's `Assignment` (the word
   retired by R5).
 - **Session:** a todo as an agent's MCP hooks see it, one per agent per todo; its runs
   are turns of it. Owner: `todo_sessions`.

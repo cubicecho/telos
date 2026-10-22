@@ -29,6 +29,8 @@ export interface ProjectOverviewData {
   id: string;
   name: string;
   description: string | null;
+  /** Standing instructions to the agents working its todos, edited in the project's form. */
+  prompt: string | null;
   todoCount: number;
   openTodoCount: number;
   /** The project's AI switch, flipped in the bar under its header. Meaningless, and not shown, unless AI is on for the account. */

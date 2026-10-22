@@ -6,6 +6,7 @@ import { useAppForm } from '@/components/app-form';
 import { DialogLayout } from '@/components/dialog-layout';
 import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
+import { useAi } from '@/lib/ai';
 import { describeError } from '@/lib/errors';
 import {
   ApplyBoardTemplateDocument,
@@ -28,6 +29,8 @@ export interface ProjectDraft {
   id: string;
   name: string;
   description: string | null;
+  /** Standing instructions to every agent working its todos. A person's only. Not shown unless AI is on for the account. */
+  prompt: string | null;
   /** The lane new todos land in, or null for the first open lane. */
   newTodoLaneId: string | null;
   /** The project's AI switch. Not shown unless AI is on for the account. */
@@ -39,6 +42,7 @@ export interface ProjectDraft {
 interface ProjectFormValues {
   name: string;
   description: string;
+  prompt: string;
   template: string;
   /** A lane's id, or `FIRST_OPEN_LANE`. */
   newTodoLane: string;
@@ -51,11 +55,12 @@ interface ProjectFormValues {
  * @returns The form's values.
  */
 function toValues(
-  project: Pick<ProjectDraft, 'name' | 'description' | 'newTodoLaneId'> | undefined,
+  project: Pick<ProjectDraft, 'name' | 'description' | 'prompt' | 'newTodoLaneId'> | undefined,
 ): ProjectFormValues {
   return {
     name: project?.name ?? '',
     description: project?.description ?? '',
+    prompt: project?.prompt ?? '',
     template: DEFAULT_LANES,
     newTodoLane: project?.newTodoLaneId ?? FIRST_OPEN_LANE,
   };
@@ -71,6 +76,8 @@ export function ProjectFormDialog({
   project?: ProjectDraft;
 }) {
   const router = useRouter();
+  // The prompt is for agents, so it is asked for only where they can work.
+  const ai = useAi();
   const [createProject, { loading: creating, error: createError }] = useMutation(CreateProjectDocument);
   const [updateProject, { loading: updating, error: updateError }] = useMutation(UpdateProjectDocument, {
     refetchQueries: [ProjectsDocument, ...(project ? [{ query: ProjectDocument, variables: { id: project.id } }] : [])],
@@ -101,14 +108,20 @@ export function ProjectFormDialog({
   const projectId = project?.id;
   const name = project?.name ?? '';
   const description = project?.description ?? null;
+  const prompt = project?.prompt ?? null;
   const newTodoLaneId = project?.newTodoLaneId ?? null;
   useEffect(() => {
     if (!open) return;
-    form.reset(toValues(projectId === undefined ? undefined : { name, description, newTodoLaneId }));
-  }, [open, projectId, name, description, newTodoLaneId, form]);
+    form.reset(toValues(projectId === undefined ? undefined : { name, description, prompt, newTodoLaneId }));
+  }, [open, projectId, name, description, prompt, newTodoLaneId, form]);
 
-  async function save({ name, description, template, newTodoLane }: ProjectFormValues) {
-    const values = { name: name.trim(), description: description.trim() === '' ? null : description.trim() };
+  async function save({ name, description, prompt, template, newTodoLane }: ProjectFormValues) {
+    const values = {
+      name: name.trim(),
+      description: description.trim() === '' ? null : description.trim(),
+      // Left out while the field is hidden, so a stored prompt is never cleared by a form that did not show it.
+      ...(ai.on ? { prompt: prompt.trim() === '' ? null : prompt.trim() } : {}),
+    };
     if (creating || updating) return;
     try {
       if (project) {
@@ -196,6 +209,17 @@ export function ProjectFormDialog({
             <form.AppField name="description">
               {(field) => <field.TextAreaField label="Description" placeholder="Optional." />}
             </form.AppField>
+            {ai.on ? (
+              <form.AppField name="prompt">
+                {(field) => (
+                  <field.TextAreaField
+                    label="Project prompt"
+                    description="Handed to every agent working this project's todos: where artifacts go, conventions to follow."
+                    placeholder="Optional."
+                  />
+                )}
+              </form.AppField>
+            ) : null}
             {project === undefined && templates.length > 0 ? (
               <form.AppField name="template">
                 {(field) => (

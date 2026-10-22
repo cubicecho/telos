@@ -99,6 +99,7 @@ export const ProjectDocument = graphql(`
       id
       name
       description
+      prompt
       createdAt
       todoCount
       openTodoCount
@@ -217,6 +218,47 @@ export const SetRunRetentionDocument = graphql(`
     setRunRetention(days: $days) {
       id
       runRetentionDays
+    }
+  }
+`);
+
+// What agents are told beyond their own instructions: the account's global
+// context and each project's context. People edit both in Settings, and AI
+// keeps them up to date through the MCP door.
+export const GlobalContextDocument = graphql(`
+  query GlobalContext {
+    users {
+      id
+      globalContext
+    }
+  }
+`);
+
+export const SetGlobalContextDocument = graphql(`
+  mutation SetGlobalContext($context: String) {
+    setGlobalContext(context: $context) {
+      id
+      globalContext
+    }
+  }
+`);
+
+export const ProjectContextsDocument = graphql(`
+  query ProjectContexts {
+    projects(where: { archivedAt: { isNull: true } }, orderBy: { name: { direction: asc, priority: 1 } }) {
+      id
+      name
+      aiEnabled
+      context
+    }
+  }
+`);
+
+export const SetProjectContextDocument = graphql(`
+  mutation SetProjectContext($id: UUID!, $context: String) {
+    updateProject(set: { context: $context }, where: { id: { eq: $id } }) {
+      id
+      context
     }
   }
 `);
@@ -833,6 +875,7 @@ export const UpdateProjectDocument = graphql(`
       id
       name
       description
+      prompt
     }
   }
 `);

@@ -69,9 +69,20 @@ The todo is then done when they all are. Order them so none depends on a later o
 Never both refine and split: a reply with both fails. You cannot edit, move or finish this todo
 with tools; what your reply says is what happens to it.`;
 
+/** What heads the account's global context in a run's system prompt. */
+export const GLOBAL_CONTEXT_HEADING = 'What every agent should know, whichever project it works in:';
+
+/** What heads the project prompt in a run's system prompt. */
+export const PROJECT_PROMPT_HEADING = "This project's instructions, for every agent working its todos:";
+
 /**
- * The system prompt for a run: where it is, who the agent is and what it does
- * (its own instructions), then the standing protocol every agent shares.
+ * The system prompt for a run, from the broadest layer to the narrowest: what
+ * every agent of the account should know (the global context), where it is
+ * (the project, its description and context), what its project asks of every
+ * agent working there (the project prompt, a person's own), who the agent is
+ * and what it does (its own instructions), then the standing protocol every
+ * agent shares. The agent's instructions sit right above the protocol, which
+ * points back at them. A layer that is blank is left out, heading and all.
  *
  * @param assignment - What telos said about the run.
  * @param instructions - The agent's own instructions, if it has any.
@@ -85,10 +96,23 @@ export function systemPromptFor(assignment: Assignment, instructions: string | n
   ]
     .join('')
     .trim();
-  return [where, instructions, STANDING_SYSTEM]
+  const globalContext = headed(GLOBAL_CONTEXT_HEADING, assignment.globalContext);
+  const projectPrompt = headed(PROJECT_PROMPT_HEADING, assignment.projectPrompt);
+  return [globalContext, where, projectPrompt, instructions, STANDING_SYSTEM]
     .map((layer) => (layer ?? '').trim())
     .filter(Boolean)
     .join('\n\n');
+}
+
+/**
+ * A layer under its heading, or null when there is nothing to put under it.
+ *
+ * @param heading - What the layer is.
+ * @param text - The layer, if any.
+ * @returns The layer, headed.
+ */
+function headed(heading: string, text: string | null): string | null {
+  return text?.trim() ? `${heading}\n${text.trim()}` : null;
 }
 
 /**

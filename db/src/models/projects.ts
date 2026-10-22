@@ -16,6 +16,12 @@ export const projects = pgTable(
     // repo, the conventions, who the work is for. Read by agents only, and
     // harmless when AI is off.
     context: text('context'),
+    // Standing instructions for every agent working this project's todos
+    // (where artifacts go, the repo's conventions), kept apart from the
+    // description, which is for people. A person's only: an AI caller may
+    // not write it (AI_PROJECT_COLUMNS in write-guards.ts), as it may not
+    // write an agent's instructions.
+    prompt: text('prompt'),
     // The project's AI switch, under the account's (users.aiEnabled) and the
     // instance's (AI_ENABLED). Off by default: an agent only ever works on a
     // project somebody deliberately opened to it. Set through

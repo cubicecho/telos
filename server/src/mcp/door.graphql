@@ -32,6 +32,13 @@ query projects {
   }
 }
 
+# What every agent of this account is told, whichever project it works in:
+# the base its project's context and prompt build on. Null when nothing is.
+# Keep it up to date with `set_global_context`.
+query globalContext {
+  globalContext
+}
+
 # One project's lanes in board order, with the agent that works each (if any),
 # where a todo goes after a run (the success and failure routes,
 # `onSuccessLaneId` and `onFailureLaneId`), how many it works at once and how
@@ -409,8 +416,10 @@ mutation createProject(
   }
 }
 
-# Changes a project's name, description or context. Whatever is left out
-# stays as it is.
+# Changes a project's name, description or context. The context is what
+# every agent working there is told about it (the repo, its conventions, who
+# the work is for): keep it up to date as you learn the project. Whatever is
+# left out stays as it is.
 mutation updateProject(
   # From `projects`.
   $id: UUID!
@@ -426,6 +435,22 @@ mutation updateProject(
     name
     description
     context
+    updatedAt
+  }
+}
+
+# Replaces what every agent of this account is told, whichever project it
+# works in. Keep it to what holds everywhere (who the work is for, the
+# machines and tools at hand, conventions shared across projects), and put
+# what is one project's in that project's context instead. Read
+# `global_context` first, and send the whole text: it replaces the old.
+mutation setGlobalContext(
+  # The new text. Blank clears it.
+  $context: String
+) {
+  setGlobalContext(context: $context) {
+    id
+    globalContext
     updatedAt
   }
 }

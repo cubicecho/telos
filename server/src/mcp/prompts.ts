@@ -54,10 +54,13 @@ then. That is queued, not stuck.
 
 You can read the board and what happened on it: \`projects\`, \`lanes\`, \`todos\`,
 \`request\`, \`todo_notes\`, \`todo_history\`, \`blockers\`, \`runs\`, \`run_events\`,
-\`artifacts\`, \`agents\`, \`spend\` and \`board_templates\`. To keep a
+\`artifacts\`, \`agents\`, \`spend\`, \`board_templates\` and \`global_context\`. To keep a
 copy of the board in step, read \`changes\` from the cursor it handed you last time.
 
 You can work it too. Make and rename projects (\`create_project\`, \`update_project\`).
+Keep what agents are told up to date: a project's context (\`update_project\`), and the
+account's global context, which every agent is told whatever project it works in
+(\`set_global_context\`). A project's prompt is its owner's to write, not yours.
 Hand work over (\`submit_request\`, or \`create_todo\` for a lane you choose), and
 change what a todo says (\`update_todo\`). Move a todo (\`move_todo\`; into the done lane completes it), make it
 wait on others (\`set_todo_dependencies\`), send it round its lane's agent again
