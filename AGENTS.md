@@ -279,8 +279,8 @@ apply the same narrowing itself — see `visibleToAi`/`hiddenFromAi` in
 `ai/reach.ts`, which checks the ids a hand-written mutation is handed
 and answers NOT_FOUND for what AI cannot see. What it writes:
 `graphql/permissions.ts` gates every root field and refuses AI all but
-`AI_MUTATIONS` — projects (create and rename, nothing else:
-`holdAiProjectWrite`), todos (create, edit, move, retry, run, stop a run,
+`AI_MUTATIONS` — projects (create and rename, and their context, nothing else:
+`holdAiProjectWrite`), the account's global context (`setGlobalContext`), todos (create, edit, move, retry, run, stop a run,
 dependencies, archive, restore, delete), notes, artifacts and board
 templates. Still a person's: the AI switches, auto-run, the project prompt, agents and their keys
 and MCP servers, API keys, lanes and their agents and check commands, the project's new-todo lane, bulk mutations, and archiving
@@ -385,7 +385,21 @@ description, which is for people. It goes in the system prompt under its own
 heading, after where the run is and before the agent's instructions, and only
 when there is one. Like an agent's instructions it is a person's to write
 (`AI_PROJECT_COLUMNS` leaves it out), and the app's project form asks for it only
-while `useAi().on`.
+while `useAi().on`. Context is the other kind of thing a run is told, in two
+layers, and AI may keep both up to date where it may not touch a prompt: the
+account's global context (`users.globalContext`, `ai/global-context.ts`:
+`globalContext` and `setGlobalContext`, the door's `global_context` and
+`set_global_context`) and each project's (`projects.context`, through
+`updateProject`). It lives on the account's row, not in `agent_defaults`,
+because that table is the server's, closed to AI, and is the agent spec's layer
+rather than the prompt's. The system prompt runs from the broadest layer to
+the narrowest: the global context under its own heading, the project (name,
+description, context), the project prompt, the agent's instructions, then
+`STANDING_SYSTEM`, which must stay right after the instructions it points back
+at. A blank layer is left out, heading and all. Settings' Context tab (while
+`useAi().on`, `domain/ai/agent-context.tsx`) edits the global context and each
+unarchived project's; a run has `set_global_context` off until a person turns
+it on for its agent (`RUN_REACH_EXEMPT`).
 The runner (`@telos/runner`, which never
 imports `@telos/db`) runs inside the server's process: `index.ts` starts it
 with `startRunner` whenever AI is included, handing it a key made up at boot

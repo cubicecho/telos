@@ -105,6 +105,8 @@ const RUNS_SDL = parse(`
 
   "Everything an agent is told about the todo it is working, and where."
   type RunAssignment {
+    "What every agent of the account is told, whichever project it works in. The base layer, under the project's."
+    globalContext: String
     projectName: String!
     projectDescription: String
     projectContext: String
@@ -433,6 +435,11 @@ async function assignmentFor(tx: AnyRow, todo: AnyRow, lane: AnyRow, project: An
     )
     .orderBy(desc(dbSchema.todoEvents.at))
     .limit(1);
+  const [owner] = await tx
+    .select({ globalContext: dbSchema.users.globalContext })
+    .from(dbSchema.users)
+    .where(eq(dbSchema.users.id, project.userId));
+
   const arrivalNote = arrival?.noteId ? thread.find((note) => note.id === arrival.noteId) : undefined;
   const why = reviews && arrivalNote?.kind === 'report' ? null : (arrivalNote?.body ?? arrival?.reason ?? null);
 
@@ -451,6 +458,7 @@ async function assignmentFor(tx: AnyRow, todo: AnyRow, lane: AnyRow, project: An
     .limit(ASSIGNMENT_ARTIFACTS);
 
   return {
+    globalContext: owner?.globalContext ?? null,
     projectName: project.name,
     projectDescription: project.description,
     projectContext: project.context,

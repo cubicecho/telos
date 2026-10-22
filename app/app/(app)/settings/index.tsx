@@ -1,5 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { View } from 'react-native';
+import { ContextSettings } from '@/components/domain/ai/agent-context';
 import { AgentSettings, AiSettings } from '@/components/domain/ai/ai-settings';
 import { McpServerManager } from '@/components/domain/ai/mcp-server-manager';
 import { LabelManager } from '@/components/domain/label/label-manager';
@@ -13,12 +14,13 @@ import { PALETTE_PREFERENCES } from '@/components/ui/theme-preference-base';
 import { useAi } from '@/lib/ai';
 import { CARD_TITLE } from '@/lib/styles';
 
-type SettingsTab = 'general' | 'ai' | 'agents' | 'mcp';
+type SettingsTab = 'general' | 'ai' | 'agents' | 'mcp' | 'context';
 
 /**
  * One card per thing you can change, in tabs: the board's own settings; AI's
- * switches and keys; and, once AI is on, the agents and the MCP servers they
- * reach, each a tab of its own. The tab lives in the URL, as the project's view
+ * switches and keys; and, once AI is on, the agents, the MCP servers they
+ * reach, and the context they are told (the account's and each project's),
+ * each a tab of its own. The tab lives in the URL, as the project's view
  * does, so a link can open one. The AI tab is not there at all for someone with
  * nothing in it — AI stays out of sight until the instance has it on — and a
  * link to Agents or MCP servers while AI is off lands on General.
@@ -26,7 +28,7 @@ type SettingsTab = 'general' | 'ai' | 'agents' | 'mcp';
 export default function SettingsScreen() {
   const { tab } = useLocalSearchParams<{ tab?: string }>();
   const ai = useAi();
-  const open: readonly SettingsTab[] = ai.on ? ['ai', 'agents', 'mcp'] : ai.settings ? ['ai'] : [];
+  const open: readonly SettingsTab[] = ai.on ? ['ai', 'agents', 'mcp', 'context'] : ai.settings ? ['ai'] : [];
   const current: SettingsTab = open.find((name) => name === tab) ?? 'general';
 
   const general = (
@@ -66,6 +68,7 @@ export default function SettingsScreen() {
                 <>
                   <TabsTrigger value="agents">Agents</TabsTrigger>
                   <TabsTrigger value="mcp">MCP servers</TabsTrigger>
+                  <TabsTrigger value="context">Context</TabsTrigger>
                 </>
               ) : null}
             </TabsList>
@@ -88,6 +91,9 @@ export default function SettingsScreen() {
                   <View className="gap-6">
                     <McpServerManager />
                   </View>
+                </TabsContent>
+                <TabsContent value="context" className="mt-0">
+                  <ContextSettings />
                 </TabsContent>
               </>
             ) : null}

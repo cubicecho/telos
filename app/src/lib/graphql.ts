@@ -222,6 +222,47 @@ export const SetRunRetentionDocument = graphql(`
   }
 `);
 
+// What agents are told beyond their own instructions: the account's global
+// context and each project's context. People edit both in Settings, and AI
+// keeps them up to date through the MCP door.
+export const GlobalContextDocument = graphql(`
+  query GlobalContext {
+    users {
+      id
+      globalContext
+    }
+  }
+`);
+
+export const SetGlobalContextDocument = graphql(`
+  mutation SetGlobalContext($context: String) {
+    setGlobalContext(context: $context) {
+      id
+      globalContext
+    }
+  }
+`);
+
+export const ProjectContextsDocument = graphql(`
+  query ProjectContexts {
+    projects(where: { archivedAt: { isNull: true } }, orderBy: { name: { direction: asc, priority: 1 } }) {
+      id
+      name
+      aiEnabled
+      context
+    }
+  }
+`);
+
+export const SetProjectContextDocument = graphql(`
+  mutation SetProjectContext($id: UUID!, $context: String) {
+    updateProject(set: { context: $context }, where: { id: { eq: $id } }) {
+      id
+      context
+    }
+  }
+`);
+
 export const SetProjectAiEnabledDocument = graphql(`
   mutation SetProjectAiEnabled($projectId: ID!, $enabled: Boolean!) {
     setProjectAiEnabled(projectId: $projectId, enabled: $enabled) {

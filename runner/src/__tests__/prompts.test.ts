@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   assignmentPrompt,
+  GLOBAL_CONTEXT_HEADING,
   PROJECT_PROMPT_HEADING,
   REVIEW_NOTE,
   readReply,
@@ -10,6 +11,7 @@ import {
 import type { Assignment } from '../telos.ts';
 
 const ASSIGNMENT: Assignment = {
+  globalContext: null,
   projectName: 'Telos',
   projectDescription: 'A board.',
   projectContext: 'TypeScript, npm.',
@@ -41,13 +43,37 @@ describe('systemPromptFor', () => {
 
   it('leaves out what the agent has not got', () => {
     const system = systemPromptFor(
-      { ...ASSIGNMENT, projectDescription: null, projectContext: null, projectPrompt: '  ' },
+      { ...ASSIGNMENT, globalContext: ' \n', projectDescription: null, projectContext: null, projectPrompt: '  ' },
       null,
     );
 
     expect(system.startsWith('Project: Telos\n\n')).toBe(true);
     expect(system).not.toContain('null');
+    expect(system).not.toContain(GLOBAL_CONTEXT_HEADING);
     expect(system).not.toContain(PROJECT_PROMPT_HEADING);
+  });
+
+  it('goes from the broadest layer to the narrowest, and ends on the protocol', () => {
+    const system = systemPromptFor(
+      {
+        ...ASSIGNMENT,
+        globalContext: 'Work happens on the homelab.\n',
+        projectPrompt: 'Keep artifacts in /srv/telos.',
+      },
+      'You are careful.',
+    );
+    const layers = [
+      `${GLOBAL_CONTEXT_HEADING}\nWork happens on the homelab.\n\n`,
+      'Project: Telos',
+      'TypeScript, npm.',
+      `${PROJECT_PROMPT_HEADING}\nKeep artifacts in /srv/telos.\n\n`,
+      'You are careful.\n\n',
+      STANDING_SYSTEM,
+    ].map((layer) => system.indexOf(layer));
+
+    expect(layers[0]).toBe(0);
+    expect(layers.every((at, index) => at >= 0 && (index === 0 || at > layers[index - 1]))).toBe(true);
+    expect(system.endsWith(`You are careful.\n\n${STANDING_SYSTEM}`)).toBe(true);
   });
 
   it("hands on the project's prompt under its own heading, between where it is and who it is", () => {

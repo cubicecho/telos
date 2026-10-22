@@ -4,6 +4,7 @@ import { buildSchema, GraphQLDateTime } from '@vantreeseba/drizzle-graphql';
 import { applyAgentDefaultsExtension } from '../agents/agent-defaults-resolvers.ts';
 import { applyAgentsExtension } from '../agents/resolvers.ts';
 import { applyAccountActivityExtension } from '../ai/account-activity.ts';
+import { applyGlobalContextExtension } from '../ai/global-context.ts';
 import { applyAiReadsExtension } from '../ai/reads.ts';
 import { applyRequestsExtension } from '../ai/requests.ts';
 import { applyAiSetupExtension } from '../ai/setup.ts';
@@ -136,6 +137,7 @@ export function createSchema(db: DB, options: SchemaOptions) {
     schema = applyAiSetupExtension(schema);
     schema = applyAccountActivityExtension(schema);
     schema = applyAiReadsExtension(schema);
+    schema = applyGlobalContextExtension(schema);
   }
   // Last, so it sees every root field the extensions above added.
   schema = applyCallerPermissions(schema, entities);
