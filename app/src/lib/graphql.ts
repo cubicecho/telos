@@ -596,8 +596,6 @@ export const LaneAgentFieldsFragment = graphql(`
   fragment LaneAgentFields on Lane {
     id
     agentId
-    checkCommand
-    checkTimeoutSeconds
     onSuccessLaneId
     onFailureLaneId
     archiveOnSuccess

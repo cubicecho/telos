@@ -1,9 +1,9 @@
 import type { probe } from '@cubicecho/agent-mcp-pool';
 import { describe, expect, it, vi } from 'vitest';
-import { configWarnings, readConfig } from '../config.ts';
+import { configWarnings } from '../config.ts';
 import { PROBE_TIMEOUT_MS, testServer } from '../probes.ts';
 import { tellServers } from '../session-deletes.ts';
-import type { AgentClaim } from '../telos.ts';
+import type { Claim } from '../telos.ts';
 import { openTools, serverConfig } from '../tools.ts';
 
 // A server's row as the pool reads it: a URL, and how long a server is given
@@ -51,7 +51,7 @@ describe('a stdio server', () => {
     const claim = {
       token: 't',
       agent: { mcpServers: JSON.stringify([stdio]), mcpNotices: [] },
-    } as unknown as AgentClaim;
+    } as unknown as Claim;
     const pool = await openTools(claim, { telosUrl: 'http://127.0.0.1:1', onNotice: (text) => notices.push(text) });
     try {
       expect(pool.state().map((server) => server.id)).toEqual(['telos']);
@@ -102,30 +102,21 @@ describe("a server's test", () => {
 describe("the runner's settings", () => {
   const env = { RUNNER_KEY: 'k' };
 
-  it('run check lanes only with RUNNER_ALLOW_CHECKS=true', () => {
-    expect(readConfig(env)?.allowChecks).toBe(false);
-    expect(readConfig({ ...env, RUNNER_ALLOW_CHECKS: 'yes' })?.allowChecks).toBe(false);
-    expect(readConfig({ ...env, RUNNER_ALLOW_CHECKS: 'true' })?.allowChecks).toBe(true);
-    // The old switch turns nothing on.
-    expect(readConfig({ ...env, RUNNER_ALLOW_STDIO: 'true' })?.allowChecks).toBe(false);
+  it('say nothing when nothing old is set, and that RUNNER_ALLOW_STDIO is no longer read', () => {
+    expect(configWarnings(env)).toEqual([]);
+    const [warning] = configWarnings({ ...env, RUNNER_ALLOW_STDIO: 'true' });
+    expect(warning).toMatch(/RUNNER_ALLOW_STDIO is no longer read/);
   });
 
-  it('say when checks are on, and that RUNNER_ALLOW_STDIO is no longer read', () => {
-    const quiet = readConfig(env);
-    expect(quiet && configWarnings(quiet, env)).toEqual([]);
-    const old = { ...env, RUNNER_ALLOW_STDIO: 'true' };
-    const [warning] = configWarnings(readConfig(old) as NonNullable<typeof quiet>, old);
-    expect(warning).toMatch(/RUNNER_ALLOW_STDIO is no longer read/);
-    expect(warning).toMatch(/RUNNER_ALLOW_CHECKS/);
-    const on = { ...env, RUNNER_ALLOW_CHECKS: 'true' };
-    expect(configWarnings(readConfig(on) as NonNullable<typeof quiet>, on)).toEqual([
-      '⚠️  RUNNER_ALLOW_CHECKS is on: check lanes may run shell commands on this host.',
-    ]);
+  it('say that RUNNER_ALLOW_CHECKS is no longer read, since check lanes were removed', () => {
+    const [warning] = configWarnings({ ...env, RUNNER_ALLOW_CHECKS: 'true' });
+    expect(warning).toMatch(/RUNNER_ALLOW_CHECKS is no longer read/);
+    expect(warning).toMatch(/check lanes were removed/);
   });
 
   it('say that RUNNER_CONCURRENCY is no longer read, and where the run limit went', () => {
     const old = { ...env, RUNNER_CONCURRENCY: '4' };
-    const [warning] = configWarnings(readConfig(old) as NonNullable<ReturnType<typeof readConfig>>, old);
+    const [warning] = configWarnings(old);
     expect(warning).toMatch(/RUNNER_CONCURRENCY is no longer read/);
     expect(warning).toMatch(/Settings → Agents/);
   });

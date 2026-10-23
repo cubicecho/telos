@@ -38,8 +38,6 @@ function laneAgent(id: string, agentId: string | null) {
     __typename: 'Lane',
     id,
     agentId,
-    checkCommand: null,
-    checkTimeoutSeconds: null,
     onSuccessLaneId: null,
     onFailureLaneId: null,
     archiveOnSuccess: false,

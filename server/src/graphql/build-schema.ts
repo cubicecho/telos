@@ -51,11 +51,9 @@ export interface SchemaOptions {
 /** Tables that exist in the API only while the instance has AI on. */
 const AI_TABLES = ['agents', 'mcpServers', 'runs', 'artifacts'];
 
-/** A lane's agent or check, and its routes, which mean nothing without the runner. */
+/** A lane's agent and routes, which mean nothing without agents. */
 const AI_LANE_COLUMNS = [
   'agentId',
-  'checkCommand',
-  'checkTimeoutSeconds',
   'onSuccessLaneId',
   'onFailureLaneId',
   'archiveOnSuccess',

@@ -50,7 +50,7 @@ const AI_STATUS_SDL = parse(`
   type LaneTally {
     laneId: ID!
     name: String!
-    "Whether an agent, or a check command, works this lane."
+    "Whether an agent works this lane."
     station: Boolean!
     isDone: Boolean!
     handedBack: Int!
@@ -176,7 +176,7 @@ async function whyNotRunnable(db: DB, todo: AnyRow): Promise<string | null> {
   }>(
     await db.execute(sql`
       SELECT
-        p.ai_enabled, p.archived_at IS NOT NULL AS project_archived, l.name AS lane_name, l.is_done, (l.agent_id IS NOT NULL OR l.check_command IS NOT NULL) AS has_agent,
+        p.ai_enabled, p.archived_at IS NOT NULL AS project_archived, l.name AS lane_name, l.is_done, l.agent_id IS NOT NULL AS has_agent,
         t.split_at IS NOT NULL AS split,
         (
           SELECT string_agg(b.title, ', ' ORDER BY b.title) FROM todo_dependencies d
@@ -270,7 +270,7 @@ export function applyAiStatusExtension(schema: GraphQLSchema): GraphQLSchema {
           .map((lane) => ({
             laneId: lane.id,
             name: lane.name,
-            station: lane.agentId != null || lane.checkCommand != null,
+            station: lane.agentId != null,
             isDone: lane.isDone,
             ...(tallies.get(lane.id) ?? noTally()),
           })),

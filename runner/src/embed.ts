@@ -17,7 +17,7 @@ export interface EmbeddedRunner {
  *
  * @param options.telosUrl Where the server is listening.
  * @param options.runnerKey The key the server accepts as x-runner-key.
- * @param options.env Where the tuning settings (poll, checks) are read from.
+ * @param options.env Where the tuning settings (the poll interval) are read from.
  * @returns A handle to stop it.
  */
 export function startRunner(options: { telosUrl: string; runnerKey: string; env?: NodeJS.ProcessEnv }): EmbeddedRunner {
@@ -26,7 +26,7 @@ export function startRunner(options: { telosUrl: string; runnerKey: string; env?
   // readConfig is only null without a key, and one was just given.
   if (!config) throw new Error('startRunner needs a runner key');
   const abort = new AbortController();
-  for (const warning of configWarnings(config, env)) console.warn(warning);
+  for (const warning of configWarnings(env)) console.warn(warning);
   const done = runLoop({ ...config, telos: createTelos(config) }, abort.signal);
   return {
     stop() {

@@ -3,14 +3,12 @@ import { and, asc, eq, inArray } from 'drizzle-orm';
 import { extendSchema, type GraphQLSchema, parse } from 'graphql';
 import type { MutationResolvers } from '../../__generated__/resolvers.ts';
 import { requireAuth } from '../auth/resolvers.ts';
-import type { Context } from '../core/context.ts';
-import { LANE_CHECK_DEFAULTS } from '../core/defaults.ts';
 import { badInput, conflict, notFound } from '../core/errors.ts';
 import { loadOwnedProject } from '../core/owned.ts';
 import { attachResolvers } from '../graphql/attach-resolvers.ts';
 
-// Board templates: a project's lanes, with their agents, checks and routes,
-// saved to start another project from. Listing, renaming and deleting one is generated
+// Board templates: a project's lanes, with their agents and routes, saved to
+// start another project from. Listing, renaming and deleting one is generated
 // CRUD; saving reads the board, and applying writes one, so those are here.
 //
 // Applying replaces a board, so it is only for a project with no todos yet —
@@ -62,16 +60,10 @@ export function checkTemplateLanes(value: unknown): TemplateLane[] {
     if (archiveOnSuccess && index(lane.onSuccess) != null) {
       throw badInput(`"${name}" can archive on success or have a success route to a lane, not both.`);
     }
-    const agentId = typeof lane.agentId === 'string' ? lane.agentId : null;
-    const check = checkOf(name, lane);
-    if (check.checkCommand && (agentId || wipLimit !== 1)) {
-      throw badInput(`"${name}" runs a check, so it has no agent and a WIP limit of 1.`);
-    }
     return {
       name,
       isDone: lane.isDone === true,
-      agentId,
-      ...check,
+      agentId: typeof lane.agentId === 'string' ? lane.agentId : null,
       onSuccess: index(lane.onSuccess),
       onFailure: index(lane.onFailure),
       archiveOnSuccess,
@@ -81,45 +73,6 @@ export function checkTemplateLanes(value: unknown): TemplateLane[] {
   });
   if (lanes.filter((lane) => lane.isDone).length > 1) throw badInput('A template may have only one done lane.');
   return lanes;
-}
-
-/**
- * A template lane's check, held to the bounds a lane's own is (write-guards.ts).
- *
- * @param name The lane's name, for the message.
- * @param lane The lane as stored.
- * @returns Its command and time limit, null where it has none.
- */
-function checkOf(
-  name: string,
-  lane: Record<string, unknown>,
-): { checkCommand: string | null; checkTimeoutSeconds: number | null } {
-  const { maxCommandChars, maxTimeoutSeconds } = LANE_CHECK_DEFAULTS;
-  const command = typeof lane.checkCommand === 'string' ? lane.checkCommand.trim() : '';
-  if (command.length > maxCommandChars)
-    throw badInput(`"${name}" has a check command over ${maxCommandChars} characters.`);
-  const timeout = lane.checkTimeoutSeconds ?? null;
-  if (
-    timeout !== null &&
-    (!Number.isInteger(timeout) || (timeout as number) < 1 || (timeout as number) > maxTimeoutSeconds)
-  ) {
-    throw badInput(`"${name}" needs a check time limit of 1 to ${maxTimeoutSeconds} seconds.`);
-  }
-  return { checkCommand: command || null, checkTimeoutSeconds: command ? (timeout as number | null) : null };
-}
-
-/**
- * A template lane's check as applying writes it. A check command is a
- * person's to set (write-guards.ts), and AI may apply a template, so when
- * anyone else does, a check lane arrives as a plain lane for a person to arm.
- *
- * @param lane The template's lane.
- * @param context The request.
- * @returns The lane's check columns.
- */
-function appliedCheck(lane: TemplateLane, context: Context) {
-  if (context.actor.kind !== 'user') return { checkCommand: null, checkTimeoutSeconds: null };
-  return { checkCommand: lane.checkCommand ?? null, checkTimeoutSeconds: lane.checkTimeoutSeconds ?? null };
 }
 
 export function applyBoardTemplatesExtension(schema: GraphQLSchema): GraphQLSchema {
@@ -147,8 +100,6 @@ export function applyBoardTemplatesExtension(schema: GraphQLSchema): GraphQLSche
       archiveOnSuccess: lane.archiveOnSuccess,
       wipLimit: lane.wipLimit,
       maxAttempts: lane.maxAttempts,
-      checkCommand: lane.checkCommand,
-      checkTimeoutSeconds: lane.checkTimeoutSeconds,
     }));
     const [template] = await db
       .insert(dbSchema.boardTemplates)
@@ -209,7 +160,6 @@ export function applyBoardTemplatesExtension(schema: GraphQLSchema): GraphQLSche
             archiveOnSuccess: lane.archiveOnSuccess ?? false,
             wipLimit: lane.wipLimit ?? 1,
             maxAttempts: lane.maxAttempts ?? 3,
-            ...appliedCheck(lane, context),
           })),
         )
         .returning({ id: dbSchema.lanes.id, position: dbSchema.lanes.position });
