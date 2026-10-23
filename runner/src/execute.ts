@@ -356,7 +356,7 @@ async function work(
   const { signal, log, feed, artifacts } = options;
   const { agent, assignment } = claim;
   const prompt = assignmentPrompt(assignment);
-  const system = systemPromptFor(assignment, agent.systemPrompt);
+  const system = systemPromptFor(assignment, agent.prompt);
   feed.prompt({ system, user: prompt });
   const catalog = config.toolDiscovery === 'eager' ? undefined : pool.catalog();
   const preselected =

@@ -1,123 +1,32 @@
 import { parseJson } from '@cubicecho/agent-core';
 import type { Assignment, ProposedTodo, RefinedTodo } from './telos.ts';
 
-// What an agent is told. The agent's own instructions say what to do with a
-// todo; the standing protocol after them says how a reply is read, which is
-// the same for every agent. A reply settles its todo one way: a ruling (PASS
-// or FAIL), a report, a refine (the todo rewritten, in a fenced `refine`
-// block) or a split (two or more todos, in a fenced `todos` block). The server
-// decides what each does to the todo (`finishRun`).
-
-export const STANDING_SYSTEM = `You work one todo on a Telos board, as your instructions above say.
-
-Your instructions say what your job is; nothing below widens it. When a tool fails, say so
-plainly and say what you tried; do not report success you did not have.
-
-Your reply goes on the todo for the next agent and the person to read, and it settles the todo in
-one of these ways. Use the one your instructions ask for.
-
-A ruling. When your instructions ask you to rule on the todo, begin with PASS or FAIL on its own
-line, the bare word with no formatting around it, since that word is how the ruling is read. Then
-take the acceptance criteria one at a time (what the brief asks for, when the todo has none): for
-each, say met or not met, and quote the evidence you found yourself (a command and what it printed,
-a line of a file, what a tool answered). FAIL only on a criterion you can name as not met, with the
-evidence that shows it; one you had no way to check is not met, and the evidence is what you tried.
-FAIL sends the todo back, and those lines are what the next agent works from.
-
-A report. When you do the work, first plan it: a short checklist of what you will change and how
-you will check each acceptance criterion (or what the brief asks for, when the todo has none).
-Before you answer, check every criterion yourself. Then end your report with these three sections:
-
-## Changes
-What you changed, and where.
-
-## Verification
-Each acceptance criterion, what you ran or looked at to check it, and what that showed.
-
-## Open questions
-What you were unsure of, could not check or left undone; "None." when there is nothing.
-
-A refine. When your job is to make the todo ready for someone else to do and it is one piece of
-work, rewrite it in a fenced block marked refine, holding a JSON object, after anything else you
-say. A field you leave out stays as it is:
-
-\`\`\`refine
-{
-  "title": "imperative, under about ten words",
-  "brief": "what to do, where, and what to watch out for",
-  "acceptance": "- one line per thing someone can check to tell this todo is done"
-}
-\`\`\`
-
-A split. When the todo is genuinely several pieces of work, propose two or more todos in a fenced
-block marked todos, holding a JSON array, after anything else you say:
-
-\`\`\`todos
-[
-  {
-    "title": "imperative, under about ten words",
-    "brief": "what to do and what to watch out for",
-    "acceptance": "- one line per thing someone can check to tell this todo is done",
-    "dependsOn": ["exact titles of todos in this list that must finish first"]
-  }
-]
-\`\`\`
-
-The todo is then done when they all are. Order them so none depends on a later one, and use
-"dependsOn" only for a real ordering constraint.
-
-A question. When the todo cannot be done well without a decision or a fact only a person can give,
-and your tools cannot find it out, call ask_person with the question instead of guessing. The run
-ends there, the todo waits for the answer, and the next run is shown both. What the notes already
-answer is not to be asked again.
-
-Never both refine and split: a reply with both fails. You cannot edit, move or finish this todo
-with tools; what your reply says is what happens to it.`;
-
-/** What heads the account's global context in a run's system prompt. */
-export const GLOBAL_CONTEXT_HEADING = 'What every agent should know, whichever project it works in:';
-
-/** What heads the project prompt in a run's system prompt. */
-export const PROJECT_PROMPT_HEADING = "This project's instructions, for every agent working its todos:";
+// What an agent is told. Its system prompt is only what people wrote, broadest
+// first: the account's agent instructions (telos's default until the account
+// writes its own, resolved by the server), the project, the project's prompt,
+// then the prompt the agent was given. What its kind of agent replies with (a
+// ruling, a report, a refine or a split) is in that last prompt, and how a
+// reply is read back (`readReply` here, `verdictOf` on the server) is the same
+// whatever the prompts say.
 
 /**
- * The system prompt for a run, from the broadest layer to the narrowest: what
- * every agent of the account should know (the global context), where it is
- * (the project, its description and context), what its project asks of every
- * agent working there (the project prompt, a person's own), who the agent is
- * and what it does (its own instructions), then the standing protocol every
- * agent shares. The agent's instructions sit right above the protocol, which
- * points back at them. A layer that is blank is left out, heading and all.
+ * The system prompt for a run: the account's agent instructions, the project
+ * (its name, then its description), the project's prompt, and the agent's own
+ * prompt, in that order. A layer that is blank is left out. Nothing else is
+ * added, so what a run is told is what people wrote, and the run log shows it.
  *
  * @param assignment - What telos said about the run.
- * @param instructions - The agent's own instructions, if it has any.
+ * @param prompt - The body of the agent's prompt, if it has one.
  * @returns The system prompt.
  */
-export function systemPromptFor(assignment: Assignment, instructions: string | null): string {
-  const where = [
-    `Project: ${assignment.projectName}`,
-    assignment.projectDescription ? `\n${assignment.projectDescription}` : '',
-    assignment.projectContext ? `\n\n${assignment.projectContext}` : '',
-  ]
-    .join('')
-    .trim();
-  const globalContext = headed(GLOBAL_CONTEXT_HEADING, assignment.globalContext);
-  const projectPrompt = headed(PROJECT_PROMPT_HEADING, assignment.projectPrompt);
-  return [globalContext, where, projectPrompt, instructions, STANDING_SYSTEM]
+export function systemPromptFor(assignment: Assignment, prompt: string | null): string {
+  const project = [`Project: ${assignment.projectName}`, assignment.projectDescription?.trim()]
+    .filter(Boolean)
+    .join('\n\n');
+  return [assignment.agentInstructions, project, assignment.projectPrompt, prompt]
     .map((layer) => (layer ?? '').trim())
     .filter(Boolean)
     .join('\n\n');
-}
-
-/**
- * A layer under its heading, or null when there is nothing to put under it.
- *
- * @param heading - What the layer is.
- * @param text - The layer, if any.
- * @returns The layer, headed.
- */
-function headed(heading: string, text: string | null): string | null {
-  return text?.trim() ? `${heading}\n${text.trim()}` : null;
 }
 
 /**

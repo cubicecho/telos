@@ -1,20 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import {
-  assignmentPrompt,
-  GLOBAL_CONTEXT_HEADING,
-  PROJECT_PROMPT_HEADING,
-  REVIEW_NOTE,
-  readReply,
-  STANDING_SYSTEM,
-  systemPromptFor,
-} from '../prompts.ts';
+import { DEFAULT_AGENT_INSTRUCTIONS, SEEDED_PROMPTS } from '../../../db/src/prompt-seeds.ts';
+import { assignmentPrompt, REVIEW_NOTE, readReply, systemPromptFor } from '../prompts.ts';
 import type { Assignment } from '../telos.ts';
 
 const ASSIGNMENT: Assignment = {
-  globalContext: null,
+  agentInstructions: 'Say what you tried.',
   projectName: 'Telos',
   projectDescription: 'A board.',
-  projectContext: 'TypeScript, npm.',
   projectPrompt: null,
   laneName: 'Doing',
   title: 'Add a search box',
@@ -29,84 +21,93 @@ const ASSIGNMENT: Assignment = {
 };
 
 describe('systemPromptFor', () => {
-  it('says where the agent is first, then who it is', () => {
-    const system = systemPromptFor(ASSIGNMENT, 'You are careful.');
-    const where = system.indexOf('Project: Telos');
-    const who = system.indexOf('You are careful.');
-
-    expect(where).toBe(0);
-    expect(system).toContain('A board.');
-    expect(system).toContain('TypeScript, npm.');
-    expect(who).toBeGreaterThan(where);
-    expect(system.endsWith(STANDING_SYSTEM)).toBe(true);
-  });
-
-  it('leaves out what the agent has not got', () => {
-    const system = systemPromptFor(
-      { ...ASSIGNMENT, globalContext: ' \n', projectDescription: null, projectContext: null, projectPrompt: '  ' },
-      null,
-    );
-
-    expect(system.startsWith('Project: Telos\n\n')).toBe(true);
-    expect(system).not.toContain('null');
-    expect(system).not.toContain(GLOBAL_CONTEXT_HEADING);
-    expect(system).not.toContain(PROJECT_PROMPT_HEADING);
-  });
-
-  it('goes from the broadest layer to the narrowest, and ends on the protocol', () => {
-    const system = systemPromptFor(
-      {
-        ...ASSIGNMENT,
-        globalContext: 'Work happens on the homelab.\n',
-        projectPrompt: 'Keep artifacts in /srv/telos.',
-      },
-      'You are careful.',
-    );
-    const layers = [
-      `${GLOBAL_CONTEXT_HEADING}\nWork happens on the homelab.\n\n`,
-      'Project: Telos',
-      'TypeScript, npm.',
-      `${PROJECT_PROMPT_HEADING}\nKeep artifacts in /srv/telos.\n\n`,
-      'You are careful.\n\n',
-      STANDING_SYSTEM,
-    ].map((layer) => system.indexOf(layer));
-
-    expect(layers[0]).toBe(0);
-    expect(layers.every((at, index) => at >= 0 && (index === 0 || at > layers[index - 1]))).toBe(true);
-    expect(system.endsWith(`You are careful.\n\n${STANDING_SYSTEM}`)).toBe(true);
-  });
-
-  it("hands on the project's prompt under its own heading, between where it is and who it is", () => {
+  it("puts the agent instructions, the project, its prompt and the agent's prompt in that order", () => {
     const system = systemPromptFor(
       { ...ASSIGNMENT, projectPrompt: 'Keep artifacts in /srv/telos.\n' },
       'You are careful.',
     );
-    const where = system.indexOf('TypeScript, npm.');
-    const prompt = system.indexOf(`${PROJECT_PROMPT_HEADING}\nKeep artifacts in /srv/telos.\n\n`);
-    const who = system.indexOf('You are careful.');
 
-    expect(prompt).toBeGreaterThan(where);
-    expect(who).toBeGreaterThan(prompt);
-    expect(system.endsWith(STANDING_SYSTEM)).toBe(true);
+    expect(system).toBe(
+      'Say what you tried.\n\nProject: Telos\n\nA board.\n\nKeep artifacts in /srv/telos.\n\nYou are careful.',
+    );
+  });
+
+  it('leaves out a blank layer, and adds no text of its own', () => {
+    const system = systemPromptFor(
+      { ...ASSIGNMENT, agentInstructions: ' \n', projectDescription: null, projectPrompt: '  ' },
+      null,
+    );
+
+    expect(system).toBe('Project: Telos');
+  });
+
+  it('sends the instructions the server resolved, word for word, first', () => {
+    const system = systemPromptFor({ ...ASSIGNMENT, agentInstructions: DEFAULT_AGENT_INSTRUCTIONS }, null);
+
+    expect(system.startsWith(DEFAULT_AGENT_INSTRUCTIONS)).toBe(true);
+    expect(DEFAULT_AGENT_INSTRUCTIONS).toContain('ask_person');
   });
 });
 
-describe('STANDING_SYSTEM', () => {
-  it('asks a work run to plan, check each criterion, and end on its three sections', () => {
-    const report = STANDING_SYSTEM.slice(STANDING_SYSTEM.indexOf('A report.'), STANDING_SYSTEM.indexOf('A refine.'));
-    expect(report).toContain('first plan it');
-    expect(report).toContain('check every criterion yourself');
-    const sections = ['## Changes', '## Verification', '## Open questions'].map((section) => report.indexOf(section));
+describe('the seeded prompts', () => {
+  const body = (name: string) => SEEDED_PROMPTS.find((prompt) => prompt.name === name)?.body ?? '';
+
+  it('are a Planner, a Reviewer and a Worker', () => {
+    expect(SEEDED_PROMPTS.map((prompt) => prompt.name)).toEqual(['Planner', 'Reviewer', 'Worker']);
+  });
+
+  it('ask the Worker to plan, check each criterion, and end on its three sections', () => {
+    const worker = body('Worker');
+    expect(worker).toContain('First plan it');
+    expect(worker).toContain('check every criterion yourself');
+    const sections = ['## Changes', '## Verification', '## Open questions'].map((section) => worker.indexOf(section));
     expect(sections.every((at) => at >= 0)).toBe(true);
     expect([...sections].sort((a, b) => a - b)).toEqual(sections);
   });
 
-  it('asks a ruling for each criterion with quoted evidence, and still to open on PASS or FAIL', () => {
-    const ruling = STANDING_SYSTEM.slice(STANDING_SYSTEM.indexOf('A ruling.'), STANDING_SYSTEM.indexOf('A report.'));
-    expect(ruling).toContain('begin with PASS or FAIL on its own');
-    expect(ruling).toContain('acceptance criteria one at a time');
-    expect(ruling).toContain('quote the evidence');
-    expect(ruling).toContain('FAIL only on a criterion you can name as not met');
+  it('ask the Reviewer for PASS or FAIL first, then each criterion with quoted evidence', () => {
+    const reviewer = body('Reviewer');
+    expect(reviewer).toContain('Begin your reply with PASS or FAIL on its own line');
+    expect(reviewer).toContain('one at a time');
+    expect(reviewer).toContain('quote the evidence');
+    expect(reviewer).toContain('FAIL only on a criterion you can name as not met');
+  });
+
+  it('tell the Worker and the Planner not to open on PASS or FAIL, which reads as a ruling', () => {
+    for (const name of ['Worker', 'Planner']) {
+      expect(body(name)).toContain('Do not begin your reply with the word PASS or FAIL');
+    }
+  });
+
+  it('read a Planner refine in the shape its prompt shows', () => {
+    const shown = /```refine\n[\s\S]*?```/.exec(body('Planner'))?.[0] ?? '';
+    const reply = readReply(`The todo is one piece of work.\n\n${shown}`);
+
+    expect(reply.report).toBe('The todo is one piece of work.');
+    expect(reply.refine).toEqual({
+      title: 'imperative, under about ten words',
+      brief: 'what to do, where, and what to watch out for',
+      acceptance: '- one line per thing someone can check to tell this todo is done',
+    });
+    expect(reply.todos).toEqual([]);
+  });
+
+  it('read a Planner split in the shape its prompt shows', () => {
+    const shown = /```todos\n[\s\S]*?```/.exec(body('Planner'))?.[0] ?? '';
+    const reply = readReply(`Two pieces.\n\n${shown}`);
+
+    expect(reply.report).toBe('Two pieces.');
+    expect(reply.todos).toHaveLength(1);
+    expect(reply.todos[0]?.title).toBe('imperative, under about ten words');
+    expect(reply.todos[0]?.dependsOn).toEqual(['exact titles of todos in this list that must finish first']);
+    expect(reply.refine).toBeNull();
+  });
+
+  it('keep a Worker report as it is', () => {
+    const report =
+      'Plan:\n- add the box\n\n## Changes\nAdded it.\n\n## Verification\nTyped; it filtered.\n\n## Open questions\nNone.';
+
+    expect(readReply(report)).toEqual({ report, todos: [], refine: null });
   });
 });
 
