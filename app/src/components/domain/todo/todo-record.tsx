@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from '@apollo/client';
-import { useState } from 'react';
+import { type ReactNode, useState } from 'react';
 import { Platform, Text, View } from 'react-native';
 import type { RunSummaryFieldsFragment, TodoNoteFieldsFragment } from '@/__generated__/graphql';
 import { RunDialog } from '@/components/domain/ai/run-dialog';
@@ -14,9 +14,12 @@ import { useAi } from '@/lib/ai';
 import { formatTimestamp } from '@/lib/dates';
 import { describeError } from '@/lib/errors';
 import {
+  AnswerTodoDocument,
+  CardMarksDocument,
   CreateTodoNoteDocument,
   DeleteTodoNoteDocument,
   EditTodoNoteDocument,
+  ProjectActivityDocument,
   TodoRecordDocument,
 } from '@/lib/graphql';
 import { cn } from '@/lib/utils';
@@ -83,6 +86,9 @@ function scrollToNote(node: View | null) {
 /** A note someone wrote, as against a report or a verdict a run returned. */
 const PLAIN_NOTE = 'note';
 
+/** What a run asked a person. The todo waits until a person writes a note after it. */
+const QUESTION = 'question';
+
 /** Who signs what a person writes here. */
 const SIGNED_BY_PERSON = 'user';
 
@@ -114,12 +120,15 @@ function ThreadNote({
   projectAi,
   onEdit,
   onDelete,
+  answerSlot,
 }: {
   note: TodoNoteFieldsFragment;
   focused: boolean;
   projectAi: boolean;
   onEdit: (id: string, body: string) => Promise<boolean>;
   onDelete: (id: string) => Promise<void>;
+  /** Under a question nobody has answered yet: the box to answer it in. */
+  answerSlot?: ReactNode;
 }) {
   const ai = useAi();
   const [draft, setDraft] = useState<string | null>(null);
@@ -144,7 +153,7 @@ function ThreadNote({
       aria-current={focused ? true : undefined}
       className={cn(
         'gap-1 rounded-lg border px-3 py-2',
-        focused ? 'border-active bg-active/10' : 'border-foreground/10',
+        focused ? 'border-active bg-active/10' : answerSlot ? 'border-warning/40' : 'border-foreground/10',
       )}
     >
       <View className="flex-row items-center gap-2">
@@ -152,7 +161,11 @@ function ThreadNote({
           {actorName(note.actorKind)} · {formatTimestamp(note.createdAt)}
           {note.editedAt ? ` · edited ${formatTimestamp(note.editedAt)}` : ''}
         </Text>
-        {note.kind === PLAIN_NOTE ? null : (
+        {note.kind === PLAIN_NOTE ? null : note.kind === QUESTION ? (
+          <Badge variant={answerSlot ? 'warning' : 'secondary'} className="self-center">
+            {answerSlot ? 'Waiting on you' : 'question'}
+          </Badge>
+        ) : (
           <Badge variant="secondary" className="self-center">
             {note.kind}
           </Badge>
@@ -195,6 +208,39 @@ function ThreadNote({
         </View>
       )}
       <ViewRun runId={note.runId} projectAi={projectAi} />
+      {answerSlot}
+    </View>
+  );
+}
+
+/**
+ * The box under a question an agent is waiting on. Its answer is a note like
+ * any other; the button says what it is for.
+ *
+ * @param props.onAnswer - Sends the answer. Resolves true when it was sent.
+ */
+function AnswerBox({ onAnswer }: { onAnswer: (text: string) => Promise<boolean> }) {
+  const [text, setText] = useState('');
+  const [sending, setSending] = useState(false);
+
+  async function send() {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    setSending(true);
+    const sent = await onAnswer(trimmed);
+    setSending(false);
+    if (sent) setText('');
+  }
+
+  return (
+    <View className="mt-1 gap-2">
+      <Textarea value={text} onChangeText={setText} aria-label="Your answer" placeholder="Your answer…" rows={2} />
+      <View className="flex-row items-center justify-end gap-2">
+        <Text className="flex-1 text-foreground/60 text-xs">
+          The agent picks the todo up again once it is answered.
+        </Text>
+        <Button size="sm" disabled={sending || text.trim() === ''} onPress={send} content="Answer" />
+      </View>
     </View>
   );
 }
@@ -210,13 +256,32 @@ export function TodoThread({ todoId, focusNoteId }: { todoId: string; focusNoteI
   const record = useTodoRecord(todoId);
   const [body, setBody] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const ai = useAi();
   const refetch = { refetchQueries: [{ query: TodoRecordDocument, variables: { id: todoId } }] };
-  const [createNote, { loading: adding }] = useMutation(CreateTodoNoteDocument, refetch);
+  // Any note can answer a question, so a new one may change the board's marks too.
+  const answered = { refetchQueries: [...refetch.refetchQueries, CardMarksDocument, ProjectActivityDocument] };
+  const [createNote, { loading: adding }] = useMutation(CreateTodoNoteDocument, answered);
+  const [answerTodo] = useMutation(AnswerTodoDocument, answered);
   const [editNote] = useMutation(EditTodoNoteDocument);
   const [deleteNote] = useMutation(DeleteTodoNoteDocument, refetch);
 
   const notes = record.data?.todo?.thread ?? [];
   const projectAi = record.data?.todo?.project?.aiEnabled === true;
+  // The question the todo waits on is its newest; the server says whether it is still open.
+  const openQuestionId = record.data?.todo?.question
+    ? notes.filter((note) => note.kind === QUESTION).at(-1)?.id
+    : undefined;
+
+  async function answer(text: string): Promise<boolean> {
+    setError(null);
+    try {
+      await answerTodo({ variables: { todoId, text } });
+      return true;
+    } catch (cause) {
+      setError(describeError(cause));
+      return false;
+    }
+  }
 
   async function add() {
     const trimmed = body.trim();
@@ -268,6 +333,8 @@ export function TodoThread({ todoId, focusNoteId }: { todoId: string; focusNoteI
               projectAi={projectAi}
               onEdit={edit}
               onDelete={remove}
+              // `answerTodo` is an AI field; with AI off a plain note still answers.
+              answerSlot={note.id === openQuestionId && ai.on ? <AnswerBox onAnswer={answer} /> : undefined}
             />
           ))}
         </View>

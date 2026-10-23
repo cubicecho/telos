@@ -8,11 +8,12 @@ export const ACTOR_KINDS = ['user', 'apiKey', 'agent', 'system'] as const;
 export type ActorKindValue = (typeof ACTOR_KINDS)[number];
 
 /**
- * What a note is. People write `note`s. `report` (what a run did) and
- * `verdict` (whether a review passed) are written by the server on an agent's
- * behalf, never through generated CRUD.
+ * What a note is. People write `note`s. `report` (what a run did), `verdict`
+ * (whether a review passed) and `question` (what a run asked a person, which
+ * holds its todo until a person writes a note after it) are written by the
+ * server on an agent's behalf, never through generated CRUD.
  */
-export const NOTE_KINDS = ['note', 'report', 'verdict'] as const;
+export const NOTE_KINDS = ['note', 'report', 'verdict', 'question'] as const;
 export type NoteKind = (typeof NOTE_KINDS)[number];
 
 // A todo's running commentary. What a run wrote stays as written, so what an

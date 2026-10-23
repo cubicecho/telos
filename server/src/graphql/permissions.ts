@@ -107,6 +107,7 @@ export const ROOT_FIELDS: Record<RootType, Partial<Record<Audience, readonly str
       'submitRequest',
       'cancelRequest',
       'addTodoNote',
+      'answerTodo',
       'editTodoNote',
       'deleteTodoNote',
       'recordArtifact',

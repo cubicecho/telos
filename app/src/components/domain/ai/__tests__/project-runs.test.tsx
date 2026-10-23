@@ -13,6 +13,7 @@ const ACTIVITY: ProjectActivity = {
   ]),
   stuck: new Map(),
   waiting: new Map(),
+  asked: new Map(),
   spent: {
     __typename: 'RunAggregate',
     count: 12,

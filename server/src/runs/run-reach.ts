@@ -249,6 +249,7 @@ export const RUN_REACH_EXEMPT: Readonly<Record<string, string>> = {
   editTodoNote: 'A run rewrites only the notes it left (todos/notes.ts).',
   deleteTodoNote: 'A run takes back only the notes it left (todos/notes.ts).',
   recordArtifact: 'Refused for a run (runs/artifacts.ts).',
+  answerTodo: 'Refused for a run, or an agent could unblock itself (ai/answers.ts).',
   setGlobalContext:
     'Text every agent is told, not work on a board; off for a run until a person turns it on for its agent (door.ts).',
 };

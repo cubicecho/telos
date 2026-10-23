@@ -2,6 +2,7 @@ import * as dbSchema from '@telos/db/schema';
 import DataLoader from 'dataloader';
 import { and, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm';
 import { findBlocked, findBlockers, type TodoRow } from '../todos/blocking.ts';
+import { findQuestions } from '../todos/questions.ts';
 
 // Per-request batching. The project screen is a list of todos each asking
 // whether it is blocked, and a sidebar of projects each asking for its counts —
@@ -72,6 +73,8 @@ export interface Loaders {
   blockers: DataLoader<string, TodoRow[]>;
   todoCounts: DataLoader<string, TodoCounts>;
   pieceCounts: DataLoader<string, TodoCounts>;
+  /** Each todo's unanswered question (todos/questions.ts), or null. */
+  questions: DataLoader<string, string | null>;
 }
 
 /**
@@ -95,6 +98,10 @@ export function createLoaders(db: AnyDb): Loaders {
     pieceCounts: new DataLoader<string, TodoCounts>(async (ids) => {
       const byTodo = await findPieceCounts(db, ids);
       return ids.map((id) => byTodo.get(id) ?? NO_TODOS);
+    }),
+    questions: new DataLoader<string, string | null>(async (ids) => {
+      const byTodo = await findQuestions(db, ids);
+      return ids.map((id) => byTodo.get(id) ?? null);
     }),
   };
 }

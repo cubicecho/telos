@@ -1,0 +1,1 @@
+ALTER TABLE "runs" DROP CONSTRAINT "ck_runs_status", ADD CONSTRAINT "ck_runs_status" CHECK ("status" in ('running', 'ok', 'error', 'stopped', 'asked'));

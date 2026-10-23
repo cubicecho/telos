@@ -55,6 +55,7 @@ function mark(todoId: string, over: Partial<CardMark> = {}): CardMark {
     runId: null,
     attempts: 0,
     maxAttempts: null,
+    question: null,
     ...over,
   };
 }
@@ -78,6 +79,19 @@ describe('card marks', () => {
     expect(await screen.findByRole('img', { name: '2 notes' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: /Sent back|Run failed/ })).toBeNull();
     expect(screen.queryByText(/attempt/)).toBeNull();
+  });
+
+  it('says its agent is waiting on an answer, and gives the question on a press', async () => {
+    board([todo('t1', 'Write it')], { data: { cardMarks: [mark('t1', { question: 'Postgres or SQLite?' })] } });
+    const button = await screen.findByRole('button', {
+      name: 'Waiting on you: what the agent working “Write it” asked',
+    });
+    expect(within(button).getByText('Waiting on you')).toBeTruthy();
+    expect(screen.queryByText('Postgres or SQLite?')).toBeNull();
+
+    await userEvent.setup().click(button);
+    expect(await screen.findByText('The agent asked')).toBeTruthy();
+    expect(screen.getByText('Postgres or SQLite?')).toBeTruthy();
   });
 
   it('counts one note as one', async () => {

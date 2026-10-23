@@ -110,7 +110,7 @@ const RUNS_SDL = parse(`
     report: String
     "Why it came back here, when it did."
     why: String
-    "What people have said about it, oldest first. A lane that reviews work gets only what no agent signed."
+    "What people have said about it, oldest first, and the questions agents asked them. A lane that reviews work gets no other note an agent signed."
     notes: [String!]!
     """
     Whether this lane reviews work: its failure route goes back to a lane whose
@@ -224,6 +224,8 @@ const RUNS_SDL = parse(`
     prompt: RunPromptInput
     "What the run left behind."
     artifacts: [ArtifactInput!]
+    "What the agent asked a person, with status ASKED. It goes on the todo's thread, and the todo waits for an answer."
+    question: String
   }
 
   extend type Query {
@@ -403,9 +405,11 @@ async function assignmentFor(tx: AnyRow, todo: AnyRow, lane: AnyRow, project: An
     acceptance: todo.acceptance,
     report,
     why,
+    // A question is kept with its answer, the person's note after it, for
+    // every lane: what was asked is what the answer means.
     notes: thread
-      .filter((note) => note.kind === 'note' && !(reviews && note.actorKind === 'agent'))
-      .map((note) => note.body as string),
+      .filter((note) => note.kind === 'question' || (note.kind === 'note' && !(reviews && note.actorKind === 'agent')))
+      .map((note) => (note.kind === 'question' ? `${QUESTION_PREFIX}${note.body}` : (note.body as string))),
     reviews,
     ruling,
     artifacts,
@@ -485,6 +489,12 @@ async function writeChildren(
   }
   return written;
 }
+
+/** What a question on the thread reads as, to the agent the next run hands it to. */
+export const QUESTION_PREFIX = 'An agent asked: ';
+
+/** Why a run that said it asked fails when it asked nothing. */
+const ASKED_NOTHING = 'The run stopped to ask a person, but asked nothing.';
 
 /** Why a run that both refined and split its todo fails: the two say different things about it. */
 const REFINED_AND_SPLIT = 'The reply both rewrote the todo and split it. A todo is either refined or split.';
@@ -710,11 +720,43 @@ async function finish(context: Context, runId: string, result: RunResultInput): 
       return stopped;
     }
 
+    // A run that asked a person something leaves its question on the thread
+    // and the todo where it is. It costs no attempt (`RUN_FAILED`) and is not
+    // its lane finishing with the todo, which waits until a person answers
+    // (todos/questions.ts).
+    const question = result.status === 'asked' ? result.question?.trim() || null : null;
+    if (question) {
+      await tx.insert(dbSchema.todoNotes).values({
+        userId: run.userId,
+        todoId: todo.id,
+        kind: 'question',
+        body: question,
+        actorKind: 'agent',
+        runId: run.id,
+      });
+      const made = artifactRows(run, result.artifacts);
+      if (made.length > 0) await tx.insert(dbSchema.artifacts).values(made);
+      const [asked] = await tx
+        .update(dbSchema.runs)
+        .set({
+          events: withEvents(run.events, result.events),
+          status: 'asked',
+          output: question,
+          finishedAt: new Date(),
+          ...spend(run, result),
+          ...reported(run, result.prompt, null),
+        })
+        .where(eq(dbSchema.runs.id, run.id))
+        .returning();
+      return asked;
+    }
+
     // A reply is one outcome: a verdict, a report, a refine (the todo
     // rewritten, then passed) or a split (two or more pieces). A lone proposed
     // todo is the todo said again, so it is read as a refine; a reply that
     // both refines and splits fails, as there is no telling which it meant.
     const ok = result.status === 'ok';
+    const askedNothing = result.status === 'asked';
     const verdict = ok ? verdictOf(output) : 'none';
     const proposed = (result.todos ?? []).filter((todo) => todo.title?.trim());
     const refined = refinementOf(result.refine);
@@ -722,7 +764,13 @@ async function finish(context: Context, runId: string, result: RunResultInput): 
     const passed = ok && verdict !== 'fail' && !mixed;
     const pieces = passed && proposed.length > 1 ? proposed : [];
     const rewrite = passed ? (refined ?? (proposed.length === 1 ? refinementOf(proposed[0]) : null)) : null;
-    const error = mixed ? REFINED_AND_SPLIT : ok ? null : result.error?.trim() || 'The run failed.';
+    const error = mixed
+      ? REFINED_AND_SPLIT
+      : ok
+        ? null
+        : askedNothing
+          ? ASKED_NOTHING
+          : result.error?.trim() || 'The run failed.';
 
     const actor: Actor = { kind: 'agent', userId: run.userId, runId: run.id };
     await stampActor(tx, actor);

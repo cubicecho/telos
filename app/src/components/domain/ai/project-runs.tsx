@@ -29,6 +29,7 @@ export const RUN_FILTERS = [
   { value: 'running', label: 'Running' },
   { value: 'error', label: 'Failed' },
   { value: 'stopped', label: 'Stopped' },
+  { value: 'asked', label: 'Asked' },
   { value: 'ok', label: 'Finished' },
 ] as const;
 

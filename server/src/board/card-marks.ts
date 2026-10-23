@@ -8,10 +8,11 @@ import { loadOwnedProject } from '../core/owned.ts';
 import { attachResolvers } from '../graphql/attach-resolvers.ts';
 import { failuresSinceTouched } from '../runs/ready.ts';
 import { resultRows } from '../todos/blocking.ts';
+import { openQuestion } from '../todos/questions.ts';
 
 // What a board's cards say at a glance, for the whole board in one query: that
-// a todo has notes, that its last run was sent back or never finished, and how
-// many attempts it has used. It carries no subscription of its own: the board
+// a todo has notes, that its last run was sent back or never finished, how
+// many attempts it has used, and the question its agent is waiting on. It carries no subscription of its own: the board
 // refetches it when `boardChanged` says a note or a run was written.
 //
 // Notes are everyone's, so the query is there with AI off too. What runs left
@@ -38,6 +39,8 @@ const CARD_MARKS_SDL = parse(`
     attempts: Int!
     "How many the lane it stands in allows before leaving it for a person. Null in a lane with no agent."
     maxAttempts: Int
+    "What its agent asked a person and is waiting on, until a person answers. Null when nothing is."
+    question: String
   }
 
   extend type Query {
@@ -55,6 +58,7 @@ interface MarkRow {
   reason: string | null;
   attempts: number;
   max_attempts: number | null;
+  question: string | null;
 }
 
 /**
@@ -79,7 +83,8 @@ async function readMarks(db: DB, userId: string, projectId: string, runs: boolea
         ) AS notes,
         last.id AS run_id, last.status, last.verdict, coalesce(last.error, last.output) AS reason,
         CASE WHEN ${runs} THEN ${failuresSinceTouched(sql`t.id`)} ELSE 0 END AS attempts,
-        CASE WHEN ${runs} AND l.agent_id IS NOT NULL THEN l.max_attempts END AS max_attempts
+        CASE WHEN ${runs} AND l.agent_id IS NOT NULL THEN l.max_attempts END AS max_attempts,
+        ${openQuestion(sql`t.id`)} AS question
       FROM todos t
       LEFT JOIN lanes l ON l.id = t.lane_id
       LEFT JOIN LATERAL (
@@ -89,7 +94,7 @@ async function readMarks(db: DB, userId: string, projectId: string, runs: boolea
       ) last ON ${runs}
       WHERE t.user_id = ${userId} AND t.project_id = ${projectId} AND t.archived_at IS NULL
     ) m
-    WHERE m.notes > 0 OR m.attempts > 0 OR m.status = 'error' OR m.verdict = 'fail'
+    WHERE m.notes > 0 OR m.attempts > 0 OR m.status = 'error' OR m.verdict = 'fail' OR m.question IS NOT NULL
     ORDER BY m.lane_position NULLS LAST, m.position, m.created_at
   `);
   return resultRows<MarkRow>(result);
@@ -140,6 +145,7 @@ export function applyCardMarksExtension(schema: GraphQLSchema, options: { ai: bo
         runId: lastRun === null ? null : row.run_id,
         attempts: Number(row.attempts),
         maxAttempts: row.max_attempts,
+        question: row.question,
       };
     });
   };

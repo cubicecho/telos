@@ -38,7 +38,7 @@ export const RUNNER_QUIET_SECONDS = 60;
 const FAILURE_HOURS = 24;
 
 /** A state's count field on `LaneTally`. */
-type Tally = 'handedBack' | 'running' | 'waiting' | 'blocked' | 'queued' | 'parked' | 'done';
+type Tally = 'handedBack' | 'asked' | 'running' | 'waiting' | 'blocked' | 'queued' | 'parked' | 'done';
 type WorkTodo = AiStatusQuery['aiStatus']['todos'][number];
 
 const STATES: Array<{ state: WorkState; tally: Tally; label: string; blurb: string; variant: BadgeVariant }> = [
@@ -48,6 +48,13 @@ const STATES: Array<{ state: WorkState; tally: Tally; label: string; blurb: stri
     label: 'Handed back',
     blurb: 'An agent gave up on these, or finished and has nowhere to send them.',
     variant: 'destructive',
+  },
+  {
+    state: WorkState.Asked,
+    tally: 'asked',
+    label: 'Waiting on you',
+    blurb: 'An agent asked a question about these, and picks them up again once someone answers in the notes.',
+    variant: 'warning',
   },
   {
     state: WorkState.Running,
@@ -100,6 +107,7 @@ export function AiStatus({ pollMs = STATUS_POLL_MS }: { pollMs?: number }) {
   const counts = useMemo(() => {
     const tally: Record<Tally, number> = {
       handedBack: 0,
+      asked: 0,
       running: 0,
       waiting: 0,
       blocked: 0,
@@ -138,7 +146,13 @@ export function AiStatus({ pollMs = STATUS_POLL_MS }: { pollMs?: number }) {
             loading={!status}
             onPress={state.state === WorkState.Done ? undefined : () => setFocus(state.state)}
             selected={focus === state.state}
-            valueClassName={state.state === WorkState.HandedBack && counts.handedBack > 0 ? 'text-negative' : undefined}
+            valueClassName={
+              state.state === WorkState.HandedBack && counts.handedBack > 0
+                ? 'text-negative'
+                : state.state === WorkState.Asked && counts.asked > 0
+                  ? 'text-warning'
+                  : undefined
+            }
             // Only work in progress pulses: "needs you" is waiting, and its red count says so.
             iconSlot={state.state === WorkState.Running && counts.running > 0 ? <LiveDot /> : undefined}
           />

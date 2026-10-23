@@ -4,6 +4,7 @@ import type { StationTodo } from '../../__generated__/resolvers.ts';
 import type { HandBack, WorkState } from '../core/enums.ts';
 import { INSTANCE_AI_ON, INSTANCE_RUN_ROOM } from '../instance/settings.ts';
 import { resultRows } from '../todos/blocking.ts';
+import { openQuestion } from '../todos/questions.ts';
 
 // The readiness rules, in one place: which todos a lane's agent may start on,
 // and how to stop what is running. The runner asks
@@ -21,6 +22,8 @@ import { resultRows } from '../todos/blocking.ts';
 //   - it is not an umbrella: a todo split into pieces is done when they are,
 //     not by being worked
 //   - nothing is working it now (a running run inside its lease)
+//   - no agent is waiting on a person: a question a run asked with no
+//     person's note after it (todos/questions.ts)
 //   - the lane's agent has not already finished with it: no `ok` run in this lane
 //     since the todo last arrived here (`arrivedIn`: an edit is not an arrival)
 //   - it has failed no more than `maxAttempts` times since a person last
@@ -134,6 +137,7 @@ export async function readyTodos(
           SELECT 1 FROM runs r
           WHERE r.todo_id = t.id AND r.status = 'running' AND r.lease_expires_at > now()
         )
+        AND ${openQuestion(sql`t.id`)} IS NULL
         AND NOT EXISTS (
           SELECT 1 FROM runs r
           WHERE r.todo_id = t.id AND r.lane_id = l.id AND r.status = 'ok'
@@ -236,6 +240,7 @@ export interface LaneDoneCount {
  * rules `readyTodos` applies, read back as a reason instead of a filter.
  *
  *   - running: a run holds it now
+ *   - asked: its agent asked a person something, and waits for the answer
  *   - waiting: it is an umbrella, done when its pieces are
  *   - parked: no agent will ever pick it up where it is (no lane, no agent
  *     or one switched off, AI told to ignore it)
@@ -283,6 +288,7 @@ export async function workStates(
     last_failure: string | null;
     blockers: string | null;
     live_run_id: string | null;
+    question: string | null;
     last_run_id: string | null;
     last_run_at: Date | string | null;
   }>(
@@ -328,11 +334,12 @@ export async function workStates(
           WHERE r.todo_id = b.id AND r.status = 'running' AND r.lease_expires_at > now()
           ORDER BY r.started_at DESC LIMIT 1
         ) AS live_run_id,
+        ${openQuestion(sql`b.id`)} AS question,
         last.id AS last_run_id, last.started_at AS last_run_at
       FROM base b
       LEFT JOIN LATERAL (
         SELECT r.id, r.started_at FROM runs r
-        WHERE r.todo_id = b.id AND r.status IN ('ok', 'error')
+        WHERE r.todo_id = b.id AND r.status IN ('ok', 'error', 'asked')
         ORDER BY r.started_at DESC LIMIT 1
       ) last ON true
       LEFT JOIN LATERAL (
@@ -402,8 +409,10 @@ function judge(row: {
   last_failure: string | null;
   blockers: string | null;
   live_run_id: string | null;
+  question: string | null;
 }): [WorkState, string | null, HandBack?] {
   if (row.live_run_id) return ['running', null];
+  if (row.question) return ['asked', `Waiting on a person: ${row.question}`];
   if (row.split) return ['waiting', `${row.pieces_done} of ${row.pieces} pieces done.`];
   if (!row.lane_id) return ['parked', 'It is in no lane.'];
   if (row.ai_ignored) return ['parked', 'AI is told to ignore it.'];
