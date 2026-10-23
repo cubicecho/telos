@@ -151,8 +151,8 @@ the site.
   Owner: `server/src/instance.ts`.
 - **Account:** you, and everything you own. It has its own AI switch, the agent
   defaults new agents start from, its prompts, and the agent instructions every agent
-  is told first whichever project it works in (a person edits them in Settings; null is
-  the default, `DEFAULT_AGENT_INSTRUCTIONS`, and Reset goes back to it).
+  is told first whichever project it works in (a person edits them in Settings, and
+  Reset goes back to the built-in default).
   Owner: `users`, `db/src/prompt-seeds.ts`.
 - **Project:** a set of lanes and the todos in them. It has its own AI switch, auto-run,
   a description every agent working in it is given, a prompt (standing instructions to
@@ -247,10 +247,10 @@ the site.
 - **Agent:** a model with a prompt, the MCP servers it may use and the tools it may
   call. A setting left blank uses the account's agent defaults. An agent knows nothing
   of lanes: a lane is given an agent. Owner: `agents`, `server/src/agent-defaults.ts`.
-- **Prompt:** what one kind of agent is told to do, chosen by each agent (`promptId`).
-  Every account starts with Planner, Reviewer and Worker (`SEEDED_PROMPTS`), which a
-  person may edit, delete or add to. A person's only. Owner: `prompts`,
-  `db/src/prompt-seeds.ts`.
+- **Prompt:** what one kind of agent is told to do, chosen by each agent. Every account
+  starts with Planner, Reviewer and Worker, which a person may edit, delete or add to.
+  A person's only.
+  Owner: `prompts`, `db/src/prompt-seeds.ts`.
 - **MCP server:** a tool server added to an account; each agent names the ones it may
   use. Owner: `server/src/mcp-servers.ts`.
 - **MCP client:** an assistant connected to telos with an API key, working in the
@@ -259,10 +259,10 @@ the site.
   their agents. Owner: `runner/`.
 - **Run:** one go by an agent at a todo, ending in a reply.
   Owner: `runs`, `server/src/resolvers/runs.ts`.
-- **Reply format:** the rules a run's reply is read by (`verdictOf`, `readReply`). They
-  are not sent as a fixed protocol: each seeded prompt asks for the shape its kind of
-  agent is read in, and the agent instructions hold the rest. Owner: `runner/src/prompts.ts`,
-  `verdictOf` in the runs resolvers.
+- **Reply format:** the rules a run's reply is read by. They are not sent as a fixed
+  protocol: each seeded prompt asks for the shape its kind of agent is read in, and the
+  agent instructions hold the rest.
+  Owner: `readReply` in `runner/src/prompts.ts`, `verdictOf` in the runs resolvers.
 - **Outcome:** what a reply comes to: a verdict, a report, a refine or a split. A run
   that fails or breaks the reply format is an error, and counts as an attempt.
   Owner: `finish` in `server/src/resolvers/runs.ts`.

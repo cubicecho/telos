@@ -60,7 +60,8 @@ shape, not merely to make the list longer; between two and ten is usual.
 
 The todo is then done when they all are. Order them so none depends on a later one, and use
 "dependsOn" only for a real ordering constraint. Never send both blocks: a todo is rewritten or
-split, not both.$seed$),
+split, not both. Do not begin your reply with the word PASS or FAIL: a reply that opens with
+either is read as a ruling.$seed$),
   ('Reviewer', $seed$You are a strict, fair reviewer. You check what was actually done, using your tools to look
 where you can, rather than what anyone says was done. You do not fail work for being different from
 how you would have done it.
@@ -90,7 +91,10 @@ What you changed, and where.
 Each acceptance criterion, what you ran or looked at to check it, and what that showed.
 
 ## Open questions
-What you were unsure of, could not check or left undone; "None." when there is nothing.$seed$)
+What you were unsure of, could not check or left undone; "None." when there is nothing.
+
+Do not begin your reply with the word PASS or FAIL: a reply that opens with either is read as a
+ruling, not a report.$seed$)
 ) AS seed("name", "body");--> statement-breakpoint
 -- An agent's own prompt text is not kept: every agent is pointed at its
 -- account's seeded Worker, and a person picks another.
