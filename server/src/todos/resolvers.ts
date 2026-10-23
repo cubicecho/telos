@@ -1,8 +1,10 @@
 import * as dbSchema from '@telos/db/schema';
-import { and, eq, inArray, isNull } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { extendSchema, type GraphQLSchema, parse } from 'graphql';
 import type { MutationResolvers, ProjectResolvers, TodoResolvers } from '../../__generated__/resolvers.ts';
 import { requireAuth } from '../auth/resolvers.ts';
+import { aiTodo } from '../auth/rows.ts';
+import { conditionsSql } from '../auth/sql-filter.ts';
 import { findDoneLaneId, findFirstOpenLaneId } from '../board/lanes.ts';
 import { appLink } from '../core/config.ts';
 import { type Context, isAiActor } from '../core/context.ts';
@@ -144,16 +146,7 @@ async function hiddenFromAi(context: Context, userId: string, ids: string[]): Pr
   const seen: Array<{ id: string }> = await context.db
     .select({ id: dbSchema.todos.id })
     .from(dbSchema.todos)
-    .innerJoin(dbSchema.projects, eq(dbSchema.projects.id, dbSchema.todos.projectId))
-    .where(
-      and(
-        inArray(dbSchema.todos.id, ids),
-        eq(dbSchema.todos.userId, userId),
-        eq(dbSchema.todos.aiIgnored, false),
-        isNull(dbSchema.todos.archivedAt),
-        eq(dbSchema.projects.aiEnabled, true),
-      ),
-    );
+    .where(and(inArray(dbSchema.todos.id, ids), conditionsSql(context.db, dbSchema.todos, 'todos', aiTodo(userId))));
   const seenIds = new Set(seen.map((row) => String(row.id)));
   return ids.filter((id) => !seenIds.has(id));
 }
