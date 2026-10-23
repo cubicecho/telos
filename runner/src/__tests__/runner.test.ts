@@ -17,7 +17,6 @@ import { createContextFactory } from '../../../server/src/graphql/context-factor
 import { toHeaders } from '../../../server/src/http/headers.ts';
 import { setInstanceRunLimit } from '../../../server/src/instance/settings.ts';
 import { mountMcp } from '../../../server/src/mcp/endpoint.ts';
-import { readConfig } from '../config.ts';
 import { startRunner } from '../embed.ts';
 import { type LoopOptions, tick } from '../loop.ts';
 import { takeTests } from '../probes.ts';
@@ -278,7 +277,6 @@ function loopOptions(overrides: Partial<LoopOptions> = {}): LoopOptions {
   return {
     telos: createTelos({ telosUrl, runnerKey: RUNNER_KEY }),
     telosUrl,
-    allowChecks: false,
     pollMs: 10,
     heartbeatMs: 50,
     log: () => {},
@@ -775,54 +773,5 @@ describe('the runner inside the server', () => {
     } finally {
       await runner.stop();
     }
-  });
-});
-
-describe('a check lane', () => {
-  beforeEach(async () => {
-    // The first lane runs a command instead of its agent, passing to Done and failing to In progress.
-    await setLane(board.person, board.lanes[0].id, {
-      agentId: null,
-      checkCommand: 'echo checking; echo "it broke" >&2; exit 3',
-      onFailureLaneId: board.lanes[1].id,
-    });
-  });
-
-  it('fails a todo on a non-zero exit, with what the command printed', async () => {
-    const todoId = await board.addTodo('Fix it');
-    expect(await cycle(loopOptions({ allowChecks: true }))).toBe(1);
-    const [run] = await runsOf(todoId);
-    expect(run).toMatchObject({ status: 'ok', verdict: 'fail', agentId: null });
-    expect(run.output).toMatch(/^FAIL: the check .* exited with code 3\./);
-    expect(run.output).toContain('checking');
-    expect(run.output).toContain('it broke');
-    expect((await todoRow(todoId)).laneId).toBe(board.lanes[1].id);
-  });
-
-  it('passes a todo on exit 0', async () => {
-    await setLane(board.person, board.lanes[0].id, { checkCommand: 'true' });
-    const todoId = await board.addTodo('Fix it');
-    expect(await cycle(loopOptions({ allowChecks: true }))).toBe(1);
-    const [run] = await runsOf(todoId);
-    expect(run).toMatchObject({ status: 'ok', verdict: 'pass' });
-    expect((await todoRow(todoId)).laneId).toBe(board.lanes[2].id);
-  });
-
-  it('is refused by a runner that does not run checks', async () => {
-    const todoId = await board.addTodo('Fix it');
-    expect(await cycle()).toBe(1);
-    const [run] = await runsOf(todoId);
-    expect(run).toMatchObject({ status: 'error', verdict: 'none' });
-    expect(run.error).toContain('RUNNER_ALLOW_CHECKS=true');
-    expect(run.error).not.toContain('RUNNER_ALLOW_STDIO');
-  });
-
-  it('is refused by a runner that only has the old RUNNER_ALLOW_STDIO on', async () => {
-    const config = readConfig({ RUNNER_KEY, TELOS_URL: telosUrl, RUNNER_ALLOW_STDIO: 'true' });
-    const todoId = await board.addTodo('Fix it');
-    expect(await cycle(loopOptions({ allowChecks: config?.allowChecks ?? true }))).toBe(1);
-    const [run] = await runsOf(todoId);
-    expect(run).toMatchObject({ status: 'error', verdict: 'none' });
-    expect(run.error).toContain('RUNNER_ALLOW_CHECKS=true');
   });
 });

@@ -91,9 +91,7 @@ telos/
 │       ├── telos.ts         # The runner's GraphQL client (queue, claim, heartbeat, finish)
 │       ├── loop.ts          # Poll the queue, claim what telos has room for, execute
 │       ├── spec.ts          # An agent over its account's defaults, as agent-core spec layers (also @telos/runner/spec)
-│       ├── execute.ts       # One run: agent-core's runAgentLoop over a per-run MCP pool, or a check
-│       ├── check.ts         # A check lane's run: the lane's shell command, its exit code the verdict
-│       ├── defaults.ts      # CHECK_DEFAULTS: a check's time limit, output kept, kill grace
+│       ├── execute.ts       # One run: agent-core's runAgentLoop over a per-run MCP pool
 │       ├── tools.ts         # The pool: telos's /mcp with the run token, plus the agent's servers and hooks
 │       ├── artifacts.ts     # What a run made: record_artifact, and writes read off tool calls
 │       ├── prompts.ts       # The standing protocol, the brief, and reading a reply
@@ -283,7 +281,7 @@ and answers NOT_FOUND for what AI cannot see. What it writes:
 `holdAiProjectWrite`), the account's global context (`setGlobalContext`), todos (create, edit, move, retry, run, stop a run,
 dependencies, archive, restore, delete), notes, artifacts and board
 templates. Still a person's: the AI switches, auto-run, the project prompt, agents and their keys
-and MCP servers, API keys, lanes and their agents and check commands, the project's new-todo lane, bulk mutations, and archiving
+and MCP servers, API keys, lanes and their agents, the project's new-todo lane, bulk mutations, and archiving
 or deleting a project. A new mutation is closed to AI until it is added there.
 The MCP door (`mcp/endpoint.ts`) serves only the operations written in `mcp/door.graphql`,
 and a test pins its mutations to `AI_MUTATIONS`: the tool list is the menu,
@@ -319,28 +317,6 @@ ideas, one name each:
 - **Run** — one agent working one todo. It ends in success or failure, with
   a report, and may rewrite (refine) or split its todo.
 - **Board template** — as below.
-
-**A check lane runs a command instead of an agent.** `lanes.checkCommand` is
-a line of shell the runner runs for each todo that arrives (`runner/src/check.ts`),
-and its exit code is the verdict: 0 passes, anything else (non-zero, killed,
-out of time, never started) fails. A lane has an agent or a check, never both,
-and a check lane's WIP limit is 1, because until todos have workspaces of their
-own every check runs in the runner's one working directory (the lane write
-guard, `assertCheckLanesFit`). `readyTodos` takes a check lane as it takes an
-enabled agent's (`IS_CHECK_LANE`), under every AI switch; `claimRun` hands the
-runner `check` and no agent, and the run keeps the command it ran
-(`runs.checkCommand`), with no agent and no model. Its token resolves to
-nobody, and the command gets none of the runner's environment beyond
-agent-mcp-pool's `MINIMAL_CHILD_ENV`. The runner reports `check { exitCode
-timedOut output }` and `finishRun` rules (`checkVerdict`): a verdict note that
-opens PASS or FAIL, names the command and keeps the end of its output, and a
-failure's move carries no fixed reason, so the next run's `why` is that note.
-Attempts, routes and the archive are a verdict lane's. **Only a person sets a
-check command or its time limit**: the actor lock keeps AI and the runner off
-lane writes, the lanes write hook refuses the columns from anyone else
-(`assertCheckFromPerson`), and `applyBoardTemplate` drops checks unless a
-person applies it. A check is a user's command on the runner's host, so the
-runner refuses check runs unless `RUNNER_ALLOW_CHECKS=true`.
 
 There is no lane prompt and no per-lane contract: what a lane asks for is its
 agent's instructions, and every reply is read the same way (`verdictOf` in
@@ -460,10 +436,11 @@ so.
 comes from `runnerQueue` and `claimRun`, and everything it does goes back
 through `finishRun` or, for the agent, through `/mcp` with the run token; its
 tests import server code only to stand a real telos up. Each run gets its own
-MCP pool, because the telos server in it carries that run's token. Check
-lanes' commands are refused unless `RUNNER_ALLOW_CHECKS=true`: a lane belongs
-to a user, and a command runs on the runner's host with its rights.
-`RUNNER_ALLOW_STDIO` is no longer read (`configWarnings` says so at start).
+MCP pool, because the telos server in it carries that run's token. Telos
+never runs a command on the runner's host or touches its disk: a lane, a
+server and an agent belong to a user, and a command there would run with the
+runner's rights. `RUNNER_ALLOW_STDIO` and the other retired switches are no
+longer read (`configWarnings` says so at start).
 
 **Telos runs no stdio MCP servers.** Every server is a URL (streamable HTTP):
 `mcp_servers.url` is NOT NULL and there is no command, arguments, working

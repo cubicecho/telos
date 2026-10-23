@@ -116,10 +116,6 @@ export function LaneColumn({
               <Badge variant="secondary" aria-label={`Worked by ${agentName ?? 'an agent'}`}>
                 Agent
               </Badge>
-            ) : laneAgent?.checkCommand ? (
-              <Badge variant="secondary" aria-label={`Checked by running ${laneAgent.checkCommand}`}>
-                Check
-              </Badge>
             ) : null}
             <Text className="shrink-0 text-foreground/60 text-xs tabular-nums">{todos.length}</Text>
           </>

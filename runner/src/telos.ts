@@ -68,22 +68,6 @@ export interface ClaimedAgent {
   mcpNotices: string[];
 }
 
-/** A check lane's command, which the runner runs in place of an agent (check.ts). */
-export interface ClaimedCheck {
-  command: string;
-  /** Null is the runner's default (`CHECK_DEFAULTS`). */
-  timeoutSeconds: number | null;
-}
-
-/** What a check's command did. Telos reads the verdict off it: exit 0 passes. */
-export interface CheckResult {
-  /** Null when it did not exit by itself: killed, or never started. */
-  exitCode: number | null;
-  timedOut: boolean;
-  /** The end of what it printed, stdout and stderr together. */
-  output: string;
-}
-
 export interface Assignment {
   /** What every agent of the account is told, whichever project it works in. */
   globalContext: string | null;
@@ -124,15 +108,9 @@ export interface Claim {
   turn: number;
   /** Whether no agent has worked the todo before: its hooks' session opens with this run. */
   opensSession: boolean;
-  /** The lane's agent; null for a check lane. */
-  agent: ClaimedAgent | null;
-  /** The lane's check; null for an agent's lane. */
-  check: ClaimedCheck | null;
+  agent: ClaimedAgent;
   assignment: Assignment;
 }
-
-/** A claim of an agent's lane: what opening tools and running the loop need. */
-export type AgentClaim = Claim & { agent: ClaimedAgent };
 
 export interface ProposedTodo {
   title: string;
@@ -164,8 +142,6 @@ export interface RunResult {
   /** What the agent was told, when no heartbeat got it there first. */
   prompt?: RunPrompt;
   artifacts?: ArtifactDraft[];
-  /** What a check run's command did. */
-  check?: CheckResult;
 }
 
 /** What a run's agent was told. */
@@ -245,7 +221,6 @@ const CLAIM = `mutation ($todoId: ID!, $laneId: ID!) {
   claimRun(todoId: $todoId, laneId: $laneId) {
     runId todoId token leaseExpiresAt turn opensSession
     agent { ${AGENT_FIELDS} }
-    check { command timeoutSeconds }
     assignment {
       globalContext projectName projectDescription projectContext projectPrompt laneName
       title brief acceptance report why notes reviews ruling

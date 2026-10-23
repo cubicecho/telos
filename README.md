@@ -125,7 +125,6 @@ domain.
 | `OIDC_DEVICE_CLIENT_ID` | — | The public client device apps (Home Assistant) use at the provider for the device flow. Telos only tells them its name, in `authConfig.sso.deviceClientId`. Pairing registers one for you; set this to use another. |
 | `AI_ENABLED` | — | Set to `false` to remove AI entirely: no MCP endpoint, no API keys, no agents, no switch in Settings. Otherwise an admin turns it on in Settings. |
 | `RUNNER_POLL_SECONDS` | `5` | How long the runner waits when nothing is ready. |
-| `RUNNER_ALLOW_CHECKS` | `false` | Let the runner run check lanes' shell commands. (`RUNNER_ALLOW_STDIO` is gone: telos runs no stdio MCP servers, and the runner warns if it is still set.) |
 | `RUNNER_KEY` | made up at boot | Only for a second runner on another host (`runner/`, with `TELOS_URL`): set the same value on both. |
 
 ### Signing in
@@ -336,8 +335,8 @@ docker compose up --build
 
 Agents talk to any OpenAI-compatible endpoint, so a local Ollama works. An
 agent's base URL and the account's MCP servers are fetched from the server's host, so on
-a shared instance keep it where it cannot reach anything private, and leave
-`RUNNER_ALLOW_CHECKS` off.
+a shared instance keep it where it cannot reach anything private. The runner
+runs no commands on its host: every MCP server is a URL.
 
 ## Keeping a copy in step
 

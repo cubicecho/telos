@@ -28,9 +28,6 @@ services:
       AI_ENABLED: ${AI_ENABLED:-}
       # The runner comes with the server and needs no key; these only tune it.
       RUNNER_POLL_SECONDS: ${RUNNER_POLL_SECONDS:-5}
-      # Lets check lanes run shell commands here. Leave off unless every user
-      # with AI on is someone you would hand a shell.
-      RUNNER_ALLOW_CHECKS: ${RUNNER_ALLOW_CHECKS:-false}
       NODE_ENV: production
       PORT: 3001
     ports:
