@@ -22,6 +22,7 @@ import {
   AgentsDocument,
   CreateAgentDocument,
   DeleteAgentDocument,
+  PromptsDocument,
   SetAgentApiKeyDocument,
   UpdateAgentDocument,
 } from '@/lib/graphql';
@@ -48,6 +49,10 @@ import { RunToolsPicker } from './run-tools-picker';
 
 type AgentRow = AgentFieldsFragment;
 
+/** What the prompt select stands for, under it. */
+export const PROMPT_HELP =
+  'What it is told about its job, after your agent instructions and the project’s prompt. Prompts are kept in the Prompts tab.';
+
 /** What the form is open on: an agent, or a new one, blank or from a starter. */
 type Editing = { agent: AgentRow } | { starter: AgentStarter | null };
 
@@ -63,6 +68,7 @@ type Editing = { agent: AgentRow } | { starter: AgentStarter | null };
 export function AgentManager() {
   const agentsQuery = useQuery(AgentsDocument);
   const inherited = useQuery(AgentDefaultsDocument).data?.agentDefaults.resolved;
+  const prompts = useQuery(PromptsDocument).data?.prompts ?? [];
   const [editing, setEditing] = useState<Editing | null>(null);
   const [keying, setKeying] = useState<AgentRow | null>(null);
   const [deleteAgent] = useMutation(DeleteAgentDocument, { refetchQueries: [AgentsDocument] });
@@ -84,7 +90,7 @@ export function AgentManager() {
       surface="card"
       titleClassName={CARD_TITLE}
       title="Agents"
-      description="Models with instructions. Give a lane an agent and it works each todo that arrives there."
+      description="Models with a prompt. Give a lane an agent and it works each todo that arrives there."
       actionSlot={
         <View className="flex-row gap-2">
           <Menu>
@@ -122,7 +128,7 @@ export function AgentManager() {
               <EmptyState
                 iconSlot={<UserRound />}
                 title="No agents yet."
-                description="An agent is a model with instructions. Give one to a lane and it works what arrives there."
+                description="An agent is a model with a prompt. Give one to a lane and it works what arrives there."
               />
             }
           />
@@ -139,7 +145,7 @@ export function AgentManager() {
                   </Text>
                   <Text numberOfLines={1} className="text-foreground/60 text-xs">
                     {agent.model ?? inheritedText(inherited?.model)} ·{' '}
-                    {agent.baseUrl ?? inheritedText(inherited?.baseUrl)}
+                    {agent.baseUrl ?? inheritedText(inherited?.baseUrl)} · {promptText(agent.promptId, prompts)}
                   </Text>
                 </View>
                 {agent.enabled ? null : <Badge variant="outline">Off</Badge>}
@@ -205,6 +211,18 @@ function inheritedText(value: string | undefined): string {
   return value ? `${value} (default)` : 'none';
 }
 
+/**
+ * An agent's prompt, in its row.
+ *
+ * @param promptId - The prompt it names, if any.
+ * @param prompts - The account's prompts, empty while they load.
+ * @returns Its name, or what having none means.
+ */
+function promptText(promptId: string | null, prompts: readonly { id: string; name: string }[]): string {
+  if (!promptId) return 'no prompt';
+  return prompts.find((prompt) => prompt.id === promptId)?.name ?? 'prompt';
+}
+
 /** The form's values: the agent, and a key typed for it, which is saved on its own. */
 type AgentFormValues = AgentDraft & { apiKey: string };
 
@@ -234,9 +252,12 @@ export function AgentFormDialog({
   const inherited = useQuery(AgentDefaultsDocument).data?.agentDefaults.resolved;
   const hints = layerHints(inherited, 'defaults');
   const endpoint = useEndpointModels(agent?.id ?? null);
+  const promptsQuery = useQuery(PromptsDocument);
+  const prompts = promptsQuery.data?.prompts;
+  // A starter picks the account's prompt of its name, so its draft waits on them.
   const initial = useMemo<AgentFormValues>(
-    () => ({ ...(agent ? toAgentDraft(agent) : draftFromStarter(starter)), apiKey: '' }),
-    [agent, starter],
+    () => ({ ...(agent ? toAgentDraft(agent) : draftFromStarter(starter, prompts)), apiKey: '' }),
+    [agent, starter, prompts],
   );
   const form = useAppForm({
     defaultValues: initial,
@@ -389,11 +410,18 @@ export function AgentFormDialog({
               )}
             </form.AppField>
             <Text className="-mt-2 text-foreground/60 text-xs">{EFFORT_HELP}</Text>
-            <form.AppField name="systemPrompt">
+            <form.AppField name="promptId">
               {(field) => (
-                <field.TextAreaField label="System prompt" placeholder="Optional. Who the agent is, in any lane." />
+                <field.SelectField
+                  label="Prompt"
+                  options={(prompts ?? []).map((prompt) => ({ value: prompt.id, label: prompt.name }))}
+                  clearable
+                  emptyLabel="No prompt"
+                  placeholder={promptsQuery.loading ? 'Loading prompts…' : undefined}
+                />
               )}
             </form.AppField>
+            <Text className="-mt-2 text-foreground/60 text-xs">{PROMPT_HELP}</Text>
 
             <FormGroupTitle title="Tools" />
             {numbers('tools')}

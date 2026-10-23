@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import SettingsScreen from '../../../../../app/(app)/settings';
 
 // Settings is tabbed: General always; AI once there is anything to switch; and
-// Agents, MCP servers and Context only with AI on, since there is nothing to set up in
+// Agents, MCP servers and Prompts only with AI on, since there is nothing to set up in
 // them before. A link to a tab that is not there lands on General.
 
 const state = vi.hoisted(() => ({
@@ -22,7 +22,7 @@ vi.mock('@/components/domain/ai/ai-settings', () => ({
   AgentSettings: () => 'Agent settings',
 }));
 vi.mock('@/components/domain/ai/mcp-server-manager', () => ({ McpServerManager: () => 'MCP servers list' }));
-vi.mock('@/components/domain/ai/agent-context', () => ({ ContextSettings: () => 'Context forms' }));
+vi.mock('@/components/domain/ai/prompt-settings', () => ({ PromptSettings: () => 'Prompt forms' }));
 vi.mock('@/components/domain/label/label-manager', () => ({ LabelManager: () => 'Labels' }));
 vi.mock('@/components/domain/template/template-manager', () => ({ TemplateManager: () => 'Templates' }));
 
@@ -49,14 +49,14 @@ describe('the settings tabs', () => {
     expect(screen.getByRole('tab', { name: 'General' })).toHaveAttribute('aria-selected', 'true');
   });
 
-  it('add Agents, MCP servers and Context once AI is on, and open the one the link names', () => {
+  it('add Agents, MCP servers and Prompts once AI is on, and open the one the link names', () => {
     open('agents', { on: true, settings: true });
     expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
       'General',
       'AI',
       'Agents',
       'MCP servers',
-      'Context',
+      'Prompts',
     ]);
     expect(screen.getByRole('tab', { name: 'Agents' })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByText(/Agent settings/)).toBeInTheDocument();
@@ -67,14 +67,19 @@ describe('the settings tabs', () => {
     expect(screen.getByText(/MCP servers list/)).toBeInTheDocument();
   });
 
-  it('open the Context tab from its link', () => {
-    open('context', { on: true, settings: true });
-    expect(screen.getByText(/Context forms/)).toBeInTheDocument();
+  it('open the Prompts tab from its link', () => {
+    open('prompts', { on: true, settings: true });
+    expect(screen.getByText(/Prompt forms/)).toBeInTheDocument();
   });
 
-  it('land a link to Context on General while AI is off for the account', () => {
-    open('context', { on: false, settings: true });
+  it('open the Prompts tab from an old link to Context', () => {
+    open('context', { on: true, settings: true });
+    expect(screen.getByRole('tab', { name: 'Prompts' })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('land a link to Prompts on General while AI is off for the account', () => {
+    open('prompts', { on: false, settings: true });
     expect(screen.getByRole('tab', { name: 'General' })).toHaveAttribute('aria-selected', 'true');
-    expect(screen.queryByText(/Context forms/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Prompt forms/)).not.toBeInTheDocument();
   });
 });
