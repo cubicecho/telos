@@ -44,7 +44,7 @@ const AGENT = {
   name: 'Reviewer',
   baseUrl: 'http://localhost:11434/v1',
   model: 'qwen3:14b',
-  systemPrompt: null,
+  promptId: null,
   temperature: null,
   maxTokens: null,
   contextLength: null,
