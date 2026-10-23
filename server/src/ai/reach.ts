@@ -1,6 +1,8 @@
 import * as dbSchema from '@telos/db/schema';
 import { and, eq } from 'drizzle-orm';
 import { requireAuth } from '../auth/resolvers.ts';
+import { aiLane, aiTodo, through } from '../auth/rows.ts';
+import { conditionsSql } from '../auth/sql-filter.ts';
 import type { Context } from '../core/context.ts';
 import { notFound } from '../core/errors.ts';
 import { loadAiProject, loadAiTodo } from '../core/owned.ts';
@@ -49,8 +51,7 @@ async function assertAiLane(context: Context, userId: string, id: string): Promi
   const [lane] = await context.db
     .select({ id: dbSchema.lanes.id })
     .from(dbSchema.lanes)
-    .innerJoin(dbSchema.projects, eq(dbSchema.projects.id, dbSchema.lanes.projectId))
-    .where(and(eq(dbSchema.lanes.id, id), eq(dbSchema.lanes.userId, userId), eq(dbSchema.projects.aiEnabled, true)));
+    .where(and(eq(dbSchema.lanes.id, id), conditionsSql(context.db, dbSchema.lanes, 'lanes', aiLane(userId))));
   if (!lane) {
     throw notFound('Lane');
   }
@@ -65,16 +66,14 @@ async function assertAiLane(context: Context, userId: string, id: string): Promi
  * @returns Nothing.
  */
 async function assertAiRun(context: Context, userId: string, id: string): Promise<void> {
+  const onTodo = through('todo', aiTodo(userId));
   const [run] = await context.db
-    .select({ todoId: dbSchema.runs.todoId })
+    .select({ id: dbSchema.runs.id })
     .from(dbSchema.runs)
-    .where(and(eq(dbSchema.runs.id, id), eq(dbSchema.runs.userId, userId)));
-  if (!run?.todoId) {
+    .where(and(eq(dbSchema.runs.id, id), conditionsSql(context.db, dbSchema.runs, 'runs', { userId, ...onTodo })));
+  if (!run) {
     throw notFound('Run');
   }
-  await loadAiTodo(context, run.todoId).catch(() => {
-    throw notFound('Run');
-  });
 }
 
 /**

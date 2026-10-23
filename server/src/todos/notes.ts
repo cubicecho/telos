@@ -1,13 +1,13 @@
 import * as dbSchema from '@telos/db/schema';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { extendSchema, type GraphQLSchema, parse } from 'graphql';
 import type { MutationResolvers } from '../../__generated__/resolvers.ts';
 import { requireAi } from '../ai/gate.ts';
 import { requireText } from '../ai/requests.ts';
-import { requireAuth } from '../auth/resolvers.ts';
 import { type Context, isAiActor } from '../core/context.ts';
 import { forbidden, notFound } from '../core/errors.ts';
 import { attachResolvers } from '../graphql/attach-resolvers.ts';
+import { reachable } from '../graphql/tenancy.ts';
 
 // Rewriting a note and taking one away. Generated CRUD adds notes and stops
 // there (tenancy.ts), because whether a note may change depends on who is
@@ -54,28 +54,17 @@ const NOTES_SDL = parse(`
  * @returns The note's row.
  */
 async function loadVisibleNote(context: Context, id: string): Promise<AnyRow> {
-  const ai = isAiActor(context);
-  const userId = ai ? await requireAi(context) : requireAuth(context);
-  const owned = and(eq(dbSchema.todoNotes.id, id), eq(dbSchema.todoNotes.userId, userId));
-  const [row] = await context.db
-    .select({ note: dbSchema.todoNotes })
+  if (isAiActor(context)) {
+    await requireAi(context);
+  }
+  const [note] = await context.db
+    .select()
     .from(dbSchema.todoNotes)
-    .innerJoin(dbSchema.todos, eq(dbSchema.todos.id, dbSchema.todoNotes.todoId))
-    .innerJoin(dbSchema.projects, eq(dbSchema.projects.id, dbSchema.todos.projectId))
-    .where(
-      ai
-        ? and(
-            owned,
-            eq(dbSchema.todos.aiIgnored, false),
-            isNull(dbSchema.todos.archivedAt),
-            eq(dbSchema.projects.aiEnabled, true),
-          )
-        : owned,
-    );
-  if (!row) {
+    .where(and(eq(dbSchema.todoNotes.id, id), reachable(context, 'todoNotes', dbSchema.todoNotes)));
+  if (!note) {
     throw notFound('Note');
   }
-  return row.note;
+  return note;
 }
 
 /** Whether the caller is who signed `note`. */

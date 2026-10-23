@@ -1,6 +1,9 @@
 import type { DB } from '@telos/db';
 import * as dbSchema from '@telos/db/schema';
 import { and, eq, isNull, type SQL } from 'drizzle-orm';
+import { requireAuth } from '../auth/resolvers.ts';
+import { aiProject, aiTodo } from '../auth/rows.ts';
+import { conditionsSql } from '../auth/sql-filter.ts';
 import { reachable } from '../graphql/tenancy.ts';
 import type { Context } from './context.ts';
 import { notFound } from './errors.ts';
@@ -13,7 +16,9 @@ import { notFound } from './errors.ts';
 // CRUD runs under, so a hand-written mutation and a generated one agree on it:
 // a person reaches their own rows, and AI only what AI may see of them. The AI
 // forms add what a draft or an artifact needs whoever asks, a project with AI
-// on, which is not a permission but a rule of the feature.
+// on, which is not a permission but a rule of the feature. They state it with
+// the same conditions the ability holds an AI caller to (auth/rows.ts), so for
+// AI they add nothing, and for a person they add exactly that rule.
 
 type OwnedName = 'todos' | 'lanes' | 'projects';
 type OwnedTable = (typeof dbSchema)[OwnedName];
@@ -93,15 +98,8 @@ export function loadOwnedTodo(context: Context, id: string, db: DB = context.db)
  * @returns The project.
  */
 export function loadAiProject(context: Context, id: string): Promise<dbSchema.Project> {
-  return loadOwned(
-    context,
-    context.db,
-    'projects',
-    dbSchema.projects,
-    'Project',
-    id,
-    eq(dbSchema.projects.aiEnabled, true),
-  );
+  const seen = conditionsSql(context.db, dbSchema.projects, 'projects', aiProject(requireAuth(context)));
+  return loadOwned(context, context.db, 'projects', dbSchema.projects, 'Project', id, seen);
 }
 
 /**
@@ -112,20 +110,7 @@ export function loadAiProject(context: Context, id: string): Promise<dbSchema.Pr
  * @param id - The todo.
  * @returns The todo.
  */
-export async function loadAiTodo(context: Context, id: string): Promise<dbSchema.Todo> {
-  const [row] = await context.db
-    .select({ todo: dbSchema.todos })
-    .from(dbSchema.todos)
-    .innerJoin(dbSchema.projects, eq(dbSchema.projects.id, dbSchema.todos.projectId))
-    .where(
-      and(
-        eq(dbSchema.todos.id, id),
-        reachable(context, 'todos', dbSchema.todos),
-        eq(dbSchema.todos.aiIgnored, false),
-        isNull(dbSchema.todos.archivedAt),
-        eq(dbSchema.projects.aiEnabled, true),
-      ),
-    );
-  if (!row) throw notFound('Todo');
-  return row.todo;
+export function loadAiTodo(context: Context, id: string): Promise<dbSchema.Todo> {
+  const seen = conditionsSql(context.db, dbSchema.todos, 'todos', aiTodo(requireAuth(context)));
+  return loadOwned(context, context.db, 'todos', dbSchema.todos, 'Todo', id, seen);
 }

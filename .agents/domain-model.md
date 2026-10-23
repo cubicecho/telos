@@ -120,7 +120,7 @@ not the AI switches, a blocker or the WIP limit.
 
 | Invariant | Enforced by |
 |---|---|
-| Every table is scoped to its owner | `scope` in `server/src/tenancy.ts`; `tenancy.test.ts` |
+| Every table is scoped to its owner | the ability's row rules (`auth/rows.ts`), as `scope` in `graphql/tenancy.ts`; `tenancy.test.ts`, `row-reach.test.ts` |
 | A todo with a lane is complete if and only if the lane is the done lane | `server/src/lanes.ts`, `assertCompletionMatchesLane` |
 | At most one done lane per project; every project has a lane | `uq_lanes_project_done`; `seedMissingLanes`, last-lane delete refused |
 | An umbrella is completed only by its pieces, while it has open ones | `todos_settle_umbrella`; `assertNotBlocked`, `assertNoBlockedCompletions` |
@@ -133,7 +133,7 @@ not the AI switches, a blocker or the WIP limit.
 | A lane archives on success or has a success route, not both | `assertArchiveOnSuccessFits` |
 | History and the change feed are written by triggers only | `todos_history`, `change_log` triggers; no CRUD on either |
 | A report or verdict note is never changed | `server/src/resolvers/notes.ts` |
-| AI sees nothing in a project with AI off, or under a hands-off todo | `tenancy.ts`, `ai-reach.ts`, `visibleToAi` |
+| AI sees nothing in a project with AI off, or under a hands-off todo | `aiReach` in `auth/rows.ts`, `ai/reach.ts`, `visibleToAi` |
 | Every AI switch must be on for any agent to run | `readyTodos`, `ai-gate.ts`, `resolveActor` |
 
 ## Glossary

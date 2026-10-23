@@ -61,7 +61,8 @@ telos/
 │       │                    #   permissions (who calls which root field), write-guards, loaders, the context factory both doors share,
 │       │                    #   the /graphql handler, and subscriptions
 │       ├── auth/            # Who the caller is and how they sign in: better-auth, actor
-│       │                    #   (resolveActor), abilities (defineAbilitiesFor), endpoints, throttle, rate-limit, email, api-keys,
+│       │                    #   (resolveActor), abilities (defineAbilitiesFor), rows (who reaches which rows),
+│       │                    #   sql-filter (the ability's row rules as SQL), endpoints, throttle, rate-limit, email, api-keys,
 │       │                    #   provider-tokens (OIDC access tokens as bearers), credential-expiry
 │       ├── sso/             # Pairing with an OIDC provider from the app: settings, pairing, device-client, resolvers
 │       ├── instance/        # The instance's settings row: its AI switch, and its admins
@@ -175,11 +176,22 @@ GraphQL extension is `resolvers.ts`, and a second one is named for what it does
 (`lanes-resolvers.ts` beside the `lanes.ts` rules). Tests mirror the folders
 under `__tests__/`. Imports use the full relative path.
 
-**Every table needs a `scope` entry.** `server/src/graphql/tenancy.ts` maps each table to
-a `RowScope` that is ANDed into the SQL of every generated read, update and
-delete. A table missing from `scope` is visible across tenants, and nothing else
-in the code will say so. `tenancy.test.ts` fails when you forget — do not delete
-the test to make it pass.
+**Every table needs a row rule.** One CASL ability per request
+(`defineAbilitiesFor` in `server/src/auth/abilities.ts`) says both which root
+fields a caller may call and which rows of each table it reaches. The rows are
+stated as conditions in `auth/rows.ts`: a person reaches their own (`ownRows`),
+AI what AI may see of them (`aiReach`), and the runner and an anonymous caller
+none. A condition may go through a relation (`'project.aiEnabled': true`,
+`'todo.project.aiEnabled'`), which `RELATIONS` names. `auth/sql-filter.ts`
+folds a caller's rules for a table into SQL with graphql-casl's `accessibleBy`,
+turning each relation into a subquery on its foreign key, and refuses an
+operator it cannot translate rather than drop it. `scope` in
+`server/src/graphql/tenancy.ts` hands that SQL to drizzle-graphql for every
+table, ANDed into every generated read, update and delete, and `reachable()`
+hands it to the hand-written code. A table with no rule reaches no row, so add
+a new table to `USER_OWNED_TABLES` in `auth/rows.ts`. `tenancy.test.ts` and
+`auth/row-reach.test.ts` fail when you forget — do not delete them to make
+them pass.
 
 **Every root field needs an audience.** `server/src/graphql/permissions.ts` is a
 graphql-casl permissions map over the root types: each field is for a person
@@ -192,7 +204,8 @@ FORBIDDEN to everyone, and `permissions.test.ts` fails until it is named. An
 anonymous caller passes as a person, so the field itself answers
 UNAUTHENTICATED. The hand-written lookups (`core/owned.ts`) read through
 tenancy's `reachable()`, so they agree with generated CRUD on what a caller,
-AI included, may reach.
+AI included, may reach. The root field says what a caller may do; the row
+rules say to which rows.
 
 **Auth is better-auth, reached only through GraphQL.** `server/src/auth/better-auth.ts`
 configures it (bearer sessions in Postgres, magic links, OIDC, API keys) over
@@ -269,15 +282,17 @@ the surface is not there. Key management is a person's alone (`Audience.Person` 
 
 **AI works the board as far as its owner lets it, and no further.** An
 `apiKey` or `agent` actor (`isAiActor`) is held to narrower rules. What it
-sees: `tenancy.ts` narrows its scope to projects with `aiEnabled` and, in them,
-todos without `aiIgnored`, and hides everything hanging off a hidden todo; the
-`agents` table is closed to it outright, and `agentRoster` (`ai/reads.ts`)
-is all it learns of agents — no key, prompt, base URL or MCP servers. A
-resolver that reads rows directly (a loader, a hand-written mutation) has to
-apply the same narrowing itself — see `visibleToAi`/`hiddenFromAi` in
-`todos/resolvers.ts`, `loadAiTodo` in `ai/requests.ts`, and
-`ai/reach.ts`, which checks the ids a hand-written mutation is handed
-and answers NOT_FOUND for what AI cannot see. What it writes:
+sees: its ability's row rules (`aiReach` in `auth/rows.ts`) narrow it to
+projects with `aiEnabled` and, in them, todos without `aiIgnored`, and hide
+everything hanging off a hidden todo; the `agents` and `mcpServers` tables are
+closed to it outright, and `agentRoster` (`ai/reads.ts`) is all it learns of
+agents — no key, prompt, base URL or MCP servers. A resolver that reads rows
+directly (a loader, a hand-written mutation) applies the same conditions
+(`aiProject`, `aiTodo`, `aiLane`) through `conditionsSql` — see `loadAiProject`
+and `loadAiTodo` in `core/owned.ts`, `hiddenFromAi` in `todos/resolvers.ts`,
+and `ai/reach.ts`, which checks the ids a hand-written mutation is handed and
+answers NOT_FOUND for what AI cannot see. `visibleToAi` filters rows already
+loaded, so it states the rule in code and must follow it. What it writes:
 `graphql/permissions.ts` gates every root field and refuses AI all but
 `AI_MUTATIONS` — projects (create and rename, and their context, nothing else:
 `holdAiProjectWrite`), the account's global context (`setGlobalContext`), todos (create, edit, move, retry, run, stop a run,
@@ -639,7 +654,7 @@ transaction holds the feed up until it ends. Rows are read back through
 is a tombstone, but for AI only if `ai_seen` says AI was ever shown it. The
 triggers re-stamp what a change moves in or out of AI's view (a project's AI
 switch, a todo's `aiIgnored`, archive or project), and `project_open_to_ai` /
-`edge_end_open_to_ai` in the migration mirror `tenancy.ts`'s AI narrowing:
+`edge_end_open_to_ai` in the migration mirror `aiReach`'s AI narrowing:
 change one, change the other, and `changes.test.ts` holds them to each other.
 Tombstones are pruned after 30 days and cursors expire a day before.
 
