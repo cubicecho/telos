@@ -132,16 +132,16 @@ describe('claimRun', () => {
       `mutation { createTodoNote(values: { todoId: "${todoId}", body: "Mind the tone." }) { id } }`,
     );
     await board.person.expectOk(
-      `mutation ($id: UUID!) { updateProject(set: { prompt: "Keep artifacts in /srv/p." }, where: { id: { eq: $id } }) { id } }`,
+      `mutation ($id: UUID!) { updateProject(set: { description: "A test board.", prompt: "Keep artifacts in /srv/p." }, where: { id: { eq: $id } }) { id } }`,
       { id: board.projectId },
     );
-    await board.person.expectOk('mutation { setGlobalContext(context: "Work runs on the homelab.") { id } }');
+    await board.person.expectOk('mutation { setAgentInstructions(instructions: "Work runs on the homelab.") { id } }');
     const claimed = await claim(todoId);
     expect(claimed.agent).toMatchObject({ name: 'Worker', apiKey: 'sk-secret', model: 'tiny', mcpServers: '[]' });
     expect(claimed.assignment).toMatchObject({
-      globalContext: 'Work runs on the homelab.',
+      agentInstructions: 'Work runs on the homelab.',
       projectName: 'P',
-      projectContext: 'A test board.',
+      projectDescription: 'A test board.',
       projectPrompt: 'Keep artifacts in /srv/p.',
       laneName: 'To do',
       title: 'Write it',

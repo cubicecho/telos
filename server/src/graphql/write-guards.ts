@@ -46,7 +46,7 @@ interface ForeignKey {
   entity: string;
   parent: AnyTable;
   /** The parent table's key, which names what of it the caller may reach (tenancy.ts). */
-  name: 'projects' | 'todos' | 'labels' | 'lanes' | 'agents';
+  name: 'projects' | 'todos' | 'labels' | 'lanes' | 'agents' | 'prompts';
 }
 
 const project: ForeignKey = { key: 'projectId', entity: 'Project', parent: dbSchema.projects, name: 'projects' };
@@ -55,6 +55,7 @@ const label: ForeignKey = { key: 'labelId', entity: 'Label', parent: dbSchema.la
 const lane: ForeignKey = { key: 'laneId', entity: 'Lane', parent: dbSchema.lanes, name: 'lanes' };
 const parentTodo: ForeignKey = { key: 'parentId', entity: 'Todo', parent: dbSchema.todos, name: 'todos' };
 const agent: ForeignKey = { key: 'agentId', entity: 'Agent', parent: dbSchema.agents, name: 'agents' };
+const prompt: ForeignKey = { key: 'promptId', entity: 'Prompt', parent: dbSchema.prompts, name: 'prompts' };
 const onSuccessLane: ForeignKey = { key: 'onSuccessLaneId', entity: 'Lane', parent: dbSchema.lanes, name: 'lanes' };
 const onFailureLane: ForeignKey = { key: 'onFailureLaneId', entity: 'Lane', parent: dbSchema.lanes, name: 'lanes' };
 const newTodoLane: ForeignKey = { key: 'newTodoLaneId', entity: 'Lane', parent: dbSchema.lanes, name: 'lanes' };
@@ -66,6 +67,7 @@ const FOREIGN_KEYS: Record<string, ForeignKey[]> = {
   todoLabels: [todo, label],
   projectLabels: [project, label],
   todoNotes: [todo],
+  agents: [prompt],
 };
 
 /**
@@ -148,7 +150,7 @@ function assertAiSwitchUntouched(args: Parameters<typeof writtenRows>[0]): void 
 }
 
 /** What of a project an AI caller may state. The rest is a person's: its switches, its prompt, and archiving it. */
-const AI_PROJECT_COLUMNS = new Set(['id', 'name', 'description', 'context']);
+const AI_PROJECT_COLUMNS = new Set(['id', 'name', 'description']);
 
 /**
  * Holds an AI caller's project write to the columns it may state. A project it
@@ -444,9 +446,10 @@ export const onWrite: NonNullable<BuildSchemaConfig['onWrite']> = {
     },
   },
   agents: {
-    before: async ({ args }: WriteHookPayload) => {
+    before: async ({ args, context, tx }: WriteHookPayload) => {
       assertServerListSound(writtenRows(args));
       assertRunToolsSound(writtenRows(args));
+      await assertForeignKeysOwned(tx, context as Context, writtenRows(args), FOREIGN_KEYS.agents);
     },
   },
   mcpServers: {

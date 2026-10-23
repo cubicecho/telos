@@ -36,6 +36,7 @@ describe('tenancy configuration', () => {
       'mcpServers',
       'projectLabels',
       'projects',
+      'prompts',
       'runs',
       'todoDependencies',
       'todoEvents',

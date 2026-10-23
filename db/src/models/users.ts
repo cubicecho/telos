@@ -15,12 +15,12 @@ export const users = pgTable('users', {
   // good. Pruning (server/src/runs/retention.ts) never takes a run readiness
   // still count, so it changes what is kept, never what runs next.
   runRetentionDays: integer('run_retention_days'),
-  // What every agent of this account should know, whichever project it works
-  // in: the base layer of a run's system prompt, under the project's own
-  // context and prompt. A person edits it in Settings, and AI may keep it up
-  // to date as it does a project's context (`setGlobalContext`). Read by
-  // agents only, and harmless when AI is off.
-  globalContext: text('global_context'),
+  // What every agent of this account is told first, whatever its prompt: the
+  // base layer of a run's system prompt. Null is the built-in default
+  // (DEFAULT_AGENT_INSTRUCTIONS in prompt-seeds.ts), so the default can
+  // improve under an account that never changed it, and resetting is writing
+  // null. A person's only (`setAgentInstructions`).
+  agentInstructions: text('agent_instructions'),
   // An admin runs the instance: only an admin flips its switches. The first
   // account is made one (auth.ts); no client can write this.
   isAdmin: boolean('is_admin').notNull().default(false),

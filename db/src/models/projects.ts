@@ -12,10 +12,6 @@ export const projects = pgTable(
       .references(() => users.id, { onDelete: 'cascade' }),
     name: text('name').notNull(),
     description: text('description'),
-    // What an agent working here should know that no single todo says: the
-    // repo, the conventions, who the work is for. Read by agents only, and
-    // harmless when AI is off.
-    context: text('context'),
     // Standing instructions for every agent working this project's todos
     // (where artifacts go, the repo's conventions), kept apart from the
     // description, which is for people. A person's only: an AI caller may

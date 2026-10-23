@@ -35,9 +35,8 @@ export async function createBoard(db: TestDb, email: string): Promise<Board> {
   const userId = await createUser(db, email);
   await db.update(dbSchema.users).set({ aiEnabled: true }).where(eq(dbSchema.users.id, userId));
   const person = createClient(db, userId, { ai: true });
-  const projectId = (
-    await person.expectOk(`mutation { createProject(values: { name: "P", context: "A test board." }) { id } }`)
-  ).createProject.id;
+  const projectId = (await person.expectOk(`mutation { createProject(values: { name: "P" }) { id } }`)).createProject
+    .id;
   await person.expectOk(`mutation ($id: ID!) { setProjectAiEnabled(projectId: $id, enabled: true) { id } }`, {
     id: projectId,
   });
@@ -96,8 +95,8 @@ export const QUEUE = `query { runnerQueue { todoId laneId projectId } }`;
 export const CLAIM = `mutation ($todoId: ID!, $laneId: ID!) {
   claimRun(todoId: $todoId, laneId: $laneId) {
     runId todoId token leaseExpiresAt
-    agent { id name baseUrl model apiKey maxToolIterations mcpServers }
-    assignment { globalContext projectName projectContext projectPrompt laneName title brief acceptance report why notes reviews ruling artifacts { location action title } }
+    agent { id name baseUrl model apiKey prompt maxToolIterations mcpServers }
+    assignment { agentInstructions projectName projectDescription projectPrompt laneName title brief acceptance report why notes reviews ruling artifacts { location action title } }
   }
 }`;
 export const HEARTBEAT = `mutation ($id: ID!, $events: [RunEventInput!], $prompt: RunPromptInput, $usage: RunUsageInput) {

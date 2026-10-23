@@ -4,6 +4,7 @@ import * as dbSchema from '@telos/db/schema';
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { bearer, genericOAuth, magicLink, oneTimeToken } from 'better-auth/plugins';
+import { seedPrompts } from '../agents/prompts.ts';
 import {
   appLink,
   appUrl,
@@ -108,8 +109,18 @@ export function createAuth(db: DB, options: AuthOptions = {}) {
     // shows the error, rather than better-auth's own error page.
     onAPIError: { errorURL: appLink('/login') },
     // Every way an account is made (a link, SECURE_LOCAL_NET, OIDC) goes through
-    // better-auth's adapter, so this is the one place the first one becomes the admin.
-    databaseHooks: { user: { create: { after: async (user) => claimFirstAdmin(db, user.id) } } },
+    // better-auth's adapter, so this is the one place the first one becomes the
+    // admin, and every one gets the prompts an account starts with.
+    databaseHooks: {
+      user: {
+        create: {
+          after: async (user) => {
+            await claimFirstAdmin(db, user.id);
+            await seedPrompts(db, user.id);
+          },
+        },
+      },
+    },
     plugins: [
       apiKey({
         enableMetadata: true,
