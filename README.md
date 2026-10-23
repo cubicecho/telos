@@ -124,7 +124,6 @@ domain.
 | `OIDC_API_AUDIENCE` | `<SERVER_URL>/graphql` | Telos's API identifier at the provider: the `aud` a provider access token must carry to be accepted as a bearer. |
 | `OIDC_DEVICE_CLIENT_ID` | — | The public client device apps (Home Assistant) use at the provider for the device flow. Telos only tells them its name, in `authConfig.sso.deviceClientId`. Pairing registers one for you; set this to use another. |
 | `AI_ENABLED` | — | Set to `false` to remove AI entirely: no MCP endpoint, no API keys, no agents, no switch in Settings. Otherwise an admin turns it on in Settings. |
-| `RUNNER_CONCURRENCY` | `2` | The most runs the runner works at once. |
 | `RUNNER_POLL_SECONDS` | `5` | How long the runner waits when nothing is ready. |
 | `RUNNER_ALLOW_CHECKS` | `false` | Let the runner run check lanes' shell commands. (`RUNNER_ALLOW_STDIO` is gone: telos runs no stdio MCP servers, and the runner warns if it is still set.) |
 | `RUNNER_KEY` | made up at boot | Only for a second runner on another host (`runner/`, with `TELOS_URL`): set the same value on both. |

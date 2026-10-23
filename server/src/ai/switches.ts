@@ -1,11 +1,12 @@
 import * as dbSchema from '@telos/db/schema';
 import { and, eq } from 'drizzle-orm';
 import { extendSchema, type GraphQLSchema, parse } from 'graphql';
-import type { MutationResolvers } from '../../__generated__/resolvers.ts';
+import type { MutationResolvers, QueryResolvers } from '../../__generated__/resolvers.ts';
 import { authConfigFor, requireAuth } from '../auth/resolvers.ts';
+import type { Context } from '../core/context.ts';
 import { badInput, forbidden, notFound } from '../core/errors.ts';
 import { attachResolvers } from '../graphql/attach-resolvers.ts';
-import { isAdmin, setInstanceAi } from '../instance/settings.ts';
+import { instanceRunLimit, isAdmin, MAX_RUN_LIMIT, setInstanceAi, setInstanceRunLimit } from '../instance/settings.ts';
 import { cancelRunsUnder, dropRunRequests } from '../runs/ready.ts';
 import { MAX_RETENTION_DAYS } from '../runs/retention.ts';
 import { requireAi } from './gate.ts';
@@ -24,14 +25,22 @@ import { requireAi } from './gate.ts';
 // start on todos by themselves. It stops nothing when it goes off.
 //
 // The instance's switch is an admin's: it decides for every account at once.
+// So is its run limit, the most runs every runner works at once between them.
 //
 // Applied only when the server offers AI (AI_ENABLED is not false). Without it
 // there is nothing to switch.
 
 const AI_SWITCHES_SDL = parse(`
+  extend type Query {
+    "The most runs the instance works at once, across every runner and account. Admins only."
+    instanceRunLimit: Int!
+  }
+
   extend type Mutation {
     "Switches AI on or off for the whole instance. Admins only. Off, no account can use AI."
     setInstanceAiEnabled(enabled: Boolean!): AuthConfig!
+    "Sets the most runs the instance works at once, 1 to ${MAX_RUN_LIMIT}. Admins only. Lowering it stops nothing that is running."
+    setInstanceRunLimit(limit: Int!): Int!
     "Switches AI on or off for the whole account. Off, no key, agent or run touches any of it."
     setAiEnabled(enabled: Boolean!): User!
     "Opens a project to agents, or closes it. Opening one needs the account's AI on."
@@ -45,7 +54,22 @@ const AI_SWITCHES_SDL = parse(`
 
 export function applyAiSwitchesExtension(schema: GraphQLSchema): GraphQLSchema {
   const extendedSchema = extendSchema(schema, AI_SWITCHES_SDL);
+  const queries: QueryResolvers = {};
   const mutations: MutationResolvers = {};
+
+  queries.instanceRunLimit = async (_parent, _args, context) => {
+    await requireAdmin(context, "Only an admin can see the instance's run limit.");
+    return instanceRunLimit(context.db);
+  };
+
+  mutations.setInstanceRunLimit = async (_parent, args, context) => {
+    await requireAdmin(context, "Only an admin can set the instance's run limit.");
+    if (!Number.isInteger(args.limit) || args.limit < 1 || args.limit > MAX_RUN_LIMIT) {
+      throw badInput(`Work 1 to ${MAX_RUN_LIMIT} runs at once.`);
+    }
+    await setInstanceRunLimit(context.db, args.limit);
+    return args.limit;
+  };
 
   mutations.setInstanceAiEnabled = async (_parent, args, context) => {
     const userId = requireAuth(context);
@@ -118,5 +142,16 @@ export function applyAiSwitchesExtension(schema: GraphQLSchema): GraphQLSchema {
     return user;
   };
 
-  return attachResolvers(extendedSchema, { Mutation: mutations });
+  return attachResolvers(extendedSchema, { Query: queries, Mutation: mutations });
+}
+
+/**
+ * Refuses anyone but an admin with a session.
+ *
+ * @param context - The request.
+ * @param message - What to say to anyone else.
+ */
+async function requireAdmin(context: Context, message: string): Promise<void> {
+  const userId = requireAuth(context);
+  if (!(await isAdmin(context.db, userId))) throw forbidden(message);
 }

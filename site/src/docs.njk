@@ -47,7 +47,6 @@ description: Configuration, the AI switches, agents, lanes and runs, the MCP doo
           <tr><td><code>SECURE_LOCAL_NET</code></td><td><code>false</code></td><td>Typing an address signs in, with no link. Private networks only; refused with a public <code>APP_URL</code>.</td></tr>
           <tr><td><code>TRUST_PROXY</code></td><td><code>false</code></td><td>Reverse proxies in front (<code>1</code> behind one). Sign-in is throttled per client address.</td></tr>
           <tr><td><code>AI_ENABLED</code></td><td>—</td><td>Set to <code>false</code> to remove AI entirely. Otherwise an admin turns it on in Settings.</td></tr>
-          <tr><td><code>RUNNER_CONCURRENCY</code></td><td><code>2</code></td><td>The most runs the runner works at once.</td></tr>
           <tr><td><code>RUNNER_POLL_SECONDS</code></td><td><code>5</code></td><td>How long the runner waits when nothing is ready.</td></tr>
           <tr><td><code>RUNNER_ALLOW_CHECKS</code></td><td><code>false</code></td><td>Let the runner run check lanes' shell commands. <code>RUNNER_ALLOW_STDIO</code> is gone: telos runs no stdio MCP servers.</td></tr>
           <tr><td><code>RUNNER_KEY</code></td><td>made up at boot</td><td>Only for a second runner on another host: set the same value on both.</td></tr>

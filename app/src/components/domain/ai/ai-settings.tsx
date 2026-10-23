@@ -11,6 +11,7 @@ import { CARD_TITLE } from '@/lib/styles';
 import { AgentDefaultsForm } from './agent-defaults-form';
 import { AgentManager } from './agent-manager';
 import { ApiKeyManager } from './api-key-manager';
+import { RunLimit } from './run-limit';
 import { RunRetention } from './run-retention';
 
 /**
@@ -119,13 +120,15 @@ export function AiSettings() {
 
 /**
  * What a lane hands its todos to: the account's defaults every agent inherits,
- * and the agents themselves. Drawn only while AI is on.
+ * and the agents themselves. An admin also sees how many runs the instance
+ * works at once. Drawn only while AI is on.
  */
 export function AgentSettings() {
   const ai = useAi();
   if (!ai.on) return null;
   return (
     <>
+      {ai.admin ? <RunLimit /> : null}
       <AgentDefaultsForm />
       <AgentManager />
     </>

@@ -251,7 +251,7 @@ const RUNS_SDL = parse(`
   }
 
   extend type Query {
-    "What lanes' agents could start on now. The runner's only."
+    "What lanes' agents could start on now, no more than the instance's run limit has room for. The runner's only."
     runnerQueue(limit: Int = 20): [ReadyTodo!]!
   }
 
@@ -288,6 +288,9 @@ const PROMPT_CHARS = 64_000;
 const MAX_ARTIFACTS = 100;
 /** The most of a todo's artifacts a run is told of: enough to find the work, not a listing of it. */
 const ASSIGNMENT_ARTIFACTS = 50;
+
+/** The advisory lock every claim takes, so claims across the instance take turns. */
+const CLAIM_LOCK = 7_340_001;
 
 /** A reply that opens with FAIL is a failing verdict: the todo takes the failure route. */
 const FAILS = /^\s*FAIL\b/i;
@@ -949,8 +952,10 @@ export function applyRunsExtension(schema: GraphQLSchema): GraphQLSchema {
   mutations.claimRun = async (_parent, args, context) => {
     try {
       return await (context.db as AnyRow).transaction(async (tx: AnyRow) => {
-        // Claims in one lane take turns, so two runners cannot both see
-        // room under its WIP limit and both take it.
+        // Claims take turns across the instance, so two runners cannot both
+        // see room under the instance's run limit, or a lane's WIP limit, and
+        // both take it.
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(${CLAIM_LOCK})`);
         const [lane] = await tx.select().from(dbSchema.lanes).where(eq(dbSchema.lanes.id, args.laneId)).for('update');
         if (!lane) return null;
         await expireLapsedRuns(tx, args);

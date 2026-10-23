@@ -29,7 +29,7 @@ for (const signal of ['SIGTERM', 'SIGINT'] as const) {
   });
 }
 
-console.log(`🤖 Telos runner working ${config.telosUrl}, ${config.concurrency} at a time`);
+console.log(`🤖 Telos runner working ${config.telosUrl}`);
 for (const warning of configWarnings(config)) console.warn(warning);
 await runLoop({ ...config, telos }, stop.signal);
 process.exit(0);

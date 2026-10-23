@@ -7,6 +7,7 @@ import {
   AgentsDocument,
   AiStateDocument,
   ApiKeysDocument,
+  InstanceRunLimitDocument,
   McpServersDocument,
   SetAiEnabledDocument,
   SetInstanceAiEnabledDocument,
@@ -170,5 +171,24 @@ describe('AgentSettings', () => {
   it('lists the agents once AI is on', async () => {
     settings([aiState(true, true), defaults, defaults, defaults, agents, servers], AgentSettings);
     expect(await screen.findByText('No agents yet.')).toBeInTheDocument();
+    // How many runs the instance works at once is an admin's.
+    expect(screen.queryByText('Runs at once')).not.toBeInTheDocument();
+  });
+
+  it("gives an admin the instance's run limit", async () => {
+    settings(
+      [
+        aiState(true, true, { admin: true }),
+        { request: { query: InstanceRunLimitDocument }, result: { data: { instanceRunLimit: 2 } } },
+        defaults,
+        defaults,
+        defaults,
+        agents,
+        servers,
+      ],
+      AgentSettings,
+    );
+    expect(await screen.findByText('Runs at once')).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: '2' })).toHaveAttribute('aria-pressed', 'true');
   });
 });

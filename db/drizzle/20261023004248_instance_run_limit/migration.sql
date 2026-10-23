@@ -1,0 +1,2 @@
+ALTER TABLE "instance_settings" ADD COLUMN "run_limit" integer DEFAULT 2 NOT NULL;--> statement-breakpoint
+ALTER TABLE "instance_settings" ADD CONSTRAINT "instance_settings_run_limit" CHECK ("run_limit" > 0);

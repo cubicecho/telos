@@ -173,6 +173,9 @@ the site.
   instead. With no route, the todo stays where it is. Owner: `lanes.onSuccessLaneId`,
   `lanes.onFailureLaneId`, `lanes.archiveOnSuccess`.
 - **WIP limit:** how many todos a lane's agent works at once. Owner: `lanes.wipLimit`.
+- **Run limit:** how many runs the whole instance works at once, across every runner, lane and
+  account; lanes' WIP limits apply under it. An admin sets it in Settings → Agents. Owner:
+  `instance_settings.runLimit` (default 2).
 - **Max attempts:** how many failed runs a lane's agent gets at a todo before it hands
   it back. Owner: `lanes.maxAttempts`.
 - **Auto-run:** when it is on, the lanes' agents start on ready todos by themselves; when

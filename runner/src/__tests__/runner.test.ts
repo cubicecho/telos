@@ -15,6 +15,7 @@ import { createContextFactory } from '../../../server/src/graphql/context-factor
 // The runner never imports the server or the database; its test does, to stand
 // a real telos up for it to talk to.
 import { toHeaders } from '../../../server/src/http/headers.ts';
+import { setInstanceRunLimit } from '../../../server/src/instance/settings.ts';
 import { mountMcp } from '../../../server/src/mcp/endpoint.ts';
 import { readConfig } from '../config.ts';
 import { startRunner } from '../embed.ts';
@@ -278,7 +279,6 @@ function loopOptions(overrides: Partial<LoopOptions> = {}): LoopOptions {
     telos: createTelos({ telosUrl, runnerKey: RUNNER_KEY }),
     telosUrl,
     allowChecks: false,
-    concurrency: 2,
     pollMs: 10,
     heartbeatMs: 50,
     log: () => {},
@@ -545,11 +545,15 @@ describe('the runner', () => {
     expect(thread).toEqual([]);
   });
 
-  it('keeps to its concurrency', async () => {
+  it("keeps to the instance's run limit, whatever a lane's WIP limit says", async () => {
     await setLane(board.person, board.lanes[0].id, { wipLimit: 5 });
-    for (const title of ['One', 'Two', 'Three']) await board.addTodo(title);
-    expect(await cycle(loopOptions({ concurrency: 2 }))).toBe(2);
-    expect(await cycle(loopOptions({ concurrency: 2 }))).toBe(1);
+    for (const title of ['One', 'Two', 'Three', 'Four']) await board.addTodo(title);
+    await setInstanceRunLimit(db, 1);
+    expect(await cycle()).toBe(1);
+    // Read afresh on every ask, so raising it takes on the next one.
+    await setInstanceRunLimit(db, 2);
+    expect(await cycle()).toBe(2);
+    expect(await cycle()).toBe(1);
   });
 
   it('leaves a board that does not run by itself alone, but for the todo a person asks for', async () => {
@@ -586,7 +590,7 @@ describe('the prefix a prompt cache keeps', () => {
     };
     for (const title of titles) {
       await board.addTodo(title);
-      await cycle(loopOptions({ concurrency: 1 }));
+      await cycle();
     }
     return seen;
   }

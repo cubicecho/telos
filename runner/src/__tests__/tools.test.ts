@@ -122,4 +122,11 @@ describe("the runner's settings", () => {
       '⚠️  RUNNER_ALLOW_CHECKS is on: check lanes may run shell commands on this host.',
     ]);
   });
+
+  it('say that RUNNER_CONCURRENCY is no longer read, and where the run limit went', () => {
+    const old = { ...env, RUNNER_CONCURRENCY: '4' };
+    const [warning] = configWarnings(readConfig(old) as NonNullable<ReturnType<typeof readConfig>>, old);
+    expect(warning).toMatch(/RUNNER_CONCURRENCY is no longer read/);
+    expect(warning).toMatch(/Settings → Agents/);
+  });
 });

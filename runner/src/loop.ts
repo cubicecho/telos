@@ -3,21 +3,25 @@ import { takeTests } from './probes.ts';
 import { takeSessionDeletes } from './session-deletes.ts';
 import type { Telos } from './telos.ts';
 
-// The runner's heartbeat as a process: ask telos what is ready, claim what it
-// has room for, work it, ask again. It keeps no state of its own worth losing —
+// The runner's heartbeat as a process: ask telos what is ready, claim it, work
+// it, ask again. How much may run at once is telos's to say (the instance's run
+// limit, set in Settings): the queue holds no more than there is room for, and
+// a claim past it comes back null. It keeps no state of its own worth losing —
 // a run it was working when it died is written off by its lease lapsing, and
 // the todo comes back to the queue.
 
 export interface LoopOptions extends Omit<ExecuteOptions, 'signal'> {
   telos: Telos;
-  concurrency: number;
   pollMs: number;
 }
 
+/** The most the runner asks telos for in one go. Telos sends fewer when the instance has less room. */
+const QUEUE_ASK = 20;
+
 /**
- * Claims and starts whatever is ready, up to the free slots.
+ * Claims and starts whatever is ready, as much as telos has room for.
  *
- * @param options How to reach telos and how much to take on.
+ * @param options How to reach telos, and how to run what it hands over.
  * @param running What is in flight, by run id. Added to here.
  * @param signal Stops the runs started.
  * @returns How many runs were started.
@@ -27,11 +31,8 @@ export async function tick(
   running: Map<string, Promise<unknown>>,
   signal?: AbortSignal,
 ): Promise<number> {
-  const room = options.concurrency - running.size;
-  if (room <= 0) return 0;
   let started = 0;
-  for (const ready of await options.telos.queue(room * 2)) {
-    if (started >= room) break;
+  for (const ready of await options.telos.queue(QUEUE_ASK)) {
     // Null is someone else got there first, or it stopped being ready.
     const claim = await options.telos.claim(ready.todoId, ready.laneId);
     if (!claim) continue;
@@ -47,7 +48,7 @@ export async function tick(
 /**
  * Runs until `signal` aborts, then waits for the runs in flight to stop.
  *
- * @param options How to reach telos and how much to take on.
+ * @param options How to reach telos, and how to run what it hands over.
  * @param signal Ends the loop.
  * @returns When the loop and its runs are done.
  */
@@ -73,8 +74,8 @@ export async function runLoop(options: LoopOptions, signal: AbortSignal): Promis
     } catch (error) {
       log(`[runner] asking telos failed: ${error instanceof Error ? error.message : String(error)}`);
     }
-    // Straight back round when there was work and room for more; otherwise wait.
-    if (started > 0 && running.size < options.concurrency) continue;
+    // Straight back round when there was work, in case there is room for more; otherwise wait.
+    if (started > 0) continue;
     await pause(options.pollMs, signal, running);
   }
   await Promise.allSettled(running.values());

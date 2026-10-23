@@ -222,6 +222,20 @@ export const SetRunRetentionDocument = graphql(`
   }
 `);
 
+// The most runs the instance works at once, across every runner and account.
+// An admin's to read and set.
+export const InstanceRunLimitDocument = graphql(`
+  query InstanceRunLimit {
+    instanceRunLimit
+  }
+`);
+
+export const SetInstanceRunLimitDocument = graphql(`
+  mutation SetInstanceRunLimit($limit: Int!) {
+    setInstanceRunLimit(limit: $limit)
+  }
+`);
+
 // What agents are told beyond their own instructions: the account's global
 // context and each project's context. People edit both in Settings, and AI
 // keeps them up to date through the MCP door.
