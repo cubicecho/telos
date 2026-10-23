@@ -1,3 +1,39 @@
+# [10.0.0](https://github.com/cubicecho/telos/compare/v9.1.0...v10.0.0) (2026-10-23)
+
+
+* feat!: prompts an agent names, under the account's agent instructions ([444f1d2](https://github.com/cubicecho/telos/commit/444f1d25712f57c3c0e037ce7d1dee1fe7c500b8))
+* feat(app)!: prompts, and agent instructions in place of context ([2b74bab](https://github.com/cubicecho/telos/commit/2b74bab50ee0371e06a3f8520ab4a84a2c56d92b))
+* feat(mcp)!: take context off the door and document prompts ([28c8763](https://github.com/cubicecho/telos/commit/28c87638603c4fcb91aee373cad88a0ce8c450a6))
+* feat(runner)!: build a run's system prompt from what people wrote ([317cbee](https://github.com/cubicecho/telos/commit/317cbee18775980ebc1d97a0bebad115cbe31f3b))
+
+
+### Bug Fixes
+
+* bring the prompts parts together ([03f020a](https://github.com/cubicecho/telos/commit/03f020a507d89dfeac05ca83993d79d83d2c225c))
+
+
+### Features
+
+* **db:** seed text for agent instructions and prompts ([e28bff1](https://github.com/cubicecho/telos/commit/e28bff1bcd942d06b2133d9dfc5e72dcded1a3c9))
+
+
+### BREAKING CHANGES
+
+* `User.globalContext`, `globalContext`, `setGlobalContext`,
+`Project.context` (and `context` on project inputs), `Agent.systemPrompt`,
+and the run assignment's `globalContext` and `projectContext` are removed.
+`RunnerAgent.systemPrompt` is now `prompt`.
+* the app no longer reads or writes User.globalContext,
+setGlobalContext, Project.context or Agent.systemPrompt; it needs the
+server's Prompt CRUD, Agent.promptId, User.agentInstructions,
+defaultAgentInstructions and setAgentInstructions.
+* the MCP tools global_context and set_global_context are
+removed, and create_project, update_project and projects no longer take
+or return context.
+* the runner asks claimRun for `RunAssignment.agentInstructions`
+and `RunnerAgent.prompt`, and no longer for `globalContext`, `projectContext`
+or `systemPrompt`. It needs a server with the prompts change.
+
 # [9.1.0](https://github.com/cubicecho/telos/compare/v9.0.0...v9.1.0) (2026-10-23)
 
 
