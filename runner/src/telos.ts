@@ -50,7 +50,8 @@ export interface ClaimedAgent {
   baseUrl: string | null;
   model: string | null;
   apiKey: string | null;
-  systemPrompt: string | null;
+  /** The body of the prompt the agent was given; null when it has none. */
+  prompt: string | null;
   temperature: number | null;
   maxTokens: number | null;
   contextLength: number | null;
@@ -69,11 +70,10 @@ export interface ClaimedAgent {
 }
 
 export interface Assignment {
-  /** What every agent of the account is told, whichever project it works in. */
-  globalContext: string | null;
+  /** What every agent of the account is told first: its own, or telos's default when it has none. */
+  agentInstructions: string;
   projectName: string;
   projectDescription: string | null;
-  projectContext: string | null;
   /** The project's standing instructions to its agents, a person's own. */
   projectPrompt: string | null;
   laneName: string;
@@ -213,7 +213,7 @@ export interface Telos {
 const QUEUE = `query ($limit: Int) { runnerQueue(limit: $limit) { todoId laneId projectId } }`;
 /** What the runner reads of an agent, for a run. */
 const AGENT_FIELDS = `
-  id name baseUrl model apiKey systemPrompt temperature maxTokens contextLength
+  id name baseUrl model apiKey prompt temperature maxTokens contextLength
   maxToolIterations toolDiscovery toolSelectModel reasoningEffort requestTimeoutSeconds maxRetries mcpServers mcpNotices
   defaults {
     baseUrl model apiKey temperature maxTokens contextLength
@@ -225,7 +225,7 @@ const CLAIM = `mutation ($todoId: ID!, $laneId: ID!) {
     runId todoId token leaseExpiresAt turn opensSession
     agent { ${AGENT_FIELDS} }
     assignment {
-      globalContext projectName projectDescription projectContext projectPrompt laneName
+      agentInstructions projectName projectDescription projectPrompt laneName
       title brief acceptance report why notes reviews ruling
       artifacts { location action title }
     }
