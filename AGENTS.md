@@ -89,7 +89,7 @@ telos/
 │       ├── index.ts         # Standalone entry, for a second runner on another host (needs RUNNER_KEY)
 │       ├── config.ts        # Env -> RunnerConfig
 │       ├── telos.ts         # The runner's GraphQL client (queue, claim, heartbeat, finish)
-│       ├── loop.ts          # Poll the queue, claim up to the concurrency, execute
+│       ├── loop.ts          # Poll the queue, claim what telos has room for, execute
 │       ├── spec.ts          # An agent over its account's defaults, as agent-core spec layers (also @telos/runner/spec)
 │       ├── execute.ts       # One run: agent-core's runAgentLoop over a per-run MCP pool, or a check
 │       ├── check.ts         # A check lane's run: the lane's shell command, its exit code the verdict
@@ -313,7 +313,8 @@ ideas, one name each:
   the account's agent defaults.
 - **Lane** — a column. Given an `agentId`, each ready todo in it becomes a run.
   `onSuccessLaneId`/`onFailureLaneId` are its success and failure routes,
-  `wipLimit` how many it works at once, `maxAttempts` how many failures it
+  `wipLimit` how many it works at once (under the instance's run limit,
+  `instance_settings.runLimit`, which an admin sets in Settings), `maxAttempts` how many failures it
   takes before leaving the todo for a person.
 - **Run** — one agent working one todo. It ends in success or failure, with
   a report, and may rewrite (refine) or split its todo.

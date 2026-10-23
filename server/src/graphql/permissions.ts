@@ -50,6 +50,7 @@ export const ROOT_FIELDS: Record<RootType, Partial<Record<Audience, readonly str
       'agentDefaults',
       'accountSpend',
       'accountHandedBack',
+      'instanceRunLimit',
     ],
     [Audience.PersonOrAi]: [
       'authConfig',
@@ -80,6 +81,7 @@ export const ROOT_FIELDS: Record<RootType, Partial<Record<Audience, readonly str
       'deleteApiKey',
       'setApiKeyTools',
       'setInstanceAiEnabled',
+      'setInstanceRunLimit',
       'setAiEnabled',
       'setProjectAiEnabled',
       'setProjectAutoRun',

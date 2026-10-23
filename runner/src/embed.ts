@@ -17,7 +17,7 @@ export interface EmbeddedRunner {
  *
  * @param options.telosUrl Where the server is listening.
  * @param options.runnerKey The key the server accepts as x-runner-key.
- * @param options.env Where the tuning settings (concurrency, poll, checks) are read from.
+ * @param options.env Where the tuning settings (poll, checks) are read from.
  * @returns A handle to stop it.
  */
 export function startRunner(options: { telosUrl: string; runnerKey: string; env?: NodeJS.ProcessEnv }): EmbeddedRunner {

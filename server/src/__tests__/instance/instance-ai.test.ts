@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { resolveActor } from '../../auth/actor.ts';
 import { mintApiKey, signInOnLocalNet } from '../../auth/better-auth.ts';
-import { type Board, CLAIM, createBoard, FINISH, HEARTBEAT, QUEUE, runnerClient } from '../board.ts';
+import { type Board, CLAIM, createBoard, FINISH, HEARTBEAT, QUEUE, runnerClient, setLane } from '../board.ts';
 import { authFor, createClient, createTestDb, type TestClient, type TestDb } from '../helpers.ts';
 
 // The instance's AI switch: an admin's, off by default, and over every
@@ -121,5 +121,45 @@ describe('an instance with its switch off', () => {
     await runner.expectOk(FINISH, { id: runId, result: { status: 'OK', output: 'Done anyway.' } });
     await admin.expectOk(SET_INSTANCE, { enabled: true });
     expect((await runner.expectOk(QUEUE)).runnerQueue).toHaveLength(1);
+  });
+});
+
+describe("the instance's run limit", () => {
+  const LIMIT = `query { instanceRunLimit }`;
+  const SET_LIMIT = `mutation ($limit: Int!) { setInstanceRunLimit(limit: $limit) }`;
+
+  it('is two until an admin says otherwise, and only an admin reads or sets it', async () => {
+    expect((await admin.expectOk(LIMIT)).instanceRunLimit).toBe(2);
+    const other = await createBoard(db, 'other@example.com');
+    expect((await other.person.expectError(LIMIT)).code).toBe('FORBIDDEN');
+    expect((await other.person.expectError(SET_LIMIT, { limit: 4 })).code).toBe('FORBIDDEN');
+
+    expect((await admin.expectOk(SET_LIMIT, { limit: 4 })).setInstanceRunLimit).toBe(4);
+    expect((await admin.expectOk(LIMIT)).instanceRunLimit).toBe(4);
+  });
+
+  it('refuses a limit below one or above the most allowed', async () => {
+    expect((await admin.expectError(SET_LIMIT, { limit: 0 })).code).toBe('BAD_USER_INPUT');
+    expect((await admin.expectError(SET_LIMIT, { limit: 33 })).code).toBe('BAD_USER_INPUT');
+    expect((await admin.expectOk(LIMIT)).instanceRunLimit).toBe(2);
+  });
+
+  it('caps the queue and the claims across every lane and account, under the WIP limits', async () => {
+    const other = await createBoard(db, 'other@example.com');
+    await setLane(board.person, board.lanes[0].id, { wipLimit: 5 });
+    await setLane(other.person, other.lanes[0].id, { wipLimit: 5 });
+    const mine = [await board.addTodo('One'), await board.addTodo('Two')];
+    const theirs = await other.addTodo('Three');
+    await admin.expectOk(SET_LIMIT, { limit: 2 });
+
+    expect((await runner.expectOk(QUEUE)).runnerQueue).toHaveLength(2);
+    for (const todoId of mine) await runner.expectOk(CLAIM, { todoId, laneId: board.lanes[0].id });
+    expect((await runner.expectOk(QUEUE)).runnerQueue).toEqual([]);
+    // A claim past the limit is refused, whatever its lane has room for.
+    expect((await runner.expectOk(CLAIM, { todoId: theirs, laneId: other.lanes[0].id })).claimRun).toBeNull();
+
+    // Raised, there is room at once.
+    await admin.expectOk(SET_LIMIT, { limit: 3 });
+    expect((await runner.expectOk(CLAIM, { todoId: theirs, laneId: other.lanes[0].id })).claimRun).not.toBeNull();
   });
 });

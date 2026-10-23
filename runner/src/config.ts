@@ -9,8 +9,6 @@ export interface RunnerConfig {
   runnerKey: string;
   /** How long to wait between asks when the queue was empty. */
   pollMs: number;
-  /** The most runs this process works at once, across every user. */
-  concurrency: number;
   /**
    * Whether a check lane may run its command. Off by default: lanes belong to
    * the board's users, and a check is a line of shell on this host with this
@@ -34,7 +32,6 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env): RunnerConfig |
     telosUrl: telosUrl.replace(/\/+$/, ''),
     runnerKey,
     pollMs: Math.max(1, Number(env.RUNNER_POLL_SECONDS) || 5) * 1000,
-    concurrency: Math.max(1, Number(env.RUNNER_CONCURRENCY) || 2),
     allowChecks: env.RUNNER_ALLOW_CHECKS === 'true',
   };
 }
@@ -42,8 +39,9 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env): RunnerConfig |
 /**
  * What the runner says about its settings as it starts: a switch that lets
  * users run commands here, and a setting it no longer reads. Neither stops it.
- * An old `RUNNER_ALLOW_STDIO` is said rather than refused, since a compose file
- * of an earlier release sets it (to false) whether or not anyone chose to.
+ * An old `RUNNER_ALLOW_STDIO` or `RUNNER_CONCURRENCY` is said rather than
+ * refused, since a compose file of an earlier release sets it whether or not
+ * anyone chose to.
  *
  * @param config The settings read.
  * @param env The environment they were read from.
@@ -55,6 +53,12 @@ export function configWarnings(config: RunnerConfig, env: NodeJS.ProcessEnv = pr
     warnings.push(
       '⚠️  RUNNER_ALLOW_STDIO is no longer read: telos does not run stdio MCP servers, only ones at a URL. ' +
         'Check lanes have their own switch, RUNNER_ALLOW_CHECKS. Remove RUNNER_ALLOW_STDIO.',
+    );
+  }
+  if (env.RUNNER_CONCURRENCY?.trim()) {
+    warnings.push(
+      "⚠️  RUNNER_CONCURRENCY is no longer read: how many runs work at once is the instance's run limit, " +
+        'which an admin sets in Settings → Agents. Remove RUNNER_CONCURRENCY.',
     );
   }
   if (config.allowChecks) {

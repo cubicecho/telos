@@ -2,7 +2,7 @@ import type { DB } from '@telos/db';
 import { type SQL, sql } from 'drizzle-orm';
 import type { StationTodo } from '../../__generated__/resolvers.ts';
 import type { HandBack, WorkState } from '../core/enums.ts';
-import { INSTANCE_AI_ON } from '../instance/settings.ts';
+import { INSTANCE_AI_ON, INSTANCE_RUN_ROOM } from '../instance/settings.ts';
 import { resultRows } from '../todos/blocking.ts';
 
 // The readiness rules, in one place: which todos a lane's agent may start on,
@@ -27,6 +27,8 @@ import { resultRows } from '../todos/blocking.ts';
 //   - it has failed no more than `maxAttempts` times since a person last
 //     touched it, which is what stops a Doing↔Review loop spending forever
 //   - the lane has room under its WIP limit
+//   - the instance has room under its run limit, which counts every lane's
+//     runs at once (instance_settings.run_limit)
 
 /**
  * Whether the lane `l` is a check lane: its command, not an agent, works its
@@ -152,7 +154,7 @@ export async function readyTodos(
     FROM candidates c LEFT JOIN live ON live.lane_id = c.lane_id
     WHERE c.place <= c.wip_limit - coalesce(live.n, 0)
     ORDER BY c.lane_position, c.position, c.created_at
-    LIMIT ${limit}
+    LIMIT least(${limit}, ${INSTANCE_RUN_ROOM})
   `);
   return resultRows<{ todo_id: string; lane_id: string; project_id: string; user_id: string }>(result).map((row) => ({
     todoId: row.todo_id,
