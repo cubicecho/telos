@@ -1,3 +1,16 @@
+# [9.0.0](https://github.com/cubicecho/telos/compare/v8.4.0...v9.0.0) (2026-10-23)
+
+
+* feat!: remove check lanes ([a5089f1](https://github.com/cubicecho/telos/commit/a5089f11988d06858de302d4edb7a4e74bc381d3)), closes [#111](https://github.com/cubicecho/telos/issues/111) [#114](https://github.com/cubicecho/telos/issues/114) [112-#114](https://github.com/112-/issues/114)
+
+
+### BREAKING CHANGES
+
+* Lane.checkCommand, Lane.checkTimeoutSeconds,
+Run.checkCommand, ClaimRun.check, RunnerCheck, CheckResultInput and
+RunResultInput.check are removed from the API, and RUNNER_ALLOW_CHECKS is no
+longer read. Existing check lanes become lanes with no agent.
+
 # [8.4.0](https://github.com/cubicecho/telos/compare/v8.3.0...v8.4.0) (2026-10-23)
 
 
