@@ -244,23 +244,27 @@ changes and deleting a project stay yours. Nothing checks what a client
 records, so the board lists it as unverified, signed with the key that said it. **The runner** is telos's own
 worker. Three ideas make it up:
 
-- an **agent** is a model and its instructions;
+- an **agent** is a model and the prompt it works from;
 - a **lane** is a column; give it an agent (its menu, **Agent…**) and each
   ready todo there becomes a run, which on success or failure follows the
   lane's success or failure route;
 - a **run** ends in success or failure, with a report and, if the agent chose,
   new todos.
 
-What an agent does is in its instructions, and every reply is read the same
+What an agent does is in its prompt, and every reply is read the same
 way: one that opens with FAIL sends the todo along the failure route, anything
 else passes (open with PASS to say so). A passing run can split its todo into
 new ones, which land in the lane the project sends new todos to (set in the
 project's form; the first open lane otherwise), and the todo is done when they
 all are.
-A new agent can start from one of three starters (Settings → Agents → Start from):
-a **Planner** that splits work into todos, a **Worker** that does it and a **Reviewer** that rules PASS or FAIL. Each comes
-with instructions and a temperature for its job; give it a base URL
-and a model, or leave those to your agent defaults. An agent's form, like the
+An agent picks its prompt from your **Prompts** (Settings → Prompts). Every
+account starts with three: a **Planner** that makes a todo ready by rewriting or
+splitting it, a **Reviewer** that rules PASS or FAIL, and a **Worker** that does
+the work and reports. Edit them, delete them or add your own. Every run is told,
+in this order: your **agent instructions** (Settings; a short default that
+**Reset** goes back to), the project's description, the project's prompt, then
+the agent's prompt. All four are yours to write; AI clients can't change them.
+Give an agent a base URL and a model, or leave those to your agent defaults. An agent's form, like the
 defaults', starts at its endpoint: type the base URL (and a key, if it wants
 one) and its models are listed, to pick from, with the context length each
 reports; an endpoint that lists nothing still takes a model typed by name.

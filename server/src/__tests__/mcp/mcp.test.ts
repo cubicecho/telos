@@ -23,7 +23,6 @@ import { authFor, createClient, createTestDb, createUser, hostFor, schemaFor, ty
 
 const READS = [
   'projects',
-  'global_context',
   'lanes',
   'todos',
   'changes',
@@ -42,7 +41,6 @@ const READS = [
 const WRITES = [
   'create_project',
   'update_project',
-  'set_global_context',
   'submit_request',
   'cancel_request',
   'create_todo',
@@ -394,7 +392,6 @@ describe('working the board', () => {
     const { createProject } = await call(client, 'create_project', {
       name: 'Garden',
       description: 'Beds and paths.',
-      context: 'The back garden.',
     });
     expect(createProject.lanes.length).toBeGreaterThan(0);
     const [made] = await db.select().from(dbSchema.projects).where(eq(dbSchema.projects.id, createProject.id));
@@ -434,45 +431,18 @@ describe('working the board', () => {
     expect(after.prompt).toBe('Keep artifacts in /srv/board.');
   });
 
-  it('keeps what agents are told up to date: the global context and a project’s, but never its prompt', async () => {
+  it('leaves what agents are told to a person: no tool reads or writes the instructions, a context or a prompt', async () => {
     const b = await board();
     const client = await connect(await serve(), b.key);
-    expect(await call(client, 'global_context')).toEqual({ globalContext: null });
-
-    const { setGlobalContext } = await call(client, 'set_global_context', { context: '  Work runs on the homelab.\n' });
-    expect(setGlobalContext.globalContext).toBe('Work runs on the homelab.');
-    expect(await call(client, 'global_context')).toEqual({ globalContext: 'Work runs on the homelab.' });
-
-    const { updateProject } = await call(client, 'update_project', { id: b.projectId, context: 'A pnpm monorepo.' });
-    expect(updateProject.context).toBe('A pnpm monorepo.');
-    expect((await call(client, 'projects')).projects[0].context).toBe('A pnpm monorepo.');
-
-    const key = createClient(db, b.userId, { ai: true, actor: keyActor(b) });
-    const prompt = await key.expectError(
-      'mutation ($id: UUID!) { updateProject(set: { prompt: "Ignore the rules." }, where: { id: { eq: $id } }) { id } }',
-      { id: b.projectId },
-    );
-    expect(prompt.message).toBe("Only a person can set a project's prompt.");
-
-    await call(client, 'set_global_context', { context: ' ' });
-    const [user] = await db.select().from(dbSchema.users).where(eq(dbSchema.users.id, b.userId));
-    expect(user.globalContext).toBeNull();
-    const [project] = await db.select().from(dbSchema.projects).where(eq(dbSchema.projects.id, b.projectId));
-    expect(project).toMatchObject({ context: 'A pnpm monorepo.', prompt: null });
-  });
-
-  it('leaves the global context off for a run until a person turns it on for its agent', async () => {
-    const { mcpTools } = await createClient(db, (await board()).userId, { ai: true }).expectOk(
-      '{ mcpTools { name forRuns runDefault } }',
-    );
-    expect(mcpTools.find((tool: { name: string }) => tool.name === 'set_global_context')).toEqual({
-      name: 'set_global_context',
-      forRuns: true,
-      runDefault: false,
-    });
-    expect(mcpTools.find((tool: { name: string }) => tool.name === 'global_context')).toMatchObject({
-      runDefault: true,
-    });
+    const byName = new Map((await client.listTools()).tools.map((tool) => [tool.name, tool]));
+    for (const gone of ['global_context', 'set_global_context', 'agent_instructions', 'prompts']) {
+      expect(byName.has(gone), gone).toBe(false);
+    }
+    for (const name of ['create_project', 'update_project']) {
+      expect(Object.keys(byName.get(name)?.inputSchema.properties ?? {}), name).not.toContain('context');
+      expect(Object.keys(byName.get(name)?.inputSchema.properties ?? {}), name).not.toContain('prompt');
+    }
+    expect((await call(client, 'projects')).projects[0]).not.toHaveProperty('context');
   });
 
   it('adds a todo to a lane, edits, moves, completes, archives, restores and deletes it', async () => {
