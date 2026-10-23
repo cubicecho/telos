@@ -22,7 +22,6 @@ query projects {
     id
     name
     description
-    context
     openTodoCount
     lanes(orderBy: { position: { direction: asc, priority: 1 } }) {
       id
@@ -30,13 +29,6 @@ query projects {
       isDone
     }
   }
-}
-
-# What every agent of this account is told, whichever project it works in:
-# the base its project's context and prompt build on. Null when nothing is.
-# Keep it up to date with `set_global_context`.
-query globalContext {
-  globalContext
 }
 
 # One project's lanes in board order, with the agent that works each (if any),
@@ -402,16 +394,13 @@ query boardTemplates {
 mutation createProject(
   # What the board is called.
   $name: String!
-  # A line about what it is for.
+  # A line about what it is for. Every agent working on it is shown it.
   $description: String
-  # The standing description every agent working on it is shown.
-  $context: String
 ) {
-  createProject(values: { name: $name, description: $description, context: $context }) {
+  createProject(values: { name: $name, description: $description }) {
     id
     name
     description
-    context
     lanes(orderBy: { position: { direction: asc, priority: 1 } }) {
       id
       name
@@ -420,10 +409,9 @@ mutation createProject(
   }
 }
 
-# Changes a project's name, description or context. The context is what
-# every agent working there is told about it (the repo, its conventions, who
-# the work is for): keep it up to date as you learn the project. Whatever is
-# left out stays as it is.
+# Changes a project's name or description. Every agent working there is shown
+# the description, so keep it to a line or two about what the project is for.
+# Whatever is left out stays as it is.
 mutation updateProject(
   # From `projects`.
   $id: UUID!
@@ -431,30 +419,11 @@ mutation updateProject(
   $name: String
   # Its new description.
   $description: String
-  # Its new context, which replaces the old whole.
-  $context: String
 ) {
-  updateProject(set: { name: $name, description: $description, context: $context }, where: { id: { eq: $id } }) {
+  updateProject(set: { name: $name, description: $description }, where: { id: { eq: $id } }) {
     id
     name
     description
-    context
-    updatedAt
-  }
-}
-
-# Replaces what every agent of this account is told, whichever project it
-# works in. Keep it to what holds everywhere (who the work is for, the
-# machines and tools at hand, conventions shared across projects), and put
-# what is one project's in that project's context instead. Read
-# `global_context` first, and send the whole text: it replaces the old.
-mutation setGlobalContext(
-  # The new text. Blank clears it.
-  $context: String
-) {
-  setGlobalContext(context: $context) {
-    id
-    globalContext
     updatedAt
   }
 }

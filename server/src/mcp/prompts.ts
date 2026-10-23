@@ -24,19 +24,23 @@ the first call. The tools say what each one does; this says how the board works.
 
 ## What is here
 
-- **Project**: a board, and a body of work. Its \`context\` is the standing description
-  every agent working on it is shown. You only see projects whose owner has switched AI
-  on for them.
+- **Project**: a board, and a body of work. Its \`description\` is shown to every agent
+  working on it. You only see projects whose owner has switched AI on for them.
 - **Lane**: a column, in board order. A lane may have an agent: the agent works each
   todo that arrives there, and the lane says where the todo goes when that run succeeds
   (its success route) or fails (its failure route). A lane without an agent is a resting place, for a person to act
   on. One lane per project may be the done lane: a todo that reaches it is complete.
 - **Todo**: the unit of work. A *request* is simply a todo you submitted: its \`brief\`
-  and \`acceptance\` are all the first agent gets, beside the project's context.
+  and \`acceptance\` are all the first agent gets about the work.
 - **Thread**: notes on a todo. \`report\` is what an agent made of it, \`verdict\` is a
   reviewer's PASS or FAIL and why, \`note\` is anything a person or you added. Every one
   is handed to the next agent that works the todo.
 - **History**: each move, edit, completion and reopening, with who did it and why.
+- **What an agent is told**: the account's agent instructions, then the project's
+  description and prompt, then the agent's own prompt (Planner, Reviewer, Worker or one
+  the owner wrote). The owner writes the instructions, the project prompt and the
+  agents' prompts; they are not yours to change, and you do not see them. The todo and
+  its thread come after, as the agent's assignment.
 
 ## What a run does
 
@@ -54,13 +58,11 @@ then. That is queued, not stuck.
 
 You can read the board and what happened on it: \`projects\`, \`lanes\`, \`todos\`,
 \`request\`, \`todo_notes\`, \`todo_history\`, \`blockers\`, \`runs\`, \`run_events\`,
-\`artifacts\`, \`agents\`, \`spend\`, \`board_templates\` and \`global_context\`. To keep a
+\`artifacts\`, \`agents\`, \`spend\` and \`board_templates\`. To keep a
 copy of the board in step, read \`changes\` from the cursor it handed you last time.
 
-You can work it too. Make and rename projects (\`create_project\`, \`update_project\`).
-Keep what agents are told up to date: a project's context (\`update_project\`), and the
-account's global context, which every agent is told whatever project it works in
-(\`set_global_context\`). A project's prompt is its owner's to write, not yours.
+You can work it too. Make projects and change their name or description
+(\`create_project\`, \`update_project\`).
 Hand work over (\`submit_request\`, or \`create_todo\` for a lane you choose), and
 change what a todo says (\`update_todo\`). Move a todo (\`move_todo\`; into the done lane completes it), make it
 wait on others (\`set_todo_dependencies\`), send it round its lane's agent again
@@ -113,9 +115,7 @@ export const PROMPTS: readonly Prompt[] = [
   {
     name: 'start_project',
     title: 'Get new work started on a fitting board',
-    description:
-      'Finds the board a new body of work belongs on, or makes one with the context its agents ' +
-      'need, then puts the first request onto it.',
+    description: 'Finds the board a new body of work belongs on, or makes one, then puts the first request onto it.',
     args: {
       goal: z.string().describe('What the work is for, in as much detail as you have.'),
       name: z.string().optional().describe('What the board should be called, if a new one is needed.'),
@@ -125,11 +125,11 @@ export const PROMPTS: readonly Prompt[] = [
 **The work:** ${args.goal}
 **Board name, if one is needed:** ${args.name || 'suggest one: short, and about the work'}
 
-1. \`projects\`. Look for a board this work belongs on, by name, description and context.
+1. \`projects\`. Look for a board this work belongs on, by name and description.
    Only boards whose owner has switched AI on are listed.
-2. If none fits, \`create_project\`: its name, a line of description, and the context every
-   agent on it should be shown (what the project is, where the work lives, the constraints
-   that apply to everything in it). It starts with the default lanes. If
+2. If none fits, \`create_project\`: its name, and a line or two of description every
+   agent on it is shown (what the project is and where the work lives). It starts with
+   the default lanes. If
    \`board_templates\` has one that fits, \`apply_board_template\` before adding any work.
    If \`create_project\` is not listed to you, stop and tell the person what to set up
    instead, and wait for them.
@@ -164,8 +164,8 @@ Finish by reporting the project, the request's id and the lane it is in.`,
    and ask: never guess at a board.
 2. Check it is not already there: \`todos\` for the project, looking for the same work. If
    it is, add what is new to it with \`add_todo_note\` instead of submitting it twice.
-3. Write it properly, because the brief, the acceptance and the project's context are all
-   the first agent gets. \`title\`: one line. \`brief\`: what is wanted and why, where it
+3. Write it properly, because the brief and the acceptance are all the first agent gets
+   about the work. \`title\`: one line. \`brief\`: what is wanted and why, where it
    lives, what must not change. \`acceptance\`: the checks that say it is done, one per
    line, not buried in the brief. \`parentId\` if it is part of a todo already there.
 4. \`submit_request\`, then \`request\` with the id, to confirm the lane it landed in.

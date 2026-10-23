@@ -11,7 +11,7 @@ description: Configuration, the AI switches, agents, lanes and runs, the MCP doo
       <a href="#configuration">Configuration</a>
       <a href="#switches">AI switches</a>
       <a href="#runner">Agents, lanes and runs</a>
-      <a href="#starters">Starters</a>
+      <a href="#prompts">Prompts</a>
       <a href="#mcp-servers">MCP servers and hooks</a>
       <a href="#mcp">The <code>/mcp</code> door</a>
       <a href="#changes">Keeping a copy in step</a>
@@ -73,7 +73,7 @@ description: Configuration, the AI switches, agents, lanes and runs, the MCP doo
     <h2 id="runner">Agents, lanes and runs</h2>
     <p>The runner is telos's own worker, part of the server, with nothing to set up. Three ideas make it up:</p>
     <ul>
-      <li>an <strong>agent</strong> is a model and its instructions;</li>
+      <li>an <strong>agent</strong> is a model and the prompt it works from;</li>
       <li>a <strong>lane</strong> is a column; give it an agent and each ready todo there becomes a run, which follows the lane's success or failure route;</li>
       <li>a <strong>run</strong> ends in success or failure, with a report and, if the agent chose, new todos.</li>
     </ul>
@@ -93,13 +93,19 @@ description: Configuration, the AI switches, agents, lanes and runs, the MCP doo
       recent runs across every project.
     </p>
 
-    <h2 id="starters">Starters</h2>
-    <p>A new agent can start from one of three (Settings → Agents → Start from), each with instructions and a temperature for its job:</p>
+    <h2 id="prompts">Prompts</h2>
+    <p>An agent picks its prompt from your prompts (Settings → Prompts). Every account starts with three, which you can edit, delete or add to:</p>
     <ul>
-      <li><strong>Planner</strong>: splits work into todos.</li>
-      <li><strong>Worker</strong>: does it.</li>
+      <li><strong>Planner</strong>: makes a todo ready, by rewriting it or splitting it into todos.</li>
+      <li><strong>Worker</strong>: does the work and reports.</li>
       <li><strong>Reviewer</strong>: rules PASS or FAIL.</li>
     </ul>
+    <p>
+      Every run is told, in this order: your <strong>agent instructions</strong>
+      (Settings; a short default that <strong>Reset</strong> goes back to), the
+      project's description, the project's prompt, then the agent's prompt.
+      All four are yours to write; AI clients can't change them.
+    </p>
     <p>
       Agents talk to any OpenAI-compatible endpoint, a local Ollama included.
       Type the base URL and its models are listed, with the context length each
