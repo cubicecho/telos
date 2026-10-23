@@ -79,6 +79,8 @@ query todos(
     laneId
     parentId
     isBlocked
+    # What its agent asked a person and is waiting on; answer with `answer_todo`.
+    question
     completedAt
     createdAt
   }
@@ -149,6 +151,8 @@ query request(
     url
     brief: notes
     acceptance
+    # What its agent asked a person and is waiting on; answer with `answer_todo`.
+    question
     completedAt
     createdAt
     updatedAt
@@ -686,6 +690,22 @@ mutation addTodoNote(
   $body: String!
 ) {
   addTodoNote(todoId: $todoId, body: $body) {
+    id
+    createdAt
+  }
+}
+
+# Answers the question an agent on the board asked a person about a todo, as a
+# note signed by this key. A todo whose agent asked waits until someone
+# answers; then its lane's agent picks it up again and reads the question and
+# your answer. `todo` and `todos` show a waiting todo's question.
+mutation answerTodo(
+  # The todo whose question you are answering.
+  $todoId: ID!
+  # The answer, in markdown.
+  $text: String!
+) {
+  answerTodo(todoId: $todoId, text: $text) {
     id
     createdAt
   }

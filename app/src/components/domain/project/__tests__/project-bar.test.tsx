@@ -21,6 +21,7 @@ const ACTIVITY: ProjectActivity = {
   live: new Map(),
   stuck: new Map(),
   waiting: new Map(),
+  asked: new Map(),
   spent: { __typename: 'RunAggregate', count: 3, sum: { __typename: 'RunSumAggregate', totalTokens: 1200 } },
   loading: false,
 } as unknown as ProjectActivity;
@@ -45,6 +46,15 @@ describe('ProjectBar', () => {
     expect(await screen.findByRole('switch', { name: 'AI works on this project' })).toBeChecked();
     expect(screen.getByRole('switch', { name: 'Agents start on todos by themselves' })).not.toBeChecked();
     expect(screen.getByText('Nothing running · 3 runs and 1,200 tokens in 30 days')).toBeInTheDocument();
+  });
+
+  it('counts the todos whose agent is waiting on an answer', async () => {
+    const asked = new Map([
+      ['t1', {}],
+      ['t2', {}],
+    ]) as unknown as ProjectActivity['asked'];
+    bar(true, { aiEnabled: true, autoRun: true }, { ...ACTIVITY, asked });
+    expect(await screen.findByText('2 waiting on you ·')).toBeInTheDocument();
   });
 
   it('leaves auto-run out while the project’s AI is off', async () => {

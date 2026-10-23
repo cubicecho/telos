@@ -11,6 +11,7 @@ import { attachResolvers } from '../graphql/attach-resolvers.ts';
 import { workStates } from '../runs/ready.ts';
 import { runnerSeenAt } from '../runs/runner-seen.ts';
 import { resultRows } from '../todos/blocking.ts';
+import { openQuestion } from '../todos/questions.ts';
 import { requireAi } from './gate.ts';
 
 // Lanes' agents, as a person reads them: what they handed back, what is running,
@@ -54,6 +55,7 @@ const AI_STATUS_SDL = parse(`
     station: Boolean!
     isDone: Boolean!
     handedBack: Int!
+    asked: Int!
     running: Int!
     waiting: Int!
     blocked: Int!
@@ -173,6 +175,7 @@ async function whyNotRunnable(db: DB, todo: AnyRow): Promise<string | null> {
     has_agent: boolean;
     split: boolean;
     blockers: string | null;
+    question: string | null;
   }>(
     await db.execute(sql`
       SELECT
@@ -182,7 +185,8 @@ async function whyNotRunnable(db: DB, todo: AnyRow): Promise<string | null> {
           SELECT string_agg(b.title, ', ' ORDER BY b.title) FROM todo_dependencies d
           JOIN todos b ON b.id = d.depends_on_todo_id
           WHERE d.todo_id = t.id AND b.completed_at IS NULL AND b.archived_at IS NULL
-        ) AS blockers
+        ) AS blockers,
+        ${openQuestion(sql`t.id`)} AS question
       FROM todos t
       JOIN projects p ON p.id = t.project_id
       JOIN lanes l ON l.id = t.lane_id
@@ -209,6 +213,9 @@ async function whyNotRunnable(db: DB, todo: AnyRow): Promise<string | null> {
   }
   if (row.blockers !== null) {
     return `It is waiting on ${row.blockers}.`;
+  }
+  if (row.question !== null) {
+    return 'Its agent asked a question and is waiting for the answer. Answer it, and it runs again.';
   }
   return null;
 }

@@ -18,6 +18,7 @@ import { toHeaders } from '../../../server/src/http/headers.ts';
 import { setInstanceRunLimit } from '../../../server/src/instance/settings.ts';
 import { mountMcp } from '../../../server/src/mcp/endpoint.ts';
 import { startRunner } from '../embed.ts';
+import { hookStatus } from '../execute.ts';
 import { type LoopOptions, tick } from '../loop.ts';
 import { takeTests } from '../probes.ts';
 import { takeSessionDeletes } from '../session-deletes.ts';
@@ -355,6 +356,46 @@ describe('the runner', () => {
         mediaType: 'text/markdown',
       }),
     ]);
+  });
+
+  it('stops to ask a person, and works the todo again once they answer', async () => {
+    const todoId = await board.addTodo('Store the settings');
+    const offered: string[] = [];
+    const told: string[] = [];
+    let calls = 0;
+    llm.script = (messages, tools) => {
+      calls++;
+      offered.push(...tools.map((tool) => tool.function.name));
+      told.push(messages.map((message) => String(message.content ?? '')).join('\n'));
+      if (calls === 1) return { tool: 'ask_person', args: { question: 'Postgres or SQLite?' } };
+      return { content: 'Stored them in Postgres.' };
+    };
+
+    expect(await cycle()).toBe(1);
+
+    // The call ends the run: the model is not asked again.
+    expect(calls).toBe(1);
+    expect(offered).toContain('ask_person');
+    expect(told[0]).toContain('ask_person');
+    const [run] = await runsOf(todoId);
+    expect(run).toMatchObject({ status: 'asked', output: 'Postgres or SQLite?', error: null });
+    expect((await todoRow(todoId)).laneId).toBe(board.lanes[0].id);
+
+    // Nothing runs it while the question is open.
+    expect(await cycle()).toBe(0);
+
+    await board.person.expectOk(`mutation ($todoId: ID!) { answerTodo(todoId: $todoId, text: "Postgres.") { id } }`, {
+      todoId,
+    });
+    expect(await cycle()).toBe(1);
+    expect(told.at(-1)).toContain('An agent asked: Postgres or SQLite?');
+    expect(told.at(-1)).toContain('Postgres.');
+    expect((await todoRow(todoId)).laneId).toBe(board.lanes[2].id);
+  });
+
+  it('tells hooks a run that asked was stopped, since they know no other word for it', () => {
+    expect(hookStatus('asked')).toBe('stopped');
+    expect(hookStatus('ok')).toBe('ok');
   });
 
   it('refuses to record a file no tool in the run wrote', async () => {

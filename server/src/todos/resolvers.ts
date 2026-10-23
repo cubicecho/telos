@@ -36,6 +36,8 @@ const TODOS_SDL = parse(`
     pieceCount: Int!
     "How many of those pieces are done. The umbrella completes itself when this reaches \`pieceCount\`."
     donePieceCount: Int!
+    "The question an agent asked about this todo that no person has answered yet (todos/questions.ts). The todo waits for an answer before its lane's agent works it again."
+    question: String
   }
 
   extend type Project {
@@ -172,6 +174,7 @@ export function applyTodosExtension(schema: GraphQLSchema): GraphQLSchema {
     const pieces = await context.loaders.pieceCounts.load(String(parent.id));
     return pieces.total - pieces.open;
   };
+  todoFields.question = (parent, _args, context) => context.loaders.questions.load(String(parent.id));
 
   const projectFields: ProjectResolvers = {};
   projectFields.todoCount = async (parent, _args, context) =>

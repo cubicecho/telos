@@ -29,6 +29,8 @@ export interface ProjectActivity {
   stuck: ReadonlyMap<string, StuckTodo>;
   /** The todos waiting to be asked for, or asked for and not yet started, by todo id. */
   waiting: ReadonlyMap<string, WaitingTodo>;
+  /** The todos whose agent asked a person something and waits for the answer, by todo id. */
+  asked: ReadonlyMap<string, WorkTodo>;
   /** Every run in the window. */
   spent: ProjectActivityQuery['spent'] | undefined;
   loading: boolean;
@@ -73,28 +75,36 @@ export function useProjectActivity(projectId: string, { skip = false }: { skip?:
       ),
     [work],
   );
+  const asked = useMemo(
+    () => new Map((work ?? []).filter((todo) => todo.state === WorkState.Asked).map((todo) => [todo.todoId, todo])),
+    [work],
+  );
   return {
     live,
     stuck,
     waiting,
+    asked,
     spent: query.data?.spent,
     loading: query.loading,
   };
 }
 
 /**
- * "3 running · 12 runs and 41,200 tokens in 30 days", or nothing before the
- * answer lands.
+ * "2 waiting on you · 3 running · 12 runs and 41,200 tokens in 30 days", or
+ * nothing before the answer lands. What waits on a person comes first, in the
+ * card badge's amber, since it is the part that asks something of the reader.
  */
 export function ProjectActivityLine({ activity }: { activity: ProjectActivity }) {
   if (!activity.spent) return null;
   const running = activity.live.size;
+  const asked = activity.asked.size;
   const tokens = activity.spent.sum?.totalTokens ?? 0;
   const runs = activity.spent.count;
   const spend = `${runs.toLocaleString()} ${runs === 1 ? 'run' : 'runs'} and ${tokens.toLocaleString()} tokens in ${SPEND_DAYS} days`;
   return (
     <View className="flex-row items-center gap-2">
       {running > 0 ? <LiveDot /> : null}
+      {asked > 0 ? <Text className="text-sm text-warning">{asked} waiting on you ·</Text> : null}
       <Text className="text-foreground/60 text-sm">
         {[running > 0 ? `${running} running` : 'Nothing running', spend].join(' · ')}
       </Text>

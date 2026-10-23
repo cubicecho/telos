@@ -123,8 +123,10 @@ export const RUN_DEFAULT_WRITES: ReadonlySet<string> = new Set([
  * Door tools a run never has, whatever its agent says. A run records what it
  * made with the runner's own `record_artifact`, which the runner checks; the
  * door's is a client's word, and is refused for a run (runs/artifacts.ts).
+ * A run asks a person with the runner's `ask_person`, and never answers one
+ * (ai/answers.ts), or it could unblock itself.
  */
-export const NOT_FOR_RUNS: ReadonlySet<string> = new Set(['record_artifact']);
+export const NOT_FOR_RUNS: ReadonlySet<string> = new Set(['record_artifact', 'answer_todo']);
 
 /**
  * Whether a run has a tool when its agent has never said: every read, and the

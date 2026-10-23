@@ -823,6 +823,7 @@ export const TodoRecordDocument = graphql(`
   query TodoRecord($id: UUID!) {
     todo(where: { id: { eq: $id } }) {
       id
+      question
       thread(orderBy: { createdAt: { direction: asc, priority: 1 } }) {
         ...TodoNoteFields
       }
@@ -860,6 +861,15 @@ export const CreateTodoNoteDocument = graphql(`
 export const EditTodoNoteDocument = graphql(`
   mutation EditTodoNote($id: ID!, $body: String!) {
     editTodoNote(id: $id, body: $body) {
+      ...TodoNoteFields
+    }
+  }
+`);
+
+/** Answers the question an agent is waiting on. Any note after it would too; this one says it is the answer. */
+export const AnswerTodoDocument = graphql(`
+  mutation AnswerTodo($todoId: ID!, $text: String!) {
+    answerTodo(todoId: $todoId, text: $text) {
       ...TodoNoteFields
     }
   }
@@ -1244,6 +1254,7 @@ export const AiStatusDocument = graphql(`
           station
           isDone
           handedBack
+          asked
           running
           waiting
           blocked
@@ -1273,7 +1284,8 @@ export const AiSetupDocument = graphql(`
 `);
 
 /**
- * What a board's cards have to show: notes, and how each todo's last run went.
+ * What a board's cards have to show: notes, how each todo's last run went, and
+ * the question its agent is waiting on.
  * Only todos with something to mark come back. An active query, so it follows
  * `boardChanged` with the rest of the board.
  */
@@ -1287,6 +1299,7 @@ export const CardMarksDocument = graphql(`
       runId
       attempts
       maxAttempts
+      question
     }
   }
 `);
@@ -1470,6 +1483,17 @@ export const ApplyBoardTemplateDocument = graphql(`
   mutation ApplyBoardTemplate($projectId: ID!, $templateId: ID!) {
     applyBoardTemplate(projectId: $projectId, templateId: $templateId) {
       id
+    }
+  }
+`);
+
+/** Adds a template from a starter (template-starters.ts), lanes and all. */
+export const CreateBoardTemplateDocument = graphql(`
+  mutation CreateBoardTemplate($name: String!, $lanes: JSON!) {
+    createBoardTemplate(values: { name: $name, lanes: $lanes }) {
+      id
+      name
+      lanes
     }
   }
 `);

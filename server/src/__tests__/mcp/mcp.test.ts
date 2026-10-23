@@ -56,6 +56,7 @@ const WRITES = [
   'restore_todo',
   'delete_todo',
   'add_todo_note',
+  'answer_todo',
   'edit_todo_note',
   'delete_todo_note',
   'record_artifact',
@@ -660,11 +661,12 @@ describe('the board’s agents and runs', () => {
     );
     await call(run, 'add_todo_note', { todoId, body: 'Halfway.' });
 
-    // Its agent switches the rest on, all but `record_artifact`: a run has the runner's.
+    // Its agent switches the rest on, all but `record_artifact` (a run has the
+    // runner's) and `answer_todo` (a run asks with the runner's `ask_person`).
     await setRunTools(b, []);
     const opened = await connectRun(url, token);
     expect((await opened.listTools()).tools.map((tool) => tool.name).sort()).toEqual(
-      TOOLS.filter((name) => name !== 'record_artifact').sort(),
+      TOOLS.filter((name) => name !== 'record_artifact' && name !== 'answer_todo').sort(),
     );
     expect(await callError(opened, 'record_artifact', { todoId })).toMatch(/Tool record_artifact not found/);
 

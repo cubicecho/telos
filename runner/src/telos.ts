@@ -127,7 +127,10 @@ export interface RefinedTodo {
 }
 
 export interface RunResult {
-  status: 'ok' | 'error' | 'stopped';
+  /** `asked`: the agent asked a person something (`ask_person`), in `question`, and the run ended there. */
+  status: 'ok' | 'error' | 'stopped' | 'asked';
+  /** What the agent asked a person, with status `asked`. */
+  question?: string;
   output?: string | null;
   error?: string | null;
   toolCalls?: number;

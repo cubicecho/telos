@@ -66,6 +66,11 @@ block marked todos, holding a JSON array, after anything else you say:
 The todo is then done when they all are. Order them so none depends on a later one, and use
 "dependsOn" only for a real ordering constraint.
 
+A question. When the todo cannot be done well without a decision or a fact only a person can give,
+and your tools cannot find it out, call ask_person with the question instead of guessing. The run
+ends there, the todo waits for the answer, and the next run is shown both. What the notes already
+answer is not to be asked again.
+
 Never both refine and split: a reply with both fails. You cannot edit, move or finish this todo
 with tools; what your reply says is what happens to it.`;
 

@@ -48,12 +48,21 @@ export function withEnums(schema: GraphQLSchema, enums: GraphQLEnumType[]): Grap
 }
 
 /** Where a todo stands with its lane's agent, for a person reading the board. In `aiStatus`'s order. */
-export const WORK_STATES = ['handedBack', 'running', 'waiting', 'blocked', 'queued', 'parked', 'done'] as const;
+export const WORK_STATES = [
+  'handedBack',
+  'asked',
+  'running',
+  'waiting',
+  'blocked',
+  'queued',
+  'parked',
+  'done',
+] as const;
 export type WorkState = (typeof WORK_STATES)[number];
 export const WorkStateEnum = serverEnum(
   'WorkState',
   WORK_STATES,
-  "Where a todo stands with its lane's agent: HANDED_BACK, RUNNING, WAITING (an umbrella, done when its pieces are), BLOCKED, QUEUED, PARKED or DONE.",
+  "Where a todo stands with its lane's agent: HANDED_BACK, ASKED (its agent asked a person something and waits for the answer), RUNNING, WAITING (an umbrella, done when its pieces are), BLOCKED, QUEUED, PARKED or DONE.",
 );
 
 /** Why a lane's agent handed a todo back. */
@@ -102,9 +111,13 @@ export const RunEventKindEnum = serverEnum(
 );
 
 /** How a run can end, as the runner reports it. */
-export const RUN_OUTCOMES = ['ok', 'error', 'stopped'] as const;
+export const RUN_OUTCOMES = ['ok', 'error', 'stopped', 'asked'] as const;
 export type RunOutcome = (typeof RUN_OUTCOMES)[number];
-export const RunOutcomeEnum = serverEnum('RunOutcome', RUN_OUTCOMES, 'How a run ended: OK, ERROR or STOPPED.');
+export const RunOutcomeEnum = serverEnum(
+  'RunOutcome',
+  RUN_OUTCOMES,
+  'How a run ended: OK, ERROR, STOPPED, or ASKED (its agent asked a person something, and the result carries the question).',
+);
 
 /** Where the instance's OIDC provider comes from (oidc-settings.ts). */
 export const SSO_SOURCES = ['env', 'paired', 'none'] as const;

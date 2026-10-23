@@ -59,7 +59,8 @@ export function attemptsText(mark: CardMark): string | null {
 }
 
 /**
- * What a card says at a glance about its thread and its last run: that it has
+ * What a card says at a glance about its thread and its last run: that its
+ * agent is waiting on an answer (the question one tap away), that it has
  * notes, that a reviewer sent it back or its run failed (the reason one tap
  * away), and how many attempts are used. Every mark is text or carries a label,
  * so none of it rests on colour.
@@ -71,6 +72,29 @@ export function CardMarks({ mark, todoTitle }: { mark: CardMark; todoTitle: stri
 
   return (
     <View className="mt-2 flex-row flex-wrap items-center gap-x-2 gap-y-1">
+      {mark.question ? (
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              size="xs"
+              className="border-warning/40 text-warning"
+              aria-label={`Waiting on you: what the agent working “${todoTitle}” asked`}
+              content="Waiting on you"
+            />
+          </PopoverTrigger>
+          <PopoverContent align="start" className="w-72">
+            <PopoverHeader>
+              <PopoverTitle>The agent asked</PopoverTitle>
+              <PopoverDescription>{mark.question}</PopoverDescription>
+            </PopoverHeader>
+            <Text className="text-foreground/60 text-xs">
+              Answer it in the todo’s notes, and the agent picks it up again.
+            </Text>
+          </PopoverContent>
+        </Popover>
+      ) : null}
+
       {mark.notes > 0 ? (
         <View role="img" aria-label={notes} className="flex-row items-center gap-1">
           <MessageSquare className="h-3.5 w-3.5 text-foreground/60" />

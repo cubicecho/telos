@@ -1,4 +1,5 @@
 import {
+  failedRun,
   type HookContext,
   type HookNote,
   type HookRunner,
@@ -18,6 +19,7 @@ import {
   RECORD_ARTIFACT_DEFINITION,
   splitToolName,
 } from './artifacts.ts';
+import { ASK_PERSON, ASK_PERSON_DEFINITION, ASKED_REPLY, questionOf } from './ask.ts';
 import { assignmentPrompt, readReply, systemPromptFor } from './prompts.ts';
 import { type ResolvedRunAgent, resolveAgent, unrunnable } from './spec.ts';
 import type { Beat, Claim, RunEvent, RunPrompt, RunResult, RunUsage, Telos } from './telos.ts';
@@ -270,8 +272,17 @@ export async function execute(claim: Claim, options: ExecuteOptions): Promise<Ru
     // Every run ends, whatever became of it. Not on the run's signal: a run
     // that was stopped has not asked for its end not to be heard.
     if (pool)
-      await notify(hooksOf(pool, log), 'sessionEnd', { ...hookContext, status: result.status }, (note) =>
-        feed.fromHook(note),
+      await notify(
+        hooksOf(pool, log),
+        'sessionEnd',
+        // A hook's status is ok, error or stopped; a run that asked a person
+        // stopped short of its work, and says so in full in `vars.runStatus`.
+        {
+          ...hookContext,
+          vars: { ...hookContext.vars, runStatus: result.status },
+          status: hookStatus(result.status),
+        },
+        (note) => feed.fromHook(note),
       );
   } finally {
     await pool?.shutdown().catch((error: unknown) => log(`closing tools failed: ${messageOf(error)}`));
@@ -294,6 +305,18 @@ export async function execute(claim: Claim, options: ExecuteOptions): Promise<Ru
     log(`finishing failed: ${messageOf(error)}`);
   }
   return result;
+}
+
+/**
+/**
+ * A run's status as a hook is told it: agent-mcp-pool's hooks know ok, error
+ * and stopped, and a run that asked a person stopped before its work was done.
+ *
+ * @param status - How the run ended.
+ * @returns The hook's status.
+ */
+export function hookStatus(status: RunResult['status']): 'ok' | 'error' | 'stopped' {
+  return status === 'asked' ? 'stopped' : status;
 }
 
 /**
@@ -348,58 +371,85 @@ async function work(
     ? catalog.some((server) => server.id !== TELOS_SERVER && server.tools.length > 0)
     : pool.tools().some((tool) => splitToolName(tool.function.name).serverSlug !== TELOS_SERVER);
 
-  const loop = await runAgentLoop({
-    config,
-    system,
-    messages: [{ role: 'user', content: prompt }],
-    tools: stores ? [...pool.tools(), RECORD_ARTIFACT_DEFINITION] : pool.tools(),
-    ...(catalog ? { catalog, loaded: stores ? [RECORD_ARTIFACT] : [] } : {}),
-    // The front of every request is what a prompt cache keeps, so it stays put:
-    // all tools sorted by name when they are all sent, and on demand the same
-    // opening set, with each tool loaded (or preselected) after it in the order
-    // it came. Sorted, a load would land mid-array and move every tool after it.
-    toolOrder: !catalog,
-    preselectRouting: PRESELECT_APPEND,
-    preselected,
-    dispatch: async (call, callSignal) => {
-      if (stores && call.name === RECORD_ARTIFACT) {
-        const declared = declaredArtifact(call.args);
-        if (!declared) throw new Error('record_artifact needs a location.');
-        if (!artifacts.seen(declared.location)) {
-          throw new Error(
-            `No tool call in this run stored ${declared.location}, so it was not recorded. ` +
-              'Record only what one of your tools wrote; your reply and notes are already on the todo.',
-          );
-        }
-        artifacts.add(declared);
-        return `Recorded ${declared.location}.`;
-      }
-      const answer = await pool.call(call.name, call.args, { signal: callSignal ?? signal });
-      artifacts.witness(call.args, answer);
-      artifacts.add(detectArtifact(call.name, call.args) ?? noteArtifact(call.name, call.args, answer, claim.todoId));
-      return answer;
-    },
-    signal,
-    hooks: {
-      run: hooksOf(pool, log),
-      // A todo's first run opens its session; every run after is another turn of it.
-      events: claim.opensSession ? ['sessionStart', 'beforeTurn'] : ['beforeTurn'],
-      context: { ...options.hookContext, prompt },
-      onNote: (note) => feed.fromHook(note),
-    },
-    onEvent: (event) => {
-      feed.fromLoop(event);
-      if (event.kind === 'notice') log(event.text ?? '');
-    },
+  // Every agent may stop and ask a person (`ask_person`). The call ends the
+  // loop: the question is kept, and the loop is stopped on a signal of its own,
+  // so a stop from telos still reads as a stop.
+  // Held on an object: the dispatcher sets it, and a `let` would read as never set here.
+  const ask: { question: string | null } = { question: null };
+  const asked = new AbortController();
+  const own = [ASK_PERSON_DEFINITION, ...(stores ? [RECORD_ARTIFACT_DEFINITION] : [])];
+  const spentBy = (usage: { prompt: number; completion: number; total: number }, toolCalls: number) => ({
+    toolCalls,
+    promptTokens: usage.prompt,
+    completionTokens: usage.completion,
+    totalTokens: usage.total,
+    ...(feed.cachedInputTokens === undefined ? {} : { cachedInputTokens: feed.cachedInputTokens }),
   });
 
+  let loop: Awaited<ReturnType<typeof runAgentLoop>>;
+  try {
+    loop = await runAgentLoop({
+      config,
+      system,
+      messages: [{ role: 'user', content: prompt }],
+      tools: [...pool.tools(), ...own],
+      ...(catalog ? { catalog, loaded: [ASK_PERSON, ...(stores ? [RECORD_ARTIFACT] : [])] } : {}),
+      // The front of every request is what a prompt cache keeps, so it stays put:
+      // all tools sorted by name when they are all sent, and on demand the same
+      // opening set, with each tool loaded (or preselected) after it in the order
+      // it came. Sorted, a load would land mid-array and move every tool after it.
+      toolOrder: !catalog,
+      preselectRouting: PRESELECT_APPEND,
+      preselected,
+      dispatch: async (call, callSignal) => {
+        if (call.name === ASK_PERSON) {
+          const asking = questionOf(call.args);
+          if (!asking) throw new Error('ask_person needs a question.');
+          ask.question = asking;
+          asked.abort(new Error('Asked a person.'));
+          return ASKED_REPLY;
+        }
+        if (stores && call.name === RECORD_ARTIFACT) {
+          const declared = declaredArtifact(call.args);
+          if (!declared) throw new Error('record_artifact needs a location.');
+          if (!artifacts.seen(declared.location)) {
+            throw new Error(
+              `No tool call in this run stored ${declared.location}, so it was not recorded. ` +
+                'Record only what one of your tools wrote; your reply and notes are already on the todo.',
+            );
+          }
+          artifacts.add(declared);
+          return `Recorded ${declared.location}.`;
+        }
+        const answer = await pool.call(call.name, call.args, { signal: callSignal ?? signal });
+        artifacts.witness(call.args, answer);
+        artifacts.add(detectArtifact(call.name, call.args) ?? noteArtifact(call.name, call.args, answer, claim.todoId));
+        return answer;
+      },
+      signal: AbortSignal.any([signal, asked.signal]),
+      hooks: {
+        run: hooksOf(pool, log),
+        // A todo's first run opens its session; every run after is another turn of it.
+        events: claim.opensSession ? ['sessionStart', 'beforeTurn'] : ['beforeTurn'],
+        context: { ...options.hookContext, prompt },
+        onNote: (note) => feed.fromHook(note),
+      },
+      onEvent: (event) => {
+        feed.fromLoop(event);
+        if (event.kind === 'notice') log(event.text ?? '');
+      },
+    });
+  } catch (error) {
+    // Stopped because it asked, and not by telos: the question is the result.
+    if (ask.question !== null && !signal.aborted) {
+      const run = failedRun(error);
+      return { status: 'asked', question: ask.question, ...(run ? spentBy(run.usage, run.toolCalls.length) : {}) };
+    }
+    throw error;
+  }
+
+  const spent = spentBy(loop.usage, loop.toolCalls.length);
+  if (ask.question !== null) return { status: 'asked', question: ask.question, ...spent };
   const { report, todos, refine } = readReply(loop.turn.content.trim());
-  const spent = {
-    toolCalls: loop.toolCalls.length,
-    promptTokens: loop.usage.prompt,
-    completionTokens: loop.usage.completion,
-    totalTokens: loop.usage.total,
-    ...(feed.cachedInputTokens === undefined ? {} : { cachedInputTokens: feed.cachedInputTokens }),
-  };
   return { status: 'ok', output: report, todos, refine, ...spent };
 }

@@ -2,7 +2,13 @@ import { MockedProvider } from '@apollo/client/testing';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { BoardTemplatesDocument, DeleteBoardTemplateDocument, SaveBoardTemplateDocument } from '@/lib/graphql';
+import {
+  BoardTemplatesDocument,
+  CreateBoardTemplateDocument,
+  DeleteBoardTemplateDocument,
+  SaveBoardTemplateDocument,
+} from '@/lib/graphql';
+import { TEMPLATE_STARTERS } from '@/lib/template-starters';
 import { SaveTemplateDialog } from '../save-template-dialog';
 import { TemplateManager } from '../template-manager';
 
@@ -38,6 +44,41 @@ describe('TemplateManager', () => {
     await user.click(await screen.findByRole('button', { name: 'Delete' }));
     await vi.waitFor(() => expect(remove).toHaveBeenCalled());
     expect(await screen.findByText('No templates yet.')).toBeInTheDocument();
+  });
+});
+
+describe('TemplateManager starters', () => {
+  it('adds "Plan, then approve": Plan routes to Approve, a resting place with no route of its own', async () => {
+    const user = userEvent.setup();
+    const [starter] = TEMPLATE_STARTERS;
+    expect(starter.lanes.map((lane) => [lane.name, lane.onSuccess, lane.isDone])).toEqual([
+      ['Plan', 1, false],
+      ['Approve', null, false],
+      ['Doing', 3, false],
+      ['Done', null, true],
+    ]);
+    const created = { __typename: 'BoardTemplate' as const, id: 't2', name: starter.name, lanes: starter.lanes };
+    const create = vi.fn(() => ({ data: { createBoardTemplate: created } }));
+    render(
+      <MockedProvider
+        mocks={[
+          listed([]),
+          {
+            request: { query: CreateBoardTemplateDocument, variables: { name: starter.name, lanes: starter.lanes } },
+            result: create,
+          },
+          // biome-ignore lint/suspicious/noExplicitAny: a starter's lanes are a template's
+          listed([created as any]),
+        ]}
+      >
+        <TemplateManager />
+      </MockedProvider>,
+    );
+
+    await user.click(await screen.findByRole('button', { name: 'Add a starter' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Plan, then approve' }));
+    await vi.waitFor(() => expect(create).toHaveBeenCalled());
+    expect(await screen.findByText('Plan, Approve, Doing, Done')).toBeInTheDocument();
   });
 });
 

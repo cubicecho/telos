@@ -10,9 +10,11 @@ import { users } from './users.ts';
 /**
  * Where a run is. `running` holds a lease the runner keeps renewing; the rest
  * are final. `stopped` is a run somebody called off, which costs the todo no
- * attempt and moves it nowhere.
+ * attempt and moves it nowhere. `asked` is a run that stopped to ask a person
+ * something (its question is a note on the todo): it costs no attempt either,
+ * moves the todo nowhere, and is not its lane finishing with it.
  */
-export const RUN_STATUSES = ['running', 'ok', 'error', 'stopped'] as const;
+export const RUN_STATUSES = ['running', 'ok', 'error', 'stopped', 'asked'] as const;
 export type RunStatus = (typeof RUN_STATUSES)[number];
 
 /** A verdict lane's ruling. `none` for every other kind of run. */
@@ -90,7 +92,7 @@ export const runs = pgTable(
     // One live run per todo. This is what makes two concurrent claims of the
     // same todo produce one winner rather than two agents doing the same work.
     uniqueIndex('uq_runs_todo_running').on(t.todoId).where(sql`status = 'running'`),
-    check('ck_runs_status', sql`${t.status} in ('running', 'ok', 'error', 'stopped')`),
+    check('ck_runs_status', sql`${t.status} in ('running', 'ok', 'error', 'stopped', 'asked')`),
     check('ck_runs_verdict', sql`${t.verdict} in ('none', 'pass', 'fail')`),
   ],
 );

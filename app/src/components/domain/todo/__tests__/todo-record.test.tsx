@@ -1,10 +1,10 @@
 import { MockedProvider } from '@apollo/client/testing';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { GraphQLError } from 'graphql';
 import { describe, expect, it } from 'vitest';
 import type { RunSummaryFieldsFragment } from '@/__generated__/graphql';
-import { DeleteTodoNoteDocument, EditTodoNoteDocument, TodoRecordDocument } from '@/lib/graphql';
+import { AnswerTodoDocument, DeleteTodoNoteDocument, EditTodoNoteDocument, TodoRecordDocument } from '@/lib/graphql';
 import { aiStateMock, fullRun, run, runMock } from '../../ai/__tests__/run-fixtures';
 import { TodoHistory, TodoThread } from '../todo-record';
 
@@ -34,7 +34,7 @@ function plainNote(id: string, body: string, extra: Record<string, unknown> = {}
   };
 }
 
-function record(aiEnabled = true, thread: Array<Record<string, unknown>> = [REPORT]) {
+function record(aiEnabled = true, thread: Array<Record<string, unknown>> = [REPORT], question: string | null = null) {
   return {
     request: { query: TodoRecordDocument, variables: { id: 't1' } },
     result: {
@@ -42,6 +42,7 @@ function record(aiEnabled = true, thread: Array<Record<string, unknown>> = [REPO
         todo: {
           __typename: 'Todo',
           id: 't1',
+          question,
           thread,
           history: [
             {
@@ -119,6 +120,46 @@ describe('TodoHistory', () => {
 });
 
 describe('TodoThread', () => {
+  const ASKED = {
+    ...REPORT,
+    id: 'q1',
+    kind: 'question',
+    body: 'Postgres or SQLite?',
+  };
+
+  it('puts an answer box under the question its agent is waiting on, and sends the answer', async () => {
+    const user = userEvent.setup();
+    const answer = plainNote('n9', 'Postgres.');
+    let answered = false;
+    show(<TodoThread todoId="t1" />, [
+      aiStateMock(true, true),
+      record(true, [ASKED], 'Postgres or SQLite?'),
+      {
+        request: { query: AnswerTodoDocument, variables: { todoId: 't1', text: 'Postgres.' } },
+        result: () => {
+          answered = true;
+          return { data: { answerTodo: answer } };
+        },
+      },
+      record(true, [ASKED, answer], null),
+    ]);
+    const question = (await screen.findByText('Postgres or SQLite?')).closest('[role="listitem"]') as HTMLElement;
+    expect(within(question).getByText('Waiting on you')).toBeInTheDocument();
+    await user.type(within(question).getByRole('textbox', { name: 'Your answer' }), 'Postgres.');
+    await user.click(within(question).getByRole('button', { name: 'Answer' }));
+    expect(await screen.findByText('Postgres.')).toBeInTheDocument();
+    expect(answered).toBe(true);
+    await waitFor(() => expect(screen.queryByRole('textbox', { name: 'Your answer' })).not.toBeInTheDocument());
+  });
+
+  it('offers no answer box once the question is answered', async () => {
+    show(<TodoThread todoId="t1" />, [aiStateMock(true, true), record(true, [ASKED, plainNote('n9', 'Postgres.')])]);
+    expect(await screen.findByText('Postgres or SQLite?')).toBeInTheDocument();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(screen.queryByRole('textbox', { name: 'Your answer' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Waiting on you')).not.toBeInTheDocument();
+  });
+
   it('links a report to the run that wrote it', async () => {
     show(<TodoThread todoId="t1" />, [aiStateMock(true, true), record()]);
     expect(await screen.findByText('Reviewed and passed.')).toBeInTheDocument();

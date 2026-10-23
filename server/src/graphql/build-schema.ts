@@ -4,6 +4,7 @@ import { buildSchema, GraphQLDateTime } from '@vantreeseba/drizzle-graphql';
 import { applyAgentDefaultsExtension } from '../agents/agent-defaults-resolvers.ts';
 import { applyAgentsExtension } from '../agents/resolvers.ts';
 import { applyAccountActivityExtension } from '../ai/account-activity.ts';
+import { applyAnswersExtension } from '../ai/answers.ts';
 import { applyGlobalContextExtension } from '../ai/global-context.ts';
 import { applyAiReadsExtension } from '../ai/reads.ts';
 import { applyRequestsExtension } from '../ai/requests.ts';
@@ -126,6 +127,7 @@ export function createSchema(db: DB, options: SchemaOptions) {
     schema = applyApiKeysExtension(schema);
     schema = applyAiSwitchesExtension(schema);
     schema = applyRequestsExtension(schema);
+    schema = applyAnswersExtension(schema);
     schema = applyAgentsExtension(schema);
     schema = applyAgentDefaultsExtension(schema);
     schema = applyRunsExtension(schema);

@@ -66,14 +66,15 @@ telos/
 │       ├── sso/             # Pairing with an OIDC provider from the app: settings, pairing, device-client, resolvers
 │       ├── instance/        # The instance's settings row: its AI switch, and its admins
 │       ├── ai/              # Whether AI may act, and what it sees and writes: gate, switches,
-│       │                    #   reach, reads, setup, status, requests, account-activity
+│       │                    #   reach, reads, setup, status, requests, answers, account-activity
 │       ├── mcp/             # The AI door: endpoint, door (+ door.graphql, its tools), prompts
 │       ├── agents/          # A lane's agents, their account defaults, their MCP servers and probes
 │       ├── runs/            # The runner's side: resolvers, ready (which todos an agent may start
 │       │                    #   on), tokens, artifacts, run-reach, session deletes, retention
 │       ├── board/           # Lanes (lanes.ts: the rules; lanes-resolvers.ts), live boards
 │       │                    #   (events.ts, board-changed.ts), card marks, templates
-│       ├── todos/           # Todos' own fields, dependencies (blocking.ts), notes, provenance
+│       ├── todos/           # Todos' own fields, dependencies (blocking.ts), notes, provenance,
+│       │                    #   questions (when a todo waits on a person)
 │       ├── changes/         # The change feed: feed.ts, and `changes(since:)` in resolvers.ts
 │       └── __tests__/       # The same folders as src; helpers.ts and board.ts at the root
 ├── db/
@@ -94,6 +95,7 @@ telos/
 │       ├── execute.ts       # One run: agent-core's runAgentLoop over a per-run MCP pool
 │       ├── tools.ts         # The pool: telos's /mcp with the run token, plus the agent's servers and hooks
 │       ├── artifacts.ts     # What a run made: record_artifact, and writes read off tool calls
+│       ├── ask.ts           # ask_person: an agent stops to ask a person, and its todo waits
 │       ├── prompts.ts       # The standing protocol, the brief, and reading a reply
 │       └── __tests__/       # End to end against a real telos and a scripted model
 ├── scripts/
@@ -346,6 +348,32 @@ person cannot complete it while a piece is open: `assertNotBlocked` and
 `completeTodo`, `moveTodo` and generated writes are all bound. `unsplitTodo`
 (a person's only) makes it an ordinary todo again; a generated write to
 `splitAt` is refused (`assertSplitUntouched`).
+
+**An agent may stop and ask a person, and its todo waits for the answer.**
+Every agent run is offered the runner's own `ask_person` tool
+(`runner/src/ask.ts`). Calling it ends the run there: the runner reports
+`status: ASKED` and the `question`, and `finishRun` writes the question as a
+note of kind `question`, signed by the run, and ends the run as `asked`. That
+run is neither a failure (`RUN_FAILED`, so it costs no attempt) nor `ok` (so it
+is not its lane finishing with the todo), and it moves the todo nowhere.
+**Waiting is derived, not stored**, as readiness is: a todo waits while its
+newest question has no note after it from a person or a person's own MCP
+client (`actor_kind` `user` or `apiKey`), and `openQuestion` in
+`todos/questions.ts` is the one definition. `readyTodos` skips such a todo,
+`workStates` calls it `asked` with the question as its reason, `runTodo`
+refuses it, `cardMarks` carries the question, and `Todo.question` reads it
+for the app and the door. A note from a run or the server never answers, or an
+agent could unblock itself. So a person answers by replying in the thread;
+`answerTodo` (`ai/answers.ts`, the door's `answer_todo`) is the explicit way,
+refuses a todo with nothing open, and is never a run's (`NOT_FOR_RUNS`,
+`RUN_REACH_EXEMPT`). Once answered the todo is ready in the same lane, and
+`assignmentFor` hands the next run the question (as "An agent asked: …") and
+the answer among its notes, in every lane. A hook's `status` knows only ok,
+error and stopped, so `sessionEnd` hears an asked run as `stopped`, with
+`vars.runStatus` saying `asked`. Plan approval needs no code of its own: a
+lane with no agent and no route is a resting place, and the app's "Plan, then
+approve" template starter (`app/src/lib/template-starters.ts`) is Plan → Approve
+(resting) → Doing → Done, where a person moving the plan on is the approval.
 
 Only
 a non-edit event is an arrival (`arrivedIn` in `ready.ts`), so editing a todo

@@ -27,6 +27,7 @@ export const RUN_STATUS: Record<string, { label: string; variant: BadgeVariant }
   ok: { label: 'Finished', variant: 'positive' },
   error: { label: 'Failed', variant: 'destructive' },
   stopped: { label: 'Stopped', variant: 'outline' },
+  asked: { label: 'Asked', variant: 'warning' },
 };
 
 export function RunStatusBadge({ status }: { status: string }) {
