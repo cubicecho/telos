@@ -1,3 +1,10 @@
+# [9.1.0](https://github.com/cubicecho/telos/compare/v9.0.0...v9.1.0) (2026-10-23)
+
+
+### Features
+
+* **ai:** let an agent ask a person and wait for the answer ([0e3c30c](https://github.com/cubicecho/telos/commit/0e3c30c868c7486f026ab58aa619ec8139e35ab5)), closes [#115](https://github.com/cubicecho/telos/issues/115)
+
 # [9.0.0](https://github.com/cubicecho/telos/compare/v8.4.0...v9.0.0) (2026-10-23)
 
 
