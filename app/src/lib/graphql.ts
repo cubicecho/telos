@@ -236,43 +236,69 @@ export const SetInstanceRunLimitDocument = graphql(`
   }
 `);
 
-// What agents are told beyond their own instructions: the account's global
-// context and each project's context. People edit both in Settings, and AI
-// keeps them up to date through the MCP door.
-export const GlobalContextDocument = graphql(`
-  query GlobalContext {
+// What every agent is told first, before its project's and its own prompt: the
+// account's agent instructions. Null is the built-in default, which the server
+// hands over as `defaultAgentInstructions` so the editor can show it and Reset
+// can go back to it. A person's alone to write.
+export const AgentInstructionsDocument = graphql(`
+  query AgentInstructions {
+    defaultAgentInstructions
     users {
       id
-      globalContext
+      agentInstructions
     }
   }
 `);
 
-export const SetGlobalContextDocument = graphql(`
-  mutation SetGlobalContext($context: String) {
-    setGlobalContext(context: $context) {
+export const SetAgentInstructionsDocument = graphql(`
+  mutation SetAgentInstructions($instructions: String) {
+    setAgentInstructions(instructions: $instructions) {
       id
-      globalContext
+      agentInstructions
     }
   }
 `);
 
-export const ProjectContextsDocument = graphql(`
-  query ProjectContexts {
-    projects(where: { archivedAt: { isNull: true } }, orderBy: { name: { direction: asc, priority: 1 } }) {
-      id
-      name
-      aiEnabled
-      context
+// Prompts: the account's library of what an agent is told about its job. An
+// agent picks one (`Agent.promptId`); every account starts with a Planner, a
+// Reviewer and a Worker, which are as editable and deletable as any other.
+export const PromptFieldsFragment = graphql(`
+  fragment PromptFields on Prompt {
+    id
+    name
+    body
+    updatedAt
+  }
+`);
+
+export const PromptsDocument = graphql(`
+  query Prompts {
+    prompts(orderBy: { name: { direction: asc, priority: 1 } }) {
+      ...PromptFields
     }
   }
 `);
 
-export const SetProjectContextDocument = graphql(`
-  mutation SetProjectContext($id: UUID!, $context: String) {
-    updateProject(set: { context: $context }, where: { id: { eq: $id } }) {
+export const CreatePromptDocument = graphql(`
+  mutation CreatePrompt($values: CreatePromptInput!) {
+    createPrompt(values: $values) {
+      ...PromptFields
+    }
+  }
+`);
+
+export const UpdatePromptDocument = graphql(`
+  mutation UpdatePrompt($id: UUID!, $set: UpdatePromptInput!) {
+    updatePrompt(set: $set, where: { id: { eq: $id } }) {
+      ...PromptFields
+    }
+  }
+`);
+
+export const DeletePromptDocument = graphql(`
+  mutation DeletePrompt($id: UUID!) {
+    deletePrompt(where: { id: { eq: $id } }) {
       id
-      context
     }
   }
 `);
@@ -365,7 +391,7 @@ export const AgentFieldsFragment = graphql(`
     name
     baseUrl
     model
-    systemPrompt
+    promptId
     temperature
     maxTokens
     contextLength

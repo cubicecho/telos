@@ -150,13 +150,13 @@ the site.
 - **Instance:** one telos installation. Its admin can switch AI off for everyone on it.
   Owner: `server/src/instance.ts`.
 - **Account:** you, and everything you own. It has its own AI switch, the agent
-  defaults new agents start from, and a global context every agent is given whichever
-  project it works in (a person edits it in Settings; AI may keep it up to date).
-  Owner: `users`.
+  defaults new agents start from, its prompts, and the agent instructions every agent
+  is told first whichever project it works in (a person edits them in Settings, and
+  Reset goes back to the built-in default).
+  Owner: `users`, `db/src/prompt-seeds.ts`.
 - **Project:** a set of lanes and the todos in them. It has its own AI switch, auto-run,
-  a description and context every agent working in it is given (the context a person
-  or AI may keep up to date), a prompt (standing instructions to those agents, a
-  person's only), and a new-todo lane.
+  a description every agent working in it is given, a prompt (standing instructions to
+  those agents, a person's only), and a new-todo lane.
   Owner: `projects`.
 - **Lane:** a column in a project. A lane can have an agent that works the todos in it,
   routes that say where they go next, a WIP limit and max attempts.
@@ -244,11 +244,13 @@ the site.
 
 - **AI switches:** the instance's, the account's, the project's and each agent's. Every
   one above an agent must be on for it to run. Owner: `ai-gate.ts`, `readyTodos`.
-- **Agent:** a model with instructions, the MCP servers it may use and the tools it may
+- **Agent:** a model with a prompt, the MCP servers it may use and the tools it may
   call. A setting left blank uses the account's agent defaults. An agent knows nothing
   of lanes: a lane is given an agent. Owner: `agents`, `server/src/agent-defaults.ts`.
-- **Agent template:** starting text for a new agent: Planner, Worker or Reviewer.
-  Owner: `app/src/lib/agent-starters.ts` (renamed by M10).
+- **Prompt:** what one kind of agent is told to do, chosen by each agent. Every account
+  starts with Planner, Reviewer and Worker, which a person may edit, delete or add to.
+  A person's only.
+  Owner: `prompts`, `db/src/prompt-seeds.ts`.
 - **MCP server:** a tool server added to an account; each agent names the ones it may
   use. Owner: `server/src/mcp-servers.ts`.
 - **MCP client:** an assistant connected to telos with an API key, working in the
@@ -257,8 +259,10 @@ the site.
   their agents. Owner: `runner/`.
 - **Run:** one go by an agent at a todo, ending in a reply.
   Owner: `runs`, `server/src/resolvers/runs.ts`.
-- **Reply format:** the rules every run's reply is read by, sent after the agent's own
-  instructions. Owner: `STANDING_SYSTEM` in `runner/src/prompts.ts` (renamed by R6).
+- **Reply format:** the rules a run's reply is read by. They are not sent as a fixed
+  protocol: each seeded prompt asks for the shape its kind of agent is read in, and the
+  agent instructions hold the rest.
+  Owner: `readReply` in `runner/src/prompts.ts`, `verdictOf` in the runs resolvers.
 - **Outcome:** what a reply comes to: a verdict, a report, a refine or a split. A run
   that fails or breaks the reply format is an error, and counts as an attempt.
   Owner: `finish` in `server/src/resolvers/runs.ts`.
@@ -284,8 +288,9 @@ the site.
   renewing that. Owner: `server/src/resolvers/runs.ts`.
 - **Run token, run reach:** what a run's `/mcp` calls may touch: notes on its own todo,
   and the todos under it and those its runs made. Owner: `run-reach.ts`.
-- **What a run is handed:** its todo, with the account's global context, the project's
-  text, its last report, why it came back and its thread. Owner: `assignmentFor`, the runner's `Assignment` (the word
+- **What a run is handed:** a system prompt of four layers (the account's agent
+  instructions, the project's description, the project's prompt, the agent's prompt),
+  and its todo, with its last report, why it came back and its thread. Owner: `assignmentFor`, the runner's `Assignment` (the word
   retired by R5).
 - **Session:** a todo as an agent's MCP hooks see it, one per agent per todo; its runs
   are turns of it. Owner: `todo_sessions`.

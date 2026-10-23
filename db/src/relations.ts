@@ -63,8 +63,13 @@ export const relations = defineRelations(schema, (r) => ({
   },
 
   agents: {
+    prompt: r.one.prompts({ from: r.agents.promptId, to: r.prompts.id }),
     lanes: r.many.lanes({ from: r.agents.id, to: r.lanes.agentId }),
     runs: r.many.runs({ from: r.agents.id, to: r.runs.agentId }),
+  },
+
+  prompts: {
+    agents: r.many.agents({ from: r.prompts.id, to: r.agents.promptId }),
   },
 
   runs: {

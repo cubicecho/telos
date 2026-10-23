@@ -2,10 +2,10 @@ import type { DB } from '@telos/db';
 import { AUTH_TABLES, SERVER_TABLES } from '@telos/db/schema';
 import { buildSchema, GraphQLDateTime } from '@vantreeseba/drizzle-graphql';
 import { applyAgentDefaultsExtension } from '../agents/agent-defaults-resolvers.ts';
+import { applyAgentInstructionsExtension } from '../agents/instructions.ts';
 import { applyAgentsExtension } from '../agents/resolvers.ts';
 import { applyAccountActivityExtension } from '../ai/account-activity.ts';
 import { applyAnswersExtension } from '../ai/answers.ts';
-import { applyGlobalContextExtension } from '../ai/global-context.ts';
 import { applyAiReadsExtension } from '../ai/reads.ts';
 import { applyRequestsExtension } from '../ai/requests.ts';
 import { applyAiSetupExtension } from '../ai/setup.ts';
@@ -50,7 +50,7 @@ export interface SchemaOptions {
 }
 
 /** Tables that exist in the API only while the instance has AI on. */
-const AI_TABLES = ['agents', 'mcpServers', 'runs', 'artifacts'];
+const AI_TABLES = ['agents', 'prompts', 'mcpServers', 'runs', 'artifacts'];
 
 /** A lane's agent and routes, which mean nothing without agents. */
 const AI_LANE_COLUMNS = [
@@ -137,7 +137,7 @@ export function createSchema(db: DB, options: SchemaOptions) {
     schema = applyAiSetupExtension(schema);
     schema = applyAccountActivityExtension(schema);
     schema = applyAiReadsExtension(schema);
-    schema = applyGlobalContextExtension(schema);
+    schema = applyAgentInstructionsExtension(schema);
   }
   // Last, so it sees every root field the extensions above added.
   schema = applyCallerPermissions(schema, entities);

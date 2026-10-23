@@ -12,6 +12,7 @@ import type {
   RunResultInput,
   RunUsageInput,
 } from '../../__generated__/resolvers.ts';
+import { agentInstructionsOf } from '../agents/instructions.ts';
 import { runnerAgent } from '../agents/mcp-servers.ts';
 import { requireAuth } from '../auth/resolvers.ts';
 import { findDoneLaneId, findNewTodoLaneId } from '../board/lanes.ts';
@@ -59,7 +60,8 @@ const RUNS_SDL = parse(`
     baseUrl: String
     model: String
     apiKey: String
-    systemPrompt: String
+    "The body of the agent's prompt: what it is told its job is, last in its system prompt. Null when it has none."
+    prompt: String
     temperature: Float
     maxTokens: Int
     contextLength: Int
@@ -95,11 +97,10 @@ const RUNS_SDL = parse(`
 
   "Everything an agent is told about the todo it is working, and where."
   type RunAssignment {
-    "What every agent of the account is told, whichever project it works in. The base layer, under the project's."
-    globalContext: String
+    "What every agent of the account is told first, whatever its prompt: the account's own, or the default."
+    agentInstructions: String!
     projectName: String!
     projectDescription: String
-    projectContext: String
     "The project's standing instructions to every agent working its todos. Only a person writes them."
     projectPrompt: String
     laneName: String!
@@ -372,7 +373,7 @@ async function assignmentFor(tx: AnyRow, todo: AnyRow, lane: AnyRow, project: An
     .orderBy(desc(dbSchema.todoEvents.at))
     .limit(1);
   const [owner] = await tx
-    .select({ globalContext: dbSchema.users.globalContext })
+    .select({ agentInstructions: dbSchema.users.agentInstructions })
     .from(dbSchema.users)
     .where(eq(dbSchema.users.id, project.userId));
 
@@ -394,10 +395,9 @@ async function assignmentFor(tx: AnyRow, todo: AnyRow, lane: AnyRow, project: An
     .limit(ASSIGNMENT_ARTIFACTS);
 
   return {
-    globalContext: owner?.globalContext ?? null,
+    agentInstructions: agentInstructionsOf(owner?.agentInstructions),
     projectName: project.name,
     projectDescription: project.description,
-    projectContext: project.context,
     projectPrompt: project.prompt,
     laneName: lane.name,
     title: todo.title,

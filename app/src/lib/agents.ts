@@ -33,7 +33,11 @@ export interface LayerDraft {
 
 export interface AgentDraft extends LayerDraft {
   name: string;
-  systemPrompt: string;
+  /**
+   * The account's prompt it is told about its job, by id: null is none, and
+   * then a run is told only the account's, the project's and the todo's.
+   */
+  promptId: string | null;
   /** Off, it takes no runs. */
   enabled: boolean;
   /**
@@ -93,7 +97,7 @@ export function toLayerDraft(layer: StoredLayer | null | undefined): LayerDraft 
 export function toAgentDraft(agent: AgentFieldsFragment | null | undefined): AgentDraft {
   return {
     name: agent?.name ?? '',
-    systemPrompt: agent?.systemPrompt ?? '',
+    promptId: agent?.promptId ?? null,
     enabled: agent?.enabled ?? true,
     ...toLayerDraft(agent),
     mcpServerSlugs: readServerSlugs(agent?.mcpServerSlugs),
@@ -126,7 +130,7 @@ export function fromLayerDraft(draft: LayerDraft): Required<StoredLayer> {
 export function fromAgentDraft(draft: AgentDraft): Omit<CreateAgentInput, 'id'> {
   return {
     name: draft.name.trim(),
-    systemPrompt: orNull(draft.systemPrompt),
+    promptId: draft.promptId || null,
     enabled: draft.enabled,
     ...fromLayerDraft(draft),
     mcpServerSlugs: draft.mcpServerSlugs,

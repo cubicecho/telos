@@ -12,6 +12,7 @@ export * from './mcp-servers.ts';
 export * from './oidc-settings.ts';
 export * from './project-labels.ts';
 export * from './projects.ts';
+export * from './prompts.ts';
 export * from './runs.ts';
 export * from './todo-dependencies.ts';
 export * from './todo-events.ts';

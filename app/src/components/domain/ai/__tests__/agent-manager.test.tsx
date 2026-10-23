@@ -3,7 +3,6 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { GraphQLError } from 'graphql';
 import { describe, expect, it, vi } from 'vitest';
-import { AGENT_STARTERS } from '@/lib/agent-starters';
 import {
   AgentDefaultsDocument,
   AgentModelsDocument,
@@ -11,6 +10,7 @@ import {
   CreateAgentDocument,
   McpServersDocument,
   McpToolsDocument,
+  PromptsDocument,
   SetAgentApiKeyDocument,
   UpdateAgentDocument,
 } from '@/lib/graphql';
@@ -27,7 +27,7 @@ const AGENT = {
   name: 'Reviewer',
   baseUrl: 'http://localhost:11434/v1',
   model: 'qwen3:14b',
-  systemPrompt: null,
+  promptId: null,
   temperature: null,
   maxTokens: null,
   contextLength: null,
@@ -121,6 +121,21 @@ function servers(rows: unknown[]) {
   return { request: { query: McpServersDocument }, result: { data: { mcpServers: rows } } };
 }
 
+/** The account's prompts: the three it starts with. */
+const PROMPTS = ['Planner', 'Reviewer', 'Worker'].map((name) => ({
+  __typename: 'Prompt',
+  id: `p-${name.toLowerCase()}`,
+  name,
+  body: `You are the ${name}.`,
+  updatedAt: '2026-10-22T00:00:00.000Z',
+}));
+
+const prompts = {
+  request: { query: PromptsDocument },
+  result: { data: { prompts: PROMPTS } },
+  maxUsageCount: Number.POSITIVE_INFINITY,
+};
+
 function agents(rows: unknown[]) {
   return { request: { query: AgentsDocument }, result: { data: { agents: rows } } };
 }
@@ -128,7 +143,7 @@ function agents(rows: unknown[]) {
 // biome-ignore lint/suspicious/noExplicitAny: MockedProvider's mock array type
 function manager(mocks: any[], inherited = defaults()) {
   render(
-    <MockedProvider mocks={[inherited, inherited, ...mocks]}>
+    <MockedProvider mocks={[inherited, inherited, prompts, ...mocks]}>
       <AgentManager />
     </MockedProvider>,
   );
@@ -154,7 +169,7 @@ describe('AgentManager', () => {
       name: 'Reviewer',
       baseUrl: 'http://localhost:11434/v1',
       model: 'qwen3:14b',
-      systemPrompt: null,
+      promptId: 'p-worker',
       temperature: 0.2,
       maxTokens: null,
       contextLength: null,
@@ -187,6 +202,14 @@ describe('AgentManager', () => {
     await user.type(screen.getByLabelText('Base URL'), 'http://localhost:11434/v1');
     await user.type(screen.getByLabelText('Model'), 'qwen3:14b');
     await user.type(screen.getByLabelText('Temperature'), '0.2');
+    await user.click(screen.getByRole('combobox', { name: 'Prompt' }));
+    expect((await screen.findAllByRole('option')).map((option) => option.textContent)).toEqual([
+      'No prompt',
+      'Planner',
+      'Reviewer',
+      'Worker',
+    ]);
+    await user.click(screen.getByRole('option', { name: 'Worker' }));
     expect(screen.getByRole('checkbox', { name: 'Every server' })).toBeChecked();
     expect(await screen.findByRole('switch', { name: 'create_todo' })).toBeChecked();
     expect(screen.getByRole('switch', { name: 'move_todo' })).not.toBeChecked();
@@ -199,13 +222,13 @@ describe('AgentManager', () => {
   it('creates an agent from a starter, needing only an endpoint and a model', async () => {
     minted = 0;
     const user = userEvent.setup();
-    const reviewer = AGENT_STARTERS.find((starter) => starter.id === 'reviewer');
     const values = {
       id: 'id-1',
       name: 'Reviewer',
       baseUrl: 'http://localhost:11434/v1',
       model: 'qwen3:14b',
-      systemPrompt: reviewer?.draft.systemPrompt,
+      // The account's prompt of the starter's name.
+      promptId: 'p-reviewer',
       temperature: 0,
       maxTokens: null,
       contextLength: null,
@@ -240,6 +263,7 @@ describe('AgentManager', () => {
     expect(await screen.findByRole('heading', { name: 'New Reviewer' })).toBeInTheDocument();
     expect(screen.getByLabelText('Name')).toHaveValue('Reviewer');
     expect(screen.getByLabelText('Temperature')).toHaveValue('0');
+    expect(await screen.findByRole('combobox', { name: 'Prompt' })).toHaveTextContent('Reviewer');
     await user.type(screen.getByLabelText('Base URL'), 'http://localhost:11434/v1');
     await user.type(screen.getByLabelText('Model'), 'qwen3:14b');
     await user.click(screen.getByRole('button', { name: 'Create agent' }));
@@ -268,7 +292,7 @@ describe('AgentManager', () => {
     );
 
     expect(await screen.findByText('Off')).toBeInTheDocument();
-    expect(await screen.findByText('big (default) · http://localhost:11434/v1')).toBeInTheDocument();
+    expect(await screen.findByText('big (default) · http://localhost:11434/v1 · no prompt')).toBeInTheDocument();
   });
 
   it('lists the endpoint’s models on opening, picks one, and takes its context length', async () => {

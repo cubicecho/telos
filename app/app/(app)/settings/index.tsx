@@ -1,8 +1,8 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { View } from 'react-native';
-import { ContextSettings } from '@/components/domain/ai/agent-context';
 import { AgentSettings, AiSettings } from '@/components/domain/ai/ai-settings';
 import { McpServerManager } from '@/components/domain/ai/mcp-server-manager';
+import { PromptSettings } from '@/components/domain/ai/prompt-settings';
 import { LabelManager } from '@/components/domain/label/label-manager';
 import { SsoSettings } from '@/components/domain/sso/sso-pairing';
 import { TemplateManager } from '@/components/domain/template/template-manager';
@@ -14,13 +14,16 @@ import { PALETTE_PREFERENCES } from '@/components/ui/theme-preference-base';
 import { useAi } from '@/lib/ai';
 import { CARD_TITLE } from '@/lib/styles';
 
-type SettingsTab = 'general' | 'ai' | 'agents' | 'mcp' | 'context';
+type SettingsTab = 'general' | 'ai' | 'agents' | 'mcp' | 'prompts';
+
+/** Old links' names for a tab: Prompts was Context, when agents were told contexts. */
+const RENAMED: Record<string, SettingsTab> = { context: 'prompts' };
 
 /**
  * One card per thing you can change, in tabs: the board's own settings; AI's
  * switches and keys; and, once AI is on, the agents, the MCP servers they
- * reach, and the context they are told (the account's and each project's),
- * each a tab of its own. The tab lives in the URL, as the project's view
+ * reach, and what they are told (the account's agent instructions and its
+ * prompts), each a tab of its own. The tab lives in the URL, as the project's view
  * does, so a link can open one. The AI tab is not there at all for someone with
  * nothing in it — AI stays out of sight until the instance has it on — and a
  * link to Agents or MCP servers while AI is off lands on General.
@@ -28,8 +31,9 @@ type SettingsTab = 'general' | 'ai' | 'agents' | 'mcp' | 'context';
 export default function SettingsScreen() {
   const { tab } = useLocalSearchParams<{ tab?: string }>();
   const ai = useAi();
-  const open: readonly SettingsTab[] = ai.on ? ['ai', 'agents', 'mcp', 'context'] : ai.settings ? ['ai'] : [];
-  const current: SettingsTab = open.find((name) => name === tab) ?? 'general';
+  const open: readonly SettingsTab[] = ai.on ? ['ai', 'agents', 'mcp', 'prompts'] : ai.settings ? ['ai'] : [];
+  const asked = (tab && RENAMED[tab]) ?? tab;
+  const current: SettingsTab = open.find((name) => name === asked) ?? 'general';
 
   const general = (
     <View className="gap-6">
@@ -68,7 +72,7 @@ export default function SettingsScreen() {
                 <>
                   <TabsTrigger value="agents">Agents</TabsTrigger>
                   <TabsTrigger value="mcp">MCP servers</TabsTrigger>
-                  <TabsTrigger value="context">Context</TabsTrigger>
+                  <TabsTrigger value="prompts">Prompts</TabsTrigger>
                 </>
               ) : null}
             </TabsList>
@@ -92,8 +96,8 @@ export default function SettingsScreen() {
                     <McpServerManager />
                   </View>
                 </TabsContent>
-                <TabsContent value="context" className="mt-0">
-                  <ContextSettings />
+                <TabsContent value="prompts" className="mt-0">
+                  <PromptSettings />
                 </TabsContent>
               </>
             ) : null}

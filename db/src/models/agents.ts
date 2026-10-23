@@ -12,11 +12,12 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 
+import { prompts } from './prompts.ts';
 import { users } from './users.ts';
 
 // Somebody the board can hand work to: a model behind an OpenAI-compatible
 // endpoint, with whatever tools it is given. An agent is nothing until a lane
-// names it (lanes.agentId); what it is asked to do is the lane's business.
+// names it (lanes.agentId); what it is asked to do is its prompt's (promptId).
 // It says only what is different about it: what it leaves null comes from the
 // account's defaults, layered by the runner (runner/src/spec.ts).
 //
@@ -39,8 +40,9 @@ export const agents = pgTable(
     baseUrl: text('base_url'),
     model: text('model'),
     apiKey: text('api_key'),
-    // Who the agent is, whichever lane it works in. The lane adds the job.
-    systemPrompt: text('system_prompt'),
+    // What the agent is told its job is: one of the account's prompts. With
+    // none, its runs are told only the account's and the project's layers.
+    promptId: uuid('prompt_id').references(() => prompts.id, { onDelete: 'set null' }),
     temperature: doublePrecision('temperature'),
     maxTokens: integer('max_tokens'),
     contextLength: integer('context_length'),

@@ -26,6 +26,7 @@ export const USER_OWNED_TABLES = [
   'todoNotes',
   'todoEvents',
   'agents',
+  'prompts',
   'mcpServers',
   'runs',
   'artifacts',
@@ -132,6 +133,8 @@ export function aiReach(userId: string): Partial<Record<RowSubject, Conditions |
   const onTodo = through('todo', aiTodo(userId));
   return {
     agents: null,
+    // An agent's prompt is its instructions, which are a person's to write.
+    prompts: null,
     mcpServers: null,
     projects: aiProject(userId),
     lanes: aiLane(userId),

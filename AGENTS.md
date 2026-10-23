@@ -97,7 +97,7 @@ telos/
 │       ├── tools.ts         # The pool: telos's /mcp with the run token, plus the agent's servers and hooks
 │       ├── artifacts.ts     # What a run made: record_artifact, and writes read off tool calls
 │       ├── ask.ts           # ask_person: an agent stops to ask a person, and its todo waits
-│       ├── prompts.ts       # The standing protocol, the brief, and reading a reply
+│       ├── prompts.ts       # The system prompt's layers, the brief, and reading a reply
 │       └── __tests__/       # End to end against a real telos and a scripted model
 ├── scripts/
 │   ├── admin.ts             # `npm run admin -- --user <email>`: make an account an admin
@@ -294,10 +294,11 @@ and `ai/reach.ts`, which checks the ids a hand-written mutation is handed and
 answers NOT_FOUND for what AI cannot see. `visibleToAi` filters rows already
 loaded, so it states the rule in code and must follow it. What it writes:
 `graphql/permissions.ts` gates every root field and refuses AI all but
-`AI_MUTATIONS` — projects (create and rename, and their context, nothing else:
-`holdAiProjectWrite`), the account's global context (`setGlobalContext`), todos (create, edit, move, retry, run, stop a run,
+`AI_MUTATIONS` — projects (create, and change their name and description, nothing else:
+`holdAiProjectWrite`), todos (create, edit, move, retry, run, stop a run,
 dependencies, archive, restore, delete), notes, artifacts and board
-templates. Still a person's: the AI switches, auto-run, the project prompt, agents and their keys
+templates. Still a person's: the AI switches, auto-run, the account's agent instructions, the
+project prompt, prompts, agents and their keys
 and MCP servers, API keys, lanes and their agents, the project's new-todo lane, bulk mutations, and archiving
 or deleting a project. A new mutation is closed to AI until it is added there.
 The MCP door (`mcp/endpoint.ts`) serves only the operations written in `mcp/door.graphql`,
@@ -324,8 +325,8 @@ above all of this. `/mcp` is a 404 unless the instance's switch is on.
 **Agents work the board only in lanes, and only through the runner.** Four
 ideas, one name each:
 
-- **Agent** — a model and its instructions (`agents`); a blank field inherits
-  the account's agent defaults.
+- **Agent** — a model and the prompt it works from (`agents`, `promptId` →
+  `prompts`); a blank field inherits the account's agent defaults.
 - **Lane** — a column. Given an `agentId`, each ready todo in it becomes a run.
   `onSuccessLaneId`/`onFailureLaneId` are its success and failure routes,
   `wipLimit` how many it works at once (under the instance's run limit,
@@ -336,7 +337,7 @@ ideas, one name each:
 - **Board template** — as below.
 
 There is no lane prompt and no per-lane contract: what a lane asks for is its
-agent's instructions, and every reply is read the same way (`verdictOf` in
+agent's prompt, and every reply is read the same way (`verdictOf` in
 `runs/resolvers.ts`). A reply that opens with FAIL fails and takes the failure
 route; one that opens with PASS passes; anything else is a report and passes.
 A passing run may refine its todo with a fenced `refine` block (`title`,
@@ -397,29 +398,47 @@ to a pass: `finishRun` completes the todo, puts it in the done lane and
 archives it in one write, as the run. It is that or a success route, never
 both; the lane write guard (`assertArchiveOnSuccessFits`) holds it and says
 what to change. `assignmentFor` in `runs/resolvers.ts` assembles what a run is
-handed; the runner adds the agent's instructions and one standing protocol
-(`STANDING_SYSTEM` in `runner/src/prompts.ts`). A project's prompt
-(`projects.prompt`) is its standing instructions to every agent working its
-todos — where artifacts go, the repo's conventions — kept apart from the
-description, which is for people. It goes in the system prompt under its own
-heading, after where the run is and before the agent's instructions, and only
-when there is one. Like an agent's instructions it is a person's to write
-(`AI_PROJECT_COLUMNS` leaves it out), and the app's project form asks for it only
-while `useAi().on`. Context is the other kind of thing a run is told, in two
-layers, and AI may keep both up to date where it may not touch a prompt: the
-account's global context (`users.globalContext`, `ai/global-context.ts`:
-`globalContext` and `setGlobalContext`, the door's `global_context` and
-`set_global_context`) and each project's (`projects.context`, through
-`updateProject`). It lives on the account's row, not in `agent_defaults`,
-because that table is the server's, closed to AI, and is the agent spec's layer
-rather than the prompt's. The system prompt runs from the broadest layer to
-the narrowest: the global context under its own heading, the project (name,
-description, context), the project prompt, the agent's instructions, then
-`STANDING_SYSTEM`, which must stay right after the instructions it points back
-at. A blank layer is left out, heading and all. Settings' Context tab (while
-`useAi().on`, `domain/ai/agent-context.tsx`) edits the global context and each
-unarchived project's; a run has `set_global_context` off until a person turns
-it on for its agent (`RUN_REACH_EXEMPT`).
+handed: the todo and its thread, as the user message. The system prompt is
+made of four layers, every one of them a person's to write, from the broadest
+to the narrowest, a blank one left out (`systemPromptFor` in
+`runner/src/prompts.ts`):
+
+1. **The account's agent instructions** (`users.agentInstructions`). Null means
+   the built-in default, `DEFAULT_AGENT_INSTRUCTIONS` in `db/src/prompt-seeds.ts`:
+   a short core (one todo, say plainly when a tool fails, the reply settles the
+   todo, `ask_person` rather than guess, never both refine and split). A person
+   edits it in Settings, and Reset writes null, back to the default. The server
+   resolves null before the claim (`assignment.agentInstructions`), so the
+   runner never holds a copy of the default.
+2. **The project's description.**
+3. **The project's prompt** (`projects.prompt`): what every agent working its
+   todos should do there, such as where artifacts go and the repo's conventions.
+4. **The agent's prompt** (`agents.promptId` → `prompts.body`, the claim's
+   `agent.prompt`). None means the layer is left out.
+
+There is no built-in protocol past the agent instructions, and that one can be
+edited. How a reply is read never changes with the text (`verdictOf`,
+`readReply`), so what an agent must say for each outcome lives in the prompt
+for that kind of agent. Every account starts with three prompts,
+`SEEDED_PROMPTS` in `db/src/prompt-seeds.ts`, seeded when the account is made:
+**Planner** (refine with a fenced `refine` block, or split with a fenced
+`todos` block), **Reviewer** (PASS or FAIL as the bare first line, then each
+criterion met or not met, with evidence it found itself) and **Worker** (plan,
+do the work, check each criterion, end with Changes, Verification and Open
+questions). They are ordinary rows: a person may edit, delete or add to them.
+Deleting a prompt leaves its agents with none (`on delete set null`). Prompts,
+the agent instructions and the project prompt are a person's: AI reaches none
+of them, through GraphQL or the MCP door (`AI_PROJECT_COLUMNS` leaves the
+project prompt out), and the door's guide says so.
+
+There used to be a global context (`users.global_context`) and a project
+context (`projects.context`) that AI could keep up to date. The prompts
+migration removed both: a non-empty global context became the default
+instructions plus that text, a non-empty project context was appended to the
+project prompt, every account was given the three seeded prompts, every agent
+was pointed at its account's Worker (`MIGRATED_AGENT_PROMPT`), and
+`agents.system_prompt` was dropped. A test pins the migration's seed text to
+`prompt-seeds.ts`.
 The runner (`@telos/runner`, which never
 imports `@telos/db`) runs inside the server's process: `index.ts` starts it
 with `startRunner` whenever AI is included, handing it a key made up at boot

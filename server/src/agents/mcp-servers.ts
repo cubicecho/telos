@@ -1,6 +1,6 @@
 import type { DB } from '@telos/db';
 import * as dbSchema from '@telos/db/schema';
-import { asc, eq } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
 import { effectiveModel, loadAgentDefaults } from './agent-defaults.ts';
 
 // The account's MCP servers an agent reaches, worked out where the secrets are:
@@ -94,14 +94,23 @@ export async function serversFor(
  *
  * @param db - The database, or the transaction the run is claimed in.
  * @param agent - The agent's row, key included.
- * @returns The row, its servers as JSON, what to say about them, its account's
+ * @returns The row, its prompt's body, its servers as JSON, what to say about them, its account's
  * defaults (key included), and the model it resolves to, for the run's record.
  */
 export async function runnerAgent(db: DB, agent: dbSchema.Agent) {
   const { servers, notices } = await serversFor(db, agent);
   const defaults = await loadAgentDefaults(db, agent.userId);
+  // Its owner's, as the foreign key's guard (write-guards.ts) already holds; said
+  // again here so a run can never be told another account's prompt.
+  const [prompt] = agent.promptId
+    ? await db
+        .select({ body: dbSchema.prompts.body })
+        .from(dbSchema.prompts)
+        .where(and(eq(dbSchema.prompts.id, agent.promptId), eq(dbSchema.prompts.userId, agent.userId)))
+    : [];
   return {
     ...agent,
+    prompt: prompt?.body.trim() ? prompt.body : null,
     mcpServers: JSON.stringify(servers),
     mcpNotices: notices,
     defaults,
