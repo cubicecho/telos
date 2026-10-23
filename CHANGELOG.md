@@ -1,3 +1,10 @@
+# [8.4.0](https://github.com/cubicecho/telos/compare/v8.3.0...v8.4.0) (2026-10-23)
+
+
+### Features
+
+* **ai:** move the runner's concurrency into an instance run limit ([70b8b52](https://github.com/cubicecho/telos/commit/70b8b52404d5ad4090592404d672e41d8545459d))
+
 # [8.3.0](https://github.com/cubicecho/telos/compare/v8.2.1...v8.3.0) (2026-10-22)
 
 
