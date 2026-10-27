@@ -29,10 +29,6 @@ export function LabelPicker({
   size?: 'icon' | 'icon-sm' | 'icon-xs';
   className?: string;
 }) {
-  const labelsQuery = useQuery(LabelsDocument);
-  const attachedIds = new Set(attached.map((label) => label.id));
-  const labels = labelsQuery.data?.labels ?? [];
-
   return (
     <Menu>
       <MenuTrigger asChild>
@@ -47,32 +43,49 @@ export function LabelPicker({
         />
       </MenuTrigger>
       <MenuContent align={align} aria-label="Labels" className="w-56">
-        {/* The failure, not "No labels yet.", when the list did not load: the
-            empty line reads as an invitation to go and make one, which is the
-            wrong errand when the list simply did not arrive. */}
-        <LoadState
-          query={labelsQuery}
-          what="your labels"
-          count={labels.length}
-          compact
-          rows={2}
-          emptySlot={
-            <Text className="px-2 py-3 text-center font-medium text-foreground/60 text-sm">No labels yet.</Text>
-          }
-        />
-        {labels.map((label) => {
-          const isAttached = attachedIds.has(label.id);
-          return (
-            <MenuCheckboxItem
-              key={label.id}
-              checked={isAttached}
-              onCheckedChange={(attach) => onToggle(label, attach)}
-              iconSlot={<ColorDot color={label.color} size="sm" />}
-              label={label.name}
-            />
-          );
-        })}
+        <LabelMenuItems attached={attached} onToggle={onToggle} />
       </MenuContent>
     </Menu>
+  );
+}
+
+/**
+ * The picker's rows without its trigger, so a menu that holds more than the
+ * labels — a todo row's ⋯ — lists them the same way.
+ */
+export function LabelMenuItems({
+  attached,
+  onToggle,
+}: {
+  attached: readonly LabelSummary[];
+  onToggle: (label: LabelSummary, attach: boolean) => void;
+}) {
+  const labelsQuery = useQuery(LabelsDocument);
+  const attachedIds = new Set(attached.map((label) => label.id));
+  const labels = labelsQuery.data?.labels ?? [];
+
+  return (
+    <>
+      {/* The failure, not "No labels yet.", when the list did not load: the
+          empty line reads as an invitation to go and make one, which is the
+          wrong errand when the list simply did not arrive. */}
+      <LoadState
+        query={labelsQuery}
+        what="your labels"
+        count={labels.length}
+        compact
+        rows={2}
+        emptySlot={<Text className="px-2 py-3 text-center font-medium text-foreground/60 text-sm">No labels yet.</Text>}
+      />
+      {labels.map((label) => (
+        <MenuCheckboxItem
+          key={label.id}
+          checked={attachedIds.has(label.id)}
+          onCheckedChange={(attach) => onToggle(label, attach)}
+          iconSlot={<ColorDot color={label.color} size="sm" />}
+          label={label.name}
+        />
+      ))}
+    </>
   );
 }

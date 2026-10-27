@@ -1,18 +1,19 @@
 import { type ApolloCache, useMutation } from '@apollo/client';
 import { useState } from 'react';
 import { Pressable, Text, View, type ViewProps } from 'react-native';
-import { Archive } from '@/components/app-icons';
+import { Archive, Ellipsis } from '@/components/app-icons';
 import { AiIgnoredBadge } from '@/components/domain/ai/ai-ignored-badge';
 import type { LiveRun } from '@/components/domain/ai/project-activity';
 import { LiveDot } from '@/components/domain/ai/run-log';
 import { LabelBadge, type LabelSummary } from '@/components/domain/label/label-badge';
-import { LabelPicker } from '@/components/domain/label/label-picker';
+import { LabelMenuItems } from '@/components/domain/label/label-picker';
 import { LaneBadge } from '@/components/domain/lane/lane-badge';
-import { LanePicker } from '@/components/domain/lane/lane-picker';
+import { LaneMenuItems } from '@/components/domain/lane/lane-picker';
 import { useMoveTodo } from '@/components/domain/lane/use-move-todo';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Pencil } from '@/components/ui/icons';
+import { Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger } from '@/components/ui/menu';
 import { bumpProjectCounts, type CachedLane, laneForCompletion, updateProjectTodos } from '@/lib/cache';
 import { describeError } from '@/lib/errors';
 import {
@@ -27,10 +28,13 @@ import {
 import { isTyping } from '@/lib/hotkeys';
 import { laneLock } from '@/lib/lanes';
 import { cn, HOVER_REVEAL } from '@/lib/utils';
-import { DependencyPicker } from './dependency-picker';
+import { DependencyMenuItems } from './dependency-picker';
 import { DueBadge } from './due-badge';
 import { TodoFormDialog } from './todo-form-dialog';
 import type { TodoSummary } from './types';
+
+/** A section's name inside the row's ⋯ menu: quieter than the rows it heads. */
+const MENU_HEADING = 'px-2 pt-1.5 pb-1 font-medium text-foreground/60 text-xs';
 
 export function TodoRow({
   todo,
@@ -263,37 +267,46 @@ export function TodoRow({
           ) : null}
         </View>
 
-        {/* Every action the row offers, in one cluster that appears together on
-            hover or focus (`HOVER_REVEAL` — always shown off web). An open
-            picker's popover is portalled, so the cluster may fade behind it;
-            the old `has-[[data-state=open]]` guard read a radix attribute that
-            react-native-web does not forward onto a `Pressable`. */}
+        {/* Every action the row offers, behind one ⋯ so the title keeps the
+            width (five icons took most of a narrow card). It appears on hover
+            or focus (`HOVER_REVEAL` — always shown off web). The actions come
+            first and the lists after, so Archive is not below a long list of
+            dependencies. */}
         <View className={cn('h-5 shrink-0 flex-row items-center focus-within:opacity-100', HOVER_REVEAL)}>
-          <Button
-            variant="ghost"
-            size="icon-xs"
-            onPress={() => setEditing(true)}
-            aria-label={`Edit ${todo.title}`}
-            iconSlot={<Pencil className="h-4 w-4" />}
-          />
-          <LanePicker
-            lanes={lanes}
-            current={todo.lane}
-            onSelect={moveToLane}
-            lockedReason={laneLock(todo)}
-            align="end"
-            size="icon-xs"
-          />
-          <LabelPicker attached={todo.labels} onToggle={toggleLabel} align="end" size="icon-xs" />
-          <DependencyPicker todo={todo} candidates={siblings} onToggle={toggleDependency} align="end" size="icon-xs" />
-          {/* No confirmation: archiving is undone from the Archived view. */}
-          <Button
-            variant="ghost"
-            size="icon-xs"
-            onPress={() => void archive()}
-            aria-label={`Archive ${todo.title}`}
-            iconSlot={<Archive className="h-4 w-4" />}
-          />
+          <Menu>
+            <MenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                className="text-foreground/60"
+                aria-label={`Actions for ${todo.title}`}
+                iconSlot={<Ellipsis className="h-4 w-4" />}
+              />
+            </MenuTrigger>
+            <MenuContent align="end" aria-label={`Actions for ${todo.title}`} className="max-h-96 overflow-y-auto">
+              <MenuItem iconSlot={<Pencil />} label="Edit" onSelect={() => setEditing(true)} />
+              {/* No confirmation: archiving is undone from the Archived view. */}
+              <MenuItem iconSlot={<Archive />} label="Archive" onSelect={() => void archive()} />
+              {lanes.length > 0 ? (
+                <>
+                  <MenuSeparator />
+                  <Text className={MENU_HEADING}>Lane</Text>
+                  <LaneMenuItems
+                    lanes={lanes}
+                    current={todo.lane}
+                    onSelect={moveToLane}
+                    lockedReason={laneLock(todo)}
+                  />
+                </>
+              ) : null}
+              <MenuSeparator />
+              <Text className={MENU_HEADING}>Labels</Text>
+              <LabelMenuItems attached={todo.labels} onToggle={toggleLabel} />
+              <MenuSeparator />
+              <Text className={MENU_HEADING}>Waits on</Text>
+              <DependencyMenuItems todo={todo} candidates={siblings} onToggle={toggleDependency} />
+            </MenuContent>
+          </Menu>
         </View>
       </View>
 
