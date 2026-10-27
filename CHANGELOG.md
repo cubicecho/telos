@@ -1,3 +1,10 @@
+# [10.1.0](https://github.com/cubicecho/telos/compare/v10.0.0...v10.1.0) (2026-10-27)
+
+
+### Features
+
+* collapse a todo row's actions into one menu ([b541911](https://github.com/cubicecho/telos/commit/b5419114c40bd568aa00b14eba90a9f57f849e5d))
+
 # [10.0.0](https://github.com/cubicecho/telos/compare/v9.1.0...v10.0.0) (2026-10-23)
 
 
