@@ -51,22 +51,45 @@ export function LanePicker({
         />
       </MenuTrigger>
       <MenuContent align={align} className="w-52">
-        {lanes.map((lane) => (
-          <MenuItem
-            key={lane.id}
-            label={lane.name}
-            disabled={lockedReason != null && lane.id !== current?.id}
-            onSelect={() => onSelect(lane)}
-            trailing={
-              <>
-                {lane.isDone ? <Text className="text-foreground/60 text-xs">done</Text> : null}
-                {lane.id === current?.id ? <Check className="h-3.5 w-3.5" /> : null}
-              </>
-            }
-          />
-        ))}
-        {lockedReason ? <Text className="px-2 py-1.5 text-foreground/60 text-xs">{lockedReason}</Text> : null}
+        <LaneMenuItems lanes={lanes} current={current} onSelect={onSelect} lockedReason={lockedReason} />
       </MenuContent>
     </Menu>
+  );
+}
+
+/**
+ * The picker's rows without its trigger, so a menu that holds more than the
+ * lanes — a todo row's ⋯ — offers the same move under the same rules.
+ */
+export function LaneMenuItems({
+  lanes,
+  current,
+  onSelect,
+  lockedReason,
+}: {
+  lanes: readonly LaneSummary[];
+  current: LaneSummary | null;
+  onSelect: (lane: LaneSummary) => void;
+  /** Why this todo cannot change column, when it cannot. */
+  lockedReason?: string | null | undefined;
+}) {
+  return (
+    <>
+      {lanes.map((lane) => (
+        <MenuItem
+          key={lane.id}
+          label={lane.name}
+          disabled={lockedReason != null && lane.id !== current?.id}
+          onSelect={() => onSelect(lane)}
+          trailing={
+            <>
+              {lane.isDone ? <Text className="text-foreground/60 text-xs">done</Text> : null}
+              {lane.id === current?.id ? <Check className="h-3.5 w-3.5" /> : null}
+            </>
+          }
+        />
+      ))}
+      {lockedReason ? <Text className="px-2 py-1.5 text-foreground/60 text-xs">{lockedReason}</Text> : null}
+    </>
   );
 }
