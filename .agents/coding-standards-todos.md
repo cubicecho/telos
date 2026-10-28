@@ -38,7 +38,7 @@ Nothing here is implemented until approved.
 | A1 | API change | Drop contracts, lane prompts and presets from the database | M1, M2 | T1 | done |
 | A2 | API change | The server reads every finished run the same way | M1–M3 | T1 | done |
 | A3 | API change | The runner sends one standing protocol | M1 | T2 | done |
-| A6 | API change | Column enums (run status, verdict; note kind; actor kind; artifact source and action) become GraphQL enums, SCREAMING_CASE on the wire | The API says which values exist; ArtifactInput shares the generated enums | drizzle-graphql#178 | blocked |
+| A6 | API change | Column enums (run status, verdict; note kind; actor kind; artifact source and action) become GraphQL enums, SCREAMING_CASE on the wire | The API says which values exist; ArtifactInput shares the generated enums | drizzle-graphql#178 (shipped in 13.1.0 as `enumValueNameMapper`) | open |
 | A7 | API change | `RunEventInput.kind` becomes an enum | The runner already types it closed | — | done |
 | A8 | API change | Drafts go, for now: their tables, their runs, `runs.kind`, the draft tools and the Refiner starter | A todo is filed, then planned; talking it over first was a second way in that few used | — | done |
 | R7 | Refactor [simplify] | Error helpers (`notFound`, `badInput`, `conflict`) in one module | 85 inline `new GraphQLError` across 24 files; `badInput` is already redefined locally | — | done |
@@ -323,7 +323,8 @@ Out of that branch's scope; one line each in the summary.
 
 - **A6:** drizzle-graphql names a column enum's values by the raw value, so they would
   be lowercase on the wire. The upstream proposal for an `enumValueNameMapper` is
-  cubicecho/drizzle-graphql#178. Until then those fields stay `String`.
+  cubicecho/drizzle-graphql#178, which shipped in 13.1.0, so this is no longer blocked. The fields
+  stay `String` until the columns declare their enums.
 - **A8:** a migration (`db/drizzle/20261016201228_drop_drafts`) deletes every draft's
   runs and drops `drafts`, `draft_messages`, `runs.kind` and `runs.draft_id`; a run's
   `todo_id` is not null. Nothing is kept. To bring drafts back is to build them again.

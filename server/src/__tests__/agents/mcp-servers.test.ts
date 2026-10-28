@@ -132,7 +132,10 @@ describe('the registry', () => {
     });
     expect(stdio.errors?.[0]?.message).toMatch(/"command" is not defined/);
     const id = await addServer('docs');
-    expect((await board.person.expectError(UPDATE, { id, set: { url: null } })).message).toMatch(/needs a URL/);
+    // The column is NOT NULL, so drizzle-graphql refuses a null before the hook sees it.
+    expect((await board.person.expectError(UPDATE, { id, set: { url: null } })).message).toMatch(
+      /'url' cannot be set to null/,
+    );
     expect((await board.person.expectError(UPDATE, { id, set: { url: '' } })).message).toMatch(/needs a URL/);
   });
 

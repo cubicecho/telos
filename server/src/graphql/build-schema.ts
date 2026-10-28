@@ -1,6 +1,6 @@
 import type { DB } from '@telos/db';
 import { AUTH_TABLES, SERVER_TABLES } from '@telos/db/schema';
-import { buildSchema, GraphQLDateTime } from '@vantreeseba/drizzle-graphql';
+import { buildSchema } from '@vantreeseba/drizzle-graphql';
 import { applyAgentDefaultsExtension } from '../agents/agent-defaults-resolvers.ts';
 import { applyAgentInstructionsExtension } from '../agents/instructions.ts';
 import { applyAgentsExtension } from '../agents/resolvers.ts';
@@ -76,24 +76,6 @@ export function createSchema(db: DB, options: SchemaOptions) {
     scope,
     contextValues,
     features,
-    // Timestamps get their *input* scalar declared rather than detected, and
-    // the declaring is the point: an overridden column skips the library's own
-    // input remapper, which runs `new Date(value)` on a timestamp behind a null
-    // guard that only covers `notNull` columns. `new Date(null)` is the epoch,
-    // not NaN, so it passes every validity check the remapper makes — clearing
-    // a nullable timestamp through a generated write would silently store
-    // 1970-01-01 instead of NULL. Clearing a due date is exactly that write.
-    //
-    // Input only, via the `{ input }` form, because the same override on the
-    // output side would skip the remapper's `Date -> toISOString()` step and
-    // hand resolvers a `Date` where they have always had a string. Over HTTP
-    // that JSON-serializes identically, but it is a change nothing here needs.
-    //
-    // `GraphQLDateTime` is the scalar detection already picks, so the SDL is
-    // unchanged and no generated client type moves. A rule rather than a
-    // per-column list, so the next nullable timestamp is covered by existing
-    // code instead of by someone remembering this comment.
-    mapColumnType: (column) => (column.columnType === 'PgTimestamp' ? { input: GraphQLDateTime } : undefined),
     onWrite,
     // Deleting a todo archives it: `restoreTodo` brings it back, and only
     // `deleteTodo(hard: true)` removes it. `scope: 'root'` keeps an archived

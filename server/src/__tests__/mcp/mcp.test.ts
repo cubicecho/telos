@@ -713,9 +713,12 @@ describe('the board’s agents and runs', () => {
     expect(unknown.message).toMatch(/teleport/);
     const shape = await b.person.expectError(SET_AGENT, { id: b.agentId, set: { toolsOff: 'move_todo' } });
     expect(shape.code).toBe('BAD_USER_INPUT');
-    await setRunTools(b, ['move_todo', 'move_todo']);
-    const [agent] = await db.select().from(dbSchema.agents).where(eq(dbSchema.agents.id, b.agentId));
-    expect(agent.toolsOff).toEqual(['move_todo']);
+    const twice = await b.person.expectError(SET_AGENT, {
+      id: b.agentId,
+      set: { toolsOff: ['move_todo', 'move_todo'] },
+    });
+    expect(twice.code).toBe('BAD_USER_INPUT');
+    expect(twice.message).toMatch(/move_todo more than once/);
   });
 
   it('lists which tools a run may have, and which it has by default', async () => {

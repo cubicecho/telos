@@ -143,7 +143,9 @@ function sqlAdapter(db: DB, table: AnyTable, subject: RowSubject): SkeletonAdapt
   return {
     rule: (conditions, inverted) => {
       const predicate = conditionsSql(db, table, subject, conditions as Conditions);
-      return inverted ? not(predicate) : predicate;
+      // rc.5 types not() as possibly undefined (for an undefined operand), so
+      // fail closed rather than cast.
+      return inverted ? (not(predicate) ?? NOTHING) : predicate;
     },
     and: (filters) => and(...filters) ?? EVERYTHING,
     or: (filters) => or(...filters) ?? NOTHING,
