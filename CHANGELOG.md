@@ -1,3 +1,10 @@
+## [10.1.1](https://github.com/cubicecho/telos/compare/v10.1.0...v10.1.1) (2026-10-28)
+
+
+### Bug Fixes
+
+* move to drizzle-graphql 19 and drizzle-orm rc.5 ([51b76cf](https://github.com/cubicecho/telos/commit/51b76cf90249846c4f42b0267145283fd9ca7880))
+
 # [10.1.0](https://github.com/cubicecho/telos/compare/v10.0.0...v10.1.0) (2026-10-27)
 
 
