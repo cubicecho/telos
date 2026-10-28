@@ -298,16 +298,17 @@ describe('the AI switches', () => {
   });
 
   it('cannot be flipped through a generated write', async () => {
+    // They are server-stamped columns (tenancy.ts), so the generated inputs do not have them.
     const error = await client.expectError(
       `mutation ($id: UUID!) { updateProject(set: { aiEnabled: true }, where: { id: { eq: $id } }) { id } }`,
       { id: projectId },
     );
-    expect(error.code).toBe('BAD_USER_INPUT');
+    expect(error.message).toMatch(/"aiEnabled" is not defined/);
     const autoRun = await client.expectError(
       `mutation ($id: UUID!) { updateProject(set: { autoRun: true }, where: { id: { eq: $id } }) { id } }`,
       { id: projectId },
     );
-    expect(autoRun.code).toBe('BAD_USER_INPUT');
+    expect(autoRun.message).toMatch(/"autoRun" is not defined/);
   });
 
   it('keep auto-run apart from the project’s AI switch', async () => {

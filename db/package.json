@@ -18,10 +18,10 @@
     "clean": "rm -rf node_modules"
   },
   "dependencies": {
-    "drizzle-orm": "1.0.0-rc.4",
+    "drizzle-orm": "1.0.0-rc.5",
     "postgres": "^3.4.9"
   },
   "devDependencies": {
-    "drizzle-kit": "1.0.0-rc.4"
+    "drizzle-kit": "1.0.0-rc.5"
   }
 }

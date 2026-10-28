@@ -3,7 +3,7 @@ import type { SQL } from 'drizzle-orm';
 import { requireAuth } from '../auth/resolvers.ts';
 import { ALL_TABLES, type RowSubject, USER_OWNED_TABLES } from '../auth/rows.ts';
 import { rowsReached } from '../auth/sql-filter.ts';
-import type { Context } from '../core/context.ts';
+import { type Context, isAiActor } from '../core/context.ts';
 
 // Multi-tenancy, expressed as drizzle-graphql configuration rather than as
 // resolver wrappers. `scope` is ANDed into the SQL of every read, update and
@@ -66,6 +66,16 @@ export const contextValues: NonNullable<BuildSchemaConfig['contextValues']> = {
     actorKeyId: (context: Context) => context.actor.keyId ?? null,
     runId: (context: Context) => context.actor.runId ?? null,
   },
+  // A project's AI switches are a person's, flipped only through
+  // setProjectAiEnabled and setProjectAutoRun (ai/switches.ts), which also stop
+  // whatever the switch was letting run. A project AI makes is open to AI from
+  // the start: it could not otherwise see what it made, and its account's and
+  // the instance's switches are already on or it would not be here.
+  projects: {
+    userId: (context: Context) => requireAuth(context),
+    aiEnabled: (context: Context) => isAiActor(context),
+    autoRun: () => false,
+  },
   // What a test of the server found is the runner's to say (`finishProbe`),
   // so no client states it: a new server has never been tested.
   mcpServers: {
@@ -109,4 +119,8 @@ export const features: NonNullable<BuildSchemaConfig['features']> = {
   update: generatedChangesAllowed,
   updateMany: generatedChangesAllowed,
   delete: generatedChangesAllowed,
+  // Off on purpose. The library now runs a nested write's own table's hooks,
+  // but write-guards.ts reads the rows from the root field's `args`, which
+  // describe the parent, not the child a nested write touches.
+  nestedWrites: false,
 };

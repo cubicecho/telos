@@ -130,52 +130,23 @@ function states(args: Parameters<typeof writtenRows>[0], ...keys: string[]): boo
   return writtenRows(args).some((row) => keys.some((key) => key in row));
 }
 
-/** The project columns only a switch mutation writes, and the mutation to name for each. */
-const PROJECT_SWITCHES = [
-  { key: 'aiEnabled', message: 'Use setProjectAiEnabled to switch AI on or off for a project.' },
-  { key: 'autoRun', message: 'Use setProjectAutoRun to switch auto-run on or off for a project.' },
-];
-
-/**
- * The AI switches are only ever flipped by a person, through the mutations in
- * ai-switches.ts, which also stop whatever the switch was letting run. A
- * generated write would flip the flag and leave the rest running.
- */
-function assertAiSwitchUntouched(args: Parameters<typeof writtenRows>[0]): void {
-  for (const { key, message } of PROJECT_SWITCHES) {
-    if (states(args, key)) {
-      throw badInput(message);
-    }
-  }
-}
-
 /** What of a project an AI caller may state. The rest is a person's: its switches, its prompt, and archiving it. */
 const AI_PROJECT_COLUMNS = new Set(['id', 'name', 'description']);
 
 /**
- * Holds an AI caller's project write to the columns it may state. A project it
- * makes is open to AI from the start: it could not otherwise see what it made,
- * and its account's and the instance's switches are already on or it would not
- * be here.
+ * Holds an AI caller's project write to the columns it may state. The AI
+ * switches are not among them for anyone: tenancy.ts stamps those.
  *
- * @param args The mutation's arguments, whose rows are marked in place.
+ * @param args The mutation's arguments.
  * @param context The request.
- * @param operation Which write it is.
  * @returns Nothing.
  */
-function holdAiProjectWrite(
-  args: Parameters<typeof writtenRows>[0],
-  context: Context,
-  operation: WriteHookPayload['operation'],
-): void {
+function holdAiProjectWrite(args: Parameters<typeof writtenRows>[0], context: Context): void {
   if (!isAiActor(context)) return;
   for (const row of writtenRows(args)) {
     const closed = Object.keys(row).find((key) => !AI_PROJECT_COLUMNS.has(key));
     if (closed !== undefined) {
       throw forbidden(`Only a person can set a project's ${closed}.`);
-    }
-    if (operation === 'insert') {
-      row.aiEnabled = true;
     }
   }
 }
@@ -399,7 +370,8 @@ function assertServerListSound(rows: Row[]): void {
  * An agent's tools for its runs are absent (null: a run's default), or a list
  * of the door's tools that are off. A name the door does not have would be a
  * switch that switches nothing, so it is refused, as `setApiKeyTools` refuses
- * it for a key.
+ * it for a key. So is a name given twice: a hook cannot rewrite the list it is
+ * handed, and quietly storing something other than what was sent would be worse.
  */
 function assertRunToolsSound(rows: Row[]): void {
   for (const row of rows) {
@@ -411,8 +383,34 @@ function assertRunToolsSound(rows: Row[]): void {
     if (unknown.length > 0) {
       throw badServer(`The MCP door has no tool ${unknown.join(', ')}.`);
     }
-    row.toolsOff = [...new Set(row.toolsOff as string[])];
+    const repeated = (row.toolsOff as string[]).filter((name, index, names) => names.indexOf(name) !== index);
+    if (repeated.length > 0) {
+      throw badServer(`toolsOff names ${[...new Set(repeated)].join(', ')} more than once.`);
+    }
   }
+}
+
+/**
+ * Holds the caller's todos to the board's rules after a write that created or
+ * changed them. Checked after the statement rather than before it: a `where`
+ * may name the affected rows by anything at all, so which todos a write
+ * completes is only knowable once it has run. The rules are re-asserted over
+ * the caller's todos, and a throw rolls the transaction back, statement
+ * included.
+ */
+async function settleWrittenTodos({ args, context, operation, tx }: WriteHookPayload): Promise<void> {
+  const created = operation === 'insert' || operation === 'upsert';
+  const userId = requireAuth(context as Context);
+  if (states(args, 'parentId')) await assertParentsSound(tx, userId);
+  // Ignoring a todo stops whatever agent is working it.
+  if (states(args, 'aiIgnored')) await cancelRunsUnder(tx, { userId, ignoredTodos: true });
+  if (!created && !statesCompletion(args) && !statesLane(args)) return;
+  if (marksComplete(args)) await assertNoBlockedCompletions(tx, userId);
+  // A write that says what is done gets its lanes fixed to match; a write
+  // that only names a lane is refused, because guessing which of the two the
+  // caller meant would silently undo one of them.
+  if (created || statesCompletion(args)) await realignLanes(tx, userId);
+  await assertCompletionMatchesLane(tx, userId);
 }
 
 export const onWrite: NonNullable<BuildSchemaConfig['onWrite']> = {
@@ -457,19 +455,18 @@ export const onWrite: NonNullable<BuildSchemaConfig['onWrite']> = {
       assertServersSound(tx, requireAuth(context as Context), writtenRows(args), operation === 'insert'),
   },
   projects: {
-    before: async ({ args, context, operation, tx }: WriteHookPayload) => {
-      assertAiSwitchUntouched(args);
-      holdAiProjectWrite(args, context as Context, operation);
+    before: async ({ args, context, tx }: WriteHookPayload) => {
+      holdAiProjectWrite(args, context as Context);
       await assertForeignKeysOwned(tx, context as Context, writtenRows(args), FOREIGN_KEYS.projects);
+    },
+    after: async ({ args, context, tx }: WriteHookPayload) => {
+      if (states(args, 'newTodoLaneId')) await assertNewTodoLaneInProject(tx, requireAuth(context as Context));
     },
     // A project without lanes has an empty board, so every project gets one at
     // the moment it is created — inside the creating transaction, so a project
     // never exists without it.
-    after: async ({ args, context, operation, tx }: WriteHookPayload) => {
-      const userId = requireAuth(context as Context);
-      if (states(args, 'newTodoLaneId')) await assertNewTodoLaneInProject(tx, userId);
-      if (operation !== 'insert') return;
-      await seedMissingLanes(tx, userId);
+    insert: {
+      after: async ({ context, tx }: WriteHookPayload) => seedMissingLanes(tx, requireAuth(context as Context)),
     },
   },
   todos: {
@@ -480,32 +477,16 @@ export const onWrite: NonNullable<BuildSchemaConfig['onWrite']> = {
       await assertForeignKeysOwned(tx, context as Context, writtenRows(args), FOREIGN_KEYS.todos);
       await stampActor(tx, (context as Context).actor);
     },
-    // Checked after the statement rather than before it: a `where` may name the
-    // affected rows by anything at all, so which todos a write completes is only
-    // knowable once it has run. The returned rows cannot answer that either —
-    // they carry only the columns the client selected — so the invariant is
-    // re-asserted over the caller's todos instead. The throw rolls the
-    // transaction back, statement included.
-    after: async ({ args, context, operation, tx }: WriteHookPayload) => {
-      if (operation === 'restore') return;
-      // Archiving a todo stops whatever agent is working it. A hard delete
-      // takes its runs with it.
-      if (operation === 'delete') {
+    insert: { after: settleWrittenTodos },
+    upsert: { after: settleWrittenTodos },
+    update: { after: settleWrittenTodos },
+    updateMany: { after: settleWrittenTodos },
+    // Archiving a todo stops whatever agent is working it. A hard delete takes
+    // its runs with it.
+    delete: {
+      after: async ({ args, context, tx }: WriteHookPayload) => {
         if (!args.hard) await cancelRunsUnder(tx, { userId: requireAuth(context as Context), archivedTodos: true });
-        return;
-      }
-      const created = operation === 'insert' || operation === 'upsert';
-      const userId = requireAuth(context as Context);
-      if (states(args, 'parentId')) await assertParentsSound(tx, userId);
-      // Ignoring a todo stops whatever agent is working it.
-      if (states(args, 'aiIgnored')) await cancelRunsUnder(tx, { userId, ignoredTodos: true });
-      if (!created && !statesCompletion(args) && !statesLane(args)) return;
-      if (marksComplete(args)) await assertNoBlockedCompletions(tx, userId);
-      // A write that says what is done gets its lanes fixed to match; a write
-      // that only names a lane is refused, because guessing which of the two the
-      // caller meant would silently undo one of them.
-      if (created || statesCompletion(args)) await realignLanes(tx, userId);
-      await assertCompletionMatchesLane(tx, userId);
+      },
     },
   },
   todoNotes: {

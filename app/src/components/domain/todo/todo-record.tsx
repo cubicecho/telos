@@ -401,8 +401,11 @@ export function TodoHistory({ todoId, runs = [] }: { todoId: string; runs?: read
         return 'Archived';
       case 'restore':
         return 'Restored';
-      case 'edit':
-        return event.fields.length > 0 ? `Changed ${event.fields.map(fieldName).join(', ')}` : 'Edited';
+      case 'edit': {
+        // The API types a Postgres array's entries as nullable; the history trigger writes none.
+        const fields = event.fields.filter((field) => field !== null);
+        return fields.length > 0 ? `Changed ${fields.map(fieldName).join(', ')}` : 'Edited';
+      }
       default:
         return event.kind;
     }
