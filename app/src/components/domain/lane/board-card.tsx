@@ -6,6 +6,7 @@ import { LabelBadge } from '@/components/domain/label/label-badge';
 import { DueBadge } from '@/components/domain/todo/due-badge';
 import type { TodoSummary } from '@/components/domain/todo/types';
 import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
 import { laneLock } from '@/lib/lanes';
 import { cn, HOVER_REVEAL } from '@/lib/utils';
 import { type CardMark, CardMarks } from './card-marks';
@@ -120,9 +121,20 @@ export function BoardCardBody({
       ) : null}
 
       {todo.splitAt ? (
-        <Text className="mt-1 text-foreground/60 text-xs tabular-nums">
-          Split · {todo.donePieceCount} of {todo.pieceCount} pieces done
-        </Text>
+        // A bar reads at a glance across a column of cards; the count beside it
+        // keeps the exact figure, and the bar's own label says it in words.
+        <View className="mt-2 flex-row items-center gap-2">
+          <Progress
+            value={todo.donePieceCount}
+            max={todo.pieceCount}
+            label={`Pieces of “${todo.title}” done`}
+            valueLabel={`${todo.donePieceCount} of ${todo.pieceCount} pieces done`}
+            className="h-1.5 flex-1"
+          />
+          <Text aria-hidden className="shrink-0 text-foreground/60 text-xs tabular-nums">
+            {todo.donePieceCount}/{todo.pieceCount}
+          </Text>
+        </View>
       ) : null}
 
       {todo.isBlocked && !done ? (
