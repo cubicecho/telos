@@ -57,7 +57,7 @@ interface SetupRow {
 async function readSetup(db: DB, userId: string): Promise<SetupRow> {
   const result = await db.execute(sql`
     WITH agent_projects AS (
-      SELECT p.id, p.ai_enabled, p.auto_run, p.created_at
+      SELECT p.id, p.ai_enabled, p.run_mode = 'auto' AS auto_run, p.created_at
       FROM projects p
       WHERE p.user_id = ${userId} AND p.archived_at IS NULL
         AND EXISTS (SELECT 1 FROM lanes l WHERE l.project_id = p.id AND l.agent_id IS NOT NULL)

@@ -568,7 +568,8 @@ mutation retryTodo(
 }
 
 # Asks for a todo to be worked once where it stands, whether or not its
-# project's agents run by themselves. Refused, with the reason, when its lane's
+# project's agents run by themselves; in a project that follows what it is
+# asked for, every lane it goes on to works it too (followedAt). Refused, with the reason, when its lane's
 # agent would not take it: the lane has no agent, it is blocked, it is done.
 mutation runTodo(
   # The todo.
@@ -578,6 +579,7 @@ mutation runTodo(
     id
     laneId
     runRequestedAt
+    followedAt
   }
 }
 

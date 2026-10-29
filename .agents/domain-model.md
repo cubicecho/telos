@@ -71,7 +71,8 @@ rules `readyTodos` filters by):
    (`gaveUp`), or an `ok` run in this lane since it arrived and nowhere to send it
    (`finished`, **finished here**).
 5. `blocked`: it waits on an open dependency.
-6. `parked` again: auto-run is off and nobody asked for a run.
+6. `parked` again: the project does not run by itself (AI mode one lane, or follow and
+   the todo not followed) and nobody asked for a run.
 7. `queued`: the lane's agent will start on it when there is room.
 
 Done todos are counted per lane, not listed. The activity page's `accountHandedBack` and
@@ -154,7 +155,7 @@ the site.
   is told first whichever project it works in (a person edits them in Settings, and
   Reset goes back to the built-in default).
   Owner: `users`, `db/src/prompt-seeds.ts`.
-- **Project:** a set of lanes and the todos in them. It has its own AI switch, auto-run,
+- **Project:** a set of lanes and the todos in them. It has its own AI mode (off, auto, one lane or follow),
   a description every agent working in it is given, a prompt (standing instructions to
   those agents, a person's only), and a new-todo lane.
   Owner: `projects`.
@@ -178,8 +179,13 @@ the site.
   `instance_settings.runLimit` (default 2).
 - **Max attempts:** how many failed runs a lane's agent gets at a todo before it hands
   it back. Owner: `lanes.maxAttempts`.
-- **Auto-run:** when it is on, the lanes' agents start on ready todos by themselves; when
-  it is off, a todo runs only when someone asks for a run. Owner: `projects.autoRun`.
+- **AI mode:** how far AI works a project. Off: not at all. Auto: the lanes' agents start
+  on ready todos by themselves. One lane: a todo runs only when someone asks for a run,
+  and waits again in the next lane. Follow: a todo runs when someone asks, and from then
+  on every lane it goes on to works it by itself. Owner: `projects.aiEnabled` and
+  `projects.runMode`, set by `setProjectAiMode`.
+- **Followed todo:** one asked for in a project in follow mode, until it is done, archived
+  or ignored, or the project leaves follow mode. Owner: `todos.followedAt`.
 - **Board template:** a saved set of lanes to start a project with.
   Owner: `board_templates`.
 
@@ -221,7 +227,8 @@ the site.
 - **Waiting:** it is an umbrella, and is done when its pieces are.
 - **Blocked:** it waits on an open dependency.
 - **Parked:** nothing will work on it where it is: its lane has no agent, AI or the
-  agent is switched off, it is hands off, or auto-run is off and nobody asked for a run.
+  agent is switched off, it is hands off, or its project does not run by itself and nobody
+  asked for a run.
 - **Handed back:** its lane's agent is done with it and it cannot move on without you:
   the agent gave up after more failed runs than the lane's max attempts, or it finished
   and the lane has nowhere to send it. Owner: `aiStatus` `HANDED_BACK`, with `GAVE_UP` or

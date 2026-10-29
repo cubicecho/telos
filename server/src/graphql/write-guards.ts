@@ -161,11 +161,11 @@ function assertIgnoreFlagFromPerson(args: Parameters<typeof writtenRows>[0], con
 }
 
 /**
- * Asking for a run is `runTodo`'s: it checks the lane's agent would take the todo,
- * and records who asked.
+ * Asking for a run, and following a todo, are `runTodo`'s: it checks the lane's
+ * agent would take the todo, and records who asked.
  */
 function assertRunRequestUntouched(args: Parameters<typeof writtenRows>[0]): void {
-  if (states(args, 'runRequestedAt')) {
+  if (states(args, 'runRequestedAt') || states(args, 'followedAt')) {
     throw badInput('Use runTodo to ask for a todo to be run.');
   }
 }

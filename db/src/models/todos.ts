@@ -37,6 +37,12 @@ export const todos = pgTable(
     // (runTodo). Cleared when a run claims it, and by the `todos_run_request`
     // trigger when the todo moves, is done, archived or ignored.
     runRequestedAt: timestamp('run_requested_at', { withTimezone: true }),
+    // A person asked for this todo to be run in a project that follows what it
+    // is asked for (run mode `follow`): every lane it goes on to works it by
+    // itself. Set by runTodo beside runRequestedAt, but kept when the todo
+    // moves; the `todos_run_request` trigger clears it when the todo is done,
+    // archived or ignored, and leaving follow mode or closing the project does too.
+    followedAt: timestamp('followed_at', { withTimezone: true }),
     // Which board column the todo sits in. Nullable because a project may have
     // no lanes yet, and `set null` because deleting a lane must not delete work.
     laneId: uuid('lane_id').references(() => lanes.id, { onDelete: 'set null' }),

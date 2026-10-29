@@ -127,3 +127,15 @@ export const SsoSourceEnum = serverEnum(
   SSO_SOURCES,
   "Where the instance's OIDC provider comes from: ENV (OIDC_ISSUER, read-only from the app), PAIRED (from a setup URL) or NONE.",
 );
+
+/**
+ * How far AI works a project, as its owner picks it: OFF is the project's AI
+ * switch off, and the others are its `run_mode` with the switch on.
+ */
+export const AI_MODES = ['off', 'auto', 'lane', 'follow'] as const;
+export type AiMode = (typeof AI_MODES)[number];
+export const AiModeEnum = serverEnum(
+  'AiMode',
+  AI_MODES,
+  "How far AI works a project: OFF (not at all), AUTO (lanes' agents start on every ready todo by themselves), LANE (a todo is worked only when asked for with runTodo, one lane at a time) or FOLLOW (once asked for, a todo is worked in every lane it goes on to).",
+);

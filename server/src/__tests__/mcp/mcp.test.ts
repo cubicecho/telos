@@ -14,7 +14,7 @@ import { AI_MUTATIONS } from '../../graphql/permissions.ts';
 import { DOOR_TOOLS } from '../../mcp/door.ts';
 import { mountMcp } from '../../mcp/endpoint.ts';
 import { RUN_REACH_EXEMPT, RUN_REACH_MUTATIONS } from '../../runs/run-reach.ts';
-import { CLAIM, createBoard, FINISH, runnerClient, SET_AUTO_RUN } from '../board.ts';
+import { CLAIM, createBoard, FINISH, runnerClient, SET_AI_MODE } from '../board.ts';
 import { authFor, createClient, createTestDb, createUser, hostFor, schemaFor, type TestDb } from '../helpers.ts';
 
 // The AI door end to end: a real HTTP server, the MCP SDK's own client, and an
@@ -395,20 +395,20 @@ describe('working the board', () => {
     });
     expect(createProject.lanes.length).toBeGreaterThan(0);
     const [made] = await db.select().from(dbSchema.projects).where(eq(dbSchema.projects.id, createProject.id));
-    expect(made).toMatchObject({ userId: b.userId, aiEnabled: true, autoRun: false });
+    expect(made).toMatchObject({ userId: b.userId, aiEnabled: true, runMode: 'lane' });
 
     const { updateProject } = await call(client, 'update_project', { id: createProject.id, name: 'Yard' });
     expect(updateProject).toMatchObject({ name: 'Yard', description: 'Beds and paths.' });
 
     const key = createClient(db, b.userId, { ai: true, actor: keyActor(b) });
-    for (const set of [{ aiEnabled: false }, { autoRun: true }, { archivedAt: new Date().toISOString() }]) {
+    for (const set of [{ aiEnabled: false }, { runMode: 'auto' }, { archivedAt: new Date().toISOString() }]) {
       await key.expectError(
         'mutation ($id: UUID!, $set: UpdateProjectInput!) { updateProject(set: $set, where: { id: { eq: $id } }) { id } }',
         { id: createProject.id, set },
       );
     }
     const [after] = await db.select().from(dbSchema.projects).where(eq(dbSchema.projects.id, createProject.id));
-    expect(after).toMatchObject({ aiEnabled: true, autoRun: false, archivedAt: null });
+    expect(after).toMatchObject({ aiEnabled: true, runMode: 'lane', archivedAt: null });
   });
 
   it('leaves the project prompt to a person: a key can neither set it nor make a project with one', async () => {
@@ -526,7 +526,7 @@ describe('the board’s agents and runs', () => {
   async function agentBoard() {
     const b = await createBoard(db, 'a@example.com');
     const { id: keyId, key } = await mintApiKey(authFor(db), { userId: b.userId, name: 'claude' });
-    await b.person.expectOk(SET_AUTO_RUN, { id: b.projectId, enabled: false });
+    await b.person.expectOk(SET_AI_MODE, { id: b.projectId, mode: 'LANE' });
     return { ...b, keyId, key };
   }
 
@@ -828,7 +828,7 @@ describe('what a key may not do', () => {
     const attempts: Array<[string, Record<string, unknown>]> = [
       ['mutation($id: ID!) { completeTodo(id: $id) { id } }', { id: todo }],
       ['mutation($p: ID!) { setProjectAiEnabled(projectId: $p, enabled: false) { id } }', { p: b.projectId }],
-      ['mutation($p: ID!) { setProjectAutoRun(projectId: $p, enabled: true) { id } }', { p: b.projectId }],
+      ['mutation($p: ID!) { setProjectAiMode(projectId: $p, mode: AUTO) { id } }', { p: b.projectId }],
       ['mutation($p: UUID!) { deleteProject(where: { id: { eq: $p } }) { id } }', { p: b.projectId }],
       ['mutation($p: UUID!) { deleteTodos(where: { projectId: { eq: $p } }) { id } }', { p: b.projectId }],
       [

@@ -50,6 +50,7 @@ const config: CodegenConfig = {
           RunOutcome: '../src/core/enums.ts#RunOutcome',
           RunEventKind: '../src/core/enums.ts#RunEventKind',
           SsoSource: '../src/core/enums.ts#SsoSource',
+          AiMode: '../src/core/enums.ts#AiMode',
         },
         avoidOptionals: {
           // Use `null` for nullable fields instead of optionals

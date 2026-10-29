@@ -180,9 +180,13 @@ export function BoardCardBody({
       ) : waiting ? (
         <View className="mt-2 flex-row items-center gap-2">
           <Text numberOfLines={1} className="min-w-0 flex-1 text-foreground/60 text-xs">
-            {waiting.runRequested ? 'Waiting for an agent' : 'Waiting to be run'}
+            {waiting.awaitsRun
+              ? 'Waiting to be run'
+              : waiting.following && !waiting.runRequested
+                ? 'Following · waiting for an agent'
+                : 'Waiting for an agent'}
           </Text>
-          {onRun && waiting.runRequested === false ? (
+          {onRun && waiting.awaitsRun ? (
             <Button
               variant="ghost"
               size="xs"

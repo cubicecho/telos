@@ -84,7 +84,7 @@ export const ROOT_FIELDS: Record<RootType, Partial<Record<Audience, readonly str
       'setInstanceRunLimit',
       'setAiEnabled',
       'setProjectAiEnabled',
-      'setProjectAutoRun',
+      'setProjectAiMode',
       'setRunRetention',
       'completeTodo',
       'reopenTodo',

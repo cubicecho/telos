@@ -26,7 +26,7 @@ const ACTIVITY: ProjectActivity = {
   loading: false,
 } as unknown as ProjectActivity;
 
-function bar(on: boolean, project: { aiEnabled: boolean; autoRun: boolean }, activity?: ProjectActivity) {
+function bar(on: boolean, project: { aiEnabled: boolean; runMode: string }, activity?: ProjectActivity) {
   render(
     <MockedProvider mocks={[aiState(on)]}>
       <ProjectBar project={{ id: 'p1', ...project }} activity={activity} />
@@ -36,15 +36,15 @@ function bar(on: boolean, project: { aiEnabled: boolean; autoRun: boolean }, act
 
 describe('ProjectBar', () => {
   it('draws nothing while AI is off for the account', async () => {
-    bar(false, { aiEnabled: true, autoRun: true }, ACTIVITY);
+    bar(false, { aiEnabled: true, runMode: 'auto' }, ACTIVITY);
     await new Promise((resolve) => setTimeout(resolve, 20));
     expect(screen.queryByRole('region', { name: 'AI on this project' })).not.toBeInTheDocument();
   });
 
-  it('holds both switches and what the agents have spent', async () => {
-    bar(true, { aiEnabled: true, autoRun: false }, ACTIVITY);
-    expect(await screen.findByRole('switch', { name: 'AI works on this project' })).toBeChecked();
-    expect(screen.getByRole('switch', { name: 'Agents start on todos by themselves' })).not.toBeChecked();
+  it('holds the project’s mode and what the agents have spent', async () => {
+    bar(true, { aiEnabled: true, runMode: 'lane' }, ACTIVITY);
+    expect(await screen.findByRole('group', { name: 'How far AI works this project' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'One lane' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByText('Nothing running · 3 runs and 1,200 tokens in 30 days')).toBeInTheDocument();
   });
 
@@ -53,13 +53,14 @@ describe('ProjectBar', () => {
       ['t1', {}],
       ['t2', {}],
     ]) as unknown as ProjectActivity['asked'];
-    bar(true, { aiEnabled: true, autoRun: true }, { ...ACTIVITY, asked });
+    bar(true, { aiEnabled: true, runMode: 'auto' }, { ...ACTIVITY, asked });
     expect(await screen.findByText('2 waiting on you ·')).toBeInTheDocument();
   });
 
-  it('leaves auto-run out while the project’s AI is off', async () => {
-    bar(true, { aiEnabled: false, autoRun: true });
-    expect(await screen.findByRole('switch', { name: 'AI works on this project' })).not.toBeChecked();
-    expect(screen.queryByRole('switch', { name: 'Agents start on todos by themselves' })).not.toBeInTheDocument();
+  it('says the project is off while its AI is, whatever its run mode', async () => {
+    bar(true, { aiEnabled: false, runMode: 'auto' });
+    expect(await screen.findByRole('button', { name: 'Off' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Auto' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByText('AI is off for this project')).toBeInTheDocument();
   });
 });

@@ -43,6 +43,8 @@ const AI_STATUS_SDL = parse(`
     liveRunId: ID
     "Its lane's agent would take it, were it asked to (runTodo): its project does not run by itself."
     awaitsRun: Boolean!
+    "It was asked for in a project that follows what it is asked for (AiMode FOLLOW): every lane it goes on to works it by itself."
+    following: Boolean!
     "It was asked to be run, and no run has taken it yet."
     runRequested: Boolean!
   }
@@ -87,7 +89,7 @@ const AI_STATUS_SDL = parse(`
   extend type Mutation {
     "Sends a todo round its lane's agent again: its failures are forgotten, and an agent that finished with it starts over."
     retryTodo(id: ID!, reason: String): Boolean!
-    "Asks for a todo to be worked once where it stands, whether or not its project runs by itself. Also a retry. Who asked is on its history."
+    "Asks for a todo to be worked once where it stands, whether or not its project runs by itself, and in a project in FOLLOW mode, in every lane after. Also a retry. Who asked is on its history."
     runTodo(id: ID!): Todo!
   }
 `);
@@ -303,11 +305,16 @@ export function applyAiStatusExtension(schema: GraphQLSchema): GraphQLSchema {
         throw badInput(refusal);
       }
       await recordNudge(tx, context.actor, todo, RUN_EVENT);
-      // The history trigger reads none of this column, so asking writes the
-      // one event above and no second one.
+      // The history trigger reads neither column, so asking writes the one
+      // event above and no second one. In a project that follows what it is
+      // asked for, the todo is followed from here on, through every lane.
       const [requested] = await tx
         .update(dbSchema.todos)
-        .set({ runRequestedAt: new Date() })
+        .set({
+          runRequestedAt: new Date(),
+          followedAt: sql`CASE WHEN (SELECT run_mode FROM projects WHERE id = ${todo.projectId}) = 'follow'
+            THEN coalesce(${dbSchema.todos.followedAt}, now()) ELSE ${dbSchema.todos.followedAt} END`,
+        })
         .where(eq(dbSchema.todos.id, todo.id))
         .returning();
       return requested;

@@ -2,7 +2,7 @@ import * as dbSchema from '@telos/db/schema';
 import { eq } from 'drizzle-orm';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { DELETED_AGENT } from '../../ai/account-activity.ts';
-import { type Board, CLAIM, createBoard, FINISH, runnerClient, SET_AUTO_RUN, setLane } from '../board.ts';
+import { type Board, CLAIM, createBoard, FINISH, runnerClient, SET_AI_MODE, setLane } from '../board.ts';
 import { createClient, createTestDb, type TestClient, type TestDb } from '../helpers.ts';
 
 // An account's activity across its projects: what its runs spent, by project
@@ -63,7 +63,7 @@ async function secondProject(): Promise<{
   await person.expectOk(`mutation ($id: ID!) { setProjectAiEnabled(projectId: $id, enabled: true) { id } }`, {
     id: projectId,
   });
-  await person.expectOk(SET_AUTO_RUN, { id: projectId, enabled: true });
+  await person.expectOk(SET_AI_MODE, { id: projectId, mode: 'AUTO' });
   const lanes = (
     await person.expectOk(
       `query ($projectId: UUID!) {

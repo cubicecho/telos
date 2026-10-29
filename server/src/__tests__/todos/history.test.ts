@@ -288,8 +288,8 @@ describe('the AI switches', () => {
     setProjectAiEnabled(projectId: $projectId, enabled: $enabled) { id aiEnabled }
   }`;
 
-  const SET_AUTO_RUN = `mutation ($projectId: ID!, $enabled: Boolean!) {
-    setProjectAutoRun(projectId: $projectId, enabled: $enabled) { id aiEnabled autoRun }
+  const SET_AI_MODE = `mutation ($projectId: ID!, $mode: AiMode!) {
+    setProjectAiMode(projectId: $projectId, mode: $mode) { id aiEnabled runMode }
   }`;
 
   it('are not there when the instance has AI off', async () => {
@@ -304,37 +304,41 @@ describe('the AI switches', () => {
       { id: projectId },
     );
     expect(error.message).toMatch(/"aiEnabled" is not defined/);
-    const autoRun = await client.expectError(
-      `mutation ($id: UUID!) { updateProject(set: { autoRun: true }, where: { id: { eq: $id } }) { id } }`,
+    const runMode = await client.expectError(
+      `mutation ($id: UUID!) { updateProject(set: { runMode: "auto" }, where: { id: { eq: $id } }) { id } }`,
       { id: projectId },
     );
-    expect(autoRun.message).toMatch(/"autoRun" is not defined/);
+    expect(runMode.message).toMatch(/"runMode" is not defined/);
   });
 
-  it('keep auto-run apart from the project’s AI switch', async () => {
+  it('set a project’s mode, which keeps its run mode while it is off', async () => {
     const ai = createClient(db, userId, { ai: true });
-    expect((await ai.expectError(SET_AUTO_RUN, { projectId, enabled: true })).code).toBe('NOT_FOUND');
+    expect((await ai.expectError(SET_AI_MODE, { projectId, mode: 'AUTO' })).code).toBe('NOT_FOUND');
     await ai.expectOk(SET_ACCOUNT, { enabled: true });
-    // Off by default, and opening the project to AI leaves it off.
+    // One lane at a time by default, and opening the project to AI leaves it so.
     const opened = (await ai.expectOk(SET_PROJECT, { projectId, enabled: true })).setProjectAiEnabled;
-    expect((await ai.expectOk(SET_AUTO_RUN, { projectId, enabled: false })).setProjectAutoRun).toEqual({
+    expect((await ai.expectOk(SET_AI_MODE, { projectId, mode: 'LANE' })).setProjectAiMode).toEqual({
       id: opened.id,
       aiEnabled: true,
-      autoRun: false,
+      runMode: 'lane',
     });
-    expect((await ai.expectOk(SET_AUTO_RUN, { projectId, enabled: true })).setProjectAutoRun.autoRun).toBe(true);
-    // Closing the project keeps the setting, as the account's switch keeps a project's.
-    await ai.expectOk(SET_PROJECT, { projectId, enabled: false });
-    expect((await ai.expectOk(SET_AUTO_RUN, { projectId, enabled: true })).setProjectAutoRun).toMatchObject({
+    expect((await ai.expectOk(SET_AI_MODE, { projectId, mode: 'FOLLOW' })).setProjectAiMode.runMode).toBe('follow');
+    // OFF closes the project and keeps its run mode, so opening it again restores it.
+    expect((await ai.expectOk(SET_AI_MODE, { projectId, mode: 'OFF' })).setProjectAiMode).toMatchObject({
       aiEnabled: false,
-      autoRun: true,
+      runMode: 'follow',
+    });
+    expect((await ai.expectOk(SET_PROJECT, { projectId, enabled: true })).setProjectAiEnabled.aiEnabled).toBe(true);
+    expect((await ai.expectOk(SET_AI_MODE, { projectId, mode: 'AUTO' })).setProjectAiMode).toMatchObject({
+      aiEnabled: true,
+      runMode: 'auto',
     });
   });
 
-  it('hide another person’s project from the auto-run switch', async () => {
+  it('hide another person’s project from the mode switch', async () => {
     const ai = createClient(db, userId, { ai: true });
     await ai.expectOk(SET_ACCOUNT, { enabled: true });
-    const error = await ai.expectError(SET_AUTO_RUN, { projectId: randomUUID(), enabled: false });
+    const error = await ai.expectError(SET_AI_MODE, { projectId: randomUUID(), mode: 'OFF' });
     expect(error.code).toBe('NOT_FOUND');
   });
 
@@ -353,7 +357,7 @@ describe('the AI switches', () => {
     const key = createClient(db, userId, { ai: true, actor: { kind: 'apiKey', userId, keyId: randomUUID() } });
     expect((await key.expectError(SET_ACCOUNT, { enabled: false })).code).toBe('FORBIDDEN');
     expect((await key.expectError(SET_PROJECT, { projectId, enabled: false })).code).toBe('FORBIDDEN');
-    expect((await key.expectError(SET_AUTO_RUN, { projectId, enabled: true })).code).toBe('FORBIDDEN');
+    expect((await key.expectError(SET_AI_MODE, { projectId, mode: 'AUTO' })).code).toBe('FORBIDDEN');
   });
 
   it('cannot reach someone else’s project', async () => {
