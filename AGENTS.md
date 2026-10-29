@@ -805,6 +805,27 @@ theme, so the ink must not either. It returns `undefined` for anything it cannot
 parse, which leaves the inherited colour in place rather than painting black onto
 a value it failed to read.
 
+**Agent work is visible, attributed, and a person can stop it.** These are the
+UI rules for the AI layer, on top of the `cubicecho_frontend` skill:
+
+- AI stays out of sight until it is on. With AI off for the account or the
+  project, no AI view, tab, badge or count is drawn.
+- Anything an agent wrote, moved or split says so (the agent's name, a badge,
+  the run), and the run it came from is one click away.
+- What an agent is doing now shows where its todo is: on the card, on the row,
+  in the project bar.
+- A running agent has a Stop, and what an agent changed can be reverted from
+  its run.
+- A consequential action waits for a person: anything that leaves the app,
+  deletes, or spends past a limit.
+- When an agent needs a person, that is the loudest thing on screen, and it is
+  counted where the person will look (the sidebar).
+
+**One known inline edit: a lane's name.** `lane-column.tsx` turns the lane title
+into a field and saves on blur, which the frontend skill's "every edit is an
+explicit form" rule bans. It is kept by choice for now. Don't copy it anywhere
+else, and don't treat it as a precedent.
+
 ## Code style
 
 - Biome, single quotes, 2-space indent, 120 columns, trailing commas. `npm run check:fix`.
