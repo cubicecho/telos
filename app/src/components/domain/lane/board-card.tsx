@@ -6,6 +6,8 @@ import { LabelBadge } from '@/components/domain/label/label-badge';
 import { DueBadge } from '@/components/domain/todo/due-badge';
 import type { TodoSummary } from '@/components/domain/todo/types';
 import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { laneLock } from '@/lib/lanes';
 import { cn, HOVER_REVEAL } from '@/lib/utils';
 import { type CardMark, CardMarks } from './card-marks';
@@ -65,13 +67,17 @@ export function BoardCardBody({
   const done = todo.completedAt != null;
   const locked = laneLock(todo);
   const titleClass = cn('text-foreground text-sm leading-5', done && 'text-foreground/60 line-through');
+  const blockedBy = todo.isBlocked && !done ? todo.blockedBy.map((blocker) => blocker.title).join(', ') : null;
 
-  return (
+  const card = (
     <View
       className={cn(
         'group rounded-lg border border-foreground/10 bg-secondary px-3 py-2.5 shadow-sm',
         live && 'border-info/40',
         !live && stuck && 'border-warning/40',
+        // Blocked reads at a glance down a column as a red edge; what blocks it
+        // is on hover, and in hidden text for a screen reader.
+        blockedBy && 'border-l-4 border-l-negative',
         className,
       )}
     >
@@ -120,16 +126,23 @@ export function BoardCardBody({
       ) : null}
 
       {todo.splitAt ? (
-        <Text className="mt-1 text-foreground/60 text-xs tabular-nums">
-          Split · {todo.donePieceCount} of {todo.pieceCount} pieces done
-        </Text>
+        // A bar reads at a glance across a column of cards; the count beside it
+        // keeps the exact figure, and the bar's own label says it in words.
+        <View className="mt-2 flex-row items-center gap-2">
+          <Progress
+            value={todo.donePieceCount}
+            max={todo.pieceCount}
+            label={`Pieces of “${todo.title}” done`}
+            valueLabel={`${todo.donePieceCount} of ${todo.pieceCount} pieces done`}
+            className="h-1.5 flex-1"
+          />
+          <Text aria-hidden className="shrink-0 text-foreground/60 text-xs tabular-nums">
+            {todo.donePieceCount}/{todo.pieceCount}
+          </Text>
+        </View>
       ) : null}
 
-      {todo.isBlocked && !done ? (
-        <Text className="mt-1 text-foreground/60 text-xs">
-          Blocked by {todo.blockedBy.map((blocker) => blocker.title).join(', ')}
-        </Text>
-      ) : null}
+      {blockedBy ? <Text className="sr-only">Blocked by {blockedBy}</Text> : null}
 
       {todo.labels.length > 0 ? (
         <View className="mt-2 flex-row flex-wrap gap-1">
@@ -199,6 +212,17 @@ export function BoardCardBody({
         </View>
       ) : null}
     </View>
+  );
+
+  if (!blockedBy) return card;
+
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>{card}</TooltipTrigger>
+        <TooltipContent side="top">Blocked by {blockedBy}</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }
 

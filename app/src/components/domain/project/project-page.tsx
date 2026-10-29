@@ -115,6 +115,9 @@ export function ProjectPage({
     <>
       <HeaderContentFooter
         width="full"
+        // The body is the height left under the header and scrolls inside it, so the
+        // list and the board stay reachable however many todos there are.
+        scroll
         className="h-full"
         headerSlot={
           <>
