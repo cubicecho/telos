@@ -297,7 +297,7 @@ loaded, so it states the rule in code and must follow it. What it writes:
 `AI_MUTATIONS` — projects (create, and change their name and description, nothing else:
 `holdAiProjectWrite`), todos (create, edit, move, retry, run, stop a run,
 dependencies, archive, restore, delete), notes, artifacts and board
-templates. Still a person's: the AI switches, auto-run, the account's agent instructions, the
+templates. Still a person's: the AI switches, a project's AI mode, the account's agent instructions, the
 project prompt, prompts, agents and their keys
 and MCP servers, API keys, lanes and their agents, the project's new-todo lane, bulk mutations, and archiving
 or deleting a project. A new mutation is closed to AI until it is added there.
@@ -448,17 +448,24 @@ as the `system` actor, which may call only
 `RUNNER_MUTATIONS` (`claimRun`, `heartbeatRun`, `finishRun`) and
 `runnerQueue`. What is ready is one SQL query, `readyTodos` in `ready.ts`,
 used by both the queue and the claim, and it checks every AI switch itself.
-A project's AI switch and its auto-run switch are two things. `projects.autoRun`
-(`setProjectAutoRun`, a person's only, off by default) says whether the lanes'
-agents start by themselves; with it off `readyTodos` takes only a todo a person asked
-for with `runTodo`, which sets `todos.runRequestedAt`. A request is for one run
+A project has one AI setting with four modes (`AiMode`, `setProjectAiMode`, a
+person's only): OFF is `projects.aiEnabled` off, and AUTO, LANE and FOLLOW are
+it on with `projects.runMode` (`auto`, `lane`, `follow`; `lane` by default) saying
+how far its lanes' agents go by themselves. OFF keeps the run mode, so opening the
+project again restores it; `setProjectAiEnabled` still opens and closes it alone.
+In `auto` every ready todo is worked. Otherwise `readyTodos` takes only a todo a person asked
+for with `runTodo`, which sets `todos.runRequestedAt`, or, in `follow`, one with
+`todos.followedAt`, which `runTodo` sets beside it there. A request is for one run
 where the todo stands: the claim clears it, the `todos_run_request` trigger
-clears it when the todo moves, is done, archived or ignored, and
-`setProjectAiEnabled(false)` clears the project's. `runTodo` never gets round
+clears it when the todo moves, is done, archived or ignored. A follow outlives the
+claim and the move, so every lane the todo goes on to works it; the same trigger
+clears it when the todo is done, archived or ignored, leaving `follow` clears the
+project's (`dropFollows`), and closing the project clears both (`dropRunRequests`). `runTodo` never gets round
 the AI switches, a lane without an agent, a blocker or the WIP limit, and it is
 also a retry: its `run` event is a person's arrival in the lane, as
-`retryTodo`'s is. Switching auto-run off cancels nothing. `aiStatus` reads the
-same rules back: such a todo is `parked` with `awaitsRun` until asked for.
+`retryTodo`'s is. Changing the run mode cancels nothing. `aiStatus` reads the
+same rules back: such a todo is `parked` with `awaitsRun` until asked for, and
+`following` says a followed one will go on by itself.
 `aiSetup` (`ai/setup.ts`) answers what an account has in place for a
 first run, in one statement and with nothing remembered; the app's setup
 checklist (`ai-setup-checklist.tsx`) adds the two switches from `useAi()` and

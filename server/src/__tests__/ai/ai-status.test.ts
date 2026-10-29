@@ -7,7 +7,7 @@ import {
   HEARTBEAT,
   QUEUE,
   runnerClient,
-  SET_AUTO_RUN,
+  SET_AI_MODE,
   setLane,
 } from '../board.ts';
 import { createTestDb, type TestClient, type TestDb } from '../helpers.ts';
@@ -109,11 +109,11 @@ describe('aiStatus', () => {
     await setLane(board.person, board.lanes[0].id, { wipLimit: 2 });
     const claim = (await runner.expectOk(CLAIM, { todoId: running, laneId: board.lanes[0].id })).claimRun;
 
-    await board.person.expectOk(SET_AUTO_RUN, { id: board.projectId, enabled: false });
+    await board.person.expectOk(SET_AI_MODE, { id: board.projectId, mode: 'LANE' });
     expect((await runner.expectOk(QUEUE)).runnerQueue).toEqual([]);
     expect((await runner.expectOk(CLAIM, { todoId: waiting, laneId: board.lanes[0].id })).claimRun).toBeNull();
     const byId = new Map((await status()).todos.map((todo: { todoId: string }) => [todo.todoId, todo]));
-    expect(byId.get(waiting)).toMatchObject({ state: 'PARKED', reason: 'Auto-run is off.' });
+    expect(byId.get(waiting)).toMatchObject({ state: 'PARKED', reason: 'It waits to be run.' });
     expect(byId.get(running)).toMatchObject({ state: 'RUNNING', liveRunId: claim.runId });
 
     // Switching it off stopped nothing: the run goes on and its work lands.
@@ -122,7 +122,7 @@ describe('aiStatus', () => {
       .finishRun;
     expect(run.status).toBe('ok');
 
-    await board.person.expectOk(SET_AUTO_RUN, { id: board.projectId, enabled: true });
+    await board.person.expectOk(SET_AI_MODE, { id: board.projectId, mode: 'AUTO' });
     expect((await runner.expectOk(QUEUE)).runnerQueue).toEqual([
       { todoId: waiting, laneId: board.lanes[0].id, projectId: board.projectId },
     ]);

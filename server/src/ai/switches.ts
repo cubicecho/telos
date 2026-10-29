@@ -4,10 +4,11 @@ import { extendSchema, type GraphQLSchema, parse } from 'graphql';
 import type { MutationResolvers, QueryResolvers } from '../../__generated__/resolvers.ts';
 import { authConfigFor, requireAuth } from '../auth/resolvers.ts';
 import type { Context } from '../core/context.ts';
+import { AiModeEnum, withEnums } from '../core/enums.ts';
 import { badInput, forbidden, notFound } from '../core/errors.ts';
 import { attachResolvers } from '../graphql/attach-resolvers.ts';
 import { instanceRunLimit, isAdmin, MAX_RUN_LIMIT, setInstanceAi, setInstanceRunLimit } from '../instance/settings.ts';
-import { cancelRunsUnder, dropRunRequests } from '../runs/ready.ts';
+import { cancelRunsUnder, dropFollows, dropRunRequests } from '../runs/ready.ts';
 import { MAX_RETENTION_DAYS } from '../runs/retention.ts';
 import { requireAi } from './gate.ts';
 
@@ -21,8 +22,10 @@ import { requireAi } from './gate.ts';
 // and switching the account off leaves each project's setting where it was, so
 // switching it back on restores the board the user had.
 //
-// A project has a second switch under its first: auto-run, whether its lanes' agents
-// start on todos by themselves. It stops nothing when it goes off.
+// A project's switch is one of four modes (AiMode, setProjectAiMode): off, or on
+// with a run mode saying how far its lanes' agents go by themselves — every
+// ready todo (auto), one lane per ask (lane), or every lane after one ask
+// (follow). Changing the run mode stops nothing that is running.
 //
 // The instance's switch is an admin's: it decides for every account at once.
 // So is its run limit, the most runs every runner works at once between them.
@@ -45,15 +48,20 @@ const AI_SWITCHES_SDL = parse(`
     setAiEnabled(enabled: Boolean!): User!
     "Opens a project to agents, or closes it. Opening one needs the account's AI on."
     setProjectAiEnabled(projectId: ID!, enabled: Boolean!): Project!
-    "Lets a project's lanes' agents start on todos by themselves, or only when asked (runTodo). Off, running work finishes."
-    setProjectAutoRun(projectId: ID!, enabled: Boolean!): Project!
+    """
+    Sets how far AI works a project. OFF closes it to agents, as setProjectAiEnabled(false)
+    does. AUTO, LANE and FOLLOW open it (which needs the account's AI on) and say
+    how far its lanes' agents go by themselves. A run mode changed stops nothing
+    that is running; leaving FOLLOW forgets which todos were followed.
+    """
+    setProjectAiMode(projectId: ID!, mode: AiMode!): Project!
     "How many days finished runs are kept before they are pruned. Null keeps them for good."
     setRunRetention(days: Int): User!
   }
 `);
 
 export function applyAiSwitchesExtension(schema: GraphQLSchema): GraphQLSchema {
-  const extendedSchema = extendSchema(schema, AI_SWITCHES_SDL);
+  const extendedSchema = extendSchema(withEnums(schema, [AiModeEnum]), AI_SWITCHES_SDL);
   const queries: QueryResolvers = {};
   const mutations: MutationResolvers = {};
 
@@ -110,20 +118,24 @@ export function applyAiSwitchesExtension(schema: GraphQLSchema): GraphQLSchema {
     return project;
   };
 
-  mutations.setProjectAutoRun = async (_parent, args, context) => {
-    // Off is always allowed and stops nothing: what is running finishes, and
-    // nothing new starts. On is an AI action, like opening the project.
+  mutations.setProjectAiMode = async (_parent, args, context) => {
+    // OFF is always allowed, and stops what was running; any other mode opens
+    // the project, an AI action, so it needs the account's AI on. A run mode
+    // changed stops nothing: what is running finishes.
     const userId = requireAuth(context);
-    if (args.enabled) {
-      await requireAi(context);
-    }
+    const on = args.mode !== 'off';
+    if (on) await requireAi(context);
     const [project] = await context.db
       .update(dbSchema.projects)
-      .set({ autoRun: args.enabled, updatedAt: new Date() })
+      .set({ aiEnabled: on, ...(on ? { runMode: args.mode } : {}), updatedAt: new Date() })
       .where(and(eq(dbSchema.projects.id, args.projectId), eq(dbSchema.projects.userId, userId)))
       .returning();
-    if (project === undefined) {
-      throw notFound('Project');
+    if (project === undefined) throw notFound('Project');
+    if (!on) {
+      await cancelRunsUnder(context.db, { userId, projectId: project.id });
+      await dropRunRequests(context.db, { projectId: project.id });
+    } else if (args.mode !== 'follow') {
+      await dropFollows(context.db, project.id);
     }
     return project;
   };

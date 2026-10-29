@@ -104,7 +104,7 @@ export const ProjectDocument = graphql(`
       todoCount
       openTodoCount
       aiEnabled
-      autoRun
+      runMode
       newTodoLaneId
       ...ProjectLabelFields
     }
@@ -303,20 +303,12 @@ export const DeletePromptDocument = graphql(`
   }
 `);
 
-export const SetProjectAiEnabledDocument = graphql(`
-  mutation SetProjectAiEnabled($projectId: ID!, $enabled: Boolean!) {
-    setProjectAiEnabled(projectId: $projectId, enabled: $enabled) {
+export const SetProjectAiModeDocument = graphql(`
+  mutation SetProjectAiMode($projectId: ID!, $mode: AiMode!) {
+    setProjectAiMode(projectId: $projectId, mode: $mode) {
       id
       aiEnabled
-    }
-  }
-`);
-
-export const SetProjectAutoRunDocument = graphql(`
-  mutation SetProjectAutoRun($projectId: ID!, $enabled: Boolean!) {
-    setProjectAutoRun(projectId: $projectId, enabled: $enabled) {
-      id
-      autoRun
+      runMode
     }
   }
 `);
@@ -786,6 +778,7 @@ export const ProjectActivityDocument = graphql(`
         failures
         awaitsRun
         runRequested
+        following
       }
     }
     live: runs(where: { projectId: { eq: $projectId }, status: { eq: "running" } }) {

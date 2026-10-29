@@ -67,14 +67,14 @@ export const contextValues: NonNullable<BuildSchemaConfig['contextValues']> = {
     runId: (context: Context) => context.actor.runId ?? null,
   },
   // A project's AI switches are a person's, flipped only through
-  // setProjectAiEnabled and setProjectAutoRun (ai/switches.ts), which also stop
+  // setProjectAiEnabled and setProjectAiMode (ai/switches.ts), which also stop
   // whatever the switch was letting run. A project AI makes is open to AI from
   // the start: it could not otherwise see what it made, and its account's and
   // the instance's switches are already on or it would not be here.
   projects: {
     userId: (context: Context) => requireAuth(context),
     aiEnabled: (context: Context) => isAiActor(context),
-    autoRun: () => false,
+    runMode: () => 'lane',
   },
   // What a test of the server found is the runner's to say (`finishProbe`),
   // so no client states it: a new server has never been tested.

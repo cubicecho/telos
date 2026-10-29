@@ -1,4 +1,5 @@
 import type { DB } from '@telos/db';
+import type { RunMode } from '@telos/db/schema';
 import { type SQL, sql } from 'drizzle-orm';
 import type { StationTodo } from '../../__generated__/resolvers.ts';
 import type { HandBack, WorkState } from '../core/enums.ts';
@@ -16,8 +17,9 @@ import { openQuestion } from '../todos/questions.ts';
 //
 //   - every AI switch over it is on: its user's, its project's, and it is not
 //     ignored — the same three checks a run token makes on every request
-//   - its project runs by itself (auto-run), or a person asked for this todo
-//     to be run (runTodo), which holds until a run claims it
+//   - its project runs by itself (run mode `auto`), or a person asked for this
+//     todo to be run (runTodo), which holds until a run claims it, or its
+//     project follows what it is asked for (`follow`) and this todo was
 //   - the project is not archived, and the todo is open and not blocked
 //   - it is not an umbrella: a todo split into pieces is done when they are,
 //     not by being worked
@@ -125,7 +127,7 @@ export async function readyTodos(
       JOIN projects p ON p.id = t.project_id
       JOIN users u ON u.id = t.user_id
       WHERE ${INSTANCE_AI_ON} AND u.ai_enabled AND p.ai_enabled AND NOT t.ai_ignored AND a.enabled
-        AND (p.auto_run OR t.run_requested_at IS NOT NULL)
+        AND (p.run_mode = 'auto' OR t.run_requested_at IS NOT NULL OR (p.run_mode = 'follow' AND t.followed_at IS NOT NULL))
         AND p.archived_at IS NULL
         AND t.completed_at IS NULL AND t.archived_at IS NULL AND t.split_at IS NULL AND NOT l.is_done
         ${sql.join(narrow, sql` `)}
@@ -202,16 +204,39 @@ export async function cancelRunsUnder(
 }
 
 /**
- * Forgets the run a person asked for: a run has taken the todo, or AI can no
- * longer work it.
+ * Forgets the run a person asked for. For one todo, a run has taken it, and
+ * whether it is followed stands. For a project, AI can no longer work it, so
+ * which of its todos were followed is forgotten too.
  *
  * @param db - The database or transaction.
  * @param where - Which requests: one todo's, or every one in a project.
  * @returns Nothing.
  */
 export async function dropRunRequests(db: DB, where: { todoId: string } | { projectId: string }): Promise<void> {
-  const narrow = 'todoId' in where ? sql`id = ${where.todoId}` : sql`project_id = ${where.projectId}`;
-  await db.execute(sql`UPDATE todos SET run_requested_at = NULL WHERE run_requested_at IS NOT NULL AND ${narrow}`);
+  if ('todoId' in where) {
+    await db.execute(
+      sql`UPDATE todos SET run_requested_at = NULL WHERE run_requested_at IS NOT NULL AND id = ${where.todoId}`,
+    );
+    return;
+  }
+  await db.execute(sql`
+    UPDATE todos SET run_requested_at = NULL, followed_at = NULL
+    WHERE (run_requested_at IS NOT NULL OR followed_at IS NOT NULL) AND project_id = ${where.projectId}
+  `);
+}
+
+/**
+ * Forgets which of a project's todos were followed: it left follow mode, and
+ * a todo asked for under it should not start following again if it returns.
+ *
+ * @param db - The database or transaction.
+ * @param projectId - The project.
+ * @returns Nothing.
+ */
+export async function dropFollows(db: DB, projectId: string): Promise<void> {
+  await db.execute(
+    sql`UPDATE todos SET followed_at = NULL WHERE followed_at IS NOT NULL AND project_id = ${projectId}`,
+  );
 }
 
 /**
@@ -249,8 +274,9 @@ export interface LaneDoneCount {
  *   - blocked: it waits on something unfinished
  *   - queued: its lane's agent will start on it when there is room
  *
- * A todo that would be queued is parked instead while its project's auto-run
- * is off, until a person asks for it to be run.
+ * A todo that would be queued is parked instead while its project does not
+ * run by itself (run mode `lane`, or `follow` and the todo not yet followed),
+ * until a person asks for it to be run.
  *
  * Done todos are only counted, per lane: there can be many, and none of them
  * needs anything.
@@ -277,8 +303,9 @@ export async function workStates(
     agent_name: string | null;
     agent_enabled: boolean;
     ai_ignored: boolean;
-    auto_run: boolean;
+    run_mode: RunMode;
     run_requested: boolean;
+    followed: boolean;
     split: boolean;
     pieces: number;
     pieces_done: number;
@@ -295,8 +322,8 @@ export async function workStates(
     await db.execute(sql`
       WITH base AS (
         SELECT
-          t.id, t.title, t.project_id, p.name AS project_name, t.lane_id, t.ai_ignored, t.position, t.created_at, p.auto_run,
-          t.run_requested_at IS NOT NULL AS run_requested, t.split_at IS NOT NULL AS split,
+          t.id, t.title, t.project_id, p.name AS project_name, t.lane_id, t.ai_ignored, t.position, t.created_at, p.run_mode,
+          t.run_requested_at IS NOT NULL AS run_requested, t.followed_at IS NOT NULL AS followed, t.split_at IS NOT NULL AS split,
           l.name AS lane_name, l.position AS lane_position, l.agent_id IS NOT NULL AS has_agent,
           a.name AS agent_name, coalesce(a.enabled, true) AS agent_enabled,
           l.max_attempts,
@@ -311,7 +338,7 @@ export async function workStates(
       )
       SELECT
         b.id AS todo_id, b.title, b.project_id, b.project_name, b.lane_id, b.lane_name,
-        coalesce(b.has_agent, false) AS has_agent, b.agent_name, b.agent_enabled, b.ai_ignored, b.auto_run, b.run_requested,
+        coalesce(b.has_agent, false) AS has_agent, b.agent_name, b.agent_enabled, b.ai_ignored, b.run_mode, b.run_requested, b.followed,
         b.split, pieces.total AS pieces, pieces.done AS pieces_done,
         b.max_attempts,
         ${failuresSinceTouched(sql`b.id`)} AS failures,
@@ -362,8 +389,9 @@ export async function workStates(
       handedBack,
       failures: Number(row.failures),
       liveRunId: row.live_run_id,
-      awaitsRun: state === 'parked' && reason === AUTO_RUN_OFF,
+      awaitsRun: state === 'parked' && reason === AWAITS_RUN,
       runRequested: row.run_requested,
+      following: row.run_mode === 'follow' && row.followed,
       projectName: row.project_name,
       laneName: row.lane_name,
       maxAttempts: row.has_agent ? row.max_attempts : null,
@@ -389,7 +417,7 @@ export async function workStates(
 }
 
 /** Why a todo a lane's agent could take is not queued, in a project that waits to be asked. */
-const AUTO_RUN_OFF = 'Auto-run is off.';
+const AWAITS_RUN = 'It waits to be run.';
 
 function judge(row: {
   lane_id: string | null;
@@ -398,8 +426,9 @@ function judge(row: {
   agent_name: string | null;
   agent_enabled: boolean;
   ai_ignored: boolean;
-  auto_run: boolean;
+  run_mode: RunMode;
   run_requested: boolean;
+  followed: boolean;
   split: boolean;
   pieces: number;
   pieces_done: number;
@@ -425,8 +454,9 @@ function judge(row: {
     return ['handedBack', `${row.lane_name} finished with it and has nowhere to send it.`, 'finished'];
   }
   if (row.blockers) return ['blocked', `Waiting on ${row.blockers}.`];
-  if (row.auto_run === false && row.run_requested === false) {
-    return ['parked', AUTO_RUN_OFF];
+  const runsByItself = row.run_mode === 'auto' || (row.run_mode === 'follow' && row.followed);
+  if (runsByItself === false && row.run_requested === false) {
+    return ['parked', AWAITS_RUN];
   }
   return ['queued', null];
 }

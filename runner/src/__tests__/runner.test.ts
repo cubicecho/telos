@@ -8,7 +8,7 @@ import { eq } from 'drizzle-orm';
 import express from 'express';
 import { graphql } from 'graphql';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { type Board, createBoard, SET_AUTO_RUN, setLane } from '../../../server/src/__tests__/board.ts';
+import { type Board, createBoard, SET_AI_MODE, setLane } from '../../../server/src/__tests__/board.ts';
 import { createTestDb, hostFor, schemaFor, type TestDb } from '../../../server/src/__tests__/helpers.ts';
 import { createRateLimiter } from '../../../server/src/auth/rate-limit.ts';
 import { createContextFactory } from '../../../server/src/graphql/context-factory.ts';
@@ -596,7 +596,7 @@ describe('the runner', () => {
   });
 
   it('leaves a board that does not run by itself alone, but for the todo a person asks for', async () => {
-    await board.person.expectOk(SET_AUTO_RUN, { id: board.projectId, enabled: false });
+    await board.person.expectOk(SET_AI_MODE, { id: board.projectId, mode: 'LANE' });
     await setLane(board.person, board.lanes[0].id, { wipLimit: 5 });
     const asked = await board.addTodo('Asked');
     const other = await board.addTodo('Other');

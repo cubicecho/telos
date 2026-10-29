@@ -1,0 +1,110 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "7e079d0c-8bdc-4357-b8d2-bdf005d9776f",
+  "prevIds": [
+    "02f1bb7c-2b6c-4068-9c6f-86d44218a275"
+  ],
+  "footprints": [
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "projects",
+        "run_mode"
+      ],
+      "writes": [
+        "s|col|public.projects.run_mode",
+        "n|col|public.projects.run_mode",
+        "e|col|public.projects.run_mode"
+      ],
+      "reads": [
+        "n|tbl|public.projects",
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "todos",
+        "followed_at"
+      ],
+      "writes": [
+        "s|col|public.todos.followed_at",
+        "n|col|public.todos.followed_at",
+        "e|col|public.todos.followed_at"
+      ],
+      "reads": [
+        "n|tbl|public.todos",
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "add_check",
+      "statementTarget": [
+        "table",
+        "public",
+        "projects"
+      ],
+      "writes": [
+        "s|ck|public.projects.ck_projects_run_mode",
+        "n|ck|public.projects.ck_projects_run_mode",
+        "e|ck|public.projects.ck_projects_run_mode",
+        "n|con|public.projects.ck_projects_run_mode"
+      ],
+      "reads": [
+        "n|tbl|public.projects",
+        "n|sch|public",
+        "n|col|public.projects.run_mode"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "projects",
+        "name": "run_mode",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "'lane'",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "todos",
+        "name": "followed_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "projects",
+        "name": "ck_projects_run_mode",
+        "value": "\"run_mode\" in ('auto', 'lane', 'follow')",
+        "entityType": "checks"
+      }
+    }
+  ]
+}

@@ -80,15 +80,32 @@ const LIVE = new Map([
   ],
 ]);
 
-function workTodo(state: WorkState, reason: string | null, { awaitsRun = false, runRequested = false } = {}) {
+function workTodo(
+  state: WorkState,
+  reason: string | null,
+  { awaitsRun = false, runRequested = false, following = false } = {},
+) {
   return new Map([
-    ['t1', { __typename: 'StationTodo' as const, todoId: 't1', state, reason, failures: 0, awaitsRun, runRequested }],
+    [
+      't1',
+      {
+        __typename: 'StationTodo' as const,
+        todoId: 't1',
+        state,
+        reason,
+        failures: 0,
+        awaitsRun,
+        runRequested,
+        following,
+      },
+    ],
   ]);
 }
 
 const STUCK = workTodo(WorkState.HandedBack, 'It broke.');
-const AWAITS_RUN = workTodo(WorkState.Parked, 'Auto-run is off.', { awaitsRun: true });
+const AWAITS_RUN = workTodo(WorkState.Parked, 'It waits to be run.', { awaitsRun: true });
 const RUN_REQUESTED = workTodo(WorkState.Queued, null, { runRequested: true });
+const FOLLOWING = workTodo(WorkState.Queued, null, { following: true });
 
 /** The board asks for its cards' marks whatever AI is set to; these tests have none to show. */
 const NO_MARKS = {
@@ -252,6 +269,12 @@ describe('Board lane agents', () => {
   it('says a card that was asked for waits on an agent, and does not offer to ask twice', async () => {
     board([aiState(true, true), LANE_AGENTS], true, { todos: [CARD], live: new Map(), waiting: RUN_REQUESTED });
     expect(await screen.findByText('Waiting for an agent')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Run “Write it” now' })).not.toBeInTheDocument();
+  });
+
+  it('says a followed card waits on the next lane’s agent by itself', async () => {
+    board([aiState(true, true), LANE_AGENTS], true, { todos: [CARD], live: new Map(), waiting: FOLLOWING });
+    expect(await screen.findByText('Following · waiting for an agent')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Run “Write it” now' })).not.toBeInTheDocument();
   });
 

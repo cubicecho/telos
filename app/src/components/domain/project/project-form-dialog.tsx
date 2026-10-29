@@ -35,8 +35,8 @@ export interface ProjectDraft {
   newTodoLaneId: string | null;
   /** The project's AI switch. Not shown unless AI is on for the account. */
   aiEnabled: boolean;
-  /** Whether its lanes' agents start on todos by themselves. Not shown while its AI is off. */
-  autoRun: boolean;
+  /** How far its lanes' agents go by themselves: auto, lane or follow. Not shown while its AI is off. */
+  runMode: string;
 }
 
 interface ProjectFormValues {

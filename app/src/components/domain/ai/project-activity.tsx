@@ -70,7 +70,9 @@ export function useProjectActivity(projectId: string, { skip = false }: { skip?:
     () =>
       new Map(
         (work ?? [])
-          .filter((todo) => todo.awaitsRun || (todo.runRequested && todo.state === WorkState.Queued))
+          .filter(
+            (todo) => todo.awaitsRun || ((todo.runRequested || todo.following) && todo.state === WorkState.Queued),
+          )
           .map((todo) => [todo.todoId, todo]),
       ),
     [work],

@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import * as dbSchema from '@telos/db/schema';
 import { eq } from 'drizzle-orm';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { type Board, CLAIM, createBoard, FINISH, QUEUE, runnerClient, SET_AUTO_RUN, setLane } from '../board.ts';
+import { type Board, CLAIM, createBoard, FINISH, QUEUE, runnerClient, SET_AI_MODE, setLane } from '../board.ts';
 import { createClient, createTestDb, type TestClient, type TestDb } from '../helpers.ts';
 
 // A person asking for one todo to be worked now, on a board that does not run
@@ -16,7 +16,7 @@ beforeEach(async () => {
   db = await createTestDb();
   board = await createBoard(db, 'owner@example.com');
   runner = runnerClient(db);
-  await board.person.expectOk(SET_AUTO_RUN, { id: board.projectId, enabled: false });
+  await board.person.expectOk(SET_AI_MODE, { id: board.projectId, mode: 'LANE' });
 });
 
 const RUN = `mutation ($id: ID!) { runTodo(id: $id) { id runRequestedAt } }`;
@@ -59,7 +59,7 @@ describe('runTodo', () => {
     expect(await queued()).toEqual([]);
     expect(await stateOf(asked)).toMatchObject({
       state: 'PARKED',
-      reason: 'Auto-run is off.',
+      reason: 'It waits to be run.',
       awaitsRun: true,
       runRequested: false,
     });
@@ -68,7 +68,7 @@ describe('runTodo', () => {
     expect(todo).toMatchObject({ id: asked });
     expect(todo.runRequestedAt).not.toBeNull();
     expect(await stateOf(asked)).toMatchObject({ state: 'QUEUED', reason: null, awaitsRun: false, runRequested: true });
-    expect(await stateOf(other)).toMatchObject({ state: 'PARKED', reason: 'Auto-run is off.' });
+    expect(await stateOf(other)).toMatchObject({ state: 'PARKED', reason: 'It waits to be run.' });
     expect(await queued()).toEqual([asked]);
     expect(await claim(other)).toBeNull();
 
@@ -92,7 +92,7 @@ describe('runTodo', () => {
     expect((await rowOf(todoId)).laneId).toBe(board.lanes[1].id);
     expect(await queued()).toEqual([]);
     expect(await claim(todoId, board.lanes[1].id)).toBeNull();
-    expect(await stateOf(todoId)).toMatchObject({ state: 'PARKED', reason: 'Auto-run is off.' });
+    expect(await stateOf(todoId)).toMatchObject({ state: 'PARKED', reason: 'It waits to be run.' });
   });
 
   it('is one run when the run fails too', async () => {
@@ -102,7 +102,7 @@ describe('runTodo', () => {
     await runner.expectOk(FINISH, { id: run?.runId, result: { status: 'ERROR', error: 'It broke.' } });
 
     expect(await queued()).toEqual([]);
-    expect(await stateOf(todoId)).toMatchObject({ state: 'PARKED', reason: 'Auto-run is off.', failures: 1 });
+    expect(await stateOf(todoId)).toMatchObject({ state: 'PARKED', reason: 'It waits to be run.', failures: 1 });
   });
 
   it('is a retry: it forgets failures and restarts an agent that finished with the todo', async () => {
@@ -136,7 +136,7 @@ describe('runTodo', () => {
   });
 
   it('works on a board that runs by itself, as a retry', async () => {
-    await board.person.expectOk(SET_AUTO_RUN, { id: board.projectId, enabled: true });
+    await board.person.expectOk(SET_AI_MODE, { id: board.projectId, mode: 'AUTO' });
     const todoId = await board.addTodo('Either way');
     await board.person.expectOk(RUN, { id: todoId });
     expect(await claim(todoId)).not.toBeNull();
@@ -203,6 +203,98 @@ describe('a run request that no longer stands', () => {
   });
 });
 
+describe('runTodo in a project that follows what it is asked for', () => {
+  const FOLLOWING = `query ($projectId: ID) { aiStatus(projectId: $projectId) { todos { todoId state following } } }`;
+
+  /** Two agent lanes in a row, then done, on a project in follow mode. */
+  async function twoAgentLanes(): Promise<void> {
+    await board.person.expectOk(SET_AI_MODE, { id: board.projectId, mode: 'FOLLOW' });
+    await setLane(board.person, board.lanes[0].id, { onSuccessLaneId: board.lanes[1].id });
+    await setLane(board.person, board.lanes[1].id, { agentId: board.agentId, onSuccessLaneId: board.lanes[2].id });
+  }
+
+  async function following(todoId: string): Promise<boolean> {
+    const { todos } = (await board.person.expectOk(FOLLOWING, { projectId: board.projectId })).aiStatus;
+    return todos.find((todo: { todoId: string }) => todo.todoId === todoId).following;
+  }
+
+  it('waits to be asked, as one lane does', async () => {
+    await twoAgentLanes();
+    const todoId = await board.addTodo('Not yet');
+    expect(await queued()).toEqual([]);
+    expect(await stateOf(todoId)).toMatchObject({ state: 'PARKED', awaitsRun: true });
+  });
+
+  it('once asked, has every lane the todo goes on to work it by itself', async () => {
+    await twoAgentLanes();
+    const todoId = await board.addTodo('Followed');
+    const other = await board.addTodo('Not asked');
+    await board.person.expectOk(RUN, { id: todoId });
+    expect((await rowOf(todoId)).followedAt).not.toBeNull();
+
+    const first = await claim(todoId);
+    await runner.expectOk(FINISH, { id: first?.runId, result: { status: 'OK', output: 'Half done.' } });
+    expect((await rowOf(todoId)).laneId).toBe(board.lanes[1].id);
+    expect(await following(todoId)).toBe(true);
+    expect(await stateOf(todoId)).toMatchObject({ state: 'QUEUED', awaitsRun: false, runRequested: false });
+    expect(await queued()).toEqual([todoId]);
+
+    const second = await claim(todoId, board.lanes[1].id);
+    expect(second).not.toBeNull();
+    await runner.expectOk(FINISH, { id: second?.runId, result: { status: 'OK', output: 'Done.' } });
+    const done = await rowOf(todoId);
+    expect(done.completedAt).not.toBeNull();
+    expect(done.followedAt).toBeNull();
+    expect(await stateOf(other)).toMatchObject({ state: 'PARKED', awaitsRun: true });
+  });
+
+  it('keeps following a todo a person moves on', async () => {
+    await twoAgentLanes();
+    const todoId = await board.addTodo('Moved');
+    await board.person.expectOk(RUN, { id: todoId });
+    await board.person.expectOk(MOVE, { id: todoId, laneId: board.lanes[1].id });
+    expect((await rowOf(todoId)).runRequestedAt).toBeNull();
+    expect(await queued()).toEqual([todoId]);
+  });
+
+  it('does not follow in a project that works one lane at a time', async () => {
+    const todoId = await board.addTodo('One lane');
+    await board.person.expectOk(RUN, { id: todoId });
+    expect((await rowOf(todoId)).followedAt).toBeNull();
+  });
+
+  it('forgets what it followed when the project leaves follow mode or AI goes off', async () => {
+    await twoAgentLanes();
+    const left = await board.addTodo('Left');
+    await board.person.expectOk(RUN, { id: left });
+    await board.person.expectOk(SET_AI_MODE, { id: board.projectId, mode: 'LANE' });
+    expect((await rowOf(left)).followedAt).toBeNull();
+
+    await board.person.expectOk(SET_AI_MODE, { id: board.projectId, mode: 'FOLLOW' });
+    const closed = await board.addTodo('Closed');
+    await board.person.expectOk(RUN, { id: closed });
+    await board.person.expectOk(SET_AI_MODE, { id: board.projectId, mode: 'OFF' });
+    expect((await rowOf(closed)).followedAt).toBeNull();
+  });
+
+  it('forgets a todo AI is told to ignore', async () => {
+    await twoAgentLanes();
+    const todoId = await board.addTodo('Ignored');
+    await board.person.expectOk(RUN, { id: todoId });
+    await board.person.expectOk(UPDATE, { id: todoId, set: { aiIgnored: true } });
+    expect((await rowOf(todoId)).followedAt).toBeNull();
+  });
+
+  it('cannot be written directly', async () => {
+    const todoId = await board.addTodo('Sneaky');
+    const error = await board.person.expectError(UPDATE, {
+      id: todoId,
+      set: { followedAt: new Date().toISOString() },
+    });
+    expect(error).toEqual({ message: 'Use runTodo to ask for a todo to be run.', code: 'BAD_USER_INPUT' });
+  });
+});
+
 describe('runTodo refuses', () => {
   /** Asks, and expects to be told no. */
   async function refusal(todoId: string): Promise<{ message: string; code: unknown }> {
@@ -260,7 +352,7 @@ describe('runTodo refuses', () => {
   });
 
   it('a todo an agent is working', async () => {
-    await board.person.expectOk(SET_AUTO_RUN, { id: board.projectId, enabled: true });
+    await board.person.expectOk(SET_AI_MODE, { id: board.projectId, mode: 'AUTO' });
     const todoId = await board.addTodo('Busy');
     await claim(todoId);
     expect(await refusal(todoId)).toEqual({ message: 'An agent is working it now.', code: 'CONFLICT' });

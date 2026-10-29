@@ -1,7 +1,7 @@
 import * as dbSchema from '@telos/db/schema';
 import { eq } from 'drizzle-orm';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { CLAIM, QUEUE, runnerClient, SET_AUTO_RUN, setLane } from '../board.ts';
+import { CLAIM, QUEUE, runnerClient, SET_AI_MODE, setLane } from '../board.ts';
 import { createClient, createTestDb, createUser, type TestClient, type TestDb } from '../helpers.ts';
 
 // What is in place for a first run, read back a step at a time.
@@ -92,7 +92,7 @@ describe('aiSetup', () => {
     const project = await createProject('P');
     await setLane(person, project.lanes[0].id, { agentId: await createAgent() });
     await person.expectOk(SET_PROJECT_AI, { id: project.id, enabled: true });
-    await person.expectOk(SET_AUTO_RUN, { id: project.id, enabled: true });
+    await person.expectOk(SET_AI_MODE, { id: project.id, mode: 'AUTO' });
     expect(await setup()).toMatchObject({ projectAi: true, request: false, started: true });
   });
 

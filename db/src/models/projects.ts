@@ -1,4 +1,5 @@
-import { type AnyPgColumn, boolean, index, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
+import { type AnyPgColumn, boolean, check, index, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 
 import { lanes } from './lanes.ts';
 import { users } from './users.ts';
@@ -23,10 +24,12 @@ export const projects = pgTable(
     // project somebody deliberately opened to it. Set through
     // setProjectAiEnabled, never a generated write — see write-guards.ts.
     aiEnabled: boolean('ai_enabled').notNull().default(false),
-    // Whether lanes' agents start on todos by themselves. Off, an open project's
-    // todos are worked only when a person asks (runTodo). Means nothing while
-    // aiEnabled is off. Set through setProjectAutoRun, as aiEnabled is.
-    autoRun: boolean('auto_run').notNull().default(false),
+    // How far lanes' agents go by themselves while aiEnabled is on (RUN_MODES):
+    // `auto`, every ready todo is worked; `lane`, a todo is worked only when a
+    // person asks (runTodo), one lane at a time; `follow`, once asked for, a todo
+    // is worked in every lane it goes on to (todos.followedAt). Means nothing
+    // while aiEnabled is off. Set through setProjectAiMode, as aiEnabled is.
+    runMode: text('run_mode').notNull().default('lane'),
     // Where new todos land: a submitted request, or the todos a run proposes.
     // Unset, or a done lane, and they land in the first open
     // lane (findNewTodoLaneId).
@@ -35,8 +38,15 @@ export const projects = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index('idx_projects_user_id').on(t.userId)],
+  (t) => [
+    index('idx_projects_user_id').on(t.userId),
+    check('ck_projects_run_mode', sql`${t.runMode} in ('auto', 'lane', 'follow')`),
+  ],
 );
+
+/** How far a project's agents go by themselves, as `projects.run_mode` stores it. */
+export const RUN_MODES = ['auto', 'lane', 'follow'] as const;
+export type RunMode = (typeof RUN_MODES)[number];
 
 export type Project = typeof projects.$inferSelect;
 export type NewProject = typeof projects.$inferInsert;

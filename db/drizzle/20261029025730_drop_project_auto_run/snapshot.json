@@ -1,0 +1,35 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "a0a59cfa-7f8c-4614-8aff-eb8557d307e4",
+  "prevIds": [
+    "86c31de2-b5dc-4128-bc0f-c56c4010b8ae"
+  ],
+  "footprints": [
+    {
+      "statementType": "drop_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "projects",
+        "auto_run"
+      ],
+      "writes": [
+        "s|col|public.projects.auto_run",
+        "n|col|public.projects.auto_run",
+        "e|col|public.projects.auto_run"
+      ],
+      "reads": [
+        "n|tbl|public.projects",
+        "n|sch|public"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "drop",
+      "key": "columns\u0000[\"public\",\"projects\",\"auto_run\"]"
+    }
+  ]
+}

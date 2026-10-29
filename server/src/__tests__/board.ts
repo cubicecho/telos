@@ -40,7 +40,7 @@ export async function createBoard(db: TestDb, email: string): Promise<Board> {
   await person.expectOk(`mutation ($id: ID!) { setProjectAiEnabled(projectId: $id, enabled: true) { id } }`, {
     id: projectId,
   });
-  await person.expectOk(SET_AUTO_RUN, { id: projectId, enabled: true });
+  await person.expectOk(SET_AI_MODE, { id: projectId, mode: 'AUTO' });
   const lanes = (
     await person.expectOk(
       `query ($projectId: UUID!) {
@@ -88,8 +88,8 @@ export async function setLane(person: TestClient, id: string, set: Record<string
   );
 }
 
-export const SET_AUTO_RUN = `mutation ($id: ID!, $enabled: Boolean!) {
-  setProjectAutoRun(projectId: $id, enabled: $enabled) { id autoRun }
+export const SET_AI_MODE = `mutation ($id: ID!, $mode: AiMode!) {
+  setProjectAiMode(projectId: $id, mode: $mode) { id aiEnabled runMode }
 }`;
 export const QUEUE = `query { runnerQueue { todoId laneId projectId } }`;
 export const CLAIM = `mutation ($todoId: ID!, $laneId: ID!) {
