@@ -1,3 +1,11 @@
+# [11.1.0](https://github.com/cubicecho/telos/compare/v11.0.0...v11.1.0) (2026-10-29)
+
+
+### Features
+
+* **app:** mark blocked cards with a red left edge ([057de10](https://github.com/cubicecho/telos/commit/057de1019c45df9e269aa47ef6036f4310c7ba7c))
+* **app:** scroll the project body and draw split progress as a bar ([0cae31f](https://github.com/cubicecho/telos/commit/0cae31f851c49e48e83d2ec481769e03df3b4206))
+
 # [11.0.0](https://github.com/cubicecho/telos/compare/v10.1.1...v11.0.0) (2026-10-29)
 
 
