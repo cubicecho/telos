@@ -1,3 +1,16 @@
+# [11.0.0](https://github.com/cubicecho/telos/compare/v10.1.1...v11.0.0) (2026-10-29)
+
+
+* feat!: a project's AI is one of four modes ([7689105](https://github.com/cubicecho/telos/commit/76891054eb388184ea24b9c898d08478a26c0cc0))
+
+
+### BREAKING CHANGES
+
+* setProjectAutoRun and Project.autoRun are gone. Use
+setProjectAiMode(projectId, mode: AiMode!) and Project.runMode.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
 ## [10.1.1](https://github.com/cubicecho/telos/compare/v10.1.0...v10.1.1) (2026-10-28)
 
 
