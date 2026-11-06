@@ -1,3 +1,10 @@
+## [11.1.1](https://github.com/cubicecho/telos/compare/v11.1.0...v11.1.1) (2026-11-06)
+
+
+### Bug Fixes
+
+* **app:** draw settings cards as CardLayout with ruled list rows ([fed72f2](https://github.com/cubicecho/telos/commit/fed72f2dcb06a5c10cc665d9ac63b00b43bec6b9))
+
 # [11.1.0](https://github.com/cubicecho/telos/compare/v11.0.0...v11.1.0) (2026-10-29)
 
 
