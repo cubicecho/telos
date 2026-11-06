@@ -1,12 +1,3 @@
-/**
- * The native tabs: a row of `Pressable`s over a context holding the active
- * value, and content panes that render only when selected.
- *
- * The active value is the caller's `value` when given, and this component's
- * own state otherwise (see `tabs-base.ts`). Unselected panes unmount, as they
- * do under radix without `forceMount`.
- */
-
 import { Slot } from '@radix-ui/react-slot';
 import {
   Children,
@@ -159,7 +150,11 @@ function TabsTrigger({ value, disabled = false, className, children, trailingSlo
   const reveal = useContext(TabsListContext);
   const span = useRef<Span | undefined>(undefined);
   const active = tabs.value === value;
-  const color = active ? 'text-active-foreground' : 'text-foreground/60';
+  // A quiet tab lifts to full ink under the pointer, as the web half's does; the colour is on each
+  // `Text`, which only the pressable's `group` reaches. Web only: a device has no pointer.
+  const color = active
+    ? 'text-active-foreground group-focus-visible/tab:text-foreground'
+    : cn('text-foreground/60', Platform.select({ web: 'group-hover:text-foreground', default: '' }));
 
   // Chosen from somewhere other than a press — a link, the caller's own state — the tab may be
   // off the end of the row. `reveal` is the list's, new every render, and not what this follows.
@@ -170,7 +165,13 @@ function TabsTrigger({ value, disabled = false, className, children, trailingSlo
     }
   }, [active]);
 
-  const styling = cn(TABS_TRIGGER_CLASS, active ? 'bg-active' : 'hover:bg-hover', disabled && 'opacity-50', className);
+  const styling = cn(
+    TABS_TRIGGER_CLASS,
+    // Focused, the active tab looks hovered, as every focused thing does.
+    active ? 'group/tab bg-active focus-visible:bg-hover' : 'group hover:bg-hover',
+    disabled && 'opacity-50',
+    className,
+  );
   // Text colour does not inherit on native, so the active/inactive split lands on each `<Text>`
   // and, through the context, on each icon — the container's colour reaches neither.
   const iconClass = cn('size-4 shrink-0', color);

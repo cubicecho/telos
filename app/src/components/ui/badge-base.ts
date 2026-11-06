@@ -1,17 +1,3 @@
-/**
- * The contract `badge.tsx` (native) and `badge.web.tsx` (web) both implement.
- * Its own module because Metro resolves `./badge` to `badge.web.tsx` on web.
- *
- * The variant names are shadcn's six — `default`, `secondary`, `destructive`,
- * `outline`, `ghost`, `link` — with their meanings, plus `positive`, `warning` and `info`,
- * which shadcn's token set has no answer for and cubeui's has (see `badge.tsx`'s header). Each
- * coloured meaning also has a `-soft` form — a tint, an edge and a dot in the hue, with the words in
- * the foreground — for a badge that is not the main thing on its row.
- *
- * The web half also takes every `<span>` attribute (`style`, `title`, `onClick`,
- * `data-*`) and shadcn's `asChild`, so a DOM call site ports unchanged. Those
- * extras are web only.
- */
 import { cva } from 'class-variance-authority';
 import { Children, type ReactNode } from 'react';
 
@@ -167,6 +153,12 @@ export const badgeContainerVariants = cva('shrink-0 rounded-full border border-t
     { variant: 'positive-soft', shape: 'dot', className: 'border-transparent bg-positive' },
     { variant: 'warning-soft', shape: 'dot', className: 'border-transparent bg-warning' },
     { variant: 'info-soft', shape: 'dot', className: 'border-transparent bg-info' },
+    // The quiet ones need a mark of their own as a dot: a /10 fill or ring is 1.24:1, and ghost
+    // and link drew nothing at all, where a dot carrying a name needs 3:1.
+    { variant: 'secondary', shape: 'dot', className: 'bg-foreground/60' },
+    { variant: 'outline', shape: 'dot', className: 'border-foreground/50 bg-transparent' },
+    { variant: 'ghost', shape: 'dot', className: 'bg-foreground/60' },
+    { variant: 'link', shape: 'dot', className: 'bg-info' },
   ],
   defaultVariants: { variant: 'default', shape: 'pill' },
 });

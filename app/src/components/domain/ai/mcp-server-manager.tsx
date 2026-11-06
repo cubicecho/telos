@@ -3,11 +3,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
 import { McpProbeStatus, McpSecretKind, type McpServerFieldsFragment } from '@/__generated__/graphql';
 import { useAppForm } from '@/components/app-form';
+import { CardLayout } from '@/components/card-layout';
 import { ConfirmButton } from '@/components/confirm-button';
 import { DialogLayout } from '@/components/dialog-layout';
 import { EmptyState } from '@/components/empty-state';
 import { List } from '@/components/list';
-import { Section } from '@/components/section';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
@@ -38,7 +38,6 @@ import {
   toServerDraft,
   urlRule,
 } from '@/lib/mcp-servers';
-import { CARD_TITLE } from '@/lib/styles';
 import { McpJsonPasteDialog } from './mcp-json-paste-dialog';
 
 type ServerRow = McpServerFieldsFragment;
@@ -85,9 +84,8 @@ export function McpServerManager() {
   }
 
   return (
-    <Section
-      surface="card"
-      titleClassName={CARD_TITLE}
+    <CardLayout
+      level={2}
       title="MCP servers"
       description="Tool servers your agents can reach. Kept once here; each agent says which it uses."
       actionSlot={
@@ -121,17 +119,15 @@ export function McpServerManager() {
             what="your MCP servers"
             count={servers.length}
             emptySlot={
-              <EmptyState
-                iconSlot={<Plug />}
-                title="No servers yet."
-                description="A server lends your agents its tools."
-              />
+              <EmptyState compact iconSlot={<Plug />} title="No servers yet. A server lends your agents its tools." />
             }
           />
+          {/* Rows written out rather than ListItems: each carries its secrets and a connection
+              test under the name, which a ListItem has no slot for. The list draws the rule. */}
           <List
-            divided={false}
+            label="MCP servers"
             contentSlot={servers.map((server) => (
-              <View key={server.id} className="gap-2 rounded-lg border border-foreground/10 bg-secondary p-3">
+              <View key={server.id} className="gap-2 px-3 py-2">
                 <View className="flex-row items-center gap-3">
                   <View className="flex-1 gap-0.5">
                     <Text numberOfLines={1} className="text-foreground text-sm">

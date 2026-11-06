@@ -1,25 +1,25 @@
 import { useMutation, useQuery } from '@apollo/client';
 import { useState } from 'react';
 import { Text, View } from 'react-native';
+import { CardLayout } from '@/components/card-layout';
 import { ConfirmButton } from '@/components/confirm-button';
 import type { LabelSummary } from '@/components/domain/label/label-badge';
 import { LabelFormDialog } from '@/components/domain/label/label-form-dialog';
 import { EmptyState } from '@/components/empty-state';
 import { List } from '@/components/list';
-import { Section } from '@/components/section';
+import { ListItem } from '@/components/list-item';
 import { Button } from '@/components/ui/button';
 import { ColorDot } from '@/components/ui/color-dot';
 import { Pencil, Plus, Tag, Trash2 } from '@/components/ui/icons';
 import { LoadState } from '@/components/ui/load-failure';
 import { describeError } from '@/lib/errors';
 import { DeleteLabelDocument, LabelsDocument } from '@/lib/graphql';
-import { CARD_TITLE } from '@/lib/styles';
 import { cn, HOVER_REVEAL } from '@/lib/utils';
 
 /**
  * The whole label lifecycle in one block: list, create, rename, delete.
  *
- * It draws its own `Section`, because the "New label" button in the header and
+ * It draws its own card, because the "New label" button in the header and
  * the dialog it opens share this component's state.
  */
 export function LabelManager() {
@@ -41,9 +41,8 @@ export function LabelManager() {
   }
 
   return (
-    <Section
-      surface="card"
-      titleClassName={CARD_TITLE}
+    <CardLayout
+      level={2}
       title="Labels"
       description="Attach them to projects and todos alike."
       actionSlot={
@@ -74,45 +73,46 @@ export function LabelManager() {
             count={labels.length}
             emptySlot={
               <EmptyState
+                compact
                 iconSlot={<Tag />}
-                title="No labels yet."
-                description="Labels mark projects and todos, and filter them."
+                title="No labels yet. They mark projects and todos, and filter them."
               />
             }
           />
           <List
-            divided={false}
+            label="Labels"
             contentSlot={labels.map((label) => (
-              <View
+              <ListItem
                 key={label.id}
-                className="group flex-row items-center gap-3 rounded-lg border border-foreground/10 bg-secondary px-3 py-2"
-              >
-                <ColorDot color={label.color} />
-                <Text numberOfLines={1} className="flex-1 text-foreground text-sm">
-                  {label.name}
-                </Text>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  className={cn('focus-visible:opacity-100', HOVER_REVEAL)}
-                  aria-label={`Rename ${label.name}`}
-                  onPress={() => {
-                    setEditing(label);
-                    setFormOpen(true);
-                  }}
-                  iconSlot={<Pencil className="h-4 w-4" />}
-                />
-                <ConfirmButton
-                  variant="ghost"
-                  size="icon-sm"
-                  className={cn('hover:text-negative focus-visible:opacity-100', HOVER_REVEAL)}
-                  aria-label={`Delete ${label.name}`}
-                  title={`Delete “${label.name}”?`}
-                  description="It is removed from every project and todo it is attached to. Nothing else is deleted."
-                  onConfirm={() => confirmDelete(label)}
-                  iconSlot={<Trash2 className="h-4 w-4" />}
-                />
-              </View>
+                className="group"
+                leadingSlot={<ColorDot color={label.color} />}
+                title={label.name}
+                actionSlot={
+                  <>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      className={cn('focus-visible:opacity-100', HOVER_REVEAL)}
+                      aria-label={`Rename ${label.name}`}
+                      onPress={() => {
+                        setEditing(label);
+                        setFormOpen(true);
+                      }}
+                      iconSlot={<Pencil className="h-4 w-4" />}
+                    />
+                    <ConfirmButton
+                      variant="ghost"
+                      size="icon-sm"
+                      className={cn('hover:text-negative focus-visible:opacity-100', HOVER_REVEAL)}
+                      aria-label={`Delete ${label.name}`}
+                      title={`Delete “${label.name}”?`}
+                      description="It is removed from every project and todo it is attached to. Nothing else is deleted."
+                      onConfirm={() => confirmDelete(label)}
+                      iconSlot={<Trash2 className="h-4 w-4" />}
+                    />
+                  </>
+                }
+              />
             ))}
           />
 

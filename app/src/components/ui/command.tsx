@@ -1,21 +1,3 @@
-/**
- * The native command list: a search `Input` over a scrolling list of pressable rows, filtered as
- * you type. `command.web.tsx` is the counterpart, shadcn's parts over `cmdk`, and
- * `command-base.ts` the contract the two share.
- *
- * cmdk has no React Native build, so this is not a port of it but the same parts with the same
- * names and the props cubeui's own call sites use. What it does not do, and why, is in
- * `command-base.ts`: in short, there is no highlighted row for arrow keys to move — a row is
- * chosen by pressing it — and the default filter matches every typed word rather than scoring
- * fuzzily and re-sorting.
- *
- * Each item decides for itself whether it matches, from the search in context, and reports the
- * answer upward. That is how `CommandEmpty` knows the list is empty and a `CommandGroup` knows to
- * hide its heading without either of them walking a tree they cannot see — an item is often
- * wrapped in the caller's own component, as `Combobox`'s rows are. An item that does not match
- * stays mounted and draws nothing, so its answer is still there when the search changes back.
- */
-
 import {
   createContext,
   useContext,

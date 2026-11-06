@@ -1,16 +1,3 @@
-/**
- * One card for both platforms — see `ui/button.tsx` for the conversion rules.
- *
- * `CardTitle` and `CardDescription` are `<Text>`, which is not optional on
- * native: a bare string inside a `<View>` throws there while rendering fine on
- * web, so the two platforms disagree silently unless the text nodes are typed.
- *
- * The `role`/`aria-level` on `CardTitle` and the `role="button"` on a pressable
- * card are not decoration. They are what a screen reader reads on device, and
- * on web react-native-web turns them into the matching ARIA attributes — which
- * is also what lets a compiled DOM version know this `<Text>` is an `<h3>`.
- */
-
 import * as React from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { ColorBar } from '@/components/ui/color-bar';
@@ -39,14 +26,17 @@ type CardProps = ViewProps & {
   onPress?: React.ComponentProps<typeof Pressable>['onPress'] | undefined;
 };
 
+/**
+ * The card's surface: its edge, fill and ink. Exported for a component that is a card but must
+ * render its own element — `Section`'s `surface="card"` is a `<section>` — so it wears this rather
+ * than a copy of it that drifts.
+ */
+const CARD_SURFACE_CLASS = 'rounded-lg border border-foreground/10 bg-secondary text-foreground';
+
 /** A bordered surface for one thing, pressable when given `onPress`. */
 const Card = React.forwardRef<React.ElementRef<typeof View>, CardProps>(
   ({ className, accentColor, accentLabel, onPress, children, ...props }, ref) => {
-    const classes = cn(
-      'rounded-lg border border-foreground/10 bg-secondary text-foreground',
-      accentColor && 'relative overflow-hidden',
-      className,
-    );
+    const classes = cn(CARD_SURFACE_CLASS, accentColor && 'relative overflow-hidden', className);
     const inner = (
       <>
         <ColorBar color={accentColor} label={accentLabel} />
@@ -76,7 +66,7 @@ Card.displayName = 'Card';
 
 /** The top of a card, holding its title and description. */
 const CardHeader = React.forwardRef<React.ElementRef<typeof View>, ViewProps>(({ className, ...props }, ref) => (
-  <View ref={ref} className={cn('flex flex-col gap-1.5 p-6', className)} {...props} />
+  <View ref={ref} className={cn('flex flex-col gap-1 p-4', className)} {...props} />
 ));
 CardHeader.displayName = 'CardHeader';
 
@@ -117,13 +107,13 @@ CardDescription.displayName = 'CardDescription';
 
 /** The card's body. */
 const CardContent = React.forwardRef<React.ElementRef<typeof View>, ViewProps>(({ className, ...props }, ref) => (
-  <View ref={ref} className={cn('p-6 pt-0', className)} {...props} />
+  <View ref={ref} className={cn('p-4 pt-0', className)} {...props} />
 ));
 CardContent.displayName = 'CardContent';
 
 /** The row at the bottom of a card, for its actions. */
 const CardFooter = React.forwardRef<React.ElementRef<typeof View>, ViewProps>(({ className, ...props }, ref) => (
-  <View ref={ref} className={cn('flex flex-row items-center p-6 pt-0', className)} {...props} />
+  <View ref={ref} className={cn('flex flex-row items-center p-4 pt-0', className)} {...props} />
 ));
 CardFooter.displayName = 'CardFooter';
 
@@ -136,8 +126,8 @@ CardFooter.displayName = 'CardFooter';
  * right padding, and the action is the only thing that sits there.
  */
 const CardAction = React.forwardRef<React.ElementRef<typeof View>, ViewProps>(({ className, ...props }, ref) => (
-  <View ref={ref} className={cn('absolute right-6 top-6 items-end', className)} {...props} />
+  <View ref={ref} className={cn('absolute right-4 top-4 items-end', className)} {...props} />
 ));
 CardAction.displayName = 'CardAction';
 
-export { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle };
+export { CARD_SURFACE_CLASS, Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle };

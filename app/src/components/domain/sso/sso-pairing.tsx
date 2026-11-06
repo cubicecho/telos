@@ -3,14 +3,13 @@ import { useState } from 'react';
 import { Text, View } from 'react-native';
 import { SsoSource } from '@/__generated__/graphql';
 import { useAppForm } from '@/components/app-form';
+import { CardLayout } from '@/components/card-layout';
 import { ConfirmButton } from '@/components/confirm-button';
-import { Section } from '@/components/section';
 import { SettingRow } from '@/components/setting-row';
 import { Code } from '@/components/ui/code';
 import { Form } from '@/components/ui/form';
 import { describeError } from '@/lib/errors';
 import { PairSsoDocument, SignInOptionsDocument, SsoSetupDocument, UnpairSsoDocument } from '@/lib/graphql';
-import { CARD_TITLE } from '@/lib/styles';
 
 // Pairing the instance with an OIDC provider (heautou, or any that supports
 // Dynamic Client Registration) by pasting the setup URL it gives you. The
@@ -100,9 +99,8 @@ export function SsoSettings() {
   }
 
   return (
-    <Section
-      surface="card"
-      titleClassName={CARD_TITLE}
+    <CardLayout
+      level={2}
       title="Sign-in"
       description="People can always sign in with an emailed link. An OpenID Connect provider adds a button for it on the login page."
       contentSlot={

@@ -136,7 +136,7 @@ describe('McpServerManager', () => {
       servers([{ ...SERVER, ...values }]),
     ]);
 
-    expect(await screen.findByText('No servers yet.')).toBeInTheDocument();
+    expect(await screen.findByText(/^No servers yet\./)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'New server' }));
     await user.type(screen.getByLabelText('Name'), 'Files');
     await user.type(screen.getByLabelText('Slug'), 'files');
@@ -421,6 +421,6 @@ describe('McpServerManager', () => {
     await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete' }));
 
     await waitFor(() => expect(drop).toHaveBeenCalled());
-    expect(await screen.findByText('No servers yet.')).toBeInTheDocument();
+    expect(await screen.findByText(/^No servers yet\./)).toBeInTheDocument();
   });
 });

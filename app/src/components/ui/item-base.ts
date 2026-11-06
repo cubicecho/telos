@@ -1,13 +1,3 @@
-/**
- * The contract `item.tsx` (native) and `item.web.tsx` (web) both implement: shadcn's `Item` parts,
- * with the part of each one's classes that Yoga can read. Its own module because Metro resolves
- * `./item` to `item.web.tsx` on web.
- *
- * Each class here is what the two halves agree on; the web half adds what only the DOM has —
- * `group-has-[…]`, `[&_svg]`, `[a]:`, the focus ring, `text-balance` — and the native half adds a
- * `Text` around a string and the ink a `Text` does not inherit there. The metrics are shadcn's,
- * so a row drawn with these parts on a device lines up with the same row in a DOM app.
- */
 import { cva } from 'class-variance-authority';
 
 /** How an `Item`'s surface is drawn. */
@@ -30,7 +20,7 @@ export const itemVariants = cva('flex-row flex-wrap items-center rounded-md bord
     },
     size: {
       default: 'gap-4 p-4',
-      sm: 'gap-2.5 px-4 py-3',
+      sm: 'gap-2 px-4 py-3',
     },
   },
   defaultVariants: { variant: 'default', size: 'default' },
@@ -44,6 +34,12 @@ export const itemVariants = cva('flex-row flex-wrap items-center rounded-md bord
 export const ITEM_SELECTED_CLASS = 'bg-active/40';
 
 /**
+ * The muted line's ink on the chosen row. `text-foreground/60` is 4.2:1 on the tint, short of the
+ * 4.5:1 text needs, so on that row the description is full `foreground`, as ListItem's is.
+ */
+export const ITEM_SELECTED_DESCRIPTION_CLASS = 'text-foreground';
+
+/**
  * The start of the row: an icon in a small tile, an image, or whatever is passed. On the web an
  * `<svg>` or `<img>` inside is sized for you; on a device pass it sized (`size-4`, `size-full`).
  */
@@ -51,7 +47,8 @@ export const itemMediaVariants = cva('shrink-0 flex-row items-center justify-cen
   variants: {
     variant: {
       default: 'bg-transparent',
-      icon: 'size-8 rounded-sm border border-foreground/10 bg-foreground/10',
+      // The fill alone, as EmptyMedia's tile: a ring on top of it was a second edge on one boundary.
+      icon: 'size-8 rounded-sm bg-foreground/10',
       image: 'size-10 overflow-hidden rounded-sm',
     },
   },

@@ -1,13 +1,3 @@
-/**
- * The contract `command.tsx` (native) and `command.web.tsx` (cmdk) both implement. Its own module
- * because Metro resolves `./command` to `command.web.tsx` on web.
- *
- * The web half widens every part to cmdk's own props, and what cmdk takes beyond this contract is
- * web only: the highlight and the props that steer it, `CommandLoading`, `CommandGroup`'s `value`
- * and `Command`'s `asChild`. The default filter differs too: cmdk's is a fuzzy scorer that
- * re-sorts the list, and the native one is {@link matchesEveryWord}, which keeps the written
- * order. A caller who passes `filter` gets the same answer on both halves.
- */
 import { Children, isValidElement, type ReactNode } from 'react';
 import type { DialogProps } from '@/components/ui/dialog-base';
 

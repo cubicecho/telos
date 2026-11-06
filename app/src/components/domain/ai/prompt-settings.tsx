@@ -3,11 +3,12 @@ import { useEffect, useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
 import type { PromptFieldsFragment } from '@/__generated__/graphql';
 import { useAppForm } from '@/components/app-form';
+import { CardLayout } from '@/components/card-layout';
 import { ConfirmButton } from '@/components/confirm-button';
 import { DialogLayout } from '@/components/dialog-layout';
 import { EmptyState } from '@/components/empty-state';
 import { List } from '@/components/list';
-import { Section } from '@/components/section';
+import { ListItem } from '@/components/list-item';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
@@ -24,7 +25,6 @@ import {
   UpdatePromptDocument,
 } from '@/lib/graphql';
 import { newId } from '@/lib/ids';
-import { CARD_TITLE } from '@/lib/styles';
 
 // What a run is told, apart from the todo itself, is four layers: the
 // account's agent instructions, the project's description, the project's
@@ -96,9 +96,8 @@ export function AgentInstructionsForm() {
   }
 
   return (
-    <Section
-      surface="card"
-      titleClassName={CARD_TITLE}
+    <CardLayout
+      level={2}
       title="Agent instructions"
       description="Sent to every agent first, before anything else it is told: then the project’s description and prompt, then the agent’s own prompt. Clear it, or reset it, to go back to the default."
       contentSlot={
@@ -196,9 +195,8 @@ export function PromptManager() {
   }
 
   return (
-    <Section
-      surface="card"
-      titleClassName={CARD_TITLE}
+    <CardLayout
+      level={2}
       title="Prompts"
       description="What an agent is told about its job. Each agent picks one; edit one here and every agent using it is told the new text from its next run."
       actionSlot={
@@ -223,49 +221,47 @@ export function PromptManager() {
             count={prompts.length}
             emptySlot={
               <EmptyState
+                compact
                 iconSlot={<FileText />}
-                title="No prompts."
-                description="A prompt says what an agent’s job is. Write one, then pick it for an agent."
+                title="No prompts. A prompt says what an agent’s job is: write one, then pick it for an agent."
               />
             }
           />
           <List
-            divided={false}
+            label="Prompts"
             contentSlot={prompts.map((prompt) => {
               const uses = usersOf(prompt.id, agents);
               return (
-                <View
+                <ListItem
                   key={prompt.id}
-                  className="flex-row items-center gap-3 rounded-lg border border-foreground/10 bg-secondary px-3 py-2"
-                >
-                  <View className="flex-1 gap-0.5">
-                    <Text numberOfLines={1} className="text-foreground text-sm">
-                      {prompt.name}
-                    </Text>
-                    <Text numberOfLines={1} className="text-foreground/60 text-xs">
-                      {prompt.body.trim().split('\n')[0] || 'Empty'}
-                    </Text>
-                  </View>
-                  <Badge variant={uses ? 'secondary' : 'outline'}>{uses === 1 ? '1 agent' : `${uses} agents`}</Badge>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label={`Edit ${prompt.name}`}
-                    onPress={() => setEditing({ prompt })}
-                    iconSlot={<Pencil className="h-4 w-4" />}
-                  />
-                  <ConfirmButton
-                    variant="ghost"
-                    size="icon-sm"
-                    className="hover:text-negative"
-                    aria-label={`Delete ${prompt.name}`}
-                    title={`Delete “${prompt.name}”?`}
-                    description={deletePromptText(uses)}
-                    confirmLabel="Delete"
-                    onConfirm={() => confirmDelete(prompt)}
-                    iconSlot={<Trash2 className="h-4 w-4" />}
-                  />
-                </View>
+                  title={prompt.name}
+                  description={prompt.body.trim().split('\n')[0] || 'Empty'}
+                  meta={
+                    <Badge variant={uses ? 'secondary' : 'outline'}>{uses === 1 ? '1 agent' : `${uses} agents`}</Badge>
+                  }
+                  actionSlot={
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label={`Edit ${prompt.name}`}
+                        onPress={() => setEditing({ prompt })}
+                        iconSlot={<Pencil className="h-4 w-4" />}
+                      />
+                      <ConfirmButton
+                        variant="ghost"
+                        size="icon-sm"
+                        className="hover:text-negative"
+                        aria-label={`Delete ${prompt.name}`}
+                        title={`Delete “${prompt.name}”?`}
+                        description={deletePromptText(uses)}
+                        confirmLabel="Delete"
+                        onConfirm={() => confirmDelete(prompt)}
+                        iconSlot={<Trash2 className="h-4 w-4" />}
+                      />
+                    </>
+                  }
+                />
               );
             })}
           />

@@ -1,21 +1,3 @@
-/**
- * A pill in a segmented control — a row of mutually exclusive options.
- *
- * Ships a component *and* two class helpers, which is unusual and deliberate.
- * The same pill is often a router link rather than a button (a nav bar is a
- * segmented control whose items navigate), and a link is a host component the
- * app owns — expo-router's `<Link>`, react-router's `<NavLink>`. Those cannot
- * take a `Pressable` wrapper without losing the router's press handling, so
- * they take the class instead and render their own element.
- *
- * `SegmentedGroup` is the row they sit in: the frame, the `role="group"` and its
- * name, and optionally the current value, so each pill can say `value="week"`
- * instead of `active={view === "week"}`.
- *
- * A pill takes an `iconSlot`, drawn before its label and sized and coloured by the
- * pill, and the group can drop the labels of such pills under a width or at
- * every width (`labelHideBelow`), leaving the label as the pill's name.
- */
 import type { ReactNode } from 'react';
 import * as React from 'react';
 import { Platform, Pressable, Text, View } from 'react-native';
@@ -43,8 +25,19 @@ export function segmentedItemClass(active: boolean, className?: string) {
  * `Text` and text-in-text does inherit.
  */
 export function segmentedTextClass(active: boolean, className?: string) {
-  return cn('text-sm font-semibold', active ? 'text-active-foreground' : 'text-foreground/60', className);
+  return cn(
+    'text-sm font-semibold',
+    active ? 'text-active-foreground group-focus-visible/pill:text-foreground' : ['text-foreground/60', HOVER_INK],
+    className,
+  );
 }
+
+/**
+ * A quiet label lifted to full ink under the pointer, as the web halves' `hover:text-foreground`
+ * does. The colour sits on each `Text`, which a container's `hover:` cannot reach, so it reads the
+ * pressable's `group` instead. Web only: a device has no pointer to hover with.
+ */
+const HOVER_INK = Platform.select({ web: 'group-hover:text-foreground', default: '' });
 
 /**
  * Where a pill with an `iconSlot` stops drawing its label: at every width, or under
@@ -235,6 +228,9 @@ const SegmentedButton = React.forwardRef<React.ElementRef<typeof Pressable>, Seg
   ({ active, value, iconSlot, className, children, onPress, ...props }, ref) => {
     const group = React.useContext(SegmentedGroupContext);
     const current = active ?? (group !== null && value !== undefined && group.value === value);
+    // The pill's own ink, for the container and the icon. A `group-*/pill` variant selects what is
+    // inside the pill, so on the pill itself it would never apply: the container turns its own ink
+    // with `focus-visible:`, and only the label takes the group variant.
     const ink = current ? 'text-active-foreground' : 'text-foreground/60';
     // Only a pill with an icon has something left to draw once its label is gone.
     const labelHideBelow = iconSlot ? group?.labelHideBelow : undefined;
@@ -268,8 +264,12 @@ const SegmentedButton = React.forwardRef<React.ElementRef<typeof Pressable>, Seg
         className={cn(
           // Inside the frame a pill is 4px shorter, so it fits the input-height
           // box instead of spilling past its padding.
-          group?.framed ? 'rounded-md px-3 py-1' : 'rounded-md px-3 py-1.5',
-          current ? 'bg-active' : 'hover:bg-hover',
+          // Inside the frame, `rounded-sm`: the radius nested in the frame's, as a tab's is.
+          group?.framed ? 'rounded-sm px-3 py-1' : 'rounded-md px-3 py-1.5',
+          // Focused, the current pill looks hovered, as every focused thing does.
+          current
+            ? 'group/pill bg-active focus-visible:bg-hover focus-visible:text-foreground'
+            : 'group hover:bg-hover',
           // The label colour on the container too, which native ignores and web
           // reads: an element child passes through untouched below, so on web its
           // colour can only come from inheriting it here.

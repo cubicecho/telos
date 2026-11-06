@@ -1,15 +1,3 @@
-/**
- * The web checkbox: radix. `checkbox.tsx` is the native counterpart and `checkbox-base.ts` holds
- * the contract they share.
- *
- * It used to be compiled from the native `Pressable`, which made it a `<button role="checkbox">`
- * with a required `aria-label` and nothing else — no `name`, no `value`, no `required`, nothing a
- * `<form>` submit could see, and no uncontrolled use. This file installs over a DOM app's shadcn
- * checkbox at `components/ui/checkbox.tsx`, so it takes radix's `Checkbox.Root` props whole, as
- * shadcn's does: radix renders the hidden `<input>` a native form submit reads, and a
- * `<Label htmlFor={id}>` names it.
- */
-
 import { Checkbox as CheckboxPrimitive } from 'radix-ui';
 import type { ComponentPropsWithRef } from 'react';
 import { CHECKBOX_CLASS } from '@/components/ui/checkbox-base';
@@ -41,7 +29,7 @@ function Checkbox({ className, accessibilityLabel, 'aria-label': ariaLabel, ...p
       aria-label={ariaLabel ?? accessibilityLabel}
       className={cn(
         CHECKBOX_CLASS,
-        'peer flex border-foreground/50 bg-background focus-visible:outline-none data-[state=unchecked]:focus-visible:bg-hover data-[state=checked]:focus-visible:bg-active/90 data-[state=indeterminate]:focus-visible:bg-active/90 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-negative data-[state=checked]:border-active data-[state=checked]:bg-active data-[state=checked]:text-active-foreground data-[state=indeterminate]:border-active data-[state=indeterminate]:bg-active data-[state=indeterminate]:text-active-foreground',
+        'peer flex border-foreground/50 bg-background focus-visible:outline-none data-[state=unchecked]:focus-visible:bg-hover data-[state=checked]:focus-visible:bg-hover data-[state=checked]:focus-visible:text-foreground data-[state=indeterminate]:focus-visible:bg-hover data-[state=indeterminate]:focus-visible:text-foreground disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-negative data-[state=checked]:border-active data-[state=checked]:bg-active data-[state=checked]:text-active-foreground data-[state=indeterminate]:border-active data-[state=indeterminate]:bg-active data-[state=indeterminate]:text-active-foreground',
         className,
       )}
     >

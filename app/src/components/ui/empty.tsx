@@ -1,13 +1,3 @@
-/**
- * shadcn's `Empty` parts on both platforms, under shadcn's names and nesting, so a DOM call site
- * ports unchanged. The drawing is `EmptyState`'s, which is built on these parts, so the compound
- * form and `<EmptyState />` give one empty state; pass a `className` for shadcn's look.
- *
- * `EmptyTitle` and `EmptyDescription` are `Text`, so a bare string inside them is safe on device.
- * The title is plain text: pass `role="heading"` and an `aria-level` when the empty state is the
- * screen. The icon bubble publishes its ink and size through `IconClassContext`.
- */
-
 import * as React from 'react';
 import { Text, View } from 'react-native';
 import { IconClassContext } from '@/components/ui/icons-base';
@@ -27,10 +17,9 @@ const Empty = React.forwardRef<React.ElementRef<typeof View>, ViewProps>(({ clas
   <View
     ref={ref}
     testID="empty"
-    className={cn(
-      'w-full min-w-0 items-center justify-center gap-3 rounded-lg border border-dashed border-foreground/10 py-10',
-      className,
-    )}
+    // `border-dashed` with no width, as shadcn's Empty: no edge unless a caller adds one. The /10
+    // edge it had was 1.24:1, barely there in light and gone in dark.
+    className={cn('w-full min-w-0 items-center justify-center gap-3 rounded-lg border-dashed py-10', className)}
     {...props}
   />
 ));
@@ -82,7 +71,13 @@ EmptyMedia.displayName = 'EmptyMedia';
 
 /** What is missing, in a few words. */
 const EmptyTitle = React.forwardRef<React.ElementRef<typeof Text>, TextProps>(({ className, ...props }, ref) => (
-  <Text ref={ref} testID="empty-title" className={cn('font-semibold text-sm text-foreground', className)} {...props} />
+  <Text
+    ref={ref}
+    testID="empty-title"
+    // A size over the description's, so the first thing a new user reads leads the block.
+    className={cn('font-semibold text-base text-foreground', className)}
+    {...props}
+  />
 ));
 EmptyTitle.displayName = 'EmptyTitle';
 

@@ -1,8 +1,3 @@
-/**
- * What `icons.tsx` and `icons.web.tsx` share. Separate module for the usual
- * reason: Metro resolves `./icons` to `icons.web.tsx` on web, so the web file
- * cannot import the shared pieces from `./icons` without importing itself.
- */
 import type { ComponentType } from 'react';
 import { createContext } from 'react';
 

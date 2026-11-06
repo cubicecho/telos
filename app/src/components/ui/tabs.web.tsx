@@ -1,11 +1,3 @@
-/**
- * The web tabs: radix. `tabs.tsx` is the native counterpart and `tabs-base.ts`
- * holds the contract they share.
- *
- * Every part also takes the props of the radix part it renders, as shadcn's
- * `tabs` does, so a DOM call site ports unchanged.
- */
-
 import { Tabs as TabsPrimitive } from 'radix-ui';
 import * as React from 'react';
 import { useEffect, useRef } from 'react';
@@ -127,7 +119,7 @@ function TabsTrigger({
       // its size is set here; device has no inheritance and uses a context.
       className={cn(
         "[&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
-        'inline-flex shrink-0 whitespace-nowrap transition-all focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 text-foreground/60 hover:bg-hover hover:text-foreground data-[state=inactive]:focus-visible:bg-hover data-[state=inactive]:focus-visible:text-foreground data-[state=active]:focus-visible:bg-active/90 data-[state=active]:bg-active data-[state=active]:text-active-foreground',
+        'inline-flex shrink-0 whitespace-nowrap transition-all focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 text-foreground/60 hover:bg-hover hover:text-foreground data-[state=inactive]:focus-visible:bg-hover data-[state=inactive]:focus-visible:text-foreground data-[state=active]:focus-visible:bg-hover data-[state=active]:focus-visible:text-foreground data-[state=active]:bg-active data-[state=active]:text-active-foreground',
         TABS_TRIGGER_CLASS,
         TABS_TRIGGER_TEXT_CLASS,
         className,

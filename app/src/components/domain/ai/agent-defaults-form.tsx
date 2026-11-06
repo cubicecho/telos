@@ -2,9 +2,9 @@ import { useMutation, useQuery } from '@apollo/client';
 import { useEffect, useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
 import { useAppForm } from '@/components/app-form';
+import { CardLayout } from '@/components/card-layout';
 import { DialogLayout } from '@/components/dialog-layout';
 import { Disclosure } from '@/components/disclosure';
-import { Section } from '@/components/section';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
@@ -12,7 +12,6 @@ import { LoadState } from '@/components/ui/load-failure';
 import { fromLayerDraft, type LayerDraft, layerHints, toLayerDraft } from '@/lib/agents';
 import { describeError } from '@/lib/errors';
 import { AgentDefaultsDocument, SetAgentDefaultsApiKeyDocument, SetAgentDefaultsDocument } from '@/lib/graphql';
-import { CARD_TITLE } from '@/lib/styles';
 import {
   DISCOVERY_HELP,
   discoveryOptions,
@@ -100,9 +99,8 @@ export function AgentDefaultsForm() {
   );
 
   return (
-    <Section
-      surface="card"
-      titleClassName={CARD_TITLE}
+    <CardLayout
+      level={2}
       title="Agent defaults"
       description="What every agent inherits for a field it leaves blank. Zero is a value: only a blank inherits."
       actionSlot={

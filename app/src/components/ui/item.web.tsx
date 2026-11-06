@@ -1,18 +1,3 @@
-/**
- * The web `Item`: shadcn's parts, with shadcn's props and markup, so a DOM call site that installed
- * `@cubeui/item` before it had a native half compiles and draws as it did. `item.tsx` is the
- * native counterpart and `item-base.ts` holds the classes the two share; what is added here is
- * what only the DOM has.
- *
- * It is hand-written rather than compiled for three reasons the compiler would have to guess at:
- * `ItemDescription` is shadcn's `<p>` taking `<p>` props, `ItemSeparator` is radix's, and the
- * compiled reset (`flex-shrink: 0` on every view) would stop a long title shrinking inside a row
- * that shadcn lets shrink — the thing `DisclosureRow`'s truncating title depends on.
- *
- * `ItemSeparator` is radix's `Separator` directly, with the classes shadcn's `Separator` gives it,
- * rather than `@cubeui/separator`: that one is web-only, and the native registry installs this file
- * beside `item.tsx`, where an import of it would point at nothing.
- */
 import type { VariantProps } from 'class-variance-authority';
 import { Separator as SeparatorPrimitive, Slot } from 'radix-ui';
 import type * as React from 'react';
@@ -98,7 +83,7 @@ function Item({
         ITEM_WEB,
         itemVariants({ variant, size }),
         selected && ITEM_SELECTED_CLASS,
-        selected && '[a]:hover:bg-active/40 [a]:focus-visible:bg-active/40',
+        selected && '[a]:hover:bg-active/40 [a]:focus-visible:bg-hover',
         className,
       )}
       {...props}
@@ -159,6 +144,9 @@ function ItemDescription({ className, ...props }: React.ComponentProps<'p'>) {
       data-slot="item-description"
       className={cn(
         ITEM_DESCRIPTION_CLASS,
+        // ITEM_SELECTED_DESCRIPTION_CLASS on the chosen row, which says so with `data-selected`:
+        // read here rather than through context so the part stays a plain `<p>`.
+        'in-data-selected:text-foreground',
         'text-balance [&>a]:underline [&>a]:underline-offset-4 [&>a:hover]:text-info',
         className,
       )}

@@ -1,11 +1,3 @@
-/**
- * One number on a card: a label, the figure under it, and a line under that. The parts are
- * `PropertyRow`'s words: `label`, `value`, `hint`, with `iconSlot` before the label.
- *
- * Given `onPress` the card is a button, and with `selected` beside it a toggle carrying
- * `aria-pressed`: a filter tile. `selected` without `onPress` is ignored, because `aria-pressed`
- * on something that cannot be pressed is markup axe rejects.
- */
 import type { ReactNode } from 'react';
 import { Platform, Text, View } from 'react-native';
 import { Card } from '@/components/ui/card';
@@ -120,7 +112,12 @@ export function StatTile({
             <IconClassContext.Provider value={cn('size-4 shrink-0', ink)}>{iconSlot}</IconClassContext.Provider>
           </View>
         ) : null}
-        <Text testID="stat-tile-label" className={cn('min-w-0 flex-1 truncate font-semibold text-sm', ink)}>
+        <Text
+          testID="stat-tile-label"
+          // Normal weight, as PropertyRow's label: the label supports the figure under it, and
+          // a grey semibold label competed with it.
+          className={cn('min-w-0 flex-1 truncate text-sm', ink)}
+        >
           {label}
         </Text>
       </View>

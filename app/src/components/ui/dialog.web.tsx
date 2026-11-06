@@ -1,16 +1,3 @@
-/**
- * The web dialog: radix, unchanged in behaviour from before the split. It keeps
- * the focus trap, the scroll lock, the `Escape` handler and the enter/exit
- * animations, none of which have a native counterpart worth faking.
- *
- * The exported surface is `dialog-base.ts`'s **plus radix's**: every part also
- * takes the props of the radix part (or the `div`) it renders, exactly as
- * shadcn's `dialog` does, so a DOM call site written against shadcn — `modal`,
- * `onOpenAutoFocus`, `forceMount`, `id`, `data-*`, a `DialogClose asChild` round
- * a Cancel button, a `DialogPortal` + `DialogOverlay` of its own — compiles and
- * behaves unchanged. Those extras are web only; the base is what native honours.
- */
-
 import { Dialog as DialogPrimitive } from 'radix-ui';
 import type * as React from 'react';
 import { Button } from '@/components/ui/button';
@@ -24,8 +11,16 @@ import type {
   DialogSectionProps,
   DialogTriggerProps,
 } from '@/components/ui/dialog-base';
-import { DIALOG_CONTENT_CLASS } from '@/components/ui/dialog-base';
+import {
+  DIALOG_CONTENT_CLASS,
+  DIALOG_DESCRIPTION_CLASS,
+  DIALOG_DISMISS_CLASS,
+  DIALOG_FOOTER_CLASS,
+  DIALOG_HEADER_CLASS,
+  DIALOG_TITLE_CLASS,
+} from '@/components/ui/dialog-base';
 import { X } from '@/components/ui/icons';
+import { FrameFocusGuard } from '@/lib/frame-focus-guard';
 import { bridgePress, cn } from '@/lib/utils';
 
 /** The shared contract, widened to what the radix part (or element) underneath accepts. */
@@ -138,10 +133,12 @@ function DialogContent({
         )}
       >
         {children}
+        {/* A framed app focusing itself would take the focus, and the typing, out of the dialog. */}
+        <FrameFocusGuard />
         {showCloseButton ? (
           <DialogPrimitive.Close
             data-slot="dialog-close"
-            className="absolute right-4 top-4 rounded-sm text-foreground/60 transition-colors hover:text-foreground focus-visible:bg-hover focus-visible:text-foreground focus:outline-none disabled:pointer-events-none"
+            className={cn(DIALOG_DISMISS_CLASS, 'transition-colors disabled:pointer-events-none')}
           >
             <X className="h-4 w-4" />
             <span className="sr-only">Close</span>
@@ -154,13 +151,7 @@ function DialogContent({
 
 /** The block holding the title and the description. */
 function DialogHeader({ className, ...props }: Wide<DialogSectionProps, React.ComponentProps<'div'>>) {
-  return (
-    <div
-      data-slot="dialog-header"
-      className={cn('flex flex-col gap-1.5 text-center sm:text-left', className)}
-      {...props}
-    />
-  );
+  return <div data-slot="dialog-header" className={cn('flex', DIALOG_HEADER_CLASS, className)} {...props} />;
 }
 
 /** The row of buttons at the bottom of the dialog. */
@@ -171,11 +162,7 @@ function DialogFooter({
   ...props
 }: Wide<DialogFooterProps, React.ComponentProps<'div'>>) {
   return (
-    <div
-      data-slot="dialog-footer"
-      className={cn('flex flex-col-reverse gap-2 sm:flex-row sm:justify-end', className)}
-      {...props}
-    >
+    <div data-slot="dialog-footer" className={cn('flex', DIALOG_FOOTER_CLASS, className)} {...props}>
       {children}
       {showCloseButton ? (
         <DialogPrimitive.Close asChild>
@@ -191,13 +178,7 @@ function DialogTitle({
   className,
   ...props
 }: Wide<DialogSectionProps, React.ComponentProps<typeof DialogPrimitive.Title>>) {
-  return (
-    <DialogPrimitive.Title
-      data-slot="dialog-title"
-      className={cn('text-lg font-semibold leading-none tracking-tight', className)}
-      {...props}
-    />
-  );
+  return <DialogPrimitive.Title data-slot="dialog-title" className={cn(DIALOG_TITLE_CLASS, className)} {...props} />;
 }
 
 /** The sentence under the title, read as the dialog's description. */
@@ -208,7 +189,7 @@ function DialogDescription({
   return (
     <DialogPrimitive.Description
       data-slot="dialog-description"
-      className={cn('text-foreground/60 text-sm', className)}
+      className={cn(DIALOG_DESCRIPTION_CLASS, className)}
       {...props}
     />
   );

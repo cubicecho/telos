@@ -1,12 +1,3 @@
-/**
- * What `theme-preference.tsx` (device) and `theme-preference.web.tsx` (the web, Expo's and the
- * DOM's) share: the preference's type, where it is stored, and the pre-paint script.
- *
- * A separate module for the usual reason: Metro resolves `./theme-preference` to the `.web.tsx`
- * on web, so the web file cannot import shared pieces from it without importing itself.
- */
-
-/** Which palette to paint. `system` follows the device and is what nothing stored means. */
 export type ThemePreference = 'light' | 'dark' | 'system';
 
 /** In the order a picker shows them. */
@@ -123,7 +114,7 @@ export type PalettePreferenceState = readonly [
 /**
  * The web's first paint, before React mounts: the rule `useThemePreference` applies, as a
  * self-contained script for an inline `<script>` in the page's `<head>`. A static `index.html`
- * pastes the copy in the skill's `controls.md`, which a unit test holds to this string.
+ * pastes the copy in the skill's `controls/theme.md`, which a unit test holds to this string.
  *
  * `dark` goes on `<html>` for Dark, for System on a dark device and for a dark-only palette,
  * because `tokens.web.css` has no media query and reads `.dark` alone. A palette other than the

@@ -1,29 +1,10 @@
-/**
- * Combined date + time picker — or, with `mode="date"`, a date on its own.
- *
- * - Date is chosen from a `Calendar` in a `Popover` — a dropdown anchored to the
- *   trigger on web, a sheet on native.
- * - Time is an `Input type="time"`: a real `<input type="time">` on web, a plain
- *   HH:mm text field on native, which is the split `input` exists for.
- *
- * Shared by both platforms with no `.web.tsx`: every piece it composes is
- * already a cross-platform primitive. The two halves always commit a single
- * `Date` back through `onChange`, so a caller never has to reassemble one.
- *
- * `mode` and `clearable` are props rather than a second component because the
- * date-only, optional field differs from this one by an input and a Clear row —
- * the same argument `DatePicker` makes for `showTime`. `DatePicker` is on both
- * platforms now too, with its own full-width trigger and the time box inside the
- * popover; folding the two into one is still open.
- */
 import { format } from 'date-fns';
 import { useId, useState } from 'react';
-import { Platform, Text, View } from 'react-native';
-import { Button, buttonTextVariants } from '@/components/ui/button';
+import { View } from 'react-native';
+import { ClearRow, PickerTrigger } from '@/components/date-picker';
 import { Calendar } from '@/components/ui/calendar';
-import { Calendar as CalendarIcon, X } from '@/components/ui/icons';
 import { Input } from '@/components/ui/input';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Popover, PopoverContent } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 
 type DateTimeInputSharedProps = {
@@ -160,57 +141,30 @@ export function DateTimeInput(props: DateTimeInputProps) {
   return (
     <View className={cn('flex-row items-center gap-2', className)}>
       <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <Button
-            variant="outline"
-            id={id}
-            // A name on a button replaces its contents, so a bare "Due" would drop the date —
-            // the part of the field that changes. Both are in the name instead: an `aria-label`
-            // is composed with the value text, which iOS reads too, and a reference is followed
-            // by one to the value text below. `htmlFor` alone cannot do this — see the skill.
-            aria-label={ariaLabel ? `${ariaLabel}, ${valueText}` : undefined}
-            aria-labelledby={ariaLabelledBy ? `${ariaLabelledBy} ${valueId}` : undefined}
-            // What react-native has no prop for, in the spelling the web reads — the same
-            // arrangement as `ColorPicker`'s swatch row. A bound field's hint and error reach
-            // the trigger this way.
-            {...(Platform.OS === 'web'
-              ? {
-                  ...(ariaDescribedBy === undefined ? {} : { 'aria-describedby': ariaDescribedBy }),
-                  ...(ariaInvalid === undefined ? {} : { 'aria-invalid': ariaInvalid }),
-                  ...(ariaRequired === undefined ? {} : { 'aria-required': ariaRequired }),
-                }
-              : {})}
-            className="flex-1 justify-start text-left font-normal"
-            iconSlot={<CalendarIcon className="mr-2 h-4 w-4" />}
-            content={
-              // Its own `Text` in both states, for the id a reference points at; and because
-              // native has no colour inheritance, the placeholder's muted class has to be on
-              // the words themselves.
-              <Text
-                nativeID={valueId}
-                className={value ? buttonTextVariants({ variant: 'outline' }) : 'text-sm text-foreground/60'}
-              >
-                {valueText}
-              </Text>
-            }
-          />
-        </PopoverTrigger>
-        <PopoverContent className="w-auto p-0" align="start">
+        {/* DatePicker's own trigger: the value in normal weight on one line, the icon trailing. */}
+        <PickerTrigger
+          id={id}
+          empty={!value}
+          valueId={valueId}
+          // A name on a button replaces its contents, so a bare "Due" would drop the date — the
+          // part of the field that changes. Both are in the name instead: an `aria-label` is
+          // composed with the value text, which iOS reads too, and a reference is followed by one
+          // to the value text. `htmlFor` alone cannot do this — see the skill.
+          aria-label={ariaLabel ? `${ariaLabel}, ${valueText}` : undefined}
+          aria-labelledby={ariaLabelledBy ? `${ariaLabelledBy} ${valueId}` : undefined}
+          aria-describedby={ariaDescribedBy}
+          aria-invalid={ariaInvalid}
+          aria-required={ariaRequired}
+          className="flex-1"
+        >
+          {valueText}
+        </PickerTrigger>
+        <PopoverContent className="w-auto gap-0 p-0" align="start">
           <Calendar selected={value ?? undefined} onSelect={handleDateSelect} defaultMonth={value ?? undefined} />
           {/* In the popover, not an X inside the trigger: the trigger is a button,
               and a button inside a button is invalid HTML that no keyboard reaches.
               `DatePicker` puts its Clear in the same place. */}
-          {props.clearable && value ? (
-            <View className="flex-row justify-end border-t border-foreground/10 p-1">
-              <Button
-                variant="outline"
-                size="sm"
-                onPress={handleClear}
-                iconSlot={<X className="h-4 w-4" />}
-                content="Clear"
-              />
-            </View>
-          ) : null}
+          {props.clearable && value ? <ClearRow onClear={handleClear} /> : null}
         </PopoverContent>
       </Popover>
       {withTime ? (

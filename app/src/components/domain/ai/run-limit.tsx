@@ -1,10 +1,9 @@
 import { useMutation, useQuery } from '@apollo/client';
 import { Text, View } from 'react-native';
-import { Section } from '@/components/section';
+import { CardLayout } from '@/components/card-layout';
 import { SegmentedButton, SegmentedGroup } from '@/components/ui/segmented';
 import { describeError } from '@/lib/errors';
 import { InstanceRunLimitDocument, SetInstanceRunLimitDocument } from '@/lib/graphql';
-import { CARD_TITLE } from '@/lib/styles';
 
 // How many runs the instance works at once, across every runner, lane and
 // account. The server reads it on every poll, so a change applies within one;
@@ -37,9 +36,8 @@ export function RunLimit() {
   }
 
   return (
-    <Section
-      surface="card"
-      titleClassName={CARD_TITLE}
+    <CardLayout
+      level={2}
       title="Runs at once"
       description="The most runs this instance works at the same time, for everyone on this server; only admins see this. Each lane's limit applies under it. Lowering it lets running work finish."
       contentSlot={

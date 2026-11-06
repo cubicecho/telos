@@ -1,13 +1,3 @@
-/**
- * A small pill stating what something is or what state it is in, and with no children the dot
- * that stands for the same thing in a row too tight for words. `badge.web.tsx` is the web
- * counterpart and `badge-base.ts` holds the contract and the class maps they share.
- *
- * The variants are shadcn's, with shadcn's meanings, plus `positive` and `warning`, which are
- * tokens of cubeui's own. Their fills are Tailwind's 700s because white text on a lighter shade is
- * under 4.5:1. Each string child is wrapped in a `Text` carrying the label colour, since native
- * does not inherit it. `onRemove` adds a trailing ✕ in its own `Pressable`.
- */
 import { Children, useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, Animated, Easing, Pressable, Text, View } from 'react-native';
 import {
@@ -142,6 +132,9 @@ export function Badge({
           role="button"
           aria-label={removeLabel ?? badgeRemoveLabel(children, label)}
           hitSlop={REMOVE_HIT_SLOP}
+          // Pressed feedback. A disc in the badge's own ink, as the web half's hover, needs
+          // `bg-current`, which a device has no colour to inherit for.
+          className="rounded-full active:opacity-50"
         >
           <X
             className={cn(badgeIconClass, inkClass)}

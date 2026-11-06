@@ -156,8 +156,8 @@ describe('AiSettings', () => {
 
     expect(await screen.findByText('API keys')).toBeInTheDocument();
     await waitFor(() => expect(screen.getByText('Claude Code')).toBeInTheDocument());
-    expect(screen.queryByText('No agents yet.')).not.toBeInTheDocument();
-    expect(screen.queryByText('No servers yet.')).not.toBeInTheDocument();
+    expect(screen.queryByText(/^No agents yet\./)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^No servers yet\./)).not.toBeInTheDocument();
   });
 });
 
@@ -165,12 +165,12 @@ describe('AgentSettings', () => {
   it('draws nothing while the account has AI off', async () => {
     settings([aiState(true, false)], AgentSettings);
     await new Promise((resolve) => setTimeout(resolve, 20));
-    expect(screen.queryByText('No agents yet.')).not.toBeInTheDocument();
+    expect(screen.queryByText(/^No agents yet\./)).not.toBeInTheDocument();
   });
 
   it('lists the agents once AI is on', async () => {
     settings([aiState(true, true), defaults, defaults, defaults, agents, servers], AgentSettings);
-    expect(await screen.findByText('No agents yet.')).toBeInTheDocument();
+    expect(await screen.findByText(/^No agents yet\./)).toBeInTheDocument();
     // How many runs the instance works at once is an admin's.
     expect(screen.queryByText('Runs at once')).not.toBeInTheDocument();
   });

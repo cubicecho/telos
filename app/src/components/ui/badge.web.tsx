@@ -1,22 +1,3 @@
-/**
- * The web badge: one `<span>`, as shadcn's is. `badge.tsx` is the native
- * counterpart, and its header has the reasoning behind the variants and the dot;
- * `badge-base.ts` holds the contract and the class maps they share.
- *
- * On the DOM, colour inherits, so the label class sits on the container and the
- * children — text, a number, an icon beside text — render straight inside it.
- * It also takes every `<span>` attribute (`style`, `title`, `onClick`, `data-*`)
- * and shadcn's `asChild`, which hands the classes to the single child — a link
- * dressed as a badge. Those extras are web only.
- *
- * `onRemove` adds a trailing ✕ as a `<button type="button">`, so it never
- * submits a form it sits in, and its click stops at the button so a badge's own
- * `onClick` does not fire under it. The glyph is `currentColor`, so it follows
- * the label through `textColor`, a variant or a hover. Its padding is the hit
- * area and a negative margin of the same size takes it back out of the layout,
- * which keeps the pill the height it was; it stays inside the pill's edge
- * because `overflow-hidden` would clip a target that did not.
- */
 import { Slot } from 'radix-ui';
 import type * as React from 'react';
 import {
@@ -70,7 +51,7 @@ export function Badge({
           <button
             type="button"
             aria-label={removeLabel ?? badgeRemoveLabel(children, label)}
-            className="-my-1 -mr-1.5 -ml-1 inline-flex cursor-pointer items-center justify-center rounded-full p-1 text-inherit outline-none hover:opacity-75 focus-visible:opacity-75"
+            className="-my-1 -mr-1.5 -ml-1 inline-flex cursor-pointer items-center justify-center rounded-full p-1 text-inherit outline-none hover:bg-current/10 focus-visible:bg-current/10"
             onClick={(event) => {
               event.stopPropagation();
               onRemove();

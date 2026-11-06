@@ -2,16 +2,15 @@ import { useQuery } from '@apollo/client';
 import { Link } from 'expo-router';
 import { useState } from 'react';
 import { Text, View } from 'react-native';
+import { CardLayout } from '@/components/card-layout';
 import { LaneTodoComposer } from '@/components/domain/lane/lane-todo-composer';
 import { TodoRow } from '@/components/domain/todo/todo-row';
 import type { TodoSummary } from '@/components/domain/todo/types';
 import { useCreateTodo } from '@/components/domain/todo/use-create-todo';
-import { Section } from '@/components/section';
 import { Button } from '@/components/ui/button';
 import { LoadState } from '@/components/ui/load-failure';
 import { describeError } from '@/lib/errors';
 import { ProjectLanesDocument, ProjectTodosDocument } from '@/lib/graphql';
-import { CARD_TITLE } from '@/lib/styles';
 
 /**
  * One project as a plain list, for the overview: what is open, a field to add
@@ -36,9 +35,8 @@ export function ProjectTaskList({ project }: { project: { id: string; name: stri
   const nextPosition = all.reduce((max, todo) => Math.max(max, todo.position ?? 0), -1) + 1;
 
   return (
-    <Section
-      surface="card"
-      titleClassName={CARD_TITLE}
+    <CardLayout
+      level={2}
       title={
         <Link href={`/projects/${project.id}`} className="text-foreground no-underline hover:underline">
           {project.name}

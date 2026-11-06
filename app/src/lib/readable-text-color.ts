@@ -1,4 +1,3 @@
-/** The two inks, as a pair. */
 export type Ink = {
   /** Drawn on light backdrops. */
   dark: string;
