@@ -1,3 +1,10 @@
+## [11.1.2](https://github.com/cubicecho/telos/compare/v11.1.1...v11.1.2) (2026-11-06)
+
+
+### Bug Fixes
+
+* **app:** use cubeui's meaning tokens for the last two alias colours ([609c9a1](https://github.com/cubicecho/telos/commit/609c9a1be38f8e3d8257ca5906112ca03586ebe9))
+
 ## [11.1.1](https://github.com/cubicecho/telos/compare/v11.1.0...v11.1.1) (2026-11-06)
 
 
