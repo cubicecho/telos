@@ -61,7 +61,7 @@ export const TodoFilterBar = forwardRef<
             <Button
               variant="outline"
               size="sm"
-              className={cn('gap-2', selected && 'border-ring')}
+              className={cn('gap-2', selected && 'border-active')}
               aria-label="Filter by label"
               iconSlot={selected ? <ColorDot color={selected.color} size="sm" /> : <Tag className="h-4 w-4" />}
               content={selected ? selected.name : 'Label'}

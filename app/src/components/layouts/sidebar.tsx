@@ -74,7 +74,7 @@ export function Sidebar() {
                   what="your projects"
                   count={projects.length}
                   compact
-                  emptySlot={<Text className="px-2 py-2 text-muted-foreground text-sm">No projects yet.</Text>}
+                  emptySlot={<Text className="px-2 py-2 text-foreground/60 text-sm">No projects yet.</Text>}
                 />
               }
               contentSlot={projects.map((project) => (
