@@ -80,7 +80,7 @@ export function SettingRow({
       className={cn('min-w-0 flex-row flex-wrap items-center justify-between gap-x-4 gap-y-2', className)}
     >
       {title || description ? (
-        <View testID="setting-row-text" className="min-w-48 flex-1 gap-0.5">
+        <View testID="setting-row-text" className="min-w-48 flex-1 gap-1">
           {folded ? (
             // Beside the title and not inside it: the title is a `Text`.
             <View testID="setting-row-title-row" className="min-w-0 flex-row items-center gap-2">

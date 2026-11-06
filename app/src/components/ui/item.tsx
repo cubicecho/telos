@@ -1,12 +1,3 @@
-/**
- * shadcn's `Item` parts on React Native, under shadcn's names and with its `variant` and `size`.
- * `item.web.tsx` is the web counterpart and `item-base.ts` holds the classes they share.
- *
- * These are for a row `ListItem` does not fit: a header line, a footer that opens, a title with a
- * badge beside it. A string passed to a part is wrapped in a `Text`, since a bare string in a
- * `View` throws on device. `ItemMedia` does not size what is in it, as there is no `[&_svg]`
- * selector: pass an icon at `size-4`.
- */
 import { Slot } from '@radix-ui/react-slot';
 import * as React from 'react';
 import { Text, View } from 'react-native';
@@ -17,6 +8,7 @@ import {
   ITEM_FOOTER_CLASS,
   ITEM_HEADER_CLASS,
   ITEM_SELECTED_CLASS,
+  ITEM_SELECTED_DESCRIPTION_CLASS,
   ITEM_SEPARATOR_CLASS,
   ITEM_TITLE_CLASS,
   ITEM_TITLE_TEXT,
@@ -91,6 +83,9 @@ type ItemProps = ViewProps & {
   selected?: boolean | undefined;
 };
 
+/** Whether the row the part is in is the chosen one, so its description can take its ink. */
+const ItemSelectedContext = React.createContext(false);
+
 /** One row: media, content and actions side by side. */
 function Item({
   className,
@@ -105,9 +100,17 @@ function Item({
     // `Slot` is typed for the DOM, but it renders nothing of its own — it clones the caller's
     // one child with these props merged in — so the cast is the honest way to say neither side's
     // typing describes it (`Button` does the same).
-    return <Slot className={classes} {...(props as unknown as React.HTMLAttributes<HTMLElement>)} />;
+    return (
+      <ItemSelectedContext.Provider value={selected}>
+        <Slot className={classes} {...(props as unknown as React.HTMLAttributes<HTMLElement>)} />
+      </ItemSelectedContext.Provider>
+    );
   }
-  return <View testID="item" className={classes} {...props} />;
+  return (
+    <ItemSelectedContext.Provider value={selected}>
+      <View testID="item" className={classes} {...props} />
+    </ItemSelectedContext.Provider>
+  );
 }
 
 type ItemMediaProps = ViewProps & { variant?: ItemMediaVariant | null | undefined };
@@ -140,7 +143,14 @@ function ItemTitle({ className, children, ...props }: ViewProps) {
 
 /** The muted line under the item's title. */
 function ItemDescription({ className, ...props }: TextProps) {
-  return <Text testID="item-description" className={cn(ITEM_DESCRIPTION_CLASS, className)} {...props} />;
+  const selected = React.useContext(ItemSelectedContext);
+  return (
+    <Text
+      testID="item-description"
+      className={cn(ITEM_DESCRIPTION_CLASS, selected && ITEM_SELECTED_DESCRIPTION_CLASS, className)}
+      {...props}
+    />
+  );
 }
 
 /** The buttons at the far end of an item. */

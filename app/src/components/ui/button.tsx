@@ -1,19 +1,3 @@
-/**
- * One button for both platforms, built on `Pressable`, and the file every other converted
- * primitive is modelled on.
- *
- * It takes no `children`: the inside is `iconSlot`, `content` and `trailingSlot`, which is what
- * lets `loading` swap the icon for a spinner. A string `content` is wrapped in a `Text`, because
- * text colour is not inherited on native. There is no `asChild`; a button that navigates takes
- * the link as `linkSlot`. The compiled web half is a real `<button>` with the rest of its props,
- * and its sizes and variants are a superset of shadcn's.
- *
- * An `icon*` size has to be given an `aria-label`. A `hint` is the button's tooltip, the only
- * one it draws, and is read after the name: on the web from an always-mounted `sr-only` text
- * the button points at, because Radix unmounts a closed tooltip, and on device as the
- * accessibility hint. With a `hint`, `disabled` is `aria-disabled`, so the reason can be reached.
- */
-
 import { Slot } from '@radix-ui/react-slot';
 import { cva, type VariantProps } from 'class-variance-authority';
 import * as React from 'react';
@@ -24,40 +8,52 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import type { TooltipSide } from '@/components/ui/tooltip-base';
 import { cn, type SlotNode } from '@/lib/utils';
 
-/** The button's container classes for each `variant` and `size`. */
+/**
+ * The button's container classes for each `variant` and `size`. Each variant does the same under
+ * the pointer, the keyboard and a finger: `hover:`, `focus-visible:` and `active:`, the last being
+ * the only one a touch screen fires.
+ */
 const buttonVariants = cva(
-  'inline-flex flex-row items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-semibold transition-colors focus-visible:outline-none [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0',
+  'group/button inline-flex flex-row items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-semibold transition-colors focus-visible:outline-none [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0',
   {
     variants: {
       variant: {
-        default: 'bg-neutral text-neutral-foreground hover:bg-neutral/90 focus-visible:bg-neutral/90',
-        destructive: 'bg-negative text-negative-foreground hover:bg-negative/90 focus-visible:bg-negative/90',
+        default:
+          'bg-neutral text-neutral-foreground hover:bg-neutral/90 focus-visible:bg-hover focus-visible:text-foreground active:bg-neutral/90',
+        destructive:
+          'bg-negative text-negative-foreground hover:bg-negative/90 focus-visible:bg-hover focus-visible:text-foreground active:bg-negative/90',
         /** A destructive action that is not the emphasis of its row. */
         'destructive-outline':
-          'border border-negative/40 bg-transparent text-negative hover:bg-negative/10 focus-visible:bg-negative/10',
+          'border border-negative/40 bg-transparent text-negative hover:bg-negative/10 focus-visible:bg-negative/10 active:bg-negative/10',
         /** The action that keeps the work: save, confirm, create. */
-        positive: 'bg-positive text-positive-foreground hover:bg-positive/90 focus-visible:bg-positive/90',
+        positive:
+          'bg-positive text-positive-foreground hover:bg-positive/90 focus-visible:bg-hover focus-visible:text-foreground active:bg-positive/90',
         'positive-outline':
-          'border border-positive/40 bg-transparent text-positive hover:bg-positive/10 focus-visible:bg-positive/10',
+          'border border-positive/40 bg-transparent text-positive hover:bg-positive/10 focus-visible:bg-positive/10 active:bg-positive/10',
         /** The action that adds something: add, new, create. */
-        info: 'bg-info text-info-foreground hover:bg-info/90 focus-visible:bg-info/90',
-        'info-outline': 'border border-info/40 bg-transparent text-info hover:bg-info/10 focus-visible:bg-info/10',
-        outline: 'border border-foreground/50 bg-background text-foreground hover:bg-hover focus-visible:bg-hover',
-        secondary: 'bg-foreground/10 text-foreground hover:bg-hover focus-visible:bg-hover',
+        info: 'bg-info text-info-foreground hover:bg-info/90 focus-visible:bg-hover focus-visible:text-foreground active:bg-info/90',
+        'info-outline':
+          'border border-info/40 bg-transparent text-info hover:bg-info/10 focus-visible:bg-info/10 active:bg-info/10',
+        outline:
+          'border border-foreground/50 bg-background text-foreground hover:bg-hover focus-visible:bg-hover active:bg-hover',
+        // Hover and focus draw an edge, not a fill: `bg-hover` is 1.01:1 against this grey, so the
+        // icon buttons inside a field (reveal, clear) showed no change when tabbed to.
+        secondary:
+          'border border-transparent bg-foreground/10 text-foreground hover:border-foreground/60 focus-visible:border-foreground/60 active:border-foreground/60',
         ghost:
-          'text-foreground/60 hover:bg-hover hover:text-foreground focus-visible:bg-hover focus-visible:text-foreground',
-        link: 'text-info underline-offset-4 hover:underline focus-visible:underline',
+          'text-foreground/60 hover:bg-hover hover:text-foreground focus-visible:bg-hover focus-visible:text-foreground active:bg-hover active:text-foreground',
+        link: 'text-info underline-offset-4 hover:underline focus-visible:underline active:underline',
       },
       size: {
         default: 'h-10 px-4 py-2',
         /** Small enough to sit inline in a list row without setting its height. */
-        xs: 'h-7 rounded-lg px-3',
+        xs: 'h-7 px-3',
         sm: 'h-9 rounded-md px-3',
         lg: 'h-11 rounded-md px-8',
         icon: 'h-10 w-10',
         // shadcn's icon ladder, on this file's own heights: each square is the height of the
         // text size it is named after, so an icon button sits flush in a row of text buttons.
-        'icon-xs': 'h-7 w-7 rounded-lg [&_svg]:size-3.5',
+        'icon-xs': 'h-7 w-7 [&_svg]:size-3.5',
         'icon-sm': 'h-9 w-9',
         'icon-lg': 'h-11 w-11',
       },
@@ -90,16 +86,16 @@ const buttonTextVariants = cva('font-semibold', {
       'icon-lg': 'text-sm',
     },
     variant: {
-      default: 'text-neutral-foreground',
-      destructive: 'text-negative-foreground',
+      default: 'text-neutral-foreground group-focus-visible/button:text-foreground',
+      destructive: 'text-negative-foreground group-focus-visible/button:text-foreground',
       'destructive-outline': 'text-negative',
-      positive: 'text-positive-foreground',
+      positive: 'text-positive-foreground group-focus-visible/button:text-foreground',
       'positive-outline': 'text-positive',
-      info: 'text-info-foreground',
+      info: 'text-info-foreground group-focus-visible/button:text-foreground',
       'info-outline': 'text-info',
       outline: 'text-foreground',
       secondary: 'text-foreground',
-      ghost: 'text-foreground/60',
+      ghost: 'text-foreground/60 group-focus-visible/button:text-foreground',
       link: 'text-info underline',
     },
   },

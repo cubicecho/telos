@@ -1,24 +1,3 @@
-/**
- * What shows when the tree below a route has thrown.
- *
- * Deliberately dependency-free beyond `ui/`: it must not rely on the data
- * client, the router, or theme state, since any of those could be what failed.
- *
- * It is the whole screen and says everything an error boundary needs said, so
- * the boundary renders it and nothing around it: the root is `role="alert"`,
- * the raw message for a bug report is `details`, and a second way out (a
- * reload, a restart) is `actionsSlot`.
- *
- * ```tsx
- * <RouteError
- *   error={error}
- *   reset={retry}
- *   describe={describeError}
- *   details
- *   actionsSlot={<Button variant="outline" size="sm" onPress={reload} content="Reload" />}
- * />
- * ```
- */
 import type { ReactNode } from 'react';
 import { Platform, Text, View } from 'react-native';
 import { Button } from '@/components/ui/button';
@@ -98,8 +77,10 @@ export function RouteError({
       <View className="rounded-full bg-negative/10 p-4">
         <CircleAlert className="h-7 w-7 text-negative" />
       </View>
-      <View className="max-w-sm items-center">
-        <Text testID="route-error-title" className="font-semibold text-foreground">
+      {/* One width for the text and the details under it, not two centred columns. The title is
+          the screen's heading: `role`/`aria-level` because an `<h1>` has no native counterpart. */}
+      <View className="max-w-md items-center">
+        <Text testID="route-error-title" role="heading" aria-level={1} className="font-semibold text-foreground">
           {title}
         </Text>
         <Text className="mt-1 text-center text-sm text-foreground/60">{summary}</Text>

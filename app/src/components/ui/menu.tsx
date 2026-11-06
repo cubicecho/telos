@@ -1,19 +1,3 @@
-/**
- * The native menu: the popover's centred sheet with a `role="menu"` inside it and a
- * `role="menuitem"` per row. `menu.web.tsx` is the counterpart and `menu-base.ts` the contract.
- *
- * Built on `Popover` rather than beside it, so the sheet, its backdrop and the back button are
- * the popover's and are not written twice. The menu keeps the open state itself and hands it to
- * the popover controlled, because a row has to close the sheet it sits in and the popover's own
- * context is not exported.
- *
- * What radix does on the web and this does not: arrow keys and typeahead. A touch screen has
- * neither, and the screen reader walks the rows by swipe. Focus does go back to the trigger when
- * the sheet shuts — by `focus()` under react-native-web, and on device as an accessibility focus
- * event, which is the only focus a `View` has there — unless the row chosen was
- * `focusesElsewhere`, whose target keeps it.
- */
-
 import {
   cloneElement,
   createContext,
@@ -189,8 +173,9 @@ function MenuItem({
       )}
     >
       {/* Colour does not inherit on native, so the row's ink reaches the icon through the
-          context and the label through its own class. */}
-      <IconClassContext.Provider value={cn('size-4 shrink-0', ink)}>
+          context and the label through its own class. The icon is quieter than the label
+          except on a destructive row, where both are `negative`. */}
+      <IconClassContext.Provider value={cn('size-4 shrink-0', destructive ? ink : 'text-foreground/60')}>
         {iconSlot}
         <Text numberOfLines={1} className={cn(MENU_ITEM_TEXT_CLASS, ink)}>
           {label}
@@ -246,7 +231,8 @@ function ToggleRow({ kind, checked, onPress, iconSlot, label, trailing, disabled
       onPress={onPress}
       className={cn(MENU_ITEM_CLASS, 'active:bg-hover', disabled && 'opacity-50', className)}
     >
-      <IconClassContext.Provider value={cn('size-4 shrink-0', ink)}>
+      {/* The icon quieter than the label, as MenuItem's. */}
+      <IconClassContext.Provider value="size-4 shrink-0 text-foreground/60">
         {iconSlot}
         <Text numberOfLines={1} className={cn(MENU_ITEM_TEXT_CLASS, ink)}>
           {label}

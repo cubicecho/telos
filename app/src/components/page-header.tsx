@@ -1,19 +1,4 @@
-/**
- * The title block a page wears in a header slot — written once here and compiled for the web by
- * `scripts/rn2web`, so the DOM `PageHeader` and the React Native one are the same component.
- *
- * Two things the web drew with CSS the device cannot, each behind a `Platform.select` the
- * compiler folds so the web output keeps the classes it always had:
- *
- * - the icon is sized with `[&_svg]:size-5`, an arbitrary variant NativeWind has no answer for —
- *   on device, pass the icon at the size you want;
- * - a loading title keeps its name in an `sr-only` heading, which is a clip on the web and a
- *   one-pixel box on device.
- *
- * The title's colour is not one of them: it is named on every platform, because react-native-web
- * does not inherit it either.
- */
-import type { ReactNode } from 'react';
+import { createContext, type ReactNode, useContext } from 'react';
 import { Platform, Text, View } from 'react-native';
 import { cn, type SlotNode } from '@/lib/utils';
 
@@ -206,6 +191,12 @@ function Heading({ level, className, children }: { level: PageHeaderLevel; class
  * one line, because the variable is how wide the action is, not the window. The title wraps and
  * never truncates.
  */
+/**
+ * Set by a shell that already insets its content — `Page` — so a `PageHeader` inside it does not
+ * add its own `px-4` and top padding on top, which put the title 16px right of the body under it.
+ */
+export const PageInsetContext = createContext(false);
+
 export function PageHeader({
   contentSlot,
   title,
@@ -220,6 +211,7 @@ export function PageHeader({
   contentClassName,
 }: PageHeaderProps) {
   const { title: titleSize, icon: iconSize, row: rowFloor, bar: barHeight } = LEVELS[level];
+  const inset = useContext(PageInsetContext);
 
   // The rule these apps already follow without having named it: a page header draws a line under
   // itself exactly when nothing else separates it from the body. The list headers, which all
@@ -235,7 +227,8 @@ export function PageHeader({
   const descriptionLine = loading ? (
     <View testID="page-header-description" aria-hidden className={cn(BAR, 'h-5 w-72')} />
   ) : (
-    <Text testID="page-header-description" webAs="p" className="text-foreground/60 text-sm">
+    // `max-w-prose`: under a page-wide header a description could run to 200 characters a line.
+    <Text testID="page-header-description" webAs="p" className="max-w-prose text-foreground/60 text-sm">
       {description}
     </Text>
   );
@@ -246,7 +239,7 @@ export function PageHeader({
     <View
       testID="page-header"
       aria-busy={loading || undefined}
-      className={cn('min-w-0 flex-col gap-3 px-4 py-4', rule, className)}
+      className={cn('min-w-0 flex-col gap-3 px-4 py-4', inset && 'px-0 pt-0', rule, className)}
     >
       {breadcrumbsSlot ? (
         <View testID="page-header-breadcrumbs" className={cn(SLOT, 'min-w-0')}>
@@ -258,12 +251,16 @@ export function PageHeader({
         testID="page-header-title-row"
         // `content-center`: a wrapping row packs its lines at the start on device and under
         // react-native-web, so the floor was left as an empty band under a lone title (#248).
-        className={cn('flex-row flex-wrap content-center items-center justify-between gap-x-4 gap-y-2', rowFloor)}
+        // `items-start`: the action lines up with the title, as CardLayout's does, rather than
+        // floating between the title and the description under it.
+        className={cn('flex-row flex-wrap content-center items-start justify-between gap-x-4 gap-y-2', rowFloor)}
       >
-        {/* `basis-64` is the threshold, and the only number here that is a judgement rather than
-            a measurement: the title keeps at least 16rem or the action wraps under it. `min-w-0`
-            is what then lets the block shrink below its longest word. */}
-        <View testID="page-header-titles" className="min-w-0 flex-1 basis-64 flex-col gap-1">
+        {/* `basis-40` is the threshold, and the only number here that is a judgement rather than
+            a measurement: the title keeps at least 10rem or the action wraps under it. At 16rem
+            any action wider than about 70px dropped under even a one-word title on a phone; 10rem
+            is the floor CardLayout's header already uses. `min-w-0` is what then lets the block
+            shrink below its longest word. */}
+        <View testID="page-header-titles" className="min-w-0 flex-1 basis-40 flex-col gap-1">
           <View className="min-w-0 flex-row items-center gap-2">
             {iconSlot ? (
               // Sized here on the web rather than by the caller, so an icon passed as `<Users />`

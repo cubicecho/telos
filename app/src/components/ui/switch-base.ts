@@ -1,13 +1,3 @@
-/**
- * The contract `switch.tsx` (native) and `switch.web.tsx` (radix) both
- * implement. Its own module because Metro resolves `./switch` to
- * `switch.web.tsx` on web — the web file would otherwise import itself.
- *
- * Controlled or not, as radix's is. The web half takes radix's whole
- * `Switch.Root` surface on top of this — `name`, `value`, `required`, the
- * `aria-*` props, shadcn's `size` — because it installs over a DOM app's
- * shadcn switch; this is the part that means something on both platforms.
- */
 import type { TooltipSide } from '@/components/ui/tooltip-base';
 
 export type SwitchProps = {
@@ -48,8 +38,13 @@ export type SwitchProps = {
   className?: string | undefined;
 };
 
-/** Shared between the two files so the track cannot drift between platforms. */
-export const SWITCH_TRACK_CLASS =
-  'h-5 w-9 shrink-0 flex-row items-center rounded-full border-2 border-transparent shadow-xs';
-/** The switch's thumb: the circle that slides along the track. */
-export const SWITCH_THUMB_CLASS = 'h-4 w-4 rounded-full bg-background shadow-lg';
+/**
+ * Shared between the two files so the track cannot drift between platforms. No shadow: the track
+ * sits in the page's flow, and only what floats draws one.
+ */
+export const SWITCH_TRACK_CLASS = 'h-5 w-9 shrink-0 flex-row items-center rounded-full border-2 border-transparent';
+/**
+ * The switch's thumb: the circle that slides along the track. The one part laid over another, so
+ * the smallest shadow — not a dialog's `shadow-lg`.
+ */
+export const SWITCH_THUMB_CLASS = 'h-4 w-4 rounded-full bg-background shadow-sm';

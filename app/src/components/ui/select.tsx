@@ -1,15 +1,3 @@
-/**
- * The native select: a trigger that opens the options in a `Modal` sheet.
- *
- * A listbox that drops open under its trigger is a pointer affordance; every
- * native platform shows the choices as a sheet instead, so that is what this
- * renders rather than trying to reproduce radix's anchored popper.
- *
- * `SelectContent` owns the `Modal`, which is why `Select` may hold both a
- * trigger and a content child in any order — the open state lives in the
- * context above them.
- */
-
 import { createContext, useContext, useState } from 'react';
 import { Modal, Pressable, ScrollView, Text, View } from 'react-native';
 import { Check, ChevronDown } from '@/components/ui/icons';
@@ -105,7 +93,8 @@ function SelectTrigger({ className, onBlur, disabled, children, ...aria }: Selec
       className={cn(
         SELECT_TRIGGER_CLASS,
         isInvalid(aria['aria-invalid']) && FIELD_INVALID_CLASS,
-        isDisabled && 'opacity-50',
+        // A quiet fill as well as the fade, so a disabled value does not read as a placeholder.
+        isDisabled && 'bg-foreground/10 opacity-50',
         className,
       )}
     >

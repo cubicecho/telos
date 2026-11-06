@@ -1,26 +1,3 @@
-/**
- * `Combobox`, bound to a form field: one of the options' values, or a list of them with
- * `multiple`.
- *
- * For the choice `SelectField` cannot draw: a list long enough to need `searchable`, one that
- * fills when it opens (`onOpenChange`), one with a note in it, or one that holds several. Its own
- * item rather than more props on `SelectField`, so a form of plain inputs does not pull in the
- * popover and the command list.
- *
- * The field is `asGroup`: the search menu's trigger is a pressable and not a form control, which
- * a label's `htmlFor` cannot name on device, so it points back at the label by `aria-labelledby`.
- *
- * ```tsx
- * <form.AppField name="model">
- *   {() => <ComboboxField label="Model" options={models} searchable />}
- * </form.AppField>
- * <form.AppField name="labelIds">
- *   {() => <ComboboxField label="Labels" options={labels} multiple />}
- * </form.AppField>
- * ```
- *
- * Or on `field.*`, with `createAppForm({ ComboboxField })`.
- */
 import { useCallback, useMemo, useRef } from 'react';
 import { Combobox, type ComboboxMultipleProps, type ComboboxSingleProps } from '@/components/combobox';
 import { type FieldProps, FieldWrapper, splitProps, useFieldContext } from '@/components/ui/form';

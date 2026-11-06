@@ -1,13 +1,3 @@
-/**
- * The web switch: radix. `switch.tsx` is the native counterpart and
- * `switch-base.ts` holds the contract they share.
- *
- * It takes radix's `Switch.Root` props whole, plus shadcn's `size`, because it
- * installs over a DOM app's shadcn switch at `components/ui/switch.tsx`:
- * `defaultChecked`, `name`, `value`, `required` and the `aria-*` props all
- * reach radix, which renders the hidden `<input>` a native form submit reads.
- */
-
 import { Switch as SwitchPrimitive } from 'radix-ui';
 import { type ComponentPropsWithRef, useId } from 'react';
 import { SWITCH_THUMB_CLASS, SWITCH_TRACK_CLASS } from '@/components/ui/switch-base';
@@ -70,7 +60,7 @@ function Switch({
       aria-label={ariaLabel ?? accessibilityLabel}
       className={cn(
         SWITCH_TRACK_CLASS,
-        'peer group/switch inline-flex cursor-pointer transition-colors focus-visible:outline-none data-[state=unchecked]:focus-visible:bg-hover data-[state=checked]:focus-visible:bg-active/90 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-negative data-[state=checked]:bg-active data-[state=unchecked]:bg-foreground/50 data-[size=sm]:h-4 data-[size=sm]:w-7',
+        'peer group/switch inline-flex cursor-pointer transition-colors focus-visible:outline-none data-[state=unchecked]:focus-visible:bg-hover data-[state=checked]:focus-visible:bg-hover disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-negative data-[state=checked]:bg-active data-[state=unchecked]:bg-foreground/50 data-[size=sm]:h-4 data-[size=sm]:w-7',
         refuses && 'cursor-not-allowed opacity-50',
         className,
       )}

@@ -1,18 +1,3 @@
-/**
- * The icon set, native implementation. `icons.web.tsx` is its web counterpart and
- * `icons-base.ts` holds what they share.
- *
- * Each icon is imported from `lucide-react-native/icons/<name>`, because Metro does not tree-shake
- * the package barrel. `cssInterop` teaches each one `className`, and its colour is resolved
- * eagerly since a device has no `currentColor`: `text-foreground`, then `IconClassContext`, then
- * the call site's own `text-*`.
- *
- * A glyph an app needs and this set lacks is wrapped in the app with the exported `icon`, since
- * the next `shadcn add` overwrites this file. A name added here goes in both files: TypeScript
- * resolves only the native one, and `npm run registry:check` is what catches a name on one
- * platform only. Names are lucide's canonical ones, not its deprecated aliases.
- */
-
 import type { LucideIcon, LucideProps } from 'lucide-react-native';
 import ArrowDownWideNarrowSource from 'lucide-react-native/icons/arrow-down-wide-narrow';
 import ArrowLeftSource from 'lucide-react-native/icons/arrow-left';
@@ -100,7 +85,14 @@ export function icon(Source: LucideIcon) {
   });
 
   return function Icon({ className, ...props }: IconProps) {
-    const inherited = useContext(IconClassContext);
+    // A `group-*` variant handed down for the label beside it (a focused pill's
+    // `group-focus-visible/pill:text-foreground`) is left out, and the icon keeps the row's ink.
+    // That is only a device's icon: there is no keyboard focus there, and on the web the icon takes
+    // `currentColor` from the pressable, which turns with its own `focus-visible:`.
+    const inherited = useContext(IconClassContext)
+      ?.split(' ')
+      .filter((cls) => cls.startsWith('group-') === false)
+      .join(' ');
     return <Styled className={cn('text-foreground', inherited, className)} {...props} />;
   };
 }

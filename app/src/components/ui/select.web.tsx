@@ -1,16 +1,3 @@
-/**
- * The web select: radix. `select.tsx` is the native counterpart and
- * `select-base.ts` holds the contract they share.
- *
- * **It is also shadcn's select, part for part and prop for prop.** It installs
- * over a DOM app's `components/ui/select.tsx`, so every part takes radix's own
- * props — `SelectTrigger` every `<button>` attribute and shadcn's `size`,
- * `SelectContent` `position`/`side`/`align`, `SelectItem` `disabled` and
- * `textValue`, the root `defaultValue`, `name` and `required` — and the two
- * scroll buttons are exported and drawn inside the content, as shadcn draws them.
- * `position` defaults to radix's `"item-aligned"`, which is shadcn's default too.
- */
-
 import { Select as SelectPrimitive } from 'radix-ui';
 import type { ComponentPropsWithRef, ElementType } from 'react';
 import { Check, ChevronDown, ChevronUp } from '@/components/ui/icons';
@@ -24,6 +11,7 @@ import {
   SELECT_TRIGGER_CLASS,
   SELECT_TRIGGER_TEXT_CLASS,
 } from '@/components/ui/select-base';
+import { FrameFocusGuard } from '@/lib/frame-focus-guard';
 import { cn } from '@/lib/utils';
 
 // Each part's props are radix's, with `className` re-declared: radix types it `className?: string`,
@@ -90,7 +78,7 @@ function SelectTrigger({
       className={cn(
         SELECT_TRIGGER_CLASS,
         SELECT_TRIGGER_TEXT_CLASS,
-        'flex focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-negative aria-invalid:focus:border-active focus:border-active data-[placeholder]:text-foreground/60 data-[size=sm]:h-8 [&>span]:line-clamp-1',
+        'flex focus:outline-none disabled:cursor-not-allowed disabled:bg-foreground/10 disabled:opacity-50 aria-invalid:border-negative aria-invalid:focus:border-active focus:border-active data-[placeholder]:text-foreground/60 data-[size=sm]:h-8 [&>span]:line-clamp-1',
         className,
       )}
     >
@@ -136,6 +124,8 @@ function SelectContent({
           {children}
         </SelectPrimitive.Viewport>
         <SelectScrollDownButton />
+        {/* A framed app focusing itself would blur the window, which closes the list at once. */}
+        <FrameFocusGuard />
       </SelectPrimitive.Content>
     </SelectPrimitive.Portal>
   );

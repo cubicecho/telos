@@ -1,17 +1,3 @@
-/**
- * The web menu: radix `DropdownMenu`, anchored to its trigger. `menu.tsx` is the native
- * counterpart and `menu-base.ts` holds the contract they share.
- *
- * Radix is the reason this half is hand-written rather than compiled: `role="menu"` with the
- * trigger as its name, arrow keys and Home/End between the rows (skipping disabled ones),
- * typeahead on each row's label, focus moved into the menu on open and back to the trigger on
- * close (unless the row chosen is `focusesElsewhere`), and the menu closing when a row is
- * chosen. None of that is layout, so none of it could come out of the React Native source.
- *
- * Each part also takes the props of the radix part it renders — `side`, `sideOffset`, `modal`,
- * `onCloseAutoFocus` — on top of the contract. Those extras are web only.
- */
-
 import { DropdownMenu as MenuPrimitive } from 'radix-ui';
 import type * as React from 'react';
 import { cloneElement, createContext, type RefObject, useContext, useRef, useState } from 'react';
@@ -34,6 +20,7 @@ import {
   type MenuSeparatorProps,
   type MenuTriggerProps,
 } from '@/components/ui/menu-base';
+import { FrameFocusGuard } from '@/lib/frame-focus-guard';
 import { cn } from '@/lib/utils';
 
 /** The shared contract, widened to what the radix part underneath accepts. */
@@ -94,6 +81,7 @@ function MenuContent({
   align = 'center',
   sideOffset = 4,
   onCloseAutoFocus,
+  children,
   ...props
 }: Wide<MenuContentProps, React.ComponentProps<typeof MenuPrimitive.Content>>) {
   const { skipReturnRef } = useContext(MenuContext);
@@ -105,7 +93,7 @@ function MenuContent({
         sideOffset={sideOffset}
         className={cn(
           MENU_CONTENT_CLASS,
-          'z-50 max-h-(--radix-dropdown-menu-content-available-height) origin-(--radix-dropdown-menu-content-transform-origin) overflow-x-hidden overflow-y-auto rounded-md border bg-secondary text-foreground shadow-md data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
+          'z-50 max-h-(--radix-dropdown-menu-content-available-height) origin-(--radix-dropdown-menu-content-transform-origin) overflow-x-hidden overflow-y-auto text-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
           className,
         )}
         {...props}
@@ -118,7 +106,11 @@ function MenuContent({
           }
           skipReturnRef.current = false;
         }}
-      />
+      >
+        {children}
+        {/* A framed app focusing itself would blur the window, which closes a menu at once. */}
+        <FrameFocusGuard />
+      </MenuPrimitive.Content>
     </MenuPrimitive.Portal>
   );
 }
@@ -140,7 +132,11 @@ function MenuItem({
   const { setOpen, skipReturnRef } = useContext(MenuContext);
   const row = (
     <>
-      {iconSlot}
+      {/* The icon quieter than the label, except on a destructive row, where it follows the
+          row's `negative` through currentColor. */}
+      {iconSlot ? (
+        <span className={cn('flex shrink-0', destructive === false && 'text-foreground/60')}>{iconSlot}</span>
+      ) : null}
       <span className={cn(MENU_ITEM_TEXT_CLASS, 'truncate')}>{label}</span>
       {typeof trailing === 'string' ? <span className={MENU_TRAILING_CLASS}>{trailing}</span> : trailing}
     </>
@@ -209,7 +205,7 @@ function MenuSeparator({
 function ToggleRowBody({ iconSlot, label, trailing }: Pick<MenuCheckboxItemProps, 'iconSlot' | 'label' | 'trailing'>) {
   return (
     <>
-      {iconSlot}
+      {iconSlot ? <span className="flex shrink-0 text-foreground/60">{iconSlot}</span> : null}
       <span className={cn(MENU_ITEM_TEXT_CLASS, 'truncate')}>{label}</span>
       {typeof trailing === 'string' ? <span className={MENU_TRAILING_CLASS}>{trailing}</span> : trailing}
       <span className={cn(MENU_INDICATOR_CLASS, 'flex')}>
