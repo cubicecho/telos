@@ -1,10 +1,9 @@
 import { useMutation, useQuery } from '@apollo/client';
 import { Text, View } from 'react-native';
-import { Section } from '@/components/section';
+import { CardLayout } from '@/components/card-layout';
 import { SegmentedButton, SegmentedGroup } from '@/components/ui/segmented';
 import { describeError } from '@/lib/errors';
 import { RunRetentionDocument, SetRunRetentionDocument } from '@/lib/graphql';
-import { CARD_TITLE } from '@/lib/styles';
 
 // How long finished runs are kept. The server prunes hourly, and only runs the
 // agents no longer count, so a shorter setting never makes an agent redo work.
@@ -37,9 +36,8 @@ export function RunRetention() {
   }
 
   return (
-    <Section
-      surface="card"
-      titleClassName={CARD_TITLE}
+    <CardLayout
+      level={2}
       title="Run history"
       description="How long finished runs and their logs are kept. Notes, history and artifacts stay either way, and a run an agent still counts is never pruned."
       contentSlot={

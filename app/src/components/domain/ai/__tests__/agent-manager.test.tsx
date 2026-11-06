@@ -195,7 +195,7 @@ describe('AgentManager', () => {
       agents([AGENT]),
     ]);
 
-    expect(await screen.findByText('No agents yet.')).toBeInTheDocument();
+    expect(await screen.findByText(/^No agents yet\./)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'New agent' }));
 
     await user.type(screen.getByLabelText('Name'), 'Reviewer');
@@ -251,7 +251,7 @@ describe('AgentManager', () => {
       agents([AGENT]),
     ]);
 
-    expect(await screen.findByText('No agents yet.')).toBeInTheDocument();
+    expect(await screen.findByText(/^No agents yet\./)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'From a template' }));
     expect((await screen.findAllByRole('menuitem')).map((item) => item.textContent)).toEqual([
       'Planner',

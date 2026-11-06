@@ -1,5 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { View } from 'react-native';
+import { CardLayout } from '@/components/card-layout';
 import { AgentSettings, AiSettings } from '@/components/domain/ai/ai-settings';
 import { McpServerManager } from '@/components/domain/ai/mcp-server-manager';
 import { PromptSettings } from '@/components/domain/ai/prompt-settings';
@@ -7,12 +8,10 @@ import { LabelManager } from '@/components/domain/label/label-manager';
 import { SsoSettings } from '@/components/domain/sso/sso-pairing';
 import { TemplateManager } from '@/components/domain/template/template-manager';
 import { PageLayout } from '@/components/page-layout';
-import { Section } from '@/components/section';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ThemePicker } from '@/components/ui/theme-picker';
 import { PALETTE_PREFERENCES } from '@/components/ui/theme-preference-base';
 import { useAi } from '@/lib/ai';
-import { CARD_TITLE } from '@/lib/styles';
 
 type SettingsTab = 'general' | 'ai' | 'agents' | 'mcp' | 'prompts';
 
@@ -37,9 +36,8 @@ export default function SettingsScreen() {
 
   const general = (
     <View className="gap-6">
-      <Section
-        surface="card"
-        titleClassName={CARD_TITLE}
+      <CardLayout
+        level={2}
         title="Theme"
         description="System follows whatever your operating system is set to. A dark-only palette, such as Monokai, keeps the page dark whatever the theme says."
         contentSlot={<ThemePicker palettes={PALETTE_PREFERENCES} />}

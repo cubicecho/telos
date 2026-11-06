@@ -43,7 +43,7 @@ describe('TemplateManager', () => {
     await user.click(screen.getByRole('button', { name: 'Delete Pipeline' }));
     await user.click(await screen.findByRole('button', { name: 'Delete' }));
     await vi.waitFor(() => expect(remove).toHaveBeenCalled());
-    expect(await screen.findByText('No templates yet.')).toBeInTheDocument();
+    expect(await screen.findByText(/^No templates yet\./)).toBeInTheDocument();
   });
 });
 

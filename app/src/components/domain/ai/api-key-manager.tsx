@@ -2,11 +2,12 @@ import { useMutation, useQuery } from '@apollo/client';
 import { useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
 import { useAppForm } from '@/components/app-form';
+import { CardLayout } from '@/components/card-layout';
 import { ConfirmButton } from '@/components/confirm-button';
 import { DialogLayout } from '@/components/dialog-layout';
 import { EmptyState } from '@/components/empty-state';
 import { List } from '@/components/list';
-import { Section } from '@/components/section';
+import { ListItem } from '@/components/list-item';
 import { Button } from '@/components/ui/button';
 import { Field, FieldContent, FieldDescription, FieldLegend, FieldSet, FieldTitle } from '@/components/ui/field';
 import { Form } from '@/components/ui/form';
@@ -22,7 +23,6 @@ import {
   McpToolsDocument,
   SetApiKeyToolsDocument,
 } from '@/lib/graphql';
-import { CARD_TITLE } from '@/lib/styles';
 
 /** The expiry options are in days; better-auth takes seconds. */
 const DAY_SECONDS = 24 * 60 * 60;
@@ -68,9 +68,8 @@ export function ApiKeyManager() {
   }
 
   return (
-    <Section
-      surface="card"
-      titleClassName={CARD_TITLE}
+    <CardLayout
+      level={2}
       title="API keys"
       description="For MCP clients. A key acts as you, and only while AI is on."
       actionSlot={
@@ -96,45 +95,47 @@ export function ApiKeyManager() {
             count={keys.length}
             emptySlot={
               <EmptyState
+                compact
                 iconSlot={<KeyRound />}
-                title="No keys yet."
-                description="A key lets an MCP client work in Telos as you."
+                title="No keys yet. A key lets an MCP client work in Telos as you."
               />
             }
           />
           <List
-            divided={false}
+            label="API keys"
             contentSlot={keys.map((key) => (
-              <View
+              <ListItem
                 key={key.id}
-                className="flex-row items-center gap-3 rounded-lg border border-foreground/10 bg-secondary px-3 py-2"
-              >
-                <View className="flex-1 gap-0.5">
+                title={
                   <Text numberOfLines={1} className="text-foreground text-sm">
                     {key.name || 'Unnamed key'}
                     {key.start ? <Text className="font-mono text-foreground/60"> {key.start}…</Text> : null}
                   </Text>
-                  <Text className="text-foreground/60 text-xs">{describeKey(key)}</Text>
-                </View>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={`Tools for ${key.name || 'key'}`}
-                  onPress={() => setSwitching(key.id)}
-                  iconSlot={<Settings className="h-4 w-4" />}
-                />
-                <ConfirmButton
-                  variant="ghost"
-                  size="icon-sm"
-                  className="hover:text-negative"
-                  aria-label={`Revoke ${key.name || 'key'}`}
-                  title={`Revoke “${key.name || 'this key'}”?`}
-                  description="Anything signed in with it stops working at once. This cannot be undone."
-                  confirmLabel="Revoke"
-                  onConfirm={() => confirmDelete(key)}
-                  iconSlot={<Trash2 className="h-4 w-4" />}
-                />
-              </View>
+                }
+                description={describeKey(key)}
+                actionSlot={
+                  <>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label={`Tools for ${key.name || 'key'}`}
+                      onPress={() => setSwitching(key.id)}
+                      iconSlot={<Settings className="h-4 w-4" />}
+                    />
+                    <ConfirmButton
+                      variant="ghost"
+                      size="icon-sm"
+                      className="hover:text-negative"
+                      aria-label={`Revoke ${key.name || 'key'}`}
+                      title={`Revoke “${key.name || 'this key'}”?`}
+                      description="Anything signed in with it stops working at once. This cannot be undone."
+                      confirmLabel="Revoke"
+                      onConfirm={() => confirmDelete(key)}
+                      iconSlot={<Trash2 className="h-4 w-4" />}
+                    />
+                  </>
+                }
+              />
             ))}
           />
 

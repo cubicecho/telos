@@ -24,7 +24,7 @@ const listed = (labels: unknown[]) => ({
 describe('LabelManager', () => {
   it('says the server has none only when the server said none', async () => {
     manager([listed([])]);
-    expect(await screen.findByText('No labels yet.')).toBeInTheDocument();
+    expect(await screen.findByText(/^No labels yet\./)).toBeInTheDocument();
   });
 
   it('says the load failed instead of claiming there are none', async () => {
@@ -35,7 +35,7 @@ describe('LabelManager', () => {
     manager([{ request: { query: LabelsDocument }, error: new Error('Failed to fetch') }]);
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Couldn’t reach the server.');
-    expect(screen.queryByText('No labels yet.')).not.toBeInTheDocument();
+    expect(screen.queryByText(/^No labels yet\./)).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument();
   });
 

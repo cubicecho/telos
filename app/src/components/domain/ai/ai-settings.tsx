@@ -1,13 +1,12 @@
 import { useMutation } from '@apollo/client';
 import { useState } from 'react';
 import { Text, View } from 'react-native';
-import { Section } from '@/components/section';
+import { CardLayout } from '@/components/card-layout';
 import { SettingRow } from '@/components/setting-row';
 import { Switch } from '@/components/ui/switch';
 import { useAi } from '@/lib/ai';
 import { describeError } from '@/lib/errors';
 import { AiStateDocument, SetAiEnabledDocument, SetInstanceAiEnabledDocument } from '@/lib/graphql';
-import { CARD_TITLE } from '@/lib/styles';
 import { AgentDefaultsForm } from './agent-defaults-form';
 import { AgentManager } from './agent-manager';
 import { ApiKeyManager } from './api-key-manager';
@@ -65,9 +64,8 @@ export function AiSettings() {
 
   return (
     <>
-      <Section
-        surface="card"
-        titleClassName={CARD_TITLE}
+      <CardLayout
+        level={2}
         title="AI"
         description="Off unless you turn it on. Each project has its own switch as well."
         contentSlot={

@@ -1,17 +1,17 @@
 import { useMutation, useQuery } from '@apollo/client';
 import { useState } from 'react';
 import { Text, View } from 'react-native';
+import { CardLayout } from '@/components/card-layout';
 import { ConfirmButton } from '@/components/confirm-button';
 import { EmptyState } from '@/components/empty-state';
 import { List } from '@/components/list';
-import { Section } from '@/components/section';
+import { ListItem } from '@/components/list-item';
 import { Button } from '@/components/ui/button';
 import { ChevronDown, Library, Trash2 } from '@/components/ui/icons';
 import { LoadState } from '@/components/ui/load-failure';
 import { Menu, MenuContent, MenuItem, MenuTrigger } from '@/components/ui/menu';
 import { describeError } from '@/lib/errors';
 import { BoardTemplatesDocument, CreateBoardTemplateDocument, DeleteBoardTemplateDocument } from '@/lib/graphql';
-import { CARD_TITLE } from '@/lib/styles';
 import { TEMPLATE_STARTERS, type TemplateStarter } from '@/lib/template-starters';
 import { cn, HOVER_REVEAL } from '@/lib/utils';
 
@@ -58,9 +58,8 @@ export function TemplateManager() {
   }
 
   return (
-    <Section
-      surface="card"
-      titleClassName={CARD_TITLE}
+    <CardLayout
+      level={2}
       title="Board templates"
       description="Lanes to start a new project with. Save one from a project's header, or add a starter."
       actionSlot={
@@ -89,39 +88,34 @@ export function TemplateManager() {
             count={templates.length}
             emptySlot={
               <EmptyState
+                compact
                 iconSlot={<Library />}
-                title="No templates yet."
-                description="Save one from a project's header, and its lanes can start the next project."
+                title="No templates yet. Save one from a project's header, and its lanes can start the next project."
               />
             }
           />
           <List
-            divided={false}
+            label="Board templates"
             contentSlot={templates.map((template) => (
-              <View
+              <ListItem
                 key={template.id}
-                className="group flex-row items-center gap-3 rounded-lg border border-foreground/10 bg-secondary px-3 py-2"
-              >
-                <View className="min-w-0 flex-1">
-                  <Text numberOfLines={1} className="text-foreground text-sm">
-                    {template.name}
-                  </Text>
-                  <Text numberOfLines={1} className="text-foreground/60 text-xs">
-                    {laneNames(template.lanes)}
-                  </Text>
-                </View>
-                <ConfirmButton
-                  variant="ghost"
-                  size="icon-sm"
-                  className={cn('hover:text-negative focus-visible:opacity-100', HOVER_REVEAL)}
-                  aria-label={`Delete ${template.name}`}
-                  title={`Delete “${template.name}”?`}
-                  description="Projects already made from it keep their lanes."
-                  confirmLabel="Delete"
-                  onConfirm={() => confirmDelete(template)}
-                  iconSlot={<Trash2 className="h-4 w-4" />}
-                />
-              </View>
+                className="group"
+                title={template.name}
+                description={laneNames(template.lanes)}
+                actionSlot={
+                  <ConfirmButton
+                    variant="ghost"
+                    size="icon-sm"
+                    className={cn('hover:text-negative focus-visible:opacity-100', HOVER_REVEAL)}
+                    aria-label={`Delete ${template.name}`}
+                    title={`Delete “${template.name}”?`}
+                    description="Projects already made from it keep their lanes."
+                    confirmLabel="Delete"
+                    onConfirm={() => confirmDelete(template)}
+                    iconSlot={<Trash2 className="h-4 w-4" />}
+                  />
+                }
+              />
             ))}
           />
         </View>

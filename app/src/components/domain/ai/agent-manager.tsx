@@ -3,11 +3,12 @@ import { useEffect, useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
 import type { AgentFieldsFragment } from '@/__generated__/graphql';
 import { useAppForm } from '@/components/app-form';
+import { CardLayout } from '@/components/card-layout';
 import { ConfirmButton } from '@/components/confirm-button';
 import { DialogLayout } from '@/components/dialog-layout';
 import { EmptyState } from '@/components/empty-state';
 import { List } from '@/components/list';
-import { Section } from '@/components/section';
+import { ListItem } from '@/components/list-item';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
@@ -27,7 +28,6 @@ import {
   UpdateAgentDocument,
 } from '@/lib/graphql';
 import { newId } from '@/lib/ids';
-import { CARD_TITLE } from '@/lib/styles';
 import {
   DISCOVERY_HELP,
   discoveryOptions,
@@ -86,9 +86,8 @@ export function AgentManager() {
   }
 
   return (
-    <Section
-      surface="card"
-      titleClassName={CARD_TITLE}
+    <CardLayout
+      level={2}
       title="Agents"
       description="Models with a prompt. Give a lane an agent and it works each todo that arrives there."
       actionSlot={
@@ -126,57 +125,58 @@ export function AgentManager() {
             count={agents.length}
             emptySlot={
               <EmptyState
+                compact
                 iconSlot={<UserRound />}
-                title="No agents yet."
-                description="An agent is a model with a prompt. Give one to a lane and it works what arrives there."
+                title="No agents yet. An agent is a model with a prompt: give one to a lane and it works what arrives there."
               />
             }
           />
           <List
-            divided={false}
+            label="Agents"
             contentSlot={agents.map((agent) => (
-              <View
+              <ListItem
                 key={agent.id}
-                className="flex-row items-center gap-3 rounded-lg border border-foreground/10 bg-secondary px-3 py-2"
-              >
-                <View className="flex-1 gap-0.5">
-                  <Text numberOfLines={1} className="text-foreground text-sm">
-                    {agent.name}
-                  </Text>
-                  <Text numberOfLines={1} className="text-foreground/60 text-xs">
-                    {agent.model ?? inheritedText(inherited?.model)} ·{' '}
-                    {agent.baseUrl ?? inheritedText(inherited?.baseUrl)} · {promptText(agent.promptId, prompts)}
-                  </Text>
-                </View>
-                {agent.enabled ? null : <Badge variant="outline">Off</Badge>}
-                <Badge variant={agent.hasApiKey ? 'secondary' : 'outline'}>
-                  {agent.hasApiKey ? 'Key set' : 'No key'}
-                </Badge>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onPress={() => setKeying(agent)}
-                  content={agent.hasApiKey ? 'Replace key' : 'Set key'}
-                />
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={`Edit ${agent.name}`}
-                  onPress={() => setEditing({ agent })}
-                  iconSlot={<Pencil className="h-4 w-4" />}
-                />
-                <ConfirmButton
-                  variant="ghost"
-                  size="icon-sm"
-                  className="hover:text-negative"
-                  aria-label={`Delete ${agent.name}`}
-                  title={`Delete “${agent.name}”?`}
-                  description="Lanes it works lose their agent, and its runs lose their agent. This cannot be undone."
-                  confirmLabel="Delete"
-                  onConfirm={() => confirmDelete(agent)}
-                  iconSlot={<Trash2 className="h-4 w-4" />}
-                />
-              </View>
+                title={agent.name}
+                description={`${agent.model ?? inheritedText(inherited?.model)} · ${
+                  agent.baseUrl ?? inheritedText(inherited?.baseUrl)
+                } · ${promptText(agent.promptId, prompts)}`}
+                meta={
+                  <>
+                    {agent.enabled ? null : <Badge variant="outline">Off</Badge>}
+                    <Badge variant={agent.hasApiKey ? 'secondary' : 'outline'}>
+                      {agent.hasApiKey ? 'Key set' : 'No key'}
+                    </Badge>
+                  </>
+                }
+                actionSlot={
+                  <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onPress={() => setKeying(agent)}
+                      content={agent.hasApiKey ? 'Replace key' : 'Set key'}
+                    />
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label={`Edit ${agent.name}`}
+                      onPress={() => setEditing({ agent })}
+                      iconSlot={<Pencil className="h-4 w-4" />}
+                    />
+                    <ConfirmButton
+                      variant="ghost"
+                      size="icon-sm"
+                      className="hover:text-negative"
+                      aria-label={`Delete ${agent.name}`}
+                      title={`Delete “${agent.name}”?`}
+                      description="Lanes it works lose their agent, and its runs lose their agent. This cannot be undone."
+                      confirmLabel="Delete"
+                      onConfirm={() => confirmDelete(agent)}
+                      iconSlot={<Trash2 className="h-4 w-4" />}
+                    />
+                  </>
+                }
+              />
             ))}
           />
 

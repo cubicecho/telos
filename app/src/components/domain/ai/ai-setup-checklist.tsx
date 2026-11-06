@@ -2,11 +2,10 @@ import { useQuery } from '@apollo/client';
 import { Link } from 'expo-router';
 import { Text, View } from 'react-native';
 import type { AiSetupQuery } from '@/__generated__/graphql';
-import { Section } from '@/components/section';
+import { CardLayout } from '@/components/card-layout';
 import { CircleCheck } from '@/components/ui/icons';
 import { useAi } from '@/lib/ai';
 import { AiSetupDocument } from '@/lib/graphql';
-import { CARD_TITLE } from '@/lib/styles';
 import { RUNNER_QUIET_SECONDS } from './ai-status';
 import { formatDuration } from './run-log';
 
@@ -170,9 +169,8 @@ export function AiSetupChecklist({
   if (left === 0) return null;
 
   return (
-    <Section
-      surface="card"
-      titleClassName={CARD_TITLE}
+    <CardLayout
+      level={2}
       className={className}
       title="Getting AI running"
       description={`${left} of ${steps.length} steps left before an agent works a todo.`}
