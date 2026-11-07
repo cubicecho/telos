@@ -6,7 +6,7 @@ import { Activity, History, List, LogOut } from '@/components/app-icons';
 import { useHandedBackCount } from '@/components/domain/ai/ai-status';
 import { ProjectFormDialog } from '@/components/domain/project/project-form-dialog';
 import { TodoSearch, useSearchShortcut } from '@/components/domain/todo/todo-search';
-import { Sidebar as SidebarFrame, SidebarNavItem, SidebarSection } from '@/components/sidebar';
+import { Sidebar as SidebarFrame, SidebarItem, SidebarSection } from '@/components/sidebar';
 import { Button } from '@/components/ui/button';
 import { Plus, Search, Settings } from '@/components/ui/icons';
 import { LoadState } from '@/components/ui/load-failure';
@@ -55,7 +55,7 @@ export function Sidebar() {
         contentSlot={
           <View role="navigation" aria-label="Projects">
             <Link href="/overview" asChild>
-              <SidebarNavItem
+              <SidebarItem
                 href="/overview"
                 label="All projects"
                 iconSlot={<List />}
@@ -79,7 +79,7 @@ export function Sidebar() {
               }
               contentSlot={projects.map((project) => (
                 <Link key={project.id} href={`/projects/${project.id}`} asChild>
-                  <SidebarNavItem
+                  <SidebarItem
                     href={`/projects/${project.id}`}
                     label={project.name}
                     count={project.openTodoCount > 0 ? project.openTodoCount : undefined}
@@ -92,7 +92,7 @@ export function Sidebar() {
         }
         footerSlot={
           <>
-            <SidebarNavItem
+            <SidebarItem
               label="Search"
               iconSlot={<Search />}
               // The shortcut is a web keyboard's; on device there is none to show.
@@ -102,7 +102,7 @@ export function Sidebar() {
             />
             {ai.on ? (
               <Link href="/agents" asChild>
-                <SidebarNavItem
+                <SidebarItem
                   href="/agents"
                   label="Agents"
                   iconSlot={<Activity />}
@@ -113,7 +113,7 @@ export function Sidebar() {
             ) : null}
             {ai.on ? (
               <Link href="/activity" asChild>
-                <SidebarNavItem
+                <SidebarItem
                   href="/activity"
                   label="Activity"
                   iconSlot={<History />}
@@ -122,7 +122,7 @@ export function Sidebar() {
               </Link>
             ) : null}
             <Link href="/settings" asChild>
-              <SidebarNavItem
+              <SidebarItem
                 href="/settings"
                 label="Settings"
                 iconSlot={<Settings />}
@@ -130,7 +130,7 @@ export function Sidebar() {
               />
             </Link>
             {/* A button, not a link: it does something rather than going somewhere. */}
-            <SidebarNavItem label="Sign out" iconSlot={<LogOut />} onPress={signOut} />
+            <SidebarItem label="Sign out" iconSlot={<LogOut />} onPress={signOut} />
           </>
         }
       />

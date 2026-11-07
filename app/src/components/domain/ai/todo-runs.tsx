@@ -54,11 +54,7 @@ export function TodoRuns({
           count={runs.length}
           emptySlot={<Text className="text-foreground/60 text-sm">No agent has worked this todo yet.</Text>}
         />
-        <List
-          label="Runs"
-          divided={false}
-          contentSlot={runs.map((run) => <RunRow key={run.id} run={run} pollMs={pollMs} />)}
-        />
+        <List label="Runs" contentSlot={runs.map((run) => <RunRow key={run.id} run={run} pollMs={pollMs} />)} />
       </View>
 
       {artifacts.length === 0 ? null : (

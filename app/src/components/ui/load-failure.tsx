@@ -1,5 +1,5 @@
 import type { ComponentProps } from 'react';
-import { QueryError, QueryState } from '@/components/query-state';
+import { LoadState as CubeLoadState, LoadError, type LoadStateProps } from '@/components/load-state';
 import { describeError } from '@/lib/errors';
 
 /**
@@ -12,7 +12,7 @@ import { describeError } from '@/lib/errors';
  * failure the reader can only respond to by reloading the whole app is barely
  * better than a blank page.
  *
- * cubeui's `QueryError`, worded through `describeError` so the reader sees
+ * cubeui's `LoadError`, worded through `describeError` so the reader sees
  * "Your session has expired" rather than the transport's "Received status code
  * 401". It is an alert, because it stands where the content the reader was
  * waiting for should have been. `compact` is the form for a popover or the
@@ -22,9 +22,12 @@ import { describeError } from '@/lib/errors';
  * the first one. A list takes `LoadState`, which adds the loading and empty
  * rungs.
  */
-export function LoadFailure(props: Omit<ComponentProps<typeof QueryError>, 'describe'>) {
-  return <QueryError describe={describeError} {...props} />;
+export function LoadFailure(props: Omit<ComponentProps<typeof LoadError>, 'describe'>) {
+  return <LoadError describe={describeError} {...props} />;
 }
+
+/** `Omit` over each member of a union, so the list and record forms of `LoadState` stay apart. */
+type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
 
 /** What `LoadState` reads off an Apollo `useQuery` result. */
 type ApolloResult = {
@@ -35,7 +38,7 @@ type ApolloResult = {
 };
 
 /**
- * cubeui's `QueryState` over an Apollo result: failed, loading, or empty,
+ * cubeui's `LoadState` over an Apollo result: failed, loading, or empty,
  * worded like `LoadFailure`, and nothing once there are rows.
  *
  * Pending and failed both mean *nothing to show*, not merely that a request is
@@ -47,10 +50,10 @@ type ApolloResult = {
 export function LoadState({
   query,
   ...props
-}: Omit<ComponentProps<typeof QueryState>, 'describe' | 'query'> & { query: ApolloResult }) {
+}: DistributiveOmit<LoadStateProps, 'describe' | 'query'> & { query: ApolloResult }) {
   const nothing = query.data === undefined;
   return (
-    <QueryState
+    <CubeLoadState
       query={{
         isPending: query.loading && nothing,
         isError: query.error != null && nothing,

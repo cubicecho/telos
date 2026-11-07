@@ -344,7 +344,6 @@ function AccountRuns({ pollMs }: { pollMs: number }) {
         />
         <List
           label="Runs"
-          divided={false}
           contentSlot={runs.map((run) => <RunRow key={run.id} run={run} showTodo project={run.project?.name} />)}
         />
         {/* A full page means there may be more; a short one means there is not. */}

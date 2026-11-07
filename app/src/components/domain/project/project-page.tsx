@@ -2,7 +2,6 @@ import { useMutation } from '@apollo/client';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Text, View } from 'react-native';
-import { DescriptionList, PropertyRow } from '@/components/description-list';
 import { AiSetupChecklist } from '@/components/domain/ai/ai-setup-checklist';
 import type { ProjectActivity } from '@/components/domain/ai/project-activity';
 import { LabelBadge, type LabelSummary } from '@/components/domain/label/label-badge';
@@ -10,6 +9,7 @@ import { LabelPicker } from '@/components/domain/label/label-picker';
 import { SaveTemplateDialog } from '@/components/domain/template/save-template-dialog';
 import { HeaderContentFooter } from '@/components/header-content-footer';
 import { PageHeader } from '@/components/page-header';
+import { PropertyList, PropertyRow } from '@/components/property-list';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Copy, Ellipsis, Pencil, Trash2 } from '@/components/ui/icons';
@@ -127,7 +127,7 @@ export function ProjectPage({
               actionSlot={
                 <>
                   {/* Beside the title rather than under it, so the views get the height. */}
-                  <DescriptionList
+                  <PropertyList
                     layout="stacked"
                     className="mr-2 flex-row gap-6"
                     contentSlot={
