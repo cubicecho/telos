@@ -37,7 +37,8 @@
     "db:studio": "npm run studio -w @telos/db",
     "db:up": "docker compose -f docker-compose.dev.yml up -d",
     "db:down": "docker compose -f docker-compose.dev.yml down",
-    "admin": "node --experimental-strip-types --env-file-if-exists=.env scripts/admin.ts"
+    "admin": "node --experimental-strip-types --env-file-if-exists=.env scripts/admin.ts",
+    "postinstall": "patch-package"
   },
   "overrides": {
     "graphql": "16.13.2",
@@ -61,6 +62,7 @@
     "concurrently": "^9.1.2",
     "drizzle-kit": "1.0.0-rc.5",
     "jsdom": "^30.0.1",
+    "patch-package": "^8.0.1",
     "typescript": "~6.0.3",
     "vitest": "^3.0.5"
   },
