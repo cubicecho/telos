@@ -1,3 +1,10 @@
+## [11.1.3](https://github.com/cubicecho/telos/compare/v11.1.2...v11.1.3) (2026-11-07)
+
+
+### Bug Fixes
+
+* **app:** patch react-native-css so opacity classes resolve on device ([c7bcd3d](https://github.com/cubicecho/telos/commit/c7bcd3ddadea137904cd2d6924589bfd8ed6985b)), closes [cubicecho/cubeui#404](https://github.com/cubicecho/cubeui/issues/404)
+
 ## [11.1.2](https://github.com/cubicecho/telos/compare/v11.1.1...v11.1.2) (2026-11-06)
 
 
