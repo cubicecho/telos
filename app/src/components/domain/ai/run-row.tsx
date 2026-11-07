@@ -2,8 +2,8 @@ import { useMutation, useQuery } from '@apollo/client';
 import { useState } from 'react';
 import { Text, View } from 'react-native';
 import type { RunSummaryFieldsFragment } from '@/__generated__/graphql';
+import { CollapsibleRow } from '@/components/collapsible-row';
 import { ConfirmButton } from '@/components/confirm-button';
-import { DisclosureRow } from '@/components/disclosure-row';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
@@ -66,7 +66,7 @@ export function RunRow({
 
   return (
     <View className="gap-1">
-      <DisclosureRow
+      <CollapsibleRow
         open={open}
         onOpenChange={setOpen}
         title={title}

@@ -3,8 +3,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
 import { useAppForm } from '@/components/app-form';
 import { CardLayout } from '@/components/card-layout';
+import { Collapsible } from '@/components/collapsible';
 import { DialogLayout } from '@/components/dialog-layout';
-import { Disclosure } from '@/components/disclosure';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
@@ -122,7 +122,7 @@ export function AgentDefaultsForm() {
         <View className="gap-4">
           <LoadState query={query} what="your agent defaults" count={defaults ? 1 : 0} />
           {defaults ? (
-            <Disclosure
+            <Collapsible
               title="Endpoint, model and limits"
               titleClassName="text-foreground"
               description={`${defaults.model || 'No model'} · ${defaults.baseUrl || 'No base URL'}`}

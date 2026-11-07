@@ -116,11 +116,7 @@ export function ProjectRuns({
             </Text>
           }
         />
-        <List
-          label="Runs"
-          divided={false}
-          contentSlot={runs.map((run) => <RunRow key={run.id} run={run} showTodo />)}
-        />
+        <List label="Runs" contentSlot={runs.map((run) => <RunRow key={run.id} run={run} showTodo />)} />
         {/* A full page means there may be more; a short one means there is not. */}
         {runs.length >= limit ? (
           <Button

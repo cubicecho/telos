@@ -2,7 +2,7 @@ import { useQuery } from '@apollo/client';
 import { List } from '@/components/app-icons';
 import { ProjectTaskList } from '@/components/domain/project/project-task-list';
 import { EmptyState } from '@/components/empty-state';
-import { CardGrid } from '@/components/page';
+import { GridLayout } from '@/components/grid-layout';
 import { PageLayout } from '@/components/page-layout';
 import { LoadState } from '@/components/ui/load-failure';
 import { ProjectsDocument } from '@/lib/graphql';
@@ -37,7 +37,9 @@ export default function OverviewScreen() {
             }
           />
           {projects.length > 0 ? (
-            <CardGrid contentSlot={projects.map((project) => <ProjectTaskList key={project.id} project={project} />)} />
+            <GridLayout
+              contentSlot={projects.map((project) => <ProjectTaskList key={project.id} project={project} />)}
+            />
           ) : null}
         </>
       }

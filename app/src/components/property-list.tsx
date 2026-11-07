@@ -52,7 +52,7 @@ function asText(node: ReactNode, className: string) {
   return isText(node) ? <Text className={className}>{node}</Text> : <View className={cn('min-w-0', SLOT)}>{node}</View>;
 }
 
-type DescriptionListProps = {
+type PropertyListProps = {
   /**
    * The rows: `PropertyRow`s, as an array or a fragment. Nothing else belongs here — on the web
    * this is a `<dl>`, which may hold only term-and-description groups.
@@ -82,10 +82,10 @@ type DescriptionListProps = {
  *
  * No state, no data, no `children` — the rows are `contentSlot`, like every other shell's body.
  */
-export function DescriptionList({ contentSlot, layout = 'inline', className }: DescriptionListProps) {
+export function PropertyList({ contentSlot, layout = 'inline', className }: PropertyListProps) {
   return (
     <LayoutContext.Provider value={layout}>
-      <View webAs="dl" role="list" testID="description-list" className={cn('min-w-0 gap-3', className)}>
+      <View webAs="dl" role="list" testID="property-list" className={cn('min-w-0 gap-3', className)}>
         {contentSlot}
       </View>
     </LayoutContext.Provider>
@@ -128,9 +128,9 @@ type PropertyRowProps = {
 };
 
 /**
- * One fact in a `DescriptionList`: a label, a value, a hint under the value, an action beside it.
+ * One fact in a `PropertyList`: a label, a value, a hint under the value, an action beside it.
  *
- * Only ever inside a `DescriptionList`, which is what gives it a layout and a parent list — a
+ * Only ever inside a `PropertyList`, which is what gives it a layout and a parent list — a
  * `<dt>` with no `<dl>` around it is markup axe rejects, as is a list item with no list.
  *
  * The row is a `<div>` on the web, not an `<li>`: `webAs` names the element, and `role="listitem"`
@@ -184,3 +184,6 @@ export function PropertyRow({
     </View>
   );
 }
+
+/** @deprecated Use `PropertyList`; this name goes in the next release. */
+export const DescriptionList = PropertyList;

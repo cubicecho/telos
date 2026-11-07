@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import type { RunFieldsFragment, RunSummaryFieldsFragment } from '@/__generated__/graphql';
-import { Disclosure } from '@/components/disclosure';
+import { Collapsible } from '@/components/collapsible';
 import { Badge } from '@/components/ui/badge';
 import type { BadgeVariant } from '@/components/ui/badge-base';
 import { Separator } from '@/components/ui/separator';
@@ -110,7 +110,7 @@ export function RunLog({ run, className }: { run: RunFieldsFragment; className?:
   return (
     <View className={cn('gap-3', className)}>
       {run.systemPrompt || run.userPrompt ? (
-        <Disclosure
+        <Collapsible
           title="What it was told"
           description={run.model ? `Model ${run.model}` : undefined}
           contentSlot={

@@ -340,11 +340,7 @@ function RecentFailures({ pollMs }: { pollMs: number }) {
             count={runs.length}
             emptySlot={<Text className="text-foreground/60 text-sm">No run failed.</Text>}
           />
-          <List
-            label="Failed runs"
-            divided={false}
-            contentSlot={runs.map((run) => <RunRow key={run.id} run={run} showTodo />)}
-          />
+          <List label="Failed runs" contentSlot={runs.map((run) => <RunRow key={run.id} run={run} showTodo />)} />
         </View>
       }
     />

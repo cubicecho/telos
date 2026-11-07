@@ -29,7 +29,10 @@ COPY db/package.json db/
 COPY server/package.json server/
 COPY app/package.json app/
 COPY runner/package.json runner/
-RUN npm ci --omit=dev --include-workspace-root --workspace @telos/db --workspace @telos/runner --workspace @telos/server \
+# --ignore-scripts: the root's postinstall is patch-package, a dev dependency
+# that patches react-native-css for the app, and neither is installed here.
+# Nothing in the runtime tree has an install script of its own.
+RUN npm ci --omit=dev --include-workspace-root --ignore-scripts --workspace @telos/db --workspace @telos/runner --workspace @telos/server \
  && npm cache clean --force
 
 # The server is not compiled: it runs its TypeScript sources directly under

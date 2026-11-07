@@ -1,7 +1,7 @@
 import { ApolloProvider } from '@apollo/client';
 import { type ErrorBoundaryProps, Stack } from 'expo-router';
 import { Text, View } from 'react-native';
-import { RouteError } from '@/components/route-error';
+import { ErrorPage } from '@/components/error-page';
 import { Button } from '@/components/ui/button';
 import { PaletteProvider, useThemePreference } from '@/components/ui/theme-preference';
 import { client } from '@/lib/apollo';
@@ -41,12 +41,12 @@ export default function RootLayout() {
 export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
   return (
     <View className="h-full flex-1 bg-background">
-      <RouteError
+      <ErrorPage
         error={error}
         reset={() => void retry()}
         describe={describeError}
         details
-        actionsSlot={<Button variant="outline" size="sm" onPress={() => window.location.reload()} content="Reload" />}
+        actionSlot={<Button variant="outline" size="sm" onPress={() => window.location.reload()} content="Reload" />}
       />
       <Text className="mx-auto max-w-md px-6 pb-12 text-center text-foreground/60 text-sm">
         This is a bug in Telos, not something you did. Your data is untouched.

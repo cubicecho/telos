@@ -77,11 +77,13 @@ function isDisabled(day: Date, disabled: CalendarProps['disabled']): boolean {
 
 /**
  * A day's text: the edge of a selection, today, a day in plain ink, or one from a neighbouring
- * month. Today is current, so it is `active`, and semibold so it is not colour alone.
+ * month. Today is current, so it is `active`, and semibold so it is not colour alone. A picked day
+ * is on the chosen tint, where `active` and the muted grey are both under 4.5:1, so it is
+ * `foreground`.
  */
 function dayInk(edge: boolean, plain: boolean, today: boolean) {
   if (edge) {
-    return 'text-active-foreground';
+    return 'text-foreground';
   }
   if (today && plain) {
     return 'font-semibold text-active';
@@ -201,9 +203,12 @@ export function Calendar(props: CalendarProps) {
                     'h-11 items-center justify-center',
                     // A range's interior is a continuous band, so only its ends are
                     // rounded — round, as the web grid draws them.
-                    // The inside is chosen, so it is the chosen-row tint, not the hover grey.
+                    // The whole range is chosen, so it is the chosen tint, not the hover grey.
+                    // A picked day and a range's ends are ringed in `active` as well: that is
+                    // what tells an end from the band, and the tint alone is not 3:1 from the
+                    // surface.
                     place.middle ? 'bg-active/40' : 'rounded-full',
-                    place.edge && 'bg-active',
+                    place.edge && 'border-2 border-active bg-active/40',
                     off && 'opacity-50',
                   )}
                   // Seven per row, and `flex-wrap` needs a width it can measure.

@@ -37,7 +37,7 @@ telos/
 │   │   ├── components/
 │   │   │   ├── ui/          # cubeui primitives (installed via shadcn) — no app logic
 │   │   │   ├── app-form.tsx # `useAppForm`: cubeui's `createAppForm`, plus the date and colour fields
-│   │   │   ├── page-layout.tsx, card-layout.tsx, section.tsx, page.tsx  # cubeui layouts
+│   │   │   ├── page-layout.tsx, card-layout.tsx, section.tsx, grid-layout.tsx  # cubeui layouts
 │   │   │   ├── domain/      # project/, todo/, lane/, label/, settings/
 │   │   │   └── layouts/     # sidebar
 │   │   └── lib/             # apollo, auth, theme, cache writers, blocking, graphql documents, cn()
@@ -743,11 +743,11 @@ field the query reads leaves that field stale, so widen the fragment rather than
 the document.
 
 **An empty state means the server said "none", never that we failed to ask.**
-A list renders `LoadState` from `ui/load-failure.tsx` (cubeui's `QueryState` over
+A list renders `LoadState` from `ui/load-failure.tsx` (cubeui's `LoadState` over
 an Apollo result, worded through `describeError()`): placeholder rows while
 there is no answer, the failure as an alert, then its `emptySlot`, and nothing once
 there are rows. A screen about one thing — the project, the home redirect —
-renders `LoadFailure` (cubeui's `QueryError`) in the same place. The app used to answer a
+renders `LoadFailure` (cubeui's `LoadError`) in the same place. The app used to answer a
 stopped API with "No projects yet." and "That project doesn't exist, or isn't
 yours." — confident claims about the reader's own data, made by code that had
 not heard back. The ordering is the rule: the failure branch comes *before* the

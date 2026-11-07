@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import * as React from 'react';
 import { View } from 'react-native';
-import { DescriptionHint, DescriptionHintText, type DescriptionPlacement } from '@/components/ui/description-hint';
+import { DescribedTitle, type DescriptionPlacement, foldsDescription } from '@/components/ui/description-hint';
 import { FieldDescription, FieldTitle } from '@/components/ui/field';
 import { cn, type SlotNode } from '@/lib/utils';
 
@@ -66,7 +66,7 @@ export function SettingRow({
   const uid = React.useId();
   const titleId = title ? `${uid}-title` : undefined;
   const descriptionId = description ? `${uid}-description` : undefined;
-  const folded = Boolean(title && description) && descriptionPlacement === 'popover';
+  const folded = foldsDescription(title, description, descriptionPlacement);
   const titleNode = title ? (
     <FieldTitle testID="setting-row-title" id={titleId} className={cn(folded && 'min-w-0 shrink', titleClassName)}>
       {title}
@@ -81,27 +81,24 @@ export function SettingRow({
     >
       {title || description ? (
         <View testID="setting-row-text" className="min-w-48 flex-1 gap-1">
-          {folded ? (
-            // Beside the title and not inside it: the title is a `Text`.
-            <View testID="setting-row-title-row" className="min-w-0 flex-row items-center gap-2">
-              {titleNode}
-              <DescriptionHint
-                testID="setting-row-description-trigger"
-                label={title}
-                fallbackName="About this setting"
-                description={description}
-                iconSlot={descriptionIconSlot}
-              />
-            </View>
-          ) : (
-            titleNode
-          )}
-          {folded ? <DescriptionHintText id={descriptionId}>{description}</DescriptionHintText> : null}
-          {description && folded === false ? (
-            <FieldDescription testID="setting-row-description" id={descriptionId} className={descriptionClassName}>
-              {description}
-            </FieldDescription>
-          ) : null}
+          <DescribedTitle
+            titleSlot={titleNode}
+            label={title}
+            description={description}
+            descriptionSlot={
+              description ? (
+                <FieldDescription testID="setting-row-description" id={descriptionId} className={descriptionClassName}>
+                  {description}
+                </FieldDescription>
+              ) : null
+            }
+            descriptionId={descriptionId}
+            folded={folded}
+            fallbackName="About this setting"
+            iconSlot={descriptionIconSlot}
+            triggerTestID="setting-row-description-trigger"
+            rowTestID="setting-row-title-row"
+          />
         </View>
       ) : null}
       {control ? (
