@@ -3,7 +3,16 @@ import * as React from 'react';
 import { View } from 'react-native';
 import { DescribedTitle, type DescriptionPlacement, foldsDescription } from '@/components/ui/description-hint';
 import { FieldDescription, FieldTitle } from '@/components/ui/field';
-import { cn, type SlotNode } from '@/lib/utils';
+import {
+  actionGap,
+  cn,
+  HEADING_DESCRIPTION,
+  HEADING_GAP,
+  HEADING_TITLE,
+  HEADING_WRAP_FLOOR,
+  HEADING_WRAP_GAP,
+  type SlotNode,
+} from '@/lib/utils';
 
 /** What `actionSlot` is handed when it is a function: the ids of the text on the row's left. */
 type SettingRowIds = {
@@ -37,9 +46,13 @@ type SettingRowProps = {
    * control that names itself — a button whose text is the action.
    */
   actionSlot?: SlotNode | ((ids: SettingRowIds) => SlotNode) | undefined;
+  /** On the row, the words and the action together. */
   className?: string | undefined;
+  /** On the title's own `Text`. */
   titleClassName?: string | undefined;
+  /** On the description's own `Text`. */
   descriptionClassName?: string | undefined;
+  /** On the box that holds `actionSlot`, at the row's far end. */
   actionClassName?: string | undefined;
 };
 
@@ -68,7 +81,11 @@ export function SettingRow({
   const descriptionId = description ? `${uid}-description` : undefined;
   const folded = foldsDescription(title, description, descriptionPlacement);
   const titleNode = title ? (
-    <FieldTitle testID="setting-row-title" id={titleId} className={cn(folded && 'min-w-0 shrink', titleClassName)}>
+    <FieldTitle
+      testID="setting-row-title"
+      id={titleId}
+      className={cn(HEADING_TITLE, folded && 'min-w-0 shrink', titleClassName)}
+    >
       {title}
     </FieldTitle>
   ) : null;
@@ -77,17 +94,23 @@ export function SettingRow({
   return (
     <View
       testID="setting-row"
-      className={cn('min-w-0 flex-row flex-wrap items-center justify-between gap-x-4 gap-y-2', className)}
+      // The heading rhythm's row: the control level with the title's top rather than centred on the
+      // text, so a second line of description does not move it, and the one wrap floor.
+      className={cn('min-w-0 flex-row flex-wrap items-start justify-between gap-x-4', HEADING_WRAP_GAP, className)}
     >
       {title || description ? (
-        <View testID="setting-row-text" className="min-w-48 flex-1 gap-1">
+        <View testID="setting-row-text" className={cn(HEADING_WRAP_FLOOR, HEADING_GAP)}>
           <DescribedTitle
             titleSlot={titleNode}
             label={title}
             description={description}
             descriptionSlot={
               description ? (
-                <FieldDescription testID="setting-row-description" id={descriptionId} className={descriptionClassName}>
+                <FieldDescription
+                  testID="setting-row-description"
+                  id={descriptionId}
+                  className={cn(HEADING_DESCRIPTION, descriptionClassName)}
+                >
                   {description}
                 </FieldDescription>
               ) : null
@@ -102,7 +125,10 @@ export function SettingRow({
         </View>
       ) : null}
       {control ? (
-        <View testID="setting-row-action" className={cn('shrink-0 flex-row items-center gap-2', actionClassName)}>
+        <View
+          testID="setting-row-action"
+          className={cn('shrink-0 flex-row items-center', actionGap(control), actionClassName)}
+        >
           {control}
         </View>
       ) : null}
