@@ -1,3 +1,10 @@
+## [11.1.4](https://github.com/cubicecho/telos/compare/v11.1.3...v11.1.4) (2026-11-09)
+
+
+### Bug Fixes
+
+* **app:** reinstall cubeui tabs for the 40px strip, and drop the touchTarget workaround ([9e52559](https://github.com/cubicecho/telos/commit/9e52559471d0bf3367453942a8cff70a9e449d91)), closes [cubeui#540](https://github.com/cubeui/issues/540) [cubeui#541](https://github.com/cubeui/issues/541)
+
 ## [11.1.3](https://github.com/cubicecho/telos/compare/v11.1.2...v11.1.3) (2026-11-07)
 
 
