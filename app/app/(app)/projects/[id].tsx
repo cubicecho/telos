@@ -338,9 +338,7 @@ export default function ProjectScreen() {
 
                     {blocked.length > 0 ? (
                       <View role="region" aria-label="Blocked" className="gap-2">
-                        <SectionHeading variant="overline" level={2}>
-                          {`Blocked (${blocked.length})`}
-                        </SectionHeading>
+                        <SectionHeading variant="overline" level={2} title={`Blocked (${blocked.length})`} />
                         {blocked.map((todo) => (
                           <TodoRow
                             key={todo.id}
