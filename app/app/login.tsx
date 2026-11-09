@@ -99,7 +99,7 @@ export default function LoginScreen() {
             </form.AppField>
             <form.SubmitButton
               createLabel={localNet ? 'Sign in' : 'Send sign-in link'}
-              savingLabel={localNet ? 'Signing in…' : 'Sending…'}
+              loadingLabel={localNet ? 'Signing in…' : 'Sending…'}
             />
           </Form>
         </form.AppForm>

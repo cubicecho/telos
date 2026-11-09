@@ -3,6 +3,7 @@ import { type ErrorBoundaryProps, Stack } from 'expo-router';
 import { Text, View } from 'react-native';
 import { ErrorPage } from '@/components/error-page';
 import { Button } from '@/components/ui/button';
+import { OverlayHost } from '@/components/ui/overlay';
 import { PaletteProvider, useThemePreference } from '@/components/ui/theme-preference';
 import { client } from '@/lib/apollo';
 import { describeError } from '@/lib/errors';
@@ -18,9 +19,14 @@ export default function RootLayout() {
 
   return (
     <PaletteProvider>
-      <ApolloProvider client={client}>
-        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: 'transparent' } }} />
-      </ApolloProvider>
+      {/* The layer tooltips are drawn in on a device, over the screen rather than inside the
+          ScrollView that would clip them. There is no ToastProvider to draw it, so it goes here,
+          inside the palette it reads. On the web it renders only its children. */}
+      <OverlayHost>
+        <ApolloProvider client={client}>
+          <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: 'transparent' } }} />
+        </ApolloProvider>
+      </OverlayHost>
     </PaletteProvider>
   );
 }
