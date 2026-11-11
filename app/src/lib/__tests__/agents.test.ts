@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { effortOptions } from '@/components/domain/ai/agent-settings-fields';
+import { effortOptions, replayOptions } from '@/components/domain/ai/agent-settings-fields';
 import { fromLayerDraft, toLayerDraft } from '../agents';
 
 // Reasoning effort is a choice like tool discovery: inherit, or a level, with
@@ -30,5 +30,18 @@ describe('reasoning effort in a layer draft', () => {
     ]);
     expect(values('high', 'auto')).toContain('auto');
     expect(effortOptions('high', 'inherit')[0].label).toBe('Inherit (high)');
+  });
+});
+
+describe('sending thinking back in a layer draft', () => {
+  it('reads null as inherit and keeps a policy as a value, both ways', () => {
+    expect(toLayerDraft({ reasoningReplay: null }).reasoningReplay).toBe('inherit');
+    expect(fromLayerDraft(toLayerDraft({ reasoningReplay: null })).reasoningReplay).toBeNull();
+    expect(fromLayerDraft(toLayerDraft({ reasoningReplay: 'none' })).reasoningReplay).toBe('none');
+  });
+
+  it('offers agent-core’s three policies, and names the one a blank inherits', () => {
+    expect(replayOptions('').map((option) => option.value)).toEqual(['inherit', 'all', 'tool-loop', 'none']);
+    expect(replayOptions('all')[0].label).toBe('Inherit (All turns)');
   });
 });

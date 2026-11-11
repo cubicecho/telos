@@ -47,6 +47,16 @@ describe('resolveAgent', () => {
     expect(resolveAgent(DEFAULTS, {}).config.reasoningEffort).toBeUndefined();
   });
 
+  it('passes a reasoning replay down, and lets an agent say otherwise', () => {
+    const replay = { ...DEFAULTS, reasoningReplay: 'tool-loop' };
+    expect(resolveAgent(replay, {}).config.reasoningReplay).toBe('tool-loop');
+    expect(resolveAgent(replay, { reasoningReplay: 'none' }).config.reasoningReplay).toBe('none');
+    // Unsaid, agent-core's own default ("all") applies in the loop.
+    expect(resolveAgent(DEFAULTS, {}).config.reasoningReplay).toBeUndefined();
+    const { warnings } = resolveAgent(DEFAULTS, { reasoningReplay: 'some' });
+    expect(warnings[0]).toMatch(/^agent: model\.reasoningReplay/);
+  });
+
   it('falls back to agent-core when nothing says anything', () => {
     const { config } = resolveAgent(null, { baseUrl: 'http://a/v1', model: 'm' });
     expect(config).toMatchObject({

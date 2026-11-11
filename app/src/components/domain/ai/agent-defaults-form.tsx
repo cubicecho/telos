@@ -19,6 +19,8 @@ import {
   effortOptions,
   type NumberGroup,
   numbersIn,
+  REPLAY_HELP,
+  replayOptions,
 } from './agent-settings-fields';
 import { BASE_URL_HELP, EndpointStatus, FormGroupTitle, ModelField, useEndpointModels } from './endpoint-fields';
 
@@ -185,6 +187,15 @@ export function AgentDefaultsForm() {
                       )}
                     </form.AppField>
                     <Text className="-mt-2 text-foreground/60 text-xs">{EFFORT_HELP}</Text>
+                    <form.AppField name="reasoningReplay">
+                      {(field) => (
+                        <field.SelectField
+                          label="Send thinking back to the model"
+                          options={replayOptions(hints.reasoningReplay)}
+                        />
+                      )}
+                    </form.AppField>
+                    <Text className="-mt-2 text-foreground/60 text-xs">{REPLAY_HELP}</Text>
 
                     <FormGroupTitle title="Tools" />
                     {numbers('tools')}

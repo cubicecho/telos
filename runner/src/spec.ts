@@ -8,6 +8,9 @@ import {
   resolveApiKey,
 } from '@cubicecho/agent-core';
 
+// The server has no agent-core of its own, and reads what a blank replay falls to from here.
+export { ReasoningReplay } from '@cubicecho/agent-core';
+
 // An agent as layered documents: the account's defaults under the agent, read
 // with agent-core's spec rules. Absent inherits and nothing else does, so a
 // stored `temperature: 0` is a temperature of zero and only a null passes the
@@ -29,6 +32,8 @@ export interface AgentLayer {
   toolSelectModel?: string | null;
   /** A level, or "off" for none, which an agent can say over a default's level. */
   reasoningEffort?: string | null;
+  /** agent-core's `reasoningReplay`: "all", "tool-loop" or "none". */
+  reasoningReplay?: string | null;
   requestTimeoutSeconds?: number | null;
   maxRetries?: number | null;
 }
@@ -73,6 +78,7 @@ export function specLayer(layer: AgentLayer): AgentSpec {
     temperature: layer.temperature,
     contextLength: layer.contextLength,
     reasoningEffort: layer.reasoningEffort,
+    reasoningReplay: layer.reasoningReplay,
   });
   const tools = section({
     discovery: has(layer.toolDiscovery) ? (layer.toolDiscovery ? 'ondemand' : 'eager') : undefined,

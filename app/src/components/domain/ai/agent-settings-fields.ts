@@ -6,7 +6,7 @@ import { type LayerDraft, numberRule } from '@/lib/agents';
 
 type NumberField = Exclude<
   keyof LayerDraft,
-  'baseUrl' | 'model' | 'toolDiscovery' | 'toolSelectModel' | 'reasoningEffort'
+  'baseUrl' | 'model' | 'toolDiscovery' | 'toolSelectModel' | 'reasoningEffort' | 'reasoningReplay'
 >;
 
 /** Which group of a form a number sits in: with the model, the tools, or the requests. */
@@ -92,3 +92,24 @@ export function effortOptions(inherited: string, current: string) {
 
 export const EFFORT_HELP =
   'How hard a reasoning model thinks before it answers. Off sends nothing, which every endpoint takes; a level the model refuses is stepped down.';
+
+/** agent-core's replay policies, as a person reads them. */
+const REPLAYS = [
+  { value: 'all', label: 'All turns' },
+  { value: 'tool-loop', label: 'Only during tool calls' },
+  { value: 'none', label: 'Never' },
+] as const;
+
+/**
+ * The choices for sending thinking back, the first saying what inheriting it gives.
+ *
+ * @param inherited - The policy a blank resolves to, or blank while it loads.
+ * @returns The select's options.
+ */
+export function replayOptions(inherited: string) {
+  const label = REPLAYS.find((replay) => replay.value === inherited)?.label;
+  return [{ value: 'inherit', label: label ? `Inherit (${label})` : 'Inherit' }, ...REPLAYS];
+}
+
+export const REPLAY_HELP =
+  'Thinking models (gpt-oss, DeepSeek, Qwen3, GLM) want their reasoning back between tool calls, and sending it as it was written keeps the endpoint’s prompt cache. Never saves context on an endpoint that does not read it.';

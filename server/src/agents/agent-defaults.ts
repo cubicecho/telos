@@ -19,6 +19,7 @@ export const LAYER_FIELDS = [
   'toolDiscovery',
   'toolSelectModel',
   'reasoningEffort',
+  'reasoningReplay',
   'requestTimeoutSeconds',
   'maxRetries',
 ] as const;

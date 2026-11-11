@@ -130,6 +130,7 @@ describe('LaneAgentDialog on a review loop', () => {
     toolDiscovery: false,
     toolSelectModel: '',
     reasoningEffort: '',
+    reasoningReplay: 'all',
     requestTimeoutSeconds: null,
     maxRetries: 0,
   };
@@ -149,6 +150,7 @@ describe('LaneAgentDialog on a review loop', () => {
           toolDiscovery: null,
           toolSelectModel: null,
           reasoningEffort: null,
+          reasoningReplay: null,
           requestTimeoutSeconds: null,
           maxRetries: null,
           hasApiKey: false,

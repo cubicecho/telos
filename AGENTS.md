@@ -486,8 +486,10 @@ it is written with `setAgentApiKey` and read only by the runner, in a claim.
 
 **An agent says only what is different about it.** `agent_defaults` (one row
 per account, a server-only table, `agents/agent-defaults-resolvers.ts`) is the layer
-under every agent the account has: endpoint, model, sampling, tool discovery,
-the tool-picking model, iterations, timeout and retries. A null on the agent
+under every agent the account has: endpoint, model, sampling, reasoning effort,
+reasoning replay (agent-core's `reasoningReplay`, a check-constrained
+`all`/`tool-loop`/`none`), tool discovery, the tool-picking model, iterations,
+timeout and retries. A null on the agent
 inherits the default, a null there agent-core's `RESOLVED_DEFAULTS`; zero and
 an empty string are values, never "inherit". The claim (`claimRun`,
 `claimDraft`) hands the runner the agent and its account's `defaults`, and

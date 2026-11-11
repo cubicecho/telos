@@ -1,5 +1,5 @@
 import * as dbSchema from '@telos/db/schema';
-import { resolveAgent } from '@telos/runner/spec';
+import { ReasoningReplay, resolveAgent } from '@telos/runner/spec';
 import { extendSchema, type GraphQLSchema, parse } from 'graphql';
 import type { MutationResolvers, QueryResolvers } from '../../__generated__/resolvers.ts';
 import { requireAi } from '../ai/gate.ts';
@@ -36,6 +36,7 @@ const AGENT_DEFAULTS_SDL = parse(`
     toolDiscovery: Boolean
     toolSelectModel: String
     reasoningEffort: String
+    reasoningReplay: String
     requestTimeoutSeconds: Int
     maxRetries: Int
     "Whether a default API key is stored. The key itself is never readable."
@@ -61,6 +62,11 @@ const AGENT_DEFAULTS_SDL = parse(`
     toolSelectModel: String!
     "Empty or off sends none: the endpoint's own."
     reasoningEffort: String!
+    """
+    Which of the model's messages carry its thinking back to it: all, tool-loop
+    (only while it is calling tools) or none.
+    """
+    reasoningReplay: String!
     "Null is no limit."
     requestTimeoutSeconds: Int
     maxRetries: Int!
@@ -77,6 +83,7 @@ const AGENT_DEFAULTS_SDL = parse(`
     toolDiscovery: Boolean
     toolSelectModel: String
     reasoningEffort: String
+    reasoningReplay: String
     requestTimeoutSeconds: Int
     maxRetries: Int
   }
@@ -129,6 +136,7 @@ function settings(row: dbSchema.AgentDefaults | null) {
     toolDiscovery: config.toolDiscovery !== 'eager',
     toolSelectModel: config.toolSelectModel,
     reasoningEffort: config.reasoningEffort ?? '',
+    reasoningReplay: config.reasoningReplay ?? ReasoningReplay.All,
     requestTimeoutSeconds: config.requestTimeoutSeconds ?? null,
     maxRetries: config.maxRetries,
   };

@@ -35,6 +35,8 @@ import {
   effortOptions,
   type NumberGroup,
   numbersIn,
+  REPLAY_HELP,
+  replayOptions,
 } from './agent-settings-fields';
 import {
   BASE_URL_HELP,
@@ -410,6 +412,15 @@ export function AgentFormDialog({
               )}
             </form.AppField>
             <Text className="-mt-2 text-foreground/60 text-xs">{EFFORT_HELP}</Text>
+            <form.AppField name="reasoningReplay">
+              {(field) => (
+                <field.SelectField
+                  label="Send thinking back to the model"
+                  options={replayOptions(hints.reasoningReplay)}
+                />
+              )}
+            </form.AppField>
+            <Text className="-mt-2 text-foreground/60 text-xs">{REPLAY_HELP}</Text>
             <form.AppField name="promptId">
               {(field) => (
                 <field.SelectField

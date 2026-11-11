@@ -61,6 +61,7 @@ const BUILT_IN = {
   toolDiscovery: false,
   toolSelectModel: '',
   reasoningEffort: '',
+  reasoningReplay: 'all',
   requestTimeoutSeconds: null,
   maxRetries: 0,
 };
@@ -81,6 +82,7 @@ const defaults = {
         toolDiscovery: null,
         toolSelectModel: null,
         reasoningEffort: null,
+        reasoningReplay: null,
         requestTimeoutSeconds: null,
         maxRetries: null,
         hasApiKey: false,

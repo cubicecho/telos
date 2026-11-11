@@ -27,6 +27,8 @@ export interface LayerDraft {
   toolSelectModel: string | null;
   /** 'inherit', or a level as agent-core takes it, "off" among them. */
   reasoningEffort: string;
+  /** 'inherit', or agent-core's "all", "tool-loop" or "none". */
+  reasoningReplay: string;
   requestTimeoutSeconds: string;
   maxRetries: string;
 }
@@ -89,6 +91,7 @@ export function toLayerDraft(layer: StoredLayer | null | undefined): LayerDraft 
     toolDiscovery: discovery == null ? 'inherit' : discovery ? 'on' : 'off',
     toolSelectModel: layer?.toolSelectModel ?? '',
     reasoningEffort: layer?.reasoningEffort ?? 'inherit',
+    reasoningReplay: layer?.reasoningReplay ?? 'inherit',
     requestTimeoutSeconds: numberText(layer?.requestTimeoutSeconds),
     maxRetries: numberText(layer?.maxRetries),
   };
@@ -121,6 +124,7 @@ export function fromLayerDraft(draft: LayerDraft): Required<StoredLayer> {
     toolDiscovery: draft.toolDiscovery === 'inherit' ? null : draft.toolDiscovery === 'on',
     toolSelectModel: orNull(draft.toolSelectModel),
     reasoningEffort: draft.reasoningEffort === 'inherit' ? null : orNull(draft.reasoningEffort),
+    reasoningReplay: draft.reasoningReplay === 'inherit' ? null : orNull(draft.reasoningReplay),
     requestTimeoutSeconds: numberOrNull(draft.requestTimeoutSeconds),
     maxRetries: numberOrNull(draft.maxRetries),
   };
@@ -160,6 +164,7 @@ export function layerHints(inherited: Inherited | null | undefined, from: 'defau
       toolDiscovery: '',
       toolSelectModel: '',
       reasoningEffort: '',
+      reasoningReplay: '',
       requestTimeoutSeconds: '',
       maxRetries: '',
     };
@@ -177,6 +182,7 @@ export function layerHints(inherited: Inherited | null | undefined, from: 'defau
     toolDiscovery: inherited.toolDiscovery ? 'on' : 'off',
     toolSelectModel: inherited.toolSelectModel || 'None',
     reasoningEffort: inherited.reasoningEffort || 'off',
+    reasoningReplay: inherited.reasoningReplay,
     requestTimeoutSeconds: numberText(inherited.requestTimeoutSeconds) || 'No limit',
     maxRetries: String(inherited.maxRetries),
   };

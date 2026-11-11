@@ -30,8 +30,11 @@ import { createTelos } from '../telos.ts';
 
 const RUNNER_KEY = 'runner-secret';
 
-/** One scripted reply: words, or a tool call. */
-type Reply = { content: string } | { tool: string; args: Record<string, unknown> } | { fail: number };
+/** One scripted reply: words, or a tool call, which may come with the model's thinking. */
+type Reply =
+  | { content: string }
+  | { tool: string; args: Record<string, unknown>; thinking?: string }
+  | { fail: number };
 
 let db: TestDb;
 let board: Board;
@@ -41,7 +44,7 @@ let telosUrl: string;
 let llm: {
   url: string;
   script: (
-    messages: Array<{ role: string; content: unknown }>,
+    messages: Array<{ role: string; content: unknown; reasoning_content?: string }>,
     tools: Array<{ function: { name: string } }>,
   ) => Reply | Promise<Reply>;
 };
@@ -177,6 +180,7 @@ async function serveLlm(): Promise<string> {
         })}\n\n`;
       res.writeHead(200, { 'content-type': 'text/event-stream' });
       if ('tool' in reply) {
+        if (reply.thinking) res.write(chunk({ role: 'assistant', reasoning_content: reply.thinking }, null));
         res.write(
           chunk(
             {
@@ -705,6 +709,34 @@ describe('the prefix a prompt cache keeps', () => {
 
     const [run] = await runsOf(todoId);
     expect(run).toMatchObject({ promptTokens: 10, cachedInputTokens: 4 });
+  });
+});
+
+describe('the thinking a model is sent back', () => {
+  /** The assistant message a run's second request replays, after a tool call the model thought about. */
+  async function replayed(): Promise<{ role: string; reasoning_content?: string } | undefined> {
+    const desk = await serveTools('Nothing yet.');
+    await setServers([{ id: 'desk', name: 'Desk', url: desk.url }]);
+    const requests: Array<Array<{ role: string; reasoning_content?: string }>> = [];
+    llm.script = (messages) => {
+      requests.push(messages);
+      if (requests.length === 1) return { tool: 'desk__recall', args: {}, thinking: 'Check memory first.' };
+      return { content: 'Done.' };
+    };
+    await board.addTodo('Remember it');
+    await cycle();
+    return requests[1]?.find((message) => message.role === 'assistant');
+  }
+
+  it('goes back on the tool call when nothing says otherwise', async () => {
+    expect((await replayed())?.reasoning_content).toBe('Check memory first.');
+  });
+
+  it('stays out of the request when the agent says never', async () => {
+    await db.update(dbSchema.agents).set({ reasoningReplay: 'none' }).where(eq(dbSchema.agents.id, board.agentId));
+    const message = await replayed();
+    expect(message).toBeDefined();
+    expect(message).not.toHaveProperty('reasoning_content');
   });
 });
 

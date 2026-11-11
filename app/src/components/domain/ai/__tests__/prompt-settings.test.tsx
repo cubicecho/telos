@@ -71,6 +71,7 @@ function agents(promptIds: (string | null)[]) {
           toolDiscovery: null,
           toolSelectModel: null,
           reasoningEffort: null,
+          reasoningReplay: null,
           requestTimeoutSeconds: null,
           maxRetries: null,
           mcpServerSlugs: null,

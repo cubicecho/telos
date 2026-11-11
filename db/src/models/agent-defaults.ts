@@ -30,6 +30,8 @@ export const agentDefaults = pgTable(
     toolDiscovery: boolean('tool_discovery'),
     toolSelectModel: text('tool_select_model'),
     reasoningEffort: text('reasoning_effort'),
+    // As an agent's (agents.ts): "all", "tool-loop" or "none", null for agent-core's "all".
+    reasoningReplay: text('reasoning_replay'),
     requestTimeoutSeconds: integer('request_timeout_seconds'),
     maxRetries: integer('max_retries'),
     updatedAt: timestamp('updated_at', { withTimezone: true })
@@ -37,7 +39,10 @@ export const agentDefaults = pgTable(
       .defaultNow()
       .$onUpdate(() => new Date()),
   },
-  (t) => [check('ck_agent_defaults_max_tool_iterations', sql`${t.maxToolIterations} > 0`)],
+  (t) => [
+    check('ck_agent_defaults_max_tool_iterations', sql`${t.maxToolIterations} > 0`),
+    check('ck_agent_defaults_reasoning_replay', sql`${t.reasoningReplay} in ('all', 'tool-loop', 'none')`),
+  ],
 );
 
 export type AgentDefaults = typeof agentDefaults.$inferSelect;

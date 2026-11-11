@@ -1,0 +1,139 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "88419123-c2a6-4328-9bbe-1182869cff93",
+  "prevIds": [
+    "a0a59cfa-7f8c-4614-8aff-eb8557d307e4"
+  ],
+  "footprints": [
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "agent_defaults",
+        "reasoning_replay"
+      ],
+      "writes": [
+        "s|col|public.agent_defaults.reasoning_replay",
+        "n|col|public.agent_defaults.reasoning_replay",
+        "e|col|public.agent_defaults.reasoning_replay"
+      ],
+      "reads": [
+        "n|tbl|public.agent_defaults",
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "agents",
+        "reasoning_replay"
+      ],
+      "writes": [
+        "s|col|public.agents.reasoning_replay",
+        "n|col|public.agents.reasoning_replay",
+        "e|col|public.agents.reasoning_replay"
+      ],
+      "reads": [
+        "n|tbl|public.agents",
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "add_check",
+      "statementTarget": [
+        "table",
+        "public",
+        "agent_defaults"
+      ],
+      "writes": [
+        "s|ck|public.agent_defaults.ck_agent_defaults_reasoning_replay",
+        "n|ck|public.agent_defaults.ck_agent_defaults_reasoning_replay",
+        "e|ck|public.agent_defaults.ck_agent_defaults_reasoning_replay",
+        "n|con|public.agent_defaults.ck_agent_defaults_reasoning_replay"
+      ],
+      "reads": [
+        "n|tbl|public.agent_defaults",
+        "n|sch|public",
+        "n|col|public.agent_defaults.reasoning_replay"
+      ]
+    },
+    {
+      "statementType": "add_check",
+      "statementTarget": [
+        "table",
+        "public",
+        "agents"
+      ],
+      "writes": [
+        "s|ck|public.agents.ck_agents_reasoning_replay",
+        "n|ck|public.agents.ck_agents_reasoning_replay",
+        "e|ck|public.agents.ck_agents_reasoning_replay",
+        "n|con|public.agents.ck_agents_reasoning_replay"
+      ],
+      "reads": [
+        "n|tbl|public.agents",
+        "n|sch|public",
+        "n|col|public.agents.reasoning_replay"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "agent_defaults",
+        "name": "reasoning_replay",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "agents",
+        "name": "reasoning_replay",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "agent_defaults",
+        "name": "ck_agent_defaults_reasoning_replay",
+        "value": "\"reasoning_replay\" in ('all', 'tool-loop', 'none')",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "agents",
+        "name": "ck_agents_reasoning_replay",
+        "value": "\"reasoning_replay\" in ('all', 'tool-loop', 'none')",
+        "entityType": "checks"
+      }
+    }
+  ]
+}
