@@ -97,6 +97,7 @@ telos/
 │       ├── tools.ts         # The pool: telos's /mcp with the run token, plus the agent's servers and hooks
 │       ├── artifacts.ts     # What a run made: agent-core's artifacts as telos stores them, and notes
 │       ├── ask.ts           # ask_person: an agent stops to ask a person, and its todo waits
+│       ├── elicit.ts        # A server asking for input mid-call, turned into the run's question
 │       ├── prompts.ts       # The system prompt's layers, the brief, and reading a reply
 │       └── __tests__/       # End to end against a real telos and a scripted model
 ├── scripts/
@@ -386,7 +387,22 @@ refuses a todo with nothing open, and is never a run's (`NOT_FOR_RUNS`,
 `assignmentFor` hands the next run the question (as "An agent asked: …") and
 the answer among its notes, in every lane. A hook's `status` knows only ok,
 error and stopped, so `sessionEnd` hears an asked run as `stopped`, with
-`vars.runStatus` saying `asked`. Plan approval needs no code of its own: a
+`vars.runStatus` saying `asked`.
+
+**A server that asks mid-call takes the same path.** A run's pool declares MCP
+elicitation (`elicitation: true` in `runner/src/tools.ts`) with no pool-wide
+handler, and every call the run makes passes its own `onElicit`, so a question
+reaches the call that caused it (one the pool cannot name, with two calls in
+flight on the connection, is declined). Nobody can fill a form in while the call is open, so the server is answered
+`cancel`, and the run ends as though the agent had called `ask_person`: the
+question is `elicitationQuestion` (`runner/src/elicit.ts`), which names the
+server and the tool, gives the server's message and the fields it wanted, flags
+any that look like a secret (the spec forbids asking for one this way), and
+tells the next run that the server will ask again, so the reply belongs in the
+tool's arguments. Holding the call open while a person answers on the todo is
+later work: it needs the run to stay leased while it waits.
+
+Plan approval needs no code of its own: a
 lane with no agent and no route is a resting place, and the app's "Plan, then
 approve" template starter (`app/src/lib/template-starters.ts`) is Plan → Approve
 (resting) → Doing → Done, where a person moving the plan on is the approval.

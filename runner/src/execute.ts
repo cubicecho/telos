@@ -9,9 +9,10 @@ import {
   type RunEventInput,
   runAgentLoop,
 } from '@cubicecho/agent-core';
-import type { McpPool } from '@cubicecho/agent-mcp-pool';
+import type { ElicitHandler, McpPool } from '@cubicecho/agent-mcp-pool';
 import { ArtifactLog, detects, noteArtifact, splitToolName } from './artifacts.ts';
 import { ASK_PERSON, ASK_PERSON_DEFINITION, ASKED_REPLY, questionOf } from './ask.ts';
+import { ELICIT_CANCEL, ELICITED_REPLY, elicitationQuestion } from './elicit.ts';
 import { assignmentPrompt, readReply, systemPromptFor } from './prompts.ts';
 import { type ResolvedRunAgent, resolveAgent, unrunnable } from './spec.ts';
 import type { Beat, Claim, RunEvent, RunPrompt, RunResult, RunUsage, Telos } from './telos.ts';
@@ -401,7 +402,32 @@ async function work(
           asked.abort(new Error('Asked a person.'));
           return ASKED_REPLY;
         }
-        const answer = await pool.call(call.name, call.args, { signal: callSignal ?? signal });
+        // A server that asks a person mid-call is asking what ask_person asks,
+        // so the run ends the same way: the server is told nobody is there
+        // (`cancel`), and what it asked becomes the run's question. The call is
+        // let finish first, so the server hears the cancel and answers it.
+        const elicited: { question: string | null } = { question: null };
+        const onElicit: ElicitHandler = (serverId, params) => {
+          if (elicited.question === null) {
+            const server = pool.state().find((entry) => entry.id === serverId)?.label ?? serverId;
+            elicited.question = elicitationQuestion(server, call.name, params);
+            feed.push({ kind: 'notice', name: server, text: `${server} asked a person for input; the run stops.` });
+          }
+          return ELICIT_CANCEL;
+        };
+        let answer: string;
+        try {
+          answer = await pool.call(call.name, call.args, { signal: callSignal ?? signal, onElicit });
+        } catch (error) {
+          // Most servers answer a cancelled question with an error; the question is the result.
+          if (elicited.question === null) throw error;
+          answer = '';
+        }
+        if (elicited.question !== null) {
+          ask.question ??= elicited.question;
+          asked.abort(new Error('A server asked a person.'));
+          return ELICITED_REPLY;
+        }
         artifacts.note(noteArtifact(call.name, call.args, answer, claim.todoId));
         return answer;
       },
