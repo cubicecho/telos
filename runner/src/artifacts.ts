@@ -29,24 +29,24 @@ export interface ArtifactDraft {
 }
 
 /**
- * Splits `<slug>__<tool>`. A slug is a single token, so the first `__` is where it ends.
- *
- * @param name The qualified tool name.
- * @returns The slug (empty when there is none) and the tool.
+ * Who offers a tool, by the name the model calls it: `McpPool.describe` bound to
+ * the run's pool. Read off the pool rather than out of the name, because the
+ * pool shortens a long name and puts a hash on it, and the first `__` of that is
+ * not always where the slug ends.
  */
-export function splitToolName(name: string): { serverSlug: string; tool: string } {
-  const at = name.indexOf('__');
-  return at < 0 ? { serverSlug: '', tool: name } : { serverSlug: name.slice(0, at), tool: name.slice(at + 2) };
-}
+export type DescribeTool = (qualified: string) => { serverId: string; name: string } | undefined;
 
 /**
  * Whether the loop reads a call for a write. The telos door writes notes and
  * requests, which are the board's own and are not artifacts.
  *
- * @param call The call, under the tool it was shown as.
- * @returns False for the board's tools.
+ * @param describe Who offers each tool.
+ * @returns The predicate: false for the board's tools.
  */
-export const detects = (call: ToolCallRequest): boolean => splitToolName(call.name).serverSlug !== TELOS_SERVER;
+export const detectsFor =
+  (describe: DescribeTool) =>
+  (call: ToolCallRequest): boolean =>
+    describe(call.name)?.serverId !== TELOS_SERVER;
 
 /**
  * One of the loop's artifacts in the shape telos stores. A link has no word in
@@ -54,17 +54,19 @@ export const detects = (call: ToolCallRequest): boolean => splitToolName(call.na
  * the guess telos already has a word for.
  *
  * @param artifact What agent-core collected.
+ * @param describe Who offers each tool. A tool the pool cannot name keeps the
+ *   name it was called by, with no server.
  * @returns The draft.
  */
-export function draftOf(artifact: RunArtifact): ArtifactDraft {
+export function draftOf(artifact: RunArtifact, describe: DescribeTool): ArtifactDraft {
   const { link } = artifact;
-  const { serverSlug, tool } = splitToolName(artifact.tool);
+  const info = describe(artifact.tool);
   return {
     location: link.uri,
     source: artifactSource(artifact) === ArtifactSource.Declared ? 'declared' : 'detected',
     action: artifact.action ?? 'created',
-    serverSlug: serverSlug || null,
-    tool: tool || null,
+    serverSlug: info?.serverId ?? null,
+    tool: info?.name ?? (artifact.tool || null),
     title: link.title ?? null,
     description: link.description ?? null,
     mediaType: link.mimeType ?? null,
@@ -85,6 +87,7 @@ const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
  * @param args The call's arguments.
  * @param answer What the tool answered: the new note's id, as JSON.
  * @param todoId The run's todo.
+ * @param describe Who offers each tool.
  * @returns The draft, or null.
  */
 export function noteArtifact(
@@ -92,9 +95,10 @@ export function noteArtifact(
   args: Record<string, unknown>,
   answer: string,
   todoId: string,
+  describe: DescribeTool,
 ): ArtifactDraft | null {
-  const { serverSlug, tool } = splitToolName(name);
-  if (serverSlug !== TELOS_SERVER || tool !== 'add_todo_note' || args.todoId !== todoId) return null;
+  const info = describe(name);
+  if (info?.serverId !== TELOS_SERVER || info.name !== 'add_todo_note' || args.todoId !== todoId) return null;
   const id = /"id"\s*:\s*"([^"]+)"/.exec(answer)?.[1];
   if (!id || !UUID.test(id)) return null;
   const body = typeof args.body === 'string' ? args.body : '';
@@ -106,8 +110,8 @@ export function noteArtifact(
     location: `${NOTE_LOCATION}${id}`,
     source: 'detected',
     action: 'created',
-    serverSlug,
-    tool,
+    serverSlug: info.serverId,
+    tool: info.name,
     title: title ? title.slice(0, 120) : null,
     mediaType: 'text/markdown',
     sizeBytes: Buffer.byteLength(body),
@@ -120,7 +124,7 @@ export function noteArtifact(
  * a failed run's files are listed too.
  */
 export class ArtifactLog {
-  #fromLoop: RunArtifact[] = [];
+  #fromLoop: ArtifactDraft[] = [];
   readonly #notes: ArtifactDraft[] = [];
 
   note(draft: ArtifactDraft | null): void {
@@ -131,12 +135,13 @@ export class ArtifactLog {
    * What the loop collected.
    *
    * @param artifacts The loop's `artifacts`.
+   * @param describe Who offers each tool, asked now, while the pool is open.
    */
-  fromLoop(artifacts: RunArtifact[]): void {
-    this.#fromLoop = artifacts;
+  fromLoop(artifacts: RunArtifact[], describe: DescribeTool): void {
+    this.#fromLoop = artifacts.map((artifact) => draftOf(artifact, describe));
   }
 
   list(): ArtifactDraft[] {
-    return [...this.#fromLoop.map(draftOf), ...this.#notes];
+    return [...this.#fromLoop, ...this.#notes];
   }
 }

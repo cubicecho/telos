@@ -3,14 +3,14 @@ import {
   type HookContext,
   type HookNote,
   type HookRunner,
+  type LoopUsage,
   notify,
   PRESELECT_APPEND,
-  preselect,
   type RunEventInput,
   runAgentLoop,
 } from '@cubicecho/agent-core';
 import type { ElicitHandler, McpPool } from '@cubicecho/agent-mcp-pool';
-import { ArtifactLog, detects, noteArtifact, splitToolName } from './artifacts.ts';
+import { ArtifactLog, type DescribeTool, detectsFor, noteArtifact } from './artifacts.ts';
 import { ASK_PERSON, ASK_PERSON_DEFINITION, ASKED_REPLY, questionOf } from './ask.ts';
 import { ELICIT_CANCEL, ELICITED_REPLY, elicitationQuestion } from './elicit.ts';
 import { assignmentPrompt, readReply, systemPromptFor } from './prompts.ts';
@@ -54,7 +54,6 @@ export class EventFeed {
   #usage: RunUsage | undefined;
   #usageSent = true;
   #toolCalls = 0;
-  #cacheReported = false;
 
   push(event: RunEvent): void {
     const last = this.#pending.at(-1);
@@ -73,15 +72,6 @@ export class EventFeed {
   /** What the agent was told; sent with every beat until one lands. */
   prompt(prompt: RunPrompt): void {
     this.#prompt = prompt;
-  }
-
-  /**
-   * How much of the run's prompt the endpoint served from its cache, so far.
-   * Undefined until a turn reports a cache count: a zero from an endpoint that
-   * says nothing about its cache is not a miss.
-   */
-  get cachedInputTokens(): number | undefined {
-    return this.#cacheReported ? this.#usage?.cachedInputTokens : undefined;
   }
 
   /** Whether a beat now would say anything. */
@@ -120,14 +110,14 @@ export class EventFeed {
       this.push({ kind: 'turn', text: event.text || null });
     } else if (event.kind === 'usage') {
       if (event.usage) {
-        // agent-core says a turn reported its cache by giving `uncached`.
-        this.#cacheReported ||= event.usage.turn?.uncached !== undefined;
+        // A zero from an endpoint that says nothing about its cache is not a
+        // miss, so the count goes only once some turn has reported one.
         this.#usage = {
           toolCalls: this.#toolCalls,
           promptTokens: event.usage.promptTokens,
           completionTokens: event.usage.completionTokens,
           totalTokens: event.usage.totalTokens,
-          ...(this.#cacheReported ? { cachedInputTokens: event.usage.cachedTokens ?? 0 } : {}),
+          ...(event.usage.cacheReported ? { cachedInputTokens: event.usage.cachedTokens ?? 0 } : {}),
         };
         this.#usageSent = false;
       }
@@ -301,7 +291,6 @@ export async function execute(claim: Claim, options: ExecuteOptions): Promise<Ru
 }
 
 /**
-/**
  * A run's status as a hook is told it: agent-mcp-pool's hooks know ok, error
  * and stopped, and a run that asked a person stopped before its work was done.
  *
@@ -313,16 +302,31 @@ export function hookStatus(status: RunResult['status']): 'ok' | 'error' | 'stopp
 }
 
 /**
- * The pool's hooks as agent-core runs them, failures logged.
+ * The pool's hooks as agent-core runs them, failures logged. Every server in
+ * the pool is the run's, so the runner is not scoped further.
  *
  * @param pool The run's servers.
  * @param log Where failures go.
  * @returns The runner.
  */
 function hooksOf(pool: McpPool, log: (text: string) => void): HookRunner {
-  return (event, context, { signal }) =>
-    pool.runHooks(event, context, { ...(signal ? { signal } : {}), onNotice: (text) => log(`[hooks] ${text}`) });
+  return pool.hookRunner({ onNotice: (text) => log(`[hooks] ${text}`) });
 }
+
+/**
+ * What a run spent, as telos is told it.
+ *
+ * @param usage The loop's totals.
+ * @param toolCalls How many calls it made.
+ * @returns The usage fields of a result. The cache count only where some turn reported one.
+ */
+const spentBy = (usage: LoopUsage, toolCalls: number) => ({
+  toolCalls,
+  promptTokens: usage.promptTokens,
+  completionTokens: usage.completionTokens,
+  totalTokens: usage.totalTokens,
+  ...(usage.cacheReported ? { cachedInputTokens: usage.cachedTokens } : {}),
+});
 
 interface WorkOptions {
   signal: AbortSignal;
@@ -352,32 +356,19 @@ async function work(
   const system = systemPromptFor(assignment, agent.prompt);
   feed.prompt({ system, user: prompt });
   const catalog = config.toolDiscovery === 'eager' ? undefined : pool.catalog();
-  const preselected =
-    catalog?.length && config.toolSelectModel
-      ? await preselect(config, config.toolSelectModel, catalog, prompt, { signal, onNotice: log }).catch(() => [])
-      : [];
+  const describe: DescribeTool = (name) => pool.describe(name);
 
   // Only an agent with somewhere to store things besides the board is offered
   // record_artifact, which the loop declares and answers: one with just telos
   // has nothing to record, and would record its own answer as a file it never
   // wrote.
-  const stores = catalog
-    ? catalog.some((server) => server.id !== TELOS_SERVER && server.tools.length > 0)
-    : pool.tools().some((tool) => splitToolName(tool.function.name).serverSlug !== TELOS_SERVER);
+  const stores = (catalog ?? pool.catalog()).some((server) => server.id !== TELOS_SERVER && server.tools.length > 0);
 
-  // Every agent may stop and ask a person (`ask_person`). The call ends the
-  // loop: the question is kept, and the loop is stopped on a signal of its own,
-  // so a stop from telos still reads as a stop.
+  // Every agent may stop and ask a person (`ask_person`), and a server may ask
+  // one mid-call. Either answer ends the loop (`end`) once the step's calls are
+  // answered, and the question is kept; a stop from telos is still a stop.
   // Held on an object: the dispatcher sets it, and a `let` would read as never set here.
   const ask: { question: string | null } = { question: null };
-  const asked = new AbortController();
-  const spentBy = (usage: { prompt: number; completion: number; total: number }, toolCalls: number) => ({
-    toolCalls,
-    promptTokens: usage.prompt,
-    completionTokens: usage.completion,
-    totalTokens: usage.total,
-    ...(feed.cachedInputTokens === undefined ? {} : { cachedInputTokens: feed.cachedInputTokens }),
-  });
 
   let loop: Awaited<ReturnType<typeof runAgentLoop>>;
   try {
@@ -385,22 +376,26 @@ async function work(
       config,
       system,
       messages: [{ role: 'user', content: prompt }],
-      tools: [...pool.tools(), ASK_PERSON_DEFINITION],
-      ...(catalog ? { catalog, loaded: [ASK_PERSON] } : {}),
+      tools: pool.tools(),
+      // The runner's own, offered in every mode and never catalogued or loaded.
+      hostTools: [ASK_PERSON_DEFINITION],
+      ...(catalog ? { catalog } : {}),
       // The front of every request is what a prompt cache keeps, so it stays put:
       // all tools sorted by name when they are all sent, and on demand the same
       // opening set, with each tool loaded (or preselected) after it in the order
       // it came. Sorted, a load would land mid-array and move every tool after it.
       toolOrder: !catalog,
+      // The loop picks on the question before the hooks' context goes on it. An
+      // agent with no tool-picking model has none picked, rather than the loop
+      // asking its own model.
+      preselect: Boolean(config.toolSelectModel),
       preselectRouting: PRESELECT_APPEND,
-      preselected,
       dispatch: async (call, callSignal) => {
         if (call.name === ASK_PERSON) {
           const asking = questionOf(call.args);
           if (!asking) throw new Error('ask_person needs a question.');
-          ask.question = asking;
-          asked.abort(new Error('Asked a person.'));
-          return ASKED_REPLY;
+          ask.question ??= asking;
+          return { text: ASKED_REPLY, end: { reason: 'Asked a person.' } };
         }
         // A server that asks a person mid-call is asking what ask_person asks,
         // so the run ends the same way: the server is told nobody is there
@@ -425,14 +420,13 @@ async function work(
         }
         if (elicited.question !== null) {
           ask.question ??= elicited.question;
-          asked.abort(new Error('A server asked a person.'));
-          return ELICITED_REPLY;
+          return { text: ELICITED_REPLY, end: { reason: 'A server asked a person.' } };
         }
-        artifacts.note(noteArtifact(call.name, call.args, answer, claim.todoId));
+        artifacts.note(noteArtifact(call.name, call.args, answer, claim.todoId, describe));
         return answer;
       },
-      artifacts: { declare: stores, detect: detects },
-      signal: AbortSignal.any([signal, asked.signal]),
+      artifacts: { declare: stores, detect: detectsFor(describe) },
+      signal,
       hooks: {
         run: hooksOf(pool, log),
         // A todo's first run opens its session; every run after is another turn of it.
@@ -448,16 +442,13 @@ async function work(
   } catch (error) {
     // What it made exists whatever became of the run.
     const run = failedRun(error);
-    if (run?.artifacts) artifacts.fromLoop(run.artifacts);
-    // Stopped because it asked, and not by telos: the question is the result.
-    if (ask.question !== null && !signal.aborted) {
-      return { status: 'asked', question: ask.question, ...(run ? spentBy(run.usage, run.toolCalls.length) : {}) };
-    }
+    if (run?.artifacts) artifacts.fromLoop(run.artifacts, describe);
     throw error;
   }
 
-  artifacts.fromLoop(loop.artifacts);
+  artifacts.fromLoop(loop.artifacts, describe);
   const spent = spentBy(loop.usage, loop.toolCalls.length);
+  // Ended by its answer: the question is the result, whatever the model wrote beside the call.
   if (ask.question !== null) return { status: 'asked', question: ask.question, ...spent };
   const { report, todos, refine } = readReply(loop.turn.content.trim());
   return { status: 'ok', output: report, todos, refine, ...spent };

@@ -38,4 +38,13 @@ describe('EventFeed', () => {
     expect(feed.drain().usage).toEqual({ toolCalls: 1, promptTokens: 30, completionTokens: 5, totalTokens: 35 });
     expect(feed.drain().usage).toBeUndefined();
   });
+
+  it('says what the cache served only once the loop says a turn reported it', () => {
+    const feed = new EventFeed();
+    const usage = { promptTokens: 10, completionTokens: 2, totalTokens: 12, cachedTokens: 0 };
+    feed.fromLoop({ kind: 'usage', usage: { ...usage, cacheReported: false } });
+    expect(feed.drain().usage).not.toHaveProperty('cachedInputTokens');
+    feed.fromLoop({ kind: 'usage', usage: { ...usage, cacheReported: true } });
+    expect(feed.drain().usage).toMatchObject({ cachedInputTokens: 0 });
+  });
 });
