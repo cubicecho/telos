@@ -1,15 +1,12 @@
 import {
-  AGENT_SPEC,
   type AgentSpec,
+  defineSpecColumns,
   NO_KEY,
   parseSpec,
   type ResolvedAgent,
   resolveAgentSpec,
   resolveApiKey,
 } from '@cubicecho/agent-core';
-
-// The server has no agent-core of its own, and reads what a blank replay falls to from here.
-export { ReasoningReplay } from '@cubicecho/agent-core';
 
 // An agent as layered documents: the account's defaults under the agent, read
 // with agent-core's spec rules. Absent inherits and nothing else does, so a
@@ -51,18 +48,24 @@ export interface ResolvedRunAgent {
   warnings: string[];
 }
 
-const has = <T>(value: T | null | undefined): value is T => value !== null && value !== undefined;
-
 /**
- * Drops the keys whose value is absent, and the object itself if nothing is left.
- *
- * @param fields - A spec section.
- * @returns It, or undefined.
+ * Which column feeds which spec field. A null is absent, which is the only
+ * "inherit" a layer stores, so no column needs a marker of its own.
  */
-function section<T extends Record<string, unknown>>(fields: T): T | undefined {
-  const kept = Object.fromEntries(Object.entries(fields).filter(([, value]) => has(value))) as T;
-  return Object.keys(kept).length > 0 ? kept : undefined;
-}
+const COLUMNS = defineSpecColumns<AgentLayer>({
+  baseUrl: { path: 'endpoint.baseUrl' },
+  requestTimeoutSeconds: { path: 'endpoint.requestTimeoutSeconds' },
+  model: { path: 'model.model' },
+  maxTokens: { path: 'model.maxTokens' },
+  temperature: { path: 'model.temperature' },
+  contextLength: { path: 'model.contextLength' },
+  reasoningEffort: { path: 'model.reasoningEffort' },
+  reasoningReplay: { path: 'model.reasoningReplay' },
+  toolDiscovery: { path: 'tools.discovery', toSpec: (on) => (on ? 'ondemand' : 'eager') },
+  maxToolIterations: { path: 'tools.maxIterations' },
+  maxRetries: { path: 'retry.maxRetries' },
+  toolSelectModel: { path: 'tasks.toolSelect.model' },
+});
 
 /**
  * A stored layer as an agent spec document, saying only what the row says.
@@ -71,28 +74,7 @@ function section<T extends Record<string, unknown>>(fields: T): T | undefined {
  * @returns The document, which `parseSpec` has not yet read.
  */
 export function specLayer(layer: AgentLayer): AgentSpec {
-  const endpoint = section({ baseUrl: layer.baseUrl, requestTimeoutSeconds: layer.requestTimeoutSeconds });
-  const model = section({
-    model: layer.model,
-    maxTokens: layer.maxTokens,
-    temperature: layer.temperature,
-    contextLength: layer.contextLength,
-    reasoningEffort: layer.reasoningEffort,
-    reasoningReplay: layer.reasoningReplay,
-  });
-  const tools = section({
-    discovery: has(layer.toolDiscovery) ? (layer.toolDiscovery ? 'ondemand' : 'eager') : undefined,
-    maxIterations: layer.maxToolIterations,
-  });
-  const retry = section({ maxRetries: layer.maxRetries });
-  return {
-    spec: AGENT_SPEC,
-    ...(endpoint ? { endpoint } : {}),
-    ...(model ? { model } : {}),
-    ...(tools ? { tools } : {}),
-    ...(retry ? { retry } : {}),
-    ...(has(layer.toolSelectModel) ? { tasks: { toolSelect: { model: layer.toolSelectModel } } } : {}),
-  } as AgentSpec;
+  return COLUMNS.toLayer(layer);
 }
 
 /**
