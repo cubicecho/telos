@@ -416,7 +416,7 @@ describe('the runner', () => {
 
     await cycle();
 
-    expect(told[0]).toContain('No tool call in this run stored fs:///summary.md');
+    expect(told[0]).toContain('No tool call in this run touched fs:///summary.md');
     expect(await db.select().from(dbSchema.artifacts).where(eq(dbSchema.artifacts.todoId, todoId))).toEqual([]);
   });
 
@@ -550,6 +550,33 @@ describe('the runner', () => {
     expect(run.status).toBe('error');
     expect(run.error).toBeTruthy();
     expect((await todoRow(todoId)).laneId).toBe(board.lanes[0].id);
+  });
+
+  it('keeps what a failed run wrote before its model failed', async () => {
+    const desk = await serveTools('');
+    await setServers([{ id: 'desk', name: 'Desk', url: desk.url }]);
+    const todoId = await board.addTodo('Draft it');
+    let step = 0;
+    llm.script = () => {
+      step++;
+      return step === 1 ? { tool: 'desk__write_file', args: { path: 'draft.md', content: 'Half' } } : { fail: 400 };
+    };
+
+    await cycle();
+
+    const [run] = await runsOf(todoId);
+    expect(run.status).toBe('error');
+    const made = await db.select().from(dbSchema.artifacts).where(eq(dbSchema.artifacts.todoId, todoId));
+    expect(made).toEqual([
+      expect.objectContaining({
+        location: 'draft.md',
+        source: 'detected',
+        action: 'created',
+        serverSlug: 'desk',
+        tool: 'write_file',
+        sizeBytes: 4,
+      }),
+    ]);
   });
 
   it('stops when telos says stop, and the stopped run writes nothing', async () => {

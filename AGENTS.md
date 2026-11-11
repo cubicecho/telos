@@ -95,7 +95,7 @@ telos/
 │       ├── spec.ts          # An agent over its account's defaults, as agent-core spec layers (also @telos/runner/spec)
 │       ├── execute.ts       # One run: agent-core's runAgentLoop over a per-run MCP pool
 │       ├── tools.ts         # The pool: telos's /mcp with the run token, plus the agent's servers and hooks
-│       ├── artifacts.ts     # What a run made: record_artifact, and writes read off tool calls
+│       ├── artifacts.ts     # What a run made: agent-core's artifacts as telos stores them, and notes
 │       ├── ask.ts           # ask_person: an agent stops to ask a person, and its todo waits
 │       ├── prompts.ts       # The system prompt's layers, the brief, and reading a reply
 │       └── __tests__/       # End to end against a real telos and a scripted model
@@ -543,10 +543,15 @@ timeout rather than its own 10s.
 (tool calls, tool results, hook notes, notices) with each heartbeat and the
 rest with `finishRun`, where they land in `runs.events`, capped at
 `MAX_RUN_EVENTS`. That is the live view: the app polls the run. Artifacts are
-what the run made, declared by the agent through the runner's own
-`record_artifact` tool or read off a write/edit/move/delete tool call, one per
-location; `finishRun` stores them in `artifacts`, a reserved table no client
-can write. A stopped run keeps its events but no artifacts.
+what the run made, declared by the agent through `record_artifact` or read off
+a write/edit/move/delete tool call, one per location. Both are agent-core's
+(`runAgentLoop`'s `artifacts`: the loop declares and answers the tool, and
+believes a declaration only where some call in the run touched that
+location); the runner only offers the tool to an agent with a server besides
+telos, keeps telos's own tools out of detection, adds its notes
+(`telos:note/<id>`), and takes the loop's list from a failure as well as a
+result. `finishRun` stores them in `artifacts`, a reserved table no client can
+write. A stopped run keeps its events but no artifacts.
 
 **An artifact says who vouches for it, and outlives its todo.** `source` is
 `declared` or `detected` for what a run reported (`RUN_ARTIFACT_SOURCES`, the

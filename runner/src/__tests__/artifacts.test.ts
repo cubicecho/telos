@@ -1,77 +1,52 @@
+import type { RunArtifact } from '@cubicecho/agent-core';
 import { describe, expect, it } from 'vitest';
-import { ArtifactLog, declaredArtifact, detectArtifact, mediaTypeFor, noteArtifact } from '../artifacts.ts';
+import { ArtifactLog, detects, draftOf, noteArtifact } from '../artifacts.ts';
 
-describe('reading a write out of a tool call', () => {
-  it('knows a write by its verb and its path', () => {
-    expect(detectArtifact('fs__write_file', { path: '/a/b.md', content: 'hi' })).toMatchObject({
-      location: '/a/b.md',
-      source: 'detected',
-      action: 'created',
-      serverSlug: 'fs',
-      tool: 'write_file',
-      mediaType: 'text/markdown',
-      sizeBytes: 2,
-    });
-    expect(detectArtifact('fs__edit_file', { path: 'x.ts' })?.action).toBe('updated');
-    expect(detectArtifact('fs__move_file', { source: 'a', destination: 'b' })).toMatchObject({
-      location: 'b',
-      action: 'moved',
-    });
-    expect(detectArtifact('fs__delete_file', { path: 'gone.txt' })?.action).toBe('deleted');
-  });
+const call = (name: string) => ({ id: 'c1', name, args: {}, raw: '{}', repaired: false });
 
-  it('ignores reads, directories, pathless writes and the board’s own tools', () => {
-    expect(detectArtifact('fs__read_file', { path: 'a' })).toBeNull();
-    expect(detectArtifact('fs__create_directory', { path: 'a' })).toBeNull();
-    expect(detectArtifact('fs__write_file', { content: 'a' })).toBeNull();
-    expect(detectArtifact('telos__create_request', { url: 'x' })).toBeNull();
-  });
-
-  it('believes a declaration, and needs its location', () => {
-    expect(declaredArtifact({ location: ' s3://b/k.png ', title: 'Chart' })).toMatchObject({
-      location: 's3://b/k.png',
-      source: 'declared',
-      title: 'Chart',
-      mediaType: 'image/png',
-    });
-    expect(declaredArtifact({ title: 'Nowhere' })).toBeNull();
-  });
-
-  it('keeps one per location, the declaration’s words and the last action', () => {
-    const log = new ArtifactLog();
-    log.add(detectArtifact('fs__write_file', { path: 'p.md', content: 'one' }));
-    log.add(declaredArtifact({ location: 'p.md', title: 'Plan' }));
-    log.add(detectArtifact('fs__edit_file', { path: 'p.md', content: 'three' }));
-    expect(log.list()).toEqual([
-      expect.objectContaining({
-        location: 'p.md',
-        source: 'declared',
-        action: 'updated',
-        title: 'Plan',
-        tool: 'edit_file',
-        sizeBytes: 5,
-      }),
-    ]);
-  });
-
-  it('guesses a media type off the extension only', () => {
-    expect(mediaTypeFor('https://x/y/report.PDF?v=1')).toBe('application/pdf');
-    expect(mediaTypeFor('/a/.env')).toBeNull();
-    expect(mediaTypeFor('/a/Makefile')).toBeNull();
+describe('what the loop reads for a write', () => {
+  it('is every tool but the board’s own', () => {
+    expect(detects(call('fs__write_file'))).toBe(true);
+    expect(detects(call('write_file'))).toBe(true);
+    expect(detects(call('telos__create_request'))).toBe(false);
   });
 });
 
-describe('what a declaration has to point at', () => {
-  it('is believed only when a tool call in the run carried the location', () => {
-    const log = new ArtifactLog();
-    expect(log.seen('/work/plan.md')).toBe(false);
-    log.witness({ path: 'work/plan.md', content: '# Plan' }, 'Wrote 6 bytes.');
-    expect(log.seen('/work/plan.md')).toBe(true);
-    expect(log.seen('file:///work/plan.md')).toBe(true);
-    expect(log.seen('fs:///quinton_lucas_summary.md')).toBe(false);
-    log.witness({ bucket: 'b' }, '{"url":"https://cdn.example.com/x/report.pdf"}');
-    expect(log.seen('https://cdn.example.com/x/report.pdf')).toBe(true);
-    expect(log.seen('  ')).toBe(false);
+describe('an artifact the loop collected', () => {
+  const written: RunArtifact = {
+    link: { uri: '/work/plan.md', name: 'plan.md', title: 'The plan', mimeType: 'text/markdown' },
+    callId: 'c1',
+    tool: 'fs__edit_file',
+    step: 0,
+    count: 2,
+    source: 'declared',
+    action: 'updated',
+    sizeBytes: 6,
+  };
+
+  it('is stored as telos keeps one, split at its server', () => {
+    expect(draftOf(written)).toEqual({
+      location: '/work/plan.md',
+      source: 'declared',
+      action: 'updated',
+      serverSlug: 'fs',
+      tool: 'edit_file',
+      title: 'The plan',
+      description: null,
+      mediaType: 'text/markdown',
+      sizeBytes: 6,
+    });
+  });
+
+  it('is created where no write said otherwise, and a link is kept as a guess', () => {
+    const linked: RunArtifact = {
+      link: { uri: 's3://b/k.png', name: 'k.png' },
+      callId: 'c2',
+      tool: 'up',
+      step: 1,
+      count: 1,
+    };
+    expect(draftOf(linked)).toMatchObject({ source: 'detected', action: 'created', serverSlug: null, tool: 'up' });
   });
 });
 
@@ -104,5 +79,13 @@ describe('a note the agent left on its todo', () => {
     expect(noteArtifact('telos__submit_request', { todoId: 't1', body: 'x' }, answer, 't1')).toBeNull();
     expect(noteArtifact('desk__add_todo_note', { todoId: 't1', body: 'x' }, answer, 't1')).toBeNull();
     expect(noteArtifact('telos__add_todo_note', { todoId: 't1', body: 'x' }, 'Error: nope', 't1')).toBeNull();
+  });
+
+  it('is listed beside what the loop collected', () => {
+    const log = new ArtifactLog();
+    log.note(noteArtifact('telos__add_todo_note', { todoId: 't1', body: 'x' }, JSON.stringify({ id }), 't1'));
+    log.note(null);
+    log.fromLoop([{ link: { uri: 'a.md', name: 'a.md' }, callId: 'c1', tool: 'fs__write_file', step: 0, count: 1 }]);
+    expect(log.list().map((draft) => draft.location)).toEqual(['a.md', `telos:note/${id}`]);
   });
 });

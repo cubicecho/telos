@@ -10,15 +10,7 @@ import {
   runAgentLoop,
 } from '@cubicecho/agent-core';
 import type { McpPool } from '@cubicecho/agent-mcp-pool';
-import {
-  ArtifactLog,
-  declaredArtifact,
-  detectArtifact,
-  noteArtifact,
-  RECORD_ARTIFACT,
-  RECORD_ARTIFACT_DEFINITION,
-  splitToolName,
-} from './artifacts.ts';
+import { ArtifactLog, detects, noteArtifact, splitToolName } from './artifacts.ts';
 import { ASK_PERSON, ASK_PERSON_DEFINITION, ASKED_REPLY, questionOf } from './ask.ts';
 import { assignmentPrompt, readReply, systemPromptFor } from './prompts.ts';
 import { type ResolvedRunAgent, resolveAgent, unrunnable } from './spec.ts';
@@ -365,8 +357,9 @@ async function work(
       : [];
 
   // Only an agent with somewhere to store things besides the board is offered
-  // record_artifact: one with just telos has nothing to record, and would
-  // record its own answer as a file it never wrote.
+  // record_artifact, which the loop declares and answers: one with just telos
+  // has nothing to record, and would record its own answer as a file it never
+  // wrote.
   const stores = catalog
     ? catalog.some((server) => server.id !== TELOS_SERVER && server.tools.length > 0)
     : pool.tools().some((tool) => splitToolName(tool.function.name).serverSlug !== TELOS_SERVER);
@@ -377,7 +370,6 @@ async function work(
   // Held on an object: the dispatcher sets it, and a `let` would read as never set here.
   const ask: { question: string | null } = { question: null };
   const asked = new AbortController();
-  const own = [ASK_PERSON_DEFINITION, ...(stores ? [RECORD_ARTIFACT_DEFINITION] : [])];
   const spentBy = (usage: { prompt: number; completion: number; total: number }, toolCalls: number) => ({
     toolCalls,
     promptTokens: usage.prompt,
@@ -392,8 +384,8 @@ async function work(
       config,
       system,
       messages: [{ role: 'user', content: prompt }],
-      tools: [...pool.tools(), ...own],
-      ...(catalog ? { catalog, loaded: [ASK_PERSON, ...(stores ? [RECORD_ARTIFACT] : [])] } : {}),
+      tools: [...pool.tools(), ASK_PERSON_DEFINITION],
+      ...(catalog ? { catalog, loaded: [ASK_PERSON] } : {}),
       // The front of every request is what a prompt cache keeps, so it stays put:
       // all tools sorted by name when they are all sent, and on demand the same
       // opening set, with each tool loaded (or preselected) after it in the order
@@ -409,23 +401,11 @@ async function work(
           asked.abort(new Error('Asked a person.'));
           return ASKED_REPLY;
         }
-        if (stores && call.name === RECORD_ARTIFACT) {
-          const declared = declaredArtifact(call.args);
-          if (!declared) throw new Error('record_artifact needs a location.');
-          if (!artifacts.seen(declared.location)) {
-            throw new Error(
-              `No tool call in this run stored ${declared.location}, so it was not recorded. ` +
-                'Record only what one of your tools wrote; your reply and notes are already on the todo.',
-            );
-          }
-          artifacts.add(declared);
-          return `Recorded ${declared.location}.`;
-        }
         const answer = await pool.call(call.name, call.args, { signal: callSignal ?? signal });
-        artifacts.witness(call.args, answer);
-        artifacts.add(detectArtifact(call.name, call.args) ?? noteArtifact(call.name, call.args, answer, claim.todoId));
+        artifacts.note(noteArtifact(call.name, call.args, answer, claim.todoId));
         return answer;
       },
+      artifacts: { declare: stores, detect: detects },
       signal: AbortSignal.any([signal, asked.signal]),
       hooks: {
         run: hooksOf(pool, log),
@@ -440,14 +420,17 @@ async function work(
       },
     });
   } catch (error) {
+    // What it made exists whatever became of the run.
+    const run = failedRun(error);
+    if (run?.artifacts) artifacts.fromLoop(run.artifacts);
     // Stopped because it asked, and not by telos: the question is the result.
     if (ask.question !== null && !signal.aborted) {
-      const run = failedRun(error);
       return { status: 'asked', question: ask.question, ...(run ? spentBy(run.usage, run.toolCalls.length) : {}) };
     }
     throw error;
   }
 
+  artifacts.fromLoop(loop.artifacts);
   const spent = spentBy(loop.usage, loop.toolCalls.length);
   if (ask.question !== null) return { status: 'asked', question: ask.question, ...spent };
   const { report, todos, refine } = readReply(loop.turn.content.trim());
