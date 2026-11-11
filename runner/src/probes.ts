@@ -1,4 +1,4 @@
-import { probe } from '@cubicecho/agent-mcp-pool';
+import { type McpConnection, McpPool, type McpProbe } from '@cubicecho/agent-mcp-pool';
 import type { ProbeResult, RunnerProbe, Telos } from './telos.ts';
 import { readServers, serverConfig, unreachable } from './tools.ts';
 
@@ -9,22 +9,30 @@ import { readServers, serverConfig, unreachable } from './tools.ts';
 /** How long a server gets to answer a test, unless it sets its own connect timeout. */
 export const PROBE_TIMEOUT_MS = 10_000;
 
+/** Makes one test's connection. */
+export type Dial = (config: McpConnection) => Promise<McpProbe>;
+
+// A pool with no servers, only for its `probe`: it introduces itself as a run's
+// pool does, and gives a row's own connect timeout precedence over the test's,
+// so a server slow to start fails no test it would pass in a run. It opens
+// nothing until asked, so one is enough for every test.
+const prober = new McpPool({ clientName: 'telos-runner', probeTimeoutMs: PROBE_TIMEOUT_MS });
+const probe: Dial = (config) => prober.probe(config);
+
 /**
  * Connects to one server, lists its tools and hangs up.
  *
  * @param test The test telos handed over.
- * @param dial Makes the connection; `probe` unless a test says otherwise.
+ * @param dial Makes the connection; the runner's prober unless a test says otherwise.
  * @returns What was found.
  */
-export async function testServer(test: RunnerProbe, dial: typeof probe = probe): Promise<ProbeResult> {
+export async function testServer(test: RunnerProbe, dial: Dial = probe): Promise<ProbeResult> {
   const [row] = readServers(`[${test.server}]`);
   if (!row) return { ok: false, tools: [], error: 'The server row could not be read.' };
   const notices: string[] = [];
   const config = serverConfig(row, (text) => notices.push(text));
   if (!config) return { ok: false, tools: [], error: unreachable(row) };
-  // A server given longer to connect is given it here too, or one slow to start
-  // would fail every test and still work in a run.
-  const found = await dial(config, 'telos-runner', { timeoutMs: config.connectTimeoutMs ?? PROBE_TIMEOUT_MS });
+  const found = await dial(config);
   if (!found.ok) return { ok: false, tools: [], error: found.error || 'The server could not be reached.' };
   return {
     ok: true,
@@ -45,7 +53,7 @@ export async function testServer(test: RunnerProbe, dial: typeof probe = probe):
 export async function takeTests(
   telos: Telos,
   log: (text: string) => void,
-  dial: typeof probe = probe,
+  dial: Dial = probe,
 ): Promise<Array<Promise<void>>> {
   return (await telos.probes()).map((test) =>
     testServer(test, dial)

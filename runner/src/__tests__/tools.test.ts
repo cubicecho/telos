@@ -1,7 +1,6 @@
-import type { probe } from '@cubicecho/agent-mcp-pool';
 import { describe, expect, it, vi } from 'vitest';
 import { configWarnings } from '../config.ts';
-import { PROBE_TIMEOUT_MS, testServer } from '../probes.ts';
+import { type Dial, testServer } from '../probes.ts';
 import { tellServers } from '../session-deletes.ts';
 import type { Claim } from '../telos.ts';
 import { openTools, serverConfig } from '../tools.ts';
@@ -62,7 +61,7 @@ describe('a stdio server', () => {
   });
 
   it('fails its test, saying why', async () => {
-    const dial = vi.fn() as unknown as typeof probe;
+    const dial = vi.fn() as unknown as Dial;
     expect(await testServer({ id: 'p', server: JSON.stringify(stdio) }, dial)).toEqual({
       ok: false,
       tools: [],
@@ -80,22 +79,17 @@ describe('a stdio server', () => {
 });
 
 describe("a server's test", () => {
-  async function waitedFor(row: Record<string, unknown>): Promise<number | undefined> {
-    let waited: number | undefined;
-    const dial = (async (_config, _client, options) => {
-      waited = options?.timeoutMs;
+  // How long it waits is the pool's rule (`McpPool.probe`): the row's own
+  // connect timeout, else the runner's PROBE_TIMEOUT_MS. What is the runner's
+  // is that the row reaches the pool with its timeout on it.
+  it('hands the pool the time the server is given to connect', async () => {
+    let dialled: unknown;
+    const dial: Dial = async (config) => {
+      dialled = config;
       return { ok: true, tools: [], toolsFingerprint: '', error: '', instructions: '' };
-    }) as typeof probe;
-    await testServer({ id: 'p', server: JSON.stringify(row) }, dial);
-    return waited;
-  }
-
-  it('waits as long as the server is given to connect', async () => {
-    expect(await waitedFor({ ...docs, connectTimeoutMs: 120_000 })).toBe(120_000);
-  });
-
-  it('waits the usual time for a server that sets nothing', async () => {
-    expect(await waitedFor(docs)).toBe(PROBE_TIMEOUT_MS);
+    };
+    await testServer({ id: 'p', server: JSON.stringify({ ...docs, connectTimeoutMs: 120_000 }) }, dial);
+    expect(dialled).toMatchObject({ url: docs.url, connectTimeoutMs: 120_000 });
   });
 });
 

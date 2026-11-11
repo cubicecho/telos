@@ -67,9 +67,9 @@ describe('agentModels', () => {
   it('says why when the endpoint will not list them', async () => {
     const missing = await board.person.expectError(MODELS, { baseUrl: `${baseUrl}/nothing` });
     expect(missing).toMatchObject({ code: 'BAD_USER_INPUT' });
-    expect(missing.message).toMatch(/answered 404/);
+    expect(missing.message).toMatch(/no model listing there \(404\)/);
     const odd = await board.person.expectError(MODELS, { baseUrl: 'file:///etc' });
-    expect(odd.message).toMatch(/http or https/);
+    expect(odd.message).toMatch(/http:\/\/ or https:\/\//);
   });
 
   it("will not use another person's agent, or answer an API key", async () => {

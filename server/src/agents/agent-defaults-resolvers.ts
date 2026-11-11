@@ -1,5 +1,6 @@
+import { ReasoningReplay } from '@cubicecho/agent-core';
 import * as dbSchema from '@telos/db/schema';
-import { ReasoningReplay, resolveAgent } from '@telos/runner/spec';
+import { resolveAgent } from '@telos/runner/spec';
 import { extendSchema, type GraphQLSchema, parse } from 'graphql';
 import type { MutationResolvers, QueryResolvers } from '../../__generated__/resolvers.ts';
 import { requireAi } from '../ai/gate.ts';
