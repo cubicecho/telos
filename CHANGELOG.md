@@ -1,3 +1,10 @@
+# [11.3.0](https://github.com/cubicecho/telos/compare/v11.2.0...v11.3.0) (2026-11-11)
+
+
+### Features
+
+* **runner:** turn an MCP server's elicitation into the run's question ([4dcf8c5](https://github.com/cubicecho/telos/commit/4dcf8c5188db41275afed1982d64b0bee1b0f373)), closes [#140](https://github.com/cubicecho/telos/issues/140)
+
 # [11.2.0](https://github.com/cubicecho/telos/compare/v11.1.5...v11.2.0) (2026-11-11)
 
 
