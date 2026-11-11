@@ -128,18 +128,26 @@ export async function openTools(
     if (config) configs.push(config);
     else options.onNotice?.(unreachable(row));
   }
-  return openPool(configs);
+  // A run answers its servers' elicitations per call (`execute.ts`), so the
+  // capability is declared with no pool-wide handler: one no call can be named
+  // for is declined.
+  return openPool(configs, { elicitation: true });
 }
 
 /**
  * Connects to a set of servers.
  *
  * @param configs The servers.
+ * @param options.elicitation Declare that calls answer a server asking for input. Only a run's do.
  * @returns Their pool. Close it with `shutdown()`.
  */
-export async function openPool(configs: McpServerConfig[]): Promise<McpPool> {
+export async function openPool(
+  configs: McpServerConfig[],
+  { elicitation = false }: { elicitation?: boolean } = {},
+): Promise<McpPool> {
   const pool = new McpPool({
     clientName: 'telos-runner',
+    elicitation,
     log: { info: () => {}, error: (message) => console.error(`[mcp] ${message}`) },
   });
   await pool.sync(configs);

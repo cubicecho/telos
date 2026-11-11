@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@cubicecho/agent-core": "^4.23.8",
-    "@cubicecho/agent-mcp-pool": "^3.16.0",
+    "@cubicecho/agent-mcp-pool": "^3.16.2",
     "openai": "^7.23.0"
   },
   "exports": {

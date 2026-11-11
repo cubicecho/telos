@@ -1,8 +1,9 @@
+import { randomUUID } from 'node:crypto';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { Server as McpServer } from '@modelcontextprotocol/sdk/server/index.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import { CallToolRequestSchema, ElicitResultSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import * as dbSchema from '@telos/db/schema';
 import { eq } from 'drizzle-orm';
 import express from 'express';
@@ -273,6 +274,65 @@ async function serveTools(
 }
 
 /**
+ * A server whose one tool asks a person before it does anything: MCP's
+ * elicitation. Stateful, unlike `serveTools`, since the answer comes back on a
+ * request of its own and has to find the call that is waiting for it.
+ *
+ * @returns Its URL, and how each question it asked was answered.
+ */
+async function serveAsking(): Promise<{ url: string; answers: string[] }> {
+  const answers: string[] = [];
+  const transports = new Map<string, StreamableHTTPServerTransport>();
+  const app = express();
+  app.all('/mcp', express.json(), async (req, res) => {
+    const id = req.headers['mcp-session-id'];
+    let transport = typeof id === 'string' ? transports.get(id) : undefined;
+    if (!transport) {
+      const opened: StreamableHTTPServerTransport = new StreamableHTTPServerTransport({
+        sessionIdGenerator: randomUUID,
+        onsessioninitialized: (sessionId) => {
+          transports.set(sessionId, opened);
+        },
+      });
+      const server = new McpServer({ name: 'deploys', version: '0' }, { capabilities: { tools: {} } });
+      server.setRequestHandler(ListToolsRequestSchema, async () => ({
+        tools: [
+          { name: 'release', description: 'Releases it.', inputSchema: { type: 'object' as const, properties: {} } },
+        ],
+      }));
+      server.setRequestHandler(CallToolRequestSchema, async (_request, extra) => {
+        const answer = await extra.sendRequest(
+          {
+            method: 'elicitation/create',
+            params: {
+              message: 'Which environment?',
+              requestedSchema: {
+                type: 'object',
+                properties: {
+                  environment: { type: 'string', enum: ['staging', 'production'] },
+                  token: { type: 'string', title: 'Deploy token' },
+                },
+                required: ['environment'],
+              },
+            },
+          },
+          ElicitResultSchema,
+        );
+        answers.push(answer.action);
+        return answer.action === 'accept'
+          ? { content: [{ type: 'text', text: 'Released.' }] }
+          : { content: [{ type: 'text', text: 'Nobody said where to.' }], isError: true };
+      });
+      closers.push(() => server.close());
+      await server.connect(opened);
+      transport = opened;
+    }
+    await transport.handleRequest(req, res, req.body);
+  });
+  return { url: `${await listen(app)}/mcp`, answers };
+}
+
+/**
  * The runner's loop options against the test telos.
  *
  * @param overrides Anything to change.
@@ -395,6 +455,44 @@ describe('the runner', () => {
     expect(told.at(-1)).toContain('An agent asked: Postgres or SQLite?');
     expect(told.at(-1)).toContain('Postgres.');
     expect((await todoRow(todoId)).laneId).toBe(board.lanes[2].id);
+  });
+
+  it('stops to ask a person when a server asks for input mid-call, and tells the server nobody is there', async () => {
+    const deploys = await serveAsking();
+    await setServers([{ id: 'deploys', name: 'Deploys', url: deploys.url }]);
+    const todoId = await board.addTodo('Release it');
+    const told: string[] = [];
+    let calls = 0;
+    llm.script = (messages) => {
+      calls++;
+      told.push(messages.map((message) => String(message.content ?? '')).join('\n'));
+      if (calls === 1) return { tool: 'deploys__release', args: {} };
+      return { content: 'Released to staging.' };
+    };
+
+    expect(await cycle()).toBe(1);
+
+    // The server heard a cancel, and the model is not asked again.
+    expect(deploys.answers).toEqual(['cancel']);
+    expect(calls).toBe(1);
+    const [run] = await runsOf(todoId);
+    expect(run).toMatchObject({ status: 'asked', error: null });
+    expect(run.output).toContain('The MCP server "Deploys" asked for input during `deploys__release`');
+    expect(run.output).toContain('Deploys asks: Which environment?');
+    expect(run.output).toContain('- `environment`, one of: staging, production, required');
+    expect(run.output).toMatch(/Deploy token \(`token`\), text — this looks like a secret/);
+    expect(run.events).toEqual(expect.arrayContaining([expect.objectContaining({ kind: 'notice', name: 'Deploys' })]));
+    expect((await todoRow(todoId)).laneId).toBe(board.lanes[0].id);
+
+    // It waits for the person, as any question does.
+    expect(await cycle()).toBe(0);
+    await board.person.expectOk(`mutation ($todoId: ID!) { answerTodo(todoId: $todoId, text: "Staging.") { id } }`, {
+      todoId,
+    });
+    expect(await cycle()).toBe(1);
+    expect(told.at(-1)).toContain('An agent asked: The MCP server "Deploys" asked for input');
+    expect(told.at(-1)).toContain('pass the reply to the tool in its arguments');
+    expect(told.at(-1)).toContain('Staging.');
   });
 
   it('tells hooks a run that asked was stopped, since they know no other word for it', () => {
