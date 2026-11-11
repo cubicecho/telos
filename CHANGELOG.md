@@ -1,3 +1,10 @@
+# [11.2.0](https://github.com/cubicecho/telos/compare/v11.1.5...v11.2.0) (2026-11-11)
+
+
+### Features
+
+* let agents and their defaults say whether thinking goes back ([5613b55](https://github.com/cubicecho/telos/commit/5613b55bfa7c9977e75233ff10be0d1d03f22507))
+
 ## [11.1.5](https://github.com/cubicecho/telos/compare/v11.1.4...v11.1.5) (2026-11-11)
 
 
