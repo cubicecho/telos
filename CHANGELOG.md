@@ -1,3 +1,11 @@
+## [11.3.1](https://github.com/cubicecho/telos/compare/v11.3.0...v11.3.1) (2026-11-11)
+
+
+### Bug Fixes
+
+* **runner:** end an asked run through its answer, and name tools by the pool ([4955e27](https://github.com/cubicecho/telos/commit/4955e271298415f971752e7618325d2e979e7d1b)), closes [#142](https://github.com/cubicecho/telos/issues/142)
+* **server:** list an endpoint's models with agent-core's probeEndpoint ([3ae4b7f](https://github.com/cubicecho/telos/commit/3ae4b7f5ff31d45e7f76b6655e41dffb1e66233d)), closes [#142](https://github.com/cubicecho/telos/issues/142)
+
 # [11.3.0](https://github.com/cubicecho/telos/compare/v11.2.0...v11.3.0) (2026-11-11)
 
 
