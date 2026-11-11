@@ -1,3 +1,10 @@
+## [11.1.5](https://github.com/cubicecho/telos/compare/v11.1.4...v11.1.5) (2026-11-11)
+
+
+### Bug Fixes
+
+* **runner:** take a run's artifacts from agent-core's shared collection ([c073f79](https://github.com/cubicecho/telos/commit/c073f79e2f7f2d906a568feeb3b99f42d1e8eb03)), closes [#141](https://github.com/cubicecho/telos/issues/141)
+
 ## [11.1.4](https://github.com/cubicecho/telos/compare/v11.1.3...v11.1.4) (2026-11-09)
 
 
