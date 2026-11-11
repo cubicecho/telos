@@ -1,3 +1,4 @@
+import { EndpointProbeError, probeEndpoint } from '@cubicecho/agent-core';
 import * as dbSchema from '@telos/db/schema';
 import { keyFor } from '@telos/runner/spec';
 import { and, eq } from 'drizzle-orm';
@@ -165,53 +166,29 @@ function visibleServer(server: dbSchema.McpServer) {
 }
 
 /**
- * Asks an OpenAI-compatible endpoint what it serves. Only the model ids (and a
- * context length, where the endpoint reports one) come back, never the body,
- * so the call says nothing about a URL beyond whether it lists models.
+ * Asks an OpenAI-compatible endpoint what it serves, with agent-core's listing
+ * for an endpoint nobody has saved yet: one request, nothing remembered, no
+ * redirect followed, so a typed key never reaches a host nobody typed. Only the
+ * model ids (and a context length, where the endpoint reports one) come back,
+ * never the body, so the call says nothing about a URL beyond whether it lists
+ * models.
  *
  * @param baseUrl The endpoint, as an agent's base URL.
  * @param apiKey The bearer key, if any.
  * @returns The models, sorted by id.
  */
 export async function listModels(baseUrl: string, apiKey: string | null): Promise<AgentModel[]> {
-  let url: URL;
   try {
-    url = new URL(`${baseUrl.trim().replace(/\/+$/, '')}/models`);
-  } catch {
-    throw badInput('That base URL is not a URL.');
+    const models = await probeEndpoint(
+      { baseUrl, ...(apiKey ? { apiKey } : {}), requestTimeoutSeconds: MODELS_TIMEOUT_MS / 1000 },
+      { limit: MODELS_LIMIT },
+    );
+    return models.map(({ id, contextLength }) => ({ id, contextLength: contextLength > 0 ? contextLength : null }));
+  } catch (error) {
+    // Its message names the endpoint by origin only, and says why in words a form can show.
+    if (error instanceof EndpointProbeError) throw badInput(error.message);
+    throw error;
   }
-  if (url.protocol !== 'http:' && url.protocol !== 'https:') throw badInput('A base URL is http or https.');
-  let response: Response;
-  try {
-    response = await fetch(url, {
-      headers: apiKey ? { authorization: `Bearer ${apiKey}` } : {},
-      signal: AbortSignal.timeout(MODELS_TIMEOUT_MS),
-      redirect: 'error',
-    });
-  } catch {
-    throw badInput(`Could not reach ${url.origin}.`);
-  }
-  if (!response.ok) throw badInput(`${url.origin} answered ${response.status} when asked for its models.`);
-  // biome-ignore lint/suspicious/noExplicitAny: an endpoint's own JSON
-  let body: any;
-  try {
-    body = await response.json();
-  } catch {
-    throw badInput(`${url.origin} did not answer with a list of models.`);
-  }
-  // OpenAI's shape is `{ data: [...] }`; Ollama's native one is `{ models: [...] }`.
-  const rows: unknown[] = Array.isArray(body?.data) ? body.data : Array.isArray(body?.models) ? body.models : [];
-  const models = new Map<string, AgentModel>();
-  for (const row of rows) {
-    if (!row || typeof row !== 'object') continue;
-    const entry = row as Record<string, unknown>;
-    const id = typeof entry.id === 'string' ? entry.id : typeof entry.name === 'string' ? entry.name : null;
-    if (!id) continue;
-    const length = entry.context_length ?? entry.max_context_length ?? entry.context_window;
-    const contextLength = typeof length === 'number' && length > 0 ? Math.floor(length) : null;
-    models.set(id, { id, contextLength: contextLength ?? models.get(id)?.contextLength ?? null });
-  }
-  return [...models.values()].sort((a, b) => a.id.localeCompare(b.id)).slice(0, MODELS_LIMIT);
 }
 
 export function applyAgentsExtension(schema: GraphQLSchema): GraphQLSchema {
