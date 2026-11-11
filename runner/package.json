@@ -9,7 +9,7 @@
     "start": "node --experimental-strip-types src/index.ts"
   },
   "dependencies": {
-    "@cubicecho/agent-core": "^4.21.0",
+    "@cubicecho/agent-core": "^4.23.8",
     "@cubicecho/agent-mcp-pool": "^3.16.0",
     "openai": "^7.23.0"
   },

@@ -53,6 +53,12 @@ export const agents = pgTable(
     toolSelectModel: text('tool_select_model'),
     /** agent-core's `reasoning_effort`: a level, or "off" for none. Null inherits. */
     reasoningEffort: text('reasoning_effort'),
+    // agent-core's `reasoningReplay`: which of the model's own messages carry
+    // its thinking back to it. Thinking models (gpt-oss, DeepSeek, Qwen3, GLM)
+    // want it between tool calls, and a replay that matches what was generated
+    // keeps the endpoint's prompt cache; "none" saves the context where it is
+    // not read. Null inherits, and agent-core's own is "all".
+    reasoningReplay: text('reasoning_replay'),
     requestTimeoutSeconds: integer('request_timeout_seconds'),
     maxRetries: integer('max_retries'),
     // The account's MCP servers it may reach, by slug (mcp-servers.ts). Null is
@@ -74,6 +80,7 @@ export const agents = pgTable(
   (t) => [
     index('idx_agents_user_id').on(t.userId),
     check('ck_agents_max_tool_iterations', sql`${t.maxToolIterations} > 0`),
+    check('ck_agents_reasoning_replay', sql`${t.reasoningReplay} in ('all', 'tool-loop', 'none')`),
   ],
 );
 

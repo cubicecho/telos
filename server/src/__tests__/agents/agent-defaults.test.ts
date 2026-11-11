@@ -88,6 +88,28 @@ describe('agentDefaults', () => {
     expect(claimRun.agent).toEqual({ reasoningEffort: 'off', defaults: { reasoningEffort: 'high' } });
   });
 
+  it('stores a reasoning replay, which an agent can say over and the runner is handed', async () => {
+    const { agentDefaults: blank } = await board.person.expectOk(
+      'query { agentDefaults { reasoningReplay resolved { reasoningReplay } } }',
+    );
+    expect(blank).toEqual({ reasoningReplay: null, resolved: { reasoningReplay: 'all' } });
+
+    await board.person.expectOk(SET, { values: { baseUrl: 'http://llm.local/v1', reasoningReplay: 'tool-loop' } });
+    await board.person.expectOk(UPDATE_AGENT, { id: board.agentId, set: { reasoningReplay: 'none' } });
+    const todoId = await board.addTodo('Think quietly');
+    const { claimRun } = await runner.expectOk(
+      `mutation ($todoId: ID!, $laneId: ID!) {
+        claimRun(todoId: $todoId, laneId: $laneId) { agent { reasoningReplay defaults { reasoningReplay } } }
+      }`,
+      { todoId, laneId: board.lanes[0].id },
+    );
+    expect(claimRun.agent).toEqual({ reasoningReplay: 'none', defaults: { reasoningReplay: 'tool-loop' } });
+
+    const wrong = await board.person.expectError(SET, { values: { reasoningReplay: 'sometimes' } });
+    expect(wrong.code).toBe('BAD_USER_INPUT');
+    expect(wrong.message).toMatch(/reasoningReplay/);
+  });
+
   it('refuses a value the runner would drop', async () => {
     const hot = await board.person.expectError(SET, { values: { temperature: 5 } });
     expect(hot.code).toBe('BAD_USER_INPUT');

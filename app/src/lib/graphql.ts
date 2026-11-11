@@ -391,6 +391,7 @@ export const AgentFieldsFragment = graphql(`
     toolDiscovery
     toolSelectModel
     reasoningEffort
+    reasoningReplay
     requestTimeoutSeconds
     maxRetries
     mcpServerSlugs
@@ -415,6 +416,7 @@ export const ResolvedAgentSettingsFieldsFragment = graphql(`
     toolDiscovery
     toolSelectModel
     reasoningEffort
+    reasoningReplay
     requestTimeoutSeconds
     maxRetries
   }
@@ -432,6 +434,7 @@ export const AgentDefaultsFieldsFragment = graphql(`
     toolDiscovery
     toolSelectModel
     reasoningEffort
+    reasoningReplay
     requestTimeoutSeconds
     maxRetries
     hasApiKey

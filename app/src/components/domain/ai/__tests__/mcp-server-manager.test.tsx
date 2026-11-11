@@ -52,6 +52,7 @@ const AGENT = {
   toolDiscovery: false,
   toolSelectModel: null,
   reasoningEffort: null,
+  reasoningReplay: null,
   requestTimeoutSeconds: null,
   maxRetries: null,
   mcpServerSlugs: null,

@@ -270,7 +270,12 @@ one) and its models are listed, to pick from, with the context length each
 reports; an endpoint that lists nothing still takes a model typed by name.
 A reasoning effort (off, or a level from none to max) is sent as
 `reasoning_effort` to a model that deliberates; an agent can turn off a level its
-defaults ask for. A lane's success route can archive
+defaults ask for. **Send thinking back to the model** says which of its own
+messages carry its reasoning back to it: all turns (the default), only during
+tool calls, or never. Thinking models (gpt-oss, DeepSeek, Qwen3, GLM) want it
+between tool calls, and a replay that matches what they wrote keeps the
+endpoint's prompt cache; never saves context on an endpoint that does not read
+it. A lane's success route can archive
 what passes instead of moving it: the todo is completed and leaves the board,
 for a pipeline whose finished work nobody needs to see in a column. The runner claims by itself in a project with auto-run on,
 and only the todos you asked for in one with it off. Each run keeps a log of its tool calls, which the
