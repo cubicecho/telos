@@ -1,3 +1,10 @@
+## [11.3.2](https://github.com/cubicecho/telos/compare/v11.3.1...v11.3.2) (2026-11-20)
+
+
+### Bug Fixes
+
+* **deps:** update to agent-core 7 and agent-mcp-pool 4 ([ed529eb](https://github.com/cubicecho/telos/commit/ed529eb7bd28d34e00e3ce94b192de6b1157b850))
+
 ## [11.3.1](https://github.com/cubicecho/telos/compare/v11.3.0...v11.3.1) (2026-11-11)
 
 
