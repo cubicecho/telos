@@ -1,0 +1,47 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "9e8b731b-c542-4b64-8795-df1b44689079",
+  "prevIds": [
+    "2c26dd0c-2a8a-4072-b7ce-71f364a39669"
+  ],
+  "footprints": [
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "agents",
+        "remote_agent"
+      ],
+      "writes": [
+        "s|col|public.agents.remote_agent",
+        "n|col|public.agents.remote_agent",
+        "e|col|public.agents.remote_agent"
+      ],
+      "reads": [
+        "n|tbl|public.agents",
+        "n|sch|public"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "agents",
+        "name": "remote_agent",
+        "type": "boolean",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "false",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    }
+  ]
+}

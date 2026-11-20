@@ -20,6 +20,12 @@ import { withOrphanOptions } from '@/lib/select-options';
 export interface EndpointModel {
   id: string;
   contextLength?: number | null;
+  /** What the endpoint calls it, where that differs from its id. */
+  name?: string | null;
+  /** What the endpoint says it is for. */
+  description?: string | null;
+  /** It runs its own agent loop on its server, as ai-router's agents do. */
+  remoteAgent?: boolean;
 }
 
 /** Known-good base URLs, as the line under the field says them. */
@@ -118,20 +124,24 @@ export function EndpointStatus({
  * @param models - What the endpoint lists, or null while there is no list.
  * @param blankLabel - What the blank choice says: what it inherits, or that it is off.
  * @param placeholder - The text box's, for the same.
- * @param onPick - Told the model chosen when the list has it, for its context length.
+ * @param disabled - Whether it cannot be changed here.
+ * @param onPick - Told the model each time the value moves: the list's entry for it, for its
+ * context length and whether it is a remote agent, or null for one the list does not have.
  */
 export function ModelField({
   label,
   models,
   blankLabel,
   placeholder,
+  disabled,
   onPick,
 }: {
   label: string;
   models: readonly EndpointModel[] | null;
   blankLabel: string;
   placeholder?: string;
-  onPick?: (model: EndpointModel) => void;
+  disabled?: boolean;
+  onPick?: (model: EndpointModel | null) => void;
 }) {
   // Null once the list's blank row is chosen, which is what `clearable` writes.
   const field = useFieldContext<string | null>();
@@ -143,8 +153,7 @@ export function ModelField({
   useEffect(() => {
     if (value === last.current) return;
     last.current = value;
-    const model = models?.find((entry) => entry.id === value);
-    if (model) onPick?.(model);
+    onPick?.(models?.find((entry) => entry.id === value) ?? null);
   }, [value, models, onPick]);
 
   const options = useMemo(
@@ -165,6 +174,7 @@ export function ModelField({
     return (
       <FieldWrapper
         label={label}
+        disabled={disabled}
         controlSlot={
           <Input
             value={value}
@@ -185,6 +195,7 @@ export function ModelField({
       searchPlaceholder="Find or type a model…"
       clearable
       emptyLabel={blankLabel}
+      disabled={disabled}
     />
   );
 }

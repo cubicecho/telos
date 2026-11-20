@@ -170,7 +170,7 @@ export function AgentDefaultsForm() {
                           blankLabel="None"
                           placeholder="qwen3:14b"
                           onPick={(model) => {
-                            if (model.contextLength && !form.getFieldValue('contextLength').trim()) {
+                            if (model?.contextLength && !form.getFieldValue('contextLength').trim()) {
                               form.setFieldValue('contextLength', String(model.contextLength));
                             }
                           }}

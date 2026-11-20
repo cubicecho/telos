@@ -113,3 +113,23 @@ export function replayOptions(inherited: string) {
 
 export const REPLAY_HELP =
   'Thinking models (gpt-oss, DeepSeek, Qwen3, GLM) want their reasoning back between tool calls, and sending it as it was written keeps the endpoint’s prompt cache. Never saves context on an endpoint that does not read it.';
+
+/**
+ * The settings a remote agent decides on its own server: its sampling, its
+ * thinking, and how it loads, picks and loops over its tools. A run of one
+ * leaves them to it (`remoteAgentConfig` in the runner), so its form greys
+ * them out. The iteration cap, which agent-core always takes, still bounds how
+ * often a run answers the tools a remote agent hands back.
+ */
+export const REMOTE_AGENT_FIELDS: ReadonlySet<keyof LayerDraft> = new Set<keyof LayerDraft>([
+  'temperature',
+  'maxTokens',
+  'maxToolIterations',
+  'toolDiscovery',
+  'toolSelectModel',
+  'reasoningEffort',
+  'reasoningReplay',
+]);
+
+export const REMOTE_AGENT_HELP =
+  'This model is a remote agent: it runs its own loop on its server, so its sampling, thinking and tools are set there.';

@@ -519,6 +519,27 @@ the runner's own environment key is never used. An agent with `enabled` off
 is not queued (`readyTodos`), and `aiStatus` parks its lanes' todos saying
 so.
 
+**A remote agent runs its own loop, and is sent nothing it did not choose.**
+An endpoint such as ai-router serves whole agents as models, and its `/models`
+entry says so: agent-core's `probeEndpoint` reads `agent_core.kind` into
+`ModelInfo.remoteAgent`, and `agentModels` (`listModels`) hands that on as
+`AgentModel.remoteAgent`, with the card's `name` and `description`. Picking one
+in the agent form sets `agents.remote_agent`, takes the model and its context
+length from the card and its name too while the name is blank, shows the
+card's description under the model, and greys out what the remote agent
+decides itself (`REMOTE_AGENT_FIELDS` in `agent-settings-fields.ts`); picking
+any other model, or typing one the list does not have, clears it. The flag
+says what the agent's own model is, so it is the agent's alone: not in
+`agent_defaults`, `LAYER_FIELDS` or the spec layers, and an agent that
+inherits the default model is never one. The claim hands it to the runner,
+which resolves the layers as always and then runs them through
+`remoteAgentConfig` (`runner/src/spec.ts`): `remoteAgent: true`, no
+temperature, max tokens, reasoning effort or reasoning replay, since ai-router
+refuses a field its agent's policy did not allow and the agent's own sampling
+should win, and every tool sent at once with none picked first, which
+agent-core would set aside with a notice anyway. The iteration cap still
+bounds the tool calls it hands back.
+
 **The runner never imports the server or the database.** Everything it knows
 comes from `runnerQueue` and `claimRun`, and everything it does goes back
 through `finishRun` or, for the agent, through `/mcp` with the run token; its

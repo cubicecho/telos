@@ -59,6 +59,8 @@ const RUNS_SDL = parse(`
     name: String!
     baseUrl: String
     model: String
+    "Whether its model is a remote agent, which runs its own loop and sampling. The agent's own: never inherited."
+    remoteAgent: Boolean!
     apiKey: String
     "The body of the agent's prompt: what it is told its job is, last in its system prompt. Null when it has none."
     prompt: String

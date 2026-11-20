@@ -1,6 +1,6 @@
 import { AGENT_DEFAULTS, AGENT_SPEC, NO_KEY } from '@cubicecho/agent-core';
 import { describe, expect, it } from 'vitest';
-import { keyFor, resolveAgent, specLayer, unrunnable } from '../spec.ts';
+import { keyFor, remoteAgentConfig, resolveAgent, specLayer, unrunnable } from '../spec.ts';
 
 // An agent says only what is different about it; the account's defaults fill
 // the rest, and agent-core's own fill what neither says.
@@ -92,6 +92,30 @@ describe('resolveAgent', () => {
     expect(config.temperature).toBe(0.4);
     expect(warnings).toHaveLength(1);
     expect(warnings[0]).toMatch(/^agent: .*temperature/);
+  });
+});
+
+describe('remoteAgentConfig', () => {
+  it('leaves a remote agent its own sampling and side work, and keeps the rest of the layers', () => {
+    const tuned = { ...DEFAULTS, reasoningEffort: 'high', reasoningReplay: 'tool-loop', maxToolIterations: 7 };
+    const { config: resolved } = resolveAgent(tuned, { model: 'triage', contextLength: 32768 });
+    const config = remoteAgentConfig(resolved);
+    expect(config).toMatchObject({
+      remoteAgent: true,
+      baseUrl: 'http://llm.local/v1',
+      model: 'triage',
+      apiKey: 'default-key',
+      requestTimeoutSeconds: 120,
+      maxRetries: 2,
+      maxToolIterations: 7,
+      toolDiscovery: 'eager',
+      toolSelectModel: '',
+    });
+    for (const field of ['temperature', 'maxTokens', 'reasoningEffort', 'reasoningReplay']) {
+      expect(config).not.toHaveProperty(field);
+    }
+    // The resolved agent is not written to: a local run of it is unchanged.
+    expect(resolved).toMatchObject({ temperature: 0.4, maxTokens: 2048, toolDiscovery: 'ondemand' });
   });
 });
 

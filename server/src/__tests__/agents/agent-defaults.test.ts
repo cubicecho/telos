@@ -187,6 +187,24 @@ describe('an agent over its defaults', () => {
     expect(run.model).toBe('big');
   });
 
+  it('is a remote agent by its own say only, and the runner is told', async () => {
+    const claimOf = async (title: string) =>
+      (
+        await runner.expectOk(
+          `mutation ($todoId: ID!, $laneId: ID!) { claimRun(todoId: $todoId, laneId: $laneId) { agent { remoteAgent } } }`,
+          { todoId: await board.addTodo(title), laneId: board.lanes[0].id },
+        )
+      ).claimRun.agent;
+    expect(await claimOf('Local')).toEqual({ remoteAgent: false });
+    await db.update(dbSchema.runs).set({ status: 'ok', finishedAt: new Date() });
+
+    await board.person.expectOk(UPDATE_AGENT, { id: board.agentId, set: { model: 'triage', remoteAgent: true } });
+    expect(await claimOf('Remote')).toEqual({ remoteAgent: true });
+    // The defaults' model is nobody's choice of a remote agent.
+    const inherited = await board.person.expectError(SET, { values: { remoteAgent: true } });
+    expect(inherited.message).toMatch(/remoteAgent/);
+  });
+
   it('shows AI the model it runs, its own or inherited', async () => {
     const roster = `query { agentRoster { id model enabled } }`;
     expect((await board.person.expectOk(roster)).agentRoster).toEqual([

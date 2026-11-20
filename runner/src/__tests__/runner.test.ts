@@ -47,6 +47,7 @@ let llm: {
   script: (
     messages: Array<{ role: string; content: unknown; reasoning_content?: string }>,
     tools: Array<{ function: { name: string } }>,
+    body: Record<string, unknown>,
   ) => Reply | Promise<Reply>;
 };
 
@@ -150,7 +151,7 @@ async function serveLlm(): Promise<string> {
         return;
       }
       const request = JSON.parse(body);
-      const reply = await llm.script(request.messages, request.tools ?? []);
+      const reply = await llm.script(request.messages, request.tools ?? [], request);
       if ('fail' in reply) {
         res.writeHead(reply.fail, { 'content-type': 'application/json' });
         res.end(JSON.stringify({ error: { message: 'The model is on fire.' } }));
@@ -835,6 +836,45 @@ describe('the thinking a model is sent back', () => {
     const message = await replayed();
     expect(message).toBeDefined();
     expect(message).not.toHaveProperty('reasoning_content');
+  });
+});
+
+describe('a remote agent', () => {
+  it('is sent none of the sampling it runs itself, and every tool up front, with nothing picked first', async () => {
+    const desk = await serveTools('');
+    await setServers([{ id: 'desk', name: 'Desk', url: desk.url }]);
+    await db
+      .update(dbSchema.agents)
+      .set({
+        remoteAgent: true,
+        temperature: 0.2,
+        maxTokens: 512,
+        reasoningEffort: 'high',
+        toolDiscovery: true,
+        toolSelectModel: 'tiny',
+      })
+      .where(eq(dbSchema.agents.id, board.agentId));
+    const bodies: Array<Record<string, unknown>> = [];
+    llm.script = (_messages, _tools, body) => {
+      bodies.push(body);
+      return { content: 'Done.' };
+    };
+    const todoId = await board.addTodo('Sort it');
+
+    await cycle();
+
+    // One request: no tool-picking call went ahead of it.
+    expect(bodies).toHaveLength(1);
+    const [body] = bodies;
+    for (const field of ['temperature', 'max_tokens', 'max_completion_tokens', 'reasoning_effort']) {
+      expect(body).not.toHaveProperty(field);
+    }
+    expect(body.agent_core).toMatchObject({ progress: true });
+    const names = (body.tools as Array<{ function: { name: string } }>).map((tool) => tool.function.name);
+    expect(names).toContain('desk__write_file');
+    expect(names).not.toContain('load_tools');
+    const [run] = await runsOf(todoId);
+    expect(run.status).toBe('ok');
   });
 });
 

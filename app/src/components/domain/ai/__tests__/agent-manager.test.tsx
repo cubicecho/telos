@@ -27,6 +27,7 @@ const AGENT = {
   name: 'Reviewer',
   baseUrl: 'http://localhost:11434/v1',
   model: 'qwen3:14b',
+  remoteAgent: false,
   promptId: null,
   temperature: null,
   maxTokens: null,
@@ -139,6 +140,38 @@ const prompts = {
   maxUsageCount: Number.POSITIVE_INFINITY,
 };
 
+/** A model as an endpoint lists it: an ordinary one unless it says more. */
+function modelEntry(entry: {
+  id: string;
+  contextLength?: number;
+  name?: string;
+  description?: string;
+  remoteAgent?: true;
+}) {
+  return { __typename: 'AgentModel', contextLength: null, name: null, description: null, remoteAgent: false, ...entry };
+}
+
+/** ai-router's listing: one of its agents, with its card, beside a plain model. */
+const ROUTER_URL = 'http://router.local/v1';
+const TRIAGE = modelEntry({
+  id: 'triage',
+  name: 'Triage',
+  description: 'Sorts new issues',
+  contextLength: 32768,
+  remoteAgent: true,
+});
+
+function routerModels(agentId: string | null) {
+  return {
+    request: { query: AgentModelsDocument, variables: { baseUrl: ROUTER_URL, agentId, apiKey: null } },
+    result: { data: { agentModels: [modelEntry({ id: 'qwen3:14b', contextLength: 8192 }), TRIAGE] } },
+  };
+}
+
+/** The settings a remote agent runs itself, by their labels. */
+const REMOTE_OWNED_INPUTS = ['Temperature', 'Max tokens', 'Max tool iterations'];
+const REMOTE_OWNED_SELECTS = ['Reasoning effort', 'Send thinking back to the model', 'Tool discovery'];
+
 function agents(rows: unknown[]) {
   return { request: { query: AgentsDocument }, result: { data: { agents: rows } } };
 }
@@ -185,6 +218,7 @@ describe('AgentManager', () => {
       requestTimeoutSeconds: null,
       maxRetries: null,
       enabled: true,
+      remoteAgent: false,
       // Every server the account has, which is what a new agent starts with.
       mcpServerSlugs: null,
       // The run default: reading, adding work and notes.
@@ -244,6 +278,7 @@ describe('AgentManager', () => {
       requestTimeoutSeconds: null,
       maxRetries: null,
       enabled: true,
+      remoteAgent: false,
       mcpServerSlugs: null,
       toolsOff: null,
     };
@@ -311,10 +346,7 @@ describe('AgentManager', () => {
         },
         result: {
           data: {
-            agentModels: [
-              { __typename: 'AgentModel', id: 'llama3:8b', contextLength: 8192 },
-              { __typename: 'AgentModel', id: 'qwen3:14b', contextLength: null },
-            ],
+            agentModels: [modelEntry({ id: 'llama3:8b', contextLength: 8192 }), modelEntry({ id: 'qwen3:14b' })],
           },
         },
       },
@@ -331,6 +363,83 @@ describe('AgentManager', () => {
     expect(screen.getByLabelText('Context length')).toHaveValue('8192');
   });
 
+  it('fills a new agent in from a remote agent’s card, and greys out what it runs itself', async () => {
+    const user = userEvent.setup();
+    const create = vi.fn((_variables: { values: Record<string, unknown> }) => ({
+      data: { createAgent: { ...AGENT, name: 'Triage', model: 'triage', remoteAgent: true } },
+    }));
+    manager(
+      [
+        agents([]),
+        routerModels(null),
+        { request: { query: CreateAgentDocument }, variableMatcher: () => true, result: create },
+        agents([]),
+      ],
+      defaults({ baseUrl: ROUTER_URL }),
+    );
+
+    await user.click(await screen.findByRole('button', { name: 'New agent' }));
+    expect(await screen.findByText('Connected')).toBeInTheDocument();
+    await user.click(screen.getByRole('combobox', { name: 'Model' }));
+    await user.click(await screen.findByRole('option', { name: /triage/ }));
+
+    expect(screen.getByLabelText('Name')).toHaveValue('Triage');
+    expect(screen.getByLabelText('Context length')).toHaveValue('32768');
+    expect(screen.getByLabelText('Context length')).toBeEnabled();
+    expect(screen.getByText('Sorts new issues')).toBeInTheDocument();
+    expect(screen.getByText(/^This model is a remote agent/)).toBeInTheDocument();
+    for (const label of REMOTE_OWNED_INPUTS) expect(screen.getByLabelText(label)).toBeDisabled();
+    for (const label of REMOTE_OWNED_SELECTS) expect(screen.getByRole('combobox', { name: label })).toBeDisabled();
+    // A combobox's trigger is not a form control, so it says so in ARIA.
+    expect(screen.getByRole('combobox', { name: 'Tool selection model' })).toHaveAttribute('aria-disabled', 'true');
+    await user.click(screen.getByRole('button', { name: 'Create agent' }));
+
+    await waitFor(() => expect(create).toHaveBeenCalled());
+    expect(create.mock.calls[0][0].values).toMatchObject({
+      name: 'Triage',
+      model: 'triage',
+      contextLength: 32768,
+      remoteAgent: true,
+    });
+  });
+
+  it('keeps a typed name, and stops being a remote agent when another model is picked', async () => {
+    const user = userEvent.setup();
+    const update = vi.fn((_variables: { set: Record<string, unknown> }) => ({ data: { updateAgent: AGENT } }));
+    manager([
+      agents([{ ...AGENT, baseUrl: ROUTER_URL, model: 'qwen3:14b' }]),
+      routerModels('a1'),
+      { request: { query: UpdateAgentDocument }, variableMatcher: () => true, result: update },
+    ]);
+
+    await user.click(await screen.findByRole('button', { name: 'Edit Reviewer' }));
+    expect(await screen.findByText('Connected')).toBeInTheDocument();
+    await user.click(screen.getByRole('combobox', { name: 'Model' }));
+    await user.click(await screen.findByRole('option', { name: /triage/ }));
+    expect(screen.getByLabelText('Name')).toHaveValue('Reviewer');
+    expect(screen.getByLabelText('Temperature')).toBeDisabled();
+
+    await user.click(screen.getByRole('combobox', { name: 'Model' }));
+    await user.click(await screen.findByRole('option', { name: /qwen3:14b/ }));
+    expect(screen.queryByText(/^This model is a remote agent/)).not.toBeInTheDocument();
+    expect(screen.queryByText('Sorts new issues')).not.toBeInTheDocument();
+    for (const label of REMOTE_OWNED_INPUTS) expect(screen.getByLabelText(label)).toBeEnabled();
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(update).toHaveBeenCalled());
+    expect(update.mock.calls[0][0].set).toMatchObject({ model: 'qwen3:14b', remoteAgent: false });
+  });
+
+  it('opens a remote agent with what it runs itself greyed out, and says what it is', async () => {
+    const user = userEvent.setup();
+    manager([agents([{ ...AGENT, baseUrl: ROUTER_URL, model: 'triage', remoteAgent: true }]), routerModels('a1')]);
+
+    await user.click(await screen.findByRole('button', { name: 'Edit Reviewer' }));
+    expect(await screen.findByText('Sorts new issues')).toBeInTheDocument();
+    expect(screen.getByText(/^This model is a remote agent/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Temperature')).toBeDisabled();
+  });
+
   it('takes a model the endpoint does not list, and saves the blank row as inherit', async () => {
     const user = userEvent.setup();
     const update = vi.fn((_variables: { set: { model: string | null; toolSelectModel: string | null } }) => ({
@@ -343,7 +452,7 @@ describe('AgentManager', () => {
           query: AgentModelsDocument,
           variables: { baseUrl: 'http://localhost:11434/v1', agentId: 'a1', apiKey: null },
         },
-        result: { data: { agentModels: [{ __typename: 'AgentModel', id: 'llama3:8b', contextLength: 8192 }] } },
+        result: { data: { agentModels: [modelEntry({ id: 'llama3:8b', contextLength: 8192 })] } },
       },
       { request: { query: UpdateAgentDocument }, variableMatcher: () => true, result: update },
     ]);

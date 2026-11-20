@@ -43,6 +43,11 @@ export interface AgentDraft extends LayerDraft {
   /** Off, it takes no runs. */
   enabled: boolean;
   /**
+   * Its model is a remote agent, which runs its own loop and sampling: set
+   * from the model's entry when it is picked, never typed and never inherited.
+   */
+  remoteAgent: boolean;
+  /**
    * The slugs of the account's MCP servers it may reach: null is every one,
    * whatever is added later; a list is exactly those, and an empty one is none.
    */
@@ -102,6 +107,7 @@ export function toAgentDraft(agent: AgentFieldsFragment | null | undefined): Age
     name: agent?.name ?? '',
     promptId: agent?.promptId ?? null,
     enabled: agent?.enabled ?? true,
+    remoteAgent: agent?.remoteAgent ?? false,
     ...toLayerDraft(agent),
     mcpServerSlugs: readServerSlugs(agent?.mcpServerSlugs),
     // The same shape as the slugs: a list of names, or null for the default.
@@ -136,6 +142,7 @@ export function fromAgentDraft(draft: AgentDraft): Omit<CreateAgentInput, 'id'> 
     name: draft.name.trim(),
     promptId: draft.promptId || null,
     enabled: draft.enabled,
+    remoteAgent: draft.remoteAgent,
     ...fromLayerDraft(draft),
     mcpServerSlugs: draft.mcpServerSlugs,
     toolsOff: draft.toolsOff,
