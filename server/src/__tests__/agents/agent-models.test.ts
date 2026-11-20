@@ -20,6 +20,23 @@ beforeAll(async () => {
           data: [{ id: 'zeta' }, { id: 'alpha', context_length: 8192 }, { id: 'alpha' }, { nope: true }],
         }),
       );
+    } else if (request.url === '/router/v1/models') {
+      // ai-router's listing: each agent as a model, with its card.
+      response.setHeader('content-type', 'application/json');
+      response.end(
+        JSON.stringify({
+          data: [
+            {
+              id: 'triage',
+              name: 'Triage',
+              description: 'Sorts new issues',
+              context_length: 32768,
+              agent_core: { kind: 'agent', prompt: [{ name: 'persona' }, { name: 'rules', allowedModes: [] }] },
+            },
+            { id: 'qwen3', context_length: 8192 },
+          ],
+        }),
+      );
     } else {
       response.statusCode = 404;
       response.end();
@@ -52,6 +69,17 @@ describe('agentModels', () => {
       { id: 'zeta', contextLength: null },
     ]);
     expect(lastAuth).toBeUndefined();
+  });
+
+  it("says which models are remote agents, with their cards' name and description", async () => {
+    const CARDS = `query ($baseUrl: String!) {
+      agentModels(baseUrl: $baseUrl) { id contextLength name description remoteAgent }
+    }`;
+    const { agentModels } = await board.person.expectOk(CARDS, { baseUrl: baseUrl.replace('/v1', '/router/v1') });
+    expect(agentModels).toEqual([
+      { id: 'qwen3', contextLength: 8192, name: null, description: null, remoteAgent: false },
+      { id: 'triage', contextLength: 32768, name: 'Triage', description: 'Sorts new issues', remoteAgent: true },
+    ]);
   });
 
   it("asks with the agent's stored key", async () => {

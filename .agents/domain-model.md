@@ -136,6 +136,7 @@ not the AI switches, a blocker or the WIP limit.
 | A report or verdict note is never changed | `server/src/resolvers/notes.ts` |
 | AI sees nothing in a project with AI off, or under a hands-off todo | `aiReach` in `auth/rows.ts`, `ai/reach.ts`, `visibleToAi` |
 | Every AI switch must be on for any agent to run | `readyTodos`, `ai-gate.ts`, `resolveActor` |
+| A remote agent's run sends no sampling or reasoning it did not choose | `remoteAgentConfig` in `runner/src/spec.ts` |
 
 ## Glossary
 
@@ -254,6 +255,15 @@ the site.
 - **Agent:** a model with a prompt, the MCP servers it may use and the tools it may
   call. A setting left blank uses the account's agent defaults. An agent knows nothing
   of lanes: a lane is given an agent. Owner: `agents`, `server/src/agent-defaults.ts`.
+- **Remote agent:** a model that is a whole agent of its own, such as one of ai-router's:
+  it runs its own loop and sampling on its server, and hands the tools it wants back to
+  the run. Picking one from an endpoint's list of models, for an agent or for the agent
+  defaults, makes that model a remote agent, and an agent that inherits the default model
+  inherits that too; an agent is named from its card when its name is blank. Its sampling,
+  thinking and how it picks its tools are then its server's. How many times it may hand
+  your tools back in one run is still yours to set.
+  Owner: `agents.remoteAgent`, `agent_defaults.remoteAgent`, `resolveRemoteAgent` and
+  `remoteAgentConfig` in `runner/src/spec.ts`.
 - **Prompt:** what one kind of agent is told to do, chosen by each agent. Every account
   starts with Planner, Reviewer and Worker, which a person may edit, delete or add to.
   A person's only.

@@ -50,6 +50,16 @@ const AGENTS_SDL = parse(`
     id: String!
     "How many tokens it takes in, when the endpoint says."
     contextLength: Int
+    "What the endpoint calls it, where that differs from its id."
+    name: String
+    "What the endpoint says it is for, when it says."
+    description: String
+    """
+    Whether it is a remote agent: a model that runs its own agent loop and
+    sampling on its server, as ai-router's agents do, and hands telos's tools
+    back to the run.
+    """
+    remoteAgent: Boolean!
   }
 
   "A tool an MCP server offered when it was tested."
@@ -168,10 +178,11 @@ function visibleServer(server: dbSchema.McpServer) {
 /**
  * Asks an OpenAI-compatible endpoint what it serves, with agent-core's listing
  * for an endpoint nobody has saved yet: one request, nothing remembered, no
- * redirect followed, so a typed key never reaches a host nobody typed. Only the
- * model ids (and a context length, where the endpoint reports one) come back,
- * never the body, so the call says nothing about a URL beyond whether it lists
- * models.
+ * redirect followed, so a typed key never reaches a host nobody typed. Only what
+ * agent-core reads off each entry comes back (its id, and where the endpoint
+ * says them a context length, a name, a description and whether it is a remote
+ * agent), never the body, so the call says nothing about a URL beyond what it
+ * lists.
  *
  * @param baseUrl The endpoint, as an agent's base URL.
  * @param apiKey The bearer key, if any.
@@ -183,7 +194,13 @@ export async function listModels(baseUrl: string, apiKey: string | null): Promis
       { baseUrl, ...(apiKey ? { apiKey } : {}), requestTimeoutSeconds: MODELS_TIMEOUT_MS / 1000 },
       { limit: MODELS_LIMIT },
     );
-    return models.map(({ id, contextLength }) => ({ id, contextLength: contextLength > 0 ? contextLength : null }));
+    return models.map(({ id, contextLength, name, description, remoteAgent }) => ({
+      id,
+      contextLength: contextLength > 0 ? contextLength : null,
+      name: name ?? null,
+      description: description ?? null,
+      remoteAgent: remoteAgent === true,
+    }));
   } catch (error) {
     // Its message names the endpoint by origin only, and says why in words a form can show.
     if (error instanceof EndpointProbeError) throw badInput(error.message);

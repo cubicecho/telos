@@ -18,6 +18,12 @@ export interface LayerDraft {
   baseUrl: string;
   /** Null as well as blank: the model picker's blank row writes null. */
   model: string | null;
+  /**
+   * Whether the model is a remote agent, which runs its own loop and sampling.
+   * Never typed: picking a model sets it from the model's entry, and clearing
+   * the model sets it back to null, which inherits.
+   */
+  remoteAgent: boolean | null;
   temperature: string;
   maxTokens: string;
   contextLength: string;
@@ -84,6 +90,7 @@ export function toLayerDraft(layer: StoredLayer | null | undefined): LayerDraft 
   return {
     baseUrl: layer?.baseUrl ?? '',
     model: layer?.model ?? '',
+    remoteAgent: layer?.remoteAgent ?? null,
     temperature: numberText(layer?.temperature),
     maxTokens: numberText(layer?.maxTokens),
     contextLength: numberText(layer?.contextLength),
@@ -117,6 +124,7 @@ export function fromLayerDraft(draft: LayerDraft): Required<StoredLayer> {
   return {
     baseUrl: orNull(draft.baseUrl),
     model: orNull(draft.model),
+    remoteAgent: draft.remoteAgent,
     temperature: numberOrNull(draft.temperature),
     maxTokens: numberOrNull(draft.maxTokens),
     contextLength: numberOrNull(draft.contextLength),
@@ -143,7 +151,9 @@ export function fromAgentDraft(draft: AgentDraft): Omit<CreateAgentInput, 'id'> 
 }
 
 /** Placeholders for a layer's blank fields: what each would be. */
-export type LayerHints = Record<Exclude<keyof LayerDraft, 'toolDiscovery'>, string> & { toolDiscovery: string };
+export type LayerHints = Record<Exclude<keyof LayerDraft, 'toolDiscovery' | 'remoteAgent'>, string> & {
+  toolDiscovery: string;
+};
 
 /**
  * What each blank field of a layer stands for, as placeholder text.
@@ -186,6 +196,30 @@ export function layerHints(inherited: Inherited | null | undefined, from: 'defau
     requestTimeoutSeconds: numberText(inherited.requestTimeoutSeconds) || 'No limit',
     maxRetries: String(inherited.maxRetries),
   };
+}
+
+/**
+ * The model a layer runs when that model is a remote agent: its own, else the one it inherits.
+ *
+ * @param draft - The layer's model and its flag, as its form holds them.
+ * @param inherited - What a blank resolves to, or nothing while it loads or where nothing is inherited.
+ * @returns The model's id, empty when no layer names one, or null when it is not a remote agent.
+ *
+ * @remarks
+ * The flag layers as `resolveRemoteAgent` in the runner layers it: the say of the layer the
+ * model comes from, so a layer that names its own model goes by its own flag. A form needs it
+ * of what is typed, before anything is saved.
+ */
+export function remoteModel(
+  draft: Pick<LayerDraft, 'model' | 'remoteAgent'>,
+  inherited: Inherited | null | undefined,
+): string | null {
+  const ownModel = draft.model?.trim();
+  const isRemote = ownModel ? (draft.remoteAgent ?? false) : (inherited?.remoteAgent ?? false);
+  if (isRemote === false) {
+    return null;
+  }
+  return ownModel || inherited?.model || '';
 }
 
 /**

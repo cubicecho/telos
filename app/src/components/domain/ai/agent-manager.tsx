@@ -16,7 +16,15 @@ import { ChevronDown, Pencil, Plus, Trash2, UserRound } from '@/components/ui/ic
 import { LoadState } from '@/components/ui/load-failure';
 import { Menu, MenuContent, MenuItem, MenuTrigger } from '@/components/ui/menu';
 import { AGENT_STARTERS, type AgentStarter, draftFromStarter } from '@/lib/agent-starters';
-import { type AgentDraft, fromAgentDraft, layerHints, missingSetup, toAgentDraft } from '@/lib/agents';
+import {
+  type AgentDraft,
+  fromAgentDraft,
+  type LayerDraft,
+  layerHints,
+  missingSetup,
+  remoteModel,
+  toAgentDraft,
+} from '@/lib/agents';
 import { describeError } from '@/lib/errors';
 import {
   AgentDefaultsDocument,
@@ -35,6 +43,9 @@ import {
   effortOptions,
   type NumberGroup,
   numbersIn,
+  REMOTE_AGENT_FIELDS,
+  REMOTE_AGENT_HELP,
+  REMOTE_ITERATIONS_HELP,
   REPLAY_HELP,
   replayOptions,
 } from './agent-settings-fields';
@@ -44,6 +55,7 @@ import {
   EndpointStatus,
   FormGroupTitle,
   ModelField,
+  remoteAgentOfPick,
   useEndpointModels,
 } from './endpoint-fields';
 import { McpServerPicker } from './mcp-server-picker';
@@ -299,22 +311,47 @@ export function AgentFormDialog({
   const required = (what: string) => ({
     onChange: ({ value }: { value: string }) => (value.trim() === '' ? `An agent needs ${what}.` : undefined),
   });
-  const numbers = (group: NumberGroup) => (
+  const numbers = (group: NumberGroup, isOwnedRemotely: (name: keyof LayerDraft) => boolean) => (
     <View className="flex-row flex-wrap gap-4">
       {numbersIn(group).map((spec) => (
         <View key={spec.name} className="min-w-[140px] flex-1">
           <form.AppField name={spec.name} validators={{ onChange: spec.rule }}>
             {(field) => (
-              <field.InputField label={spec.label} inputMode={spec.inputMode} placeholder={hints[spec.name]} />
+              <field.InputField
+                label={spec.label}
+                inputMode={spec.inputMode}
+                placeholder={hints[spec.name]}
+                disabled={isOwnedRemotely(spec.name)}
+              />
             )}
           </form.AppField>
         </View>
       ))}
     </View>
   );
-  const pickModel = (model: EndpointModel) => {
-    if (model.contextLength && !form.getFieldValue('contextLength').trim()) {
+  /**
+   * Fills the agent in from the entry of the model picked. A remote agent's
+   * entry is its card: its context length, and its name when none is typed.
+   * Any other model, or one the list does not have, is not a remote agent, and
+   * no model at all inherits the flag with the model.
+   */
+  const pickModel = (model: EndpointModel | null, value: string) => {
+    const remoteAgent = remoteAgentOfPick(model, value);
+    // Told on every keystroke of a typed model, so it writes only a change.
+    if (form.getFieldValue('remoteAgent') !== remoteAgent) {
+      form.setFieldValue('remoteAgent', remoteAgent);
+    }
+    if (model === null) {
+      return;
+    }
+    const isRemote = remoteAgent === true;
+    const keepsTypedLength = isRemote === false && form.getFieldValue('contextLength').trim() !== '';
+    if (model.contextLength && keepsTypedLength === false) {
       form.setFieldValue('contextLength', String(model.contextLength));
+    }
+    const isUnnamed = form.getFieldValue('name').trim() === '';
+    if (isRemote && isUnnamed) {
+      form.setFieldValue('name', model.name ?? model.id);
     }
   };
 
@@ -345,121 +382,160 @@ export function AgentFormDialog({
           </>
         )}
         contentSlot={
-          <Form className="gap-4">
-            <form.AppField name="name" validators={required('a name')}>
-              {(field) => <field.InputField label="Name" autoFocus placeholder="Reviewer" />}
-            </form.AppField>
-            <form.AppField name="enabled">
-              {(field) => <field.SwitchField label="On" description="Off, it takes no runs, and its lanes wait." />}
-            </form.AppField>
+          // The body follows the model it runs while that is a remote agent, its own or
+          // inherited, and null for any other. One string, because the store compares a
+          // selection by identity: an object would redraw the whole body on every keystroke.
+          <form.Subscribe selector={(state) => remoteModel(state.values, inherited)}>
+            {(runsRemote) => {
+              const isRemote = runsRemote !== null;
+              const isOwnedRemotely = (name: keyof LayerDraft) => isRemote && REMOTE_AGENT_FIELDS.has(name);
+              const card = endpoint.models?.find((entry) => entry.id === runsRemote);
+              return (
+                <Form className="gap-4">
+                  <form.AppField name="name" validators={required('a name')}>
+                    {(field) => <field.InputField label="Name" autoFocus placeholder="Reviewer" />}
+                  </form.AppField>
+                  <form.AppField name="enabled">
+                    {(field) => (
+                      <field.SwitchField label="On" description="Off, it takes no runs, and its lanes wait." />
+                    )}
+                  </form.AppField>
 
-            <FormGroupTitle title="Endpoint" description="Where it runs. Its models are listed from here." />
-            <form.AppField name="baseUrl" listeners={{ onBlur: () => askModels() }}>
-              {(field) => <field.InputField label="Base URL" type="url" placeholder={hints.baseUrl} />}
-            </form.AppField>
-            <Text className="-mt-2 text-foreground/60 text-xs">{BASE_URL_HELP}</Text>
-            <form.AppField name="apiKey" listeners={{ onBlur: () => askModels() }}>
-              {(field) => (
-                <field.PasswordField
-                  label="API key"
-                  placeholder={
-                    agent?.hasApiKey
-                      ? 'A key is set: leave blank to keep it'
-                      : 'Optional. Local servers such as Ollama need none.'
-                  }
-                />
-              )}
-            </form.AppField>
-            <form.Subscribe selector={(state) => state.values.baseUrl}>
-              {(baseUrl) => (
-                <EndpointStatus
-                  endpoint={endpoint}
-                  canLoad={Boolean(baseUrl.trim() || inherited?.baseUrl)}
-                  onLoad={() => askModels(true)}
-                />
-              )}
-            </form.Subscribe>
+                  <FormGroupTitle title="Endpoint" description="Where it runs. Its models are listed from here." />
+                  <form.AppField name="baseUrl" listeners={{ onBlur: () => askModels() }}>
+                    {(field) => <field.InputField label="Base URL" type="url" placeholder={hints.baseUrl} />}
+                  </form.AppField>
+                  <Text className="-mt-2 text-foreground/60 text-xs">{BASE_URL_HELP}</Text>
+                  <form.AppField name="apiKey" listeners={{ onBlur: () => askModels() }}>
+                    {(field) => (
+                      <field.PasswordField
+                        label="API key"
+                        placeholder={
+                          agent?.hasApiKey
+                            ? 'A key is set: leave blank to keep it'
+                            : 'Optional. Local servers such as Ollama need none.'
+                        }
+                      />
+                    )}
+                  </form.AppField>
+                  <form.Subscribe selector={(state) => state.values.baseUrl}>
+                    {(baseUrl) => (
+                      <EndpointStatus
+                        endpoint={endpoint}
+                        canLoad={Boolean(baseUrl.trim() || inherited?.baseUrl)}
+                        onLoad={() => askModels(true)}
+                      />
+                    )}
+                  </form.Subscribe>
 
-            <FormGroupTitle title="Model" />
-            <form.AppField name="model">
-              {() => (
-                <ModelField
-                  label="Model"
-                  models={endpoint.models}
-                  blankLabel={`Inherit (${hints.model || 'default'})`}
-                  placeholder={hints.model}
-                  onPick={pickModel}
-                />
-              )}
-            </form.AppField>
-            <form.Subscribe selector={(state) => ({ baseUrl: state.values.baseUrl, model: state.values.model })}>
-              {(own) => {
-                const missing = missingSetup(own, inherited);
-                return missing ? (
-                  <Text className="text-negative text-sm" aria-live="polite">
-                    {missing}
-                  </Text>
-                ) : null;
-              }}
-            </form.Subscribe>
-            {numbers('model')}
-            <form.AppField name="reasoningEffort">
-              {(field) => (
-                <field.SelectField
-                  label="Reasoning effort"
-                  options={effortOptions(hints.reasoningEffort, field.state.value)}
-                />
-              )}
-            </form.AppField>
-            <Text className="-mt-2 text-foreground/60 text-xs">{EFFORT_HELP}</Text>
-            <form.AppField name="reasoningReplay">
-              {(field) => (
-                <field.SelectField
-                  label="Send thinking back to the model"
-                  options={replayOptions(hints.reasoningReplay)}
-                />
-              )}
-            </form.AppField>
-            <Text className="-mt-2 text-foreground/60 text-xs">{REPLAY_HELP}</Text>
-            <form.AppField name="promptId">
-              {(field) => (
-                <field.SelectField
-                  label="Prompt"
-                  options={(prompts ?? []).map((prompt) => ({ value: prompt.id, label: prompt.name }))}
-                  clearable
-                  emptyLabel="No prompt"
-                  placeholder={promptsQuery.loading ? 'Loading prompts…' : undefined}
-                />
-              )}
-            </form.AppField>
-            <Text className="-mt-2 text-foreground/60 text-xs">{PROMPT_HELP}</Text>
+                  <FormGroupTitle title="Model" />
+                  <form.AppField name="model">
+                    {() => (
+                      <ModelField
+                        label="Model"
+                        models={endpoint.models}
+                        blankLabel={`Inherit (${hints.model || 'default'})`}
+                        placeholder={hints.model}
+                        onPick={pickModel}
+                      />
+                    )}
+                  </form.AppField>
+                  {card?.description ? (
+                    <Text className="-mt-2 text-foreground/60 text-xs">{card.description}</Text>
+                  ) : null}
+                  {isRemote ? <Text className="-mt-2 text-foreground/60 text-xs">{REMOTE_AGENT_HELP}</Text> : null}
+                  <form.Subscribe selector={(state) => ({ baseUrl: state.values.baseUrl, model: state.values.model })}>
+                    {(own) => {
+                      const missing = missingSetup(own, inherited);
+                      return missing ? (
+                        <Text className="text-negative text-sm" aria-live="polite">
+                          {missing}
+                        </Text>
+                      ) : null;
+                    }}
+                  </form.Subscribe>
+                  {numbers('model', isOwnedRemotely)}
+                  <form.AppField name="reasoningEffort">
+                    {(field) => (
+                      <field.SelectField
+                        label="Reasoning effort"
+                        options={effortOptions(hints.reasoningEffort, field.state.value)}
+                        disabled={isOwnedRemotely('reasoningEffort')}
+                      />
+                    )}
+                  </form.AppField>
+                  <Text className="-mt-2 text-foreground/60 text-xs">{EFFORT_HELP}</Text>
+                  <form.AppField name="reasoningReplay">
+                    {(field) => (
+                      <field.SelectField
+                        label="Send thinking back to the model"
+                        options={replayOptions(hints.reasoningReplay)}
+                        disabled={isOwnedRemotely('reasoningReplay')}
+                      />
+                    )}
+                  </form.AppField>
+                  <Text className="-mt-2 text-foreground/60 text-xs">{REPLAY_HELP}</Text>
+                  <form.AppField name="promptId">
+                    {(field) => (
+                      <field.SelectField
+                        label="Prompt"
+                        options={(prompts ?? []).map((prompt) => ({ value: prompt.id, label: prompt.name }))}
+                        clearable
+                        emptyLabel="No prompt"
+                        placeholder={promptsQuery.loading ? 'Loading prompts…' : undefined}
+                      />
+                    )}
+                  </form.AppField>
+                  <Text className="-mt-2 text-foreground/60 text-xs">{PROMPT_HELP}</Text>
 
-            <FormGroupTitle title="Tools" />
-            {numbers('tools')}
-            <form.AppField name="toolDiscovery">
-              {(field) => <field.SelectField label="Tool discovery" options={discoveryOptions(hints.toolDiscovery)} />}
-            </form.AppField>
-            <Text className="-mt-2 text-foreground/60 text-xs">{DISCOVERY_HELP}</Text>
-            <form.AppField name="toolSelectModel">
-              {() => (
-                <ModelField
-                  label="Tool selection model"
-                  models={endpoint.models}
-                  blankLabel={`Inherit (${hints.toolSelectModel || 'none'})`}
-                  placeholder={hints.toolSelectModel}
-                />
-              )}
-            </form.AppField>
-            <form.AppField name="mcpServerSlugs">
-              {(field) => <McpServerPicker slugs={field.state.value} onChange={(next) => field.handleChange(next)} />}
-            </form.AppField>
-            <form.AppField name="toolsOff">
-              {(field) => <RunToolsPicker toolsOff={field.state.value} onChange={(next) => field.handleChange(next)} />}
-            </form.AppField>
+                  <FormGroupTitle
+                    title="Tools"
+                    description={
+                      isRemote
+                        ? 'A remote agent loads and picks from these itself: each one chosen below is offered to it.'
+                        : undefined
+                    }
+                  />
+                  {numbers('tools', isOwnedRemotely)}
+                  {isRemote ? <Text className="-mt-2 text-foreground/60 text-xs">{REMOTE_ITERATIONS_HELP}</Text> : null}
+                  <form.AppField name="toolDiscovery">
+                    {(field) => (
+                      <field.SelectField
+                        label="Tool discovery"
+                        options={discoveryOptions(hints.toolDiscovery)}
+                        disabled={isOwnedRemotely('toolDiscovery')}
+                      />
+                    )}
+                  </form.AppField>
+                  <Text className="-mt-2 text-foreground/60 text-xs">{DISCOVERY_HELP}</Text>
+                  <form.AppField name="toolSelectModel">
+                    {() => (
+                      <ModelField
+                        label="Tool selection model"
+                        models={endpoint.models}
+                        blankLabel={`Inherit (${hints.toolSelectModel || 'none'})`}
+                        placeholder={hints.toolSelectModel}
+                        disabled={isOwnedRemotely('toolSelectModel')}
+                      />
+                    )}
+                  </form.AppField>
+                  <form.AppField name="mcpServerSlugs">
+                    {(field) => (
+                      <McpServerPicker slugs={field.state.value} onChange={(next) => field.handleChange(next)} />
+                    )}
+                  </form.AppField>
+                  <form.AppField name="toolsOff">
+                    {(field) => (
+                      <RunToolsPicker toolsOff={field.state.value} onChange={(next) => field.handleChange(next)} />
+                    )}
+                  </form.AppField>
 
-            <FormGroupTitle title="Requests" />
-            {numbers('requests')}
-          </Form>
+                  <FormGroupTitle title="Requests" />
+                  {numbers('requests', isOwnedRemotely)}
+                </Form>
+              );
+            }}
+          </form.Subscribe>
         }
       />
     </form.AppForm>

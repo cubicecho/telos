@@ -3,9 +3,11 @@ import {
   defineSpecColumns,
   NO_KEY,
   parseSpec,
+  type RemoteAgentParams,
   type ResolvedAgent,
   resolveAgentSpec,
   resolveApiKey,
+  ToolDiscovery,
 } from '@cubicecho/agent-core';
 
 // An agent as layered documents: the account's defaults under the agent, read
@@ -33,6 +35,11 @@ export interface AgentLayer {
   reasoningReplay?: string | null;
   requestTimeoutSeconds?: number | null;
   maxRetries?: number | null;
+  /**
+   * Whether the layer's model is a remote agent. The agent spec has no such
+   * field, so `resolveRemoteAgent` layers it rather than `COLUMNS`.
+   */
+  remoteAgent?: boolean | null;
 }
 
 /** A layer with its key, which no spec carries and `resolveApiKey` applies afterwards. */
@@ -44,6 +51,8 @@ export interface KeyedLayer extends AgentLayer {
 export interface ResolvedRunAgent {
   /** What `runAgentLoop` takes, key included. */
   config: ResolvedAgent;
+  /** Whether its model is a remote agent, run through `remoteAgentConfig`. */
+  remoteAgent: boolean;
   /** Values the spec would not take, dropped: one line each, for the run to show. */
   warnings: string[];
 }
@@ -108,7 +117,66 @@ export function resolveAgent(defaults: KeyedLayer | null, agent: KeyedLayer): Re
     defaults ? { baseUrl: defaults.baseUrl ?? '', apiKey: defaults.apiKey ?? '' } : undefined,
     {},
   );
-  return { config, warnings };
+  return { config, remoteAgent: resolveRemoteAgent(defaults, agent), warnings };
+}
+
+/**
+ * Whether an agent's model is a remote agent: the say of the layer its model
+ * comes from. An agent that names a model goes by its own flag, else by its
+ * defaults'.
+ *
+ * @param defaults - The account's layer, or null where it has set none.
+ * @param agent - The agent's own.
+ * @returns The flag a run goes by.
+ *
+ * @remarks
+ * The flag describes a model, so it never crosses from one layer's model to
+ * another's: an agent with a model of its own and no flag (one saved before the
+ * flag existed) is not a remote agent because its defaults' model is.
+ *
+ * Here beside `resolveAgent` because agent-core's spec has no field for it,
+ * so this is the one place it is layered: the runner's and Settings' answers
+ * both come from it.
+ */
+export function resolveRemoteAgent(defaults: AgentLayer | null, agent: AgentLayer): boolean {
+  const hasOwnModel = Boolean(agent.model?.trim());
+  return hasOwnModel ? (agent.remoteAgent ?? false) : (defaults?.remoteAgent ?? false);
+}
+
+/**
+ * What `runAgentLoop` takes for a remote agent: the resolved agent, less the
+ * sampling and the side work that are the remote agent's own.
+ */
+export type RemoteAgentConfig = Omit<
+  ResolvedAgent,
+  'temperature' | 'maxTokens' | 'reasoningEffort' | 'reasoningReplay' | 'remoteAgent'
+> &
+  RemoteAgentParams;
+
+/**
+ * A resolved agent as a remote agent is run: one that runs its own loop on its
+ * server (ai-router) and hands telos's tools back.
+ *
+ * @param config - What `resolveAgent` made of the agent and its defaults.
+ * @returns The same agent with `remoteAgent` on, and no temperature, max
+ * tokens, reasoning effort or reasoning replay, so the remote agent's own
+ * sampling wins and its server refuses nothing it did not choose. Tools go out
+ * eagerly and none are picked first, since loading and picking are its server's.
+ *
+ * @remarks
+ * Not a second merge: the layers are resolved once, by `resolveAgent`, and
+ * this only sets aside what a remote agent decides itself.
+ */
+export function remoteAgentConfig(config: ResolvedAgent): RemoteAgentConfig {
+  const {
+    temperature: _temperature,
+    maxTokens: _maxTokens,
+    reasoningEffort: _reasoningEffort,
+    reasoningReplay: _reasoningReplay,
+    remoteAgent: _remoteAgent,
+    ...kept
+  } = config;
+  return { ...kept, remoteAgent: true, toolDiscovery: ToolDiscovery.Eager, toolSelectModel: '' };
 }
 
 /**

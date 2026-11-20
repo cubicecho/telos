@@ -187,6 +187,35 @@ describe('an agent over its defaults', () => {
     expect(run.model).toBe('big');
   });
 
+  it('layers whether the model is a remote agent, and hands the runner both layers', async () => {
+    const claimOf = async (title: string) =>
+      (
+        await runner.expectOk(
+          `mutation ($todoId: ID!, $laneId: ID!) {
+            claimRun(todoId: $todoId, laneId: $laneId) { agent { remoteAgent defaults { remoteAgent } } }
+          }`,
+          { todoId: await board.addTodo(title), laneId: board.lanes[0].id },
+        )
+      ).claimRun.agent;
+    const resolvedFlag = async () =>
+      (await board.person.expectOk('query { agentDefaults { remoteAgent resolved { remoteAgent } } }')).agentDefaults;
+
+    await board.person.expectOk(SET, {
+      values: { baseUrl: 'http://router.test/v1', model: 'triage', remoteAgent: true },
+    });
+    expect(await resolvedFlag()).toEqual({ remoteAgent: true, resolved: { remoteAgent: true } });
+    await board.person.expectOk(UPDATE_AGENT, { id: board.agentId, set: { model: null, remoteAgent: null } });
+    expect(await claimOf('Inherited')).toEqual({ remoteAgent: null, defaults: { remoteAgent: true } });
+    await db.update(dbSchema.runs).set({ status: 'ok', finishedAt: new Date() });
+
+    await board.person.expectOk(UPDATE_AGENT, { id: board.agentId, set: { model: 'qwen3', remoteAgent: false } });
+    expect(await claimOf('Its own')).toEqual({ remoteAgent: false, defaults: { remoteAgent: true } });
+
+    // A save is the whole layer: left out, the flag is blank again, and resolves to not.
+    await board.person.expectOk(SET, { values: { model: 'qwen3' } });
+    expect(await resolvedFlag()).toEqual({ remoteAgent: null, resolved: { remoteAgent: false } });
+  });
+
   it('shows AI the model it runs, its own or inherited', async () => {
     const roster = `query { agentRoster { id model enabled } }`;
     expect((await board.person.expectOk(roster)).agentRoster).toEqual([

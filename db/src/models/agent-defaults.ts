@@ -22,6 +22,8 @@ export const agentDefaults = pgTable(
       .references(() => users.id, { onDelete: 'cascade' }),
     baseUrl: text('base_url'),
     model: text('model'),
+    // As an agent's (agents.ts): whether the default model is a remote agent.
+    remoteAgent: boolean('remote_agent'),
     apiKey: text('api_key'),
     temperature: doublePrecision('temperature'),
     maxTokens: integer('max_tokens'),

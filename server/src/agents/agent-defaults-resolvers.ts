@@ -30,6 +30,8 @@ const AGENT_DEFAULTS_SDL = parse(`
     id: ID!
     baseUrl: String
     model: String
+    "Whether the model is a remote agent, as its entry in the endpoint's models said when it was picked."
+    remoteAgent: Boolean
     temperature: Float
     maxTokens: Int
     contextLength: Int
@@ -52,6 +54,8 @@ const AGENT_DEFAULTS_SDL = parse(`
   type ResolvedAgentSettings {
     baseUrl: String!
     model: String!
+    "Whether the model is a remote agent, which runs its own loop and sampling on its server."
+    remoteAgent: Boolean!
     temperature: Float!
     "Zero sends no ceiling and leaves it to the endpoint."
     maxTokens: Int!
@@ -77,6 +81,7 @@ const AGENT_DEFAULTS_SDL = parse(`
   input AgentDefaultsInput {
     baseUrl: String
     model: String
+    remoteAgent: Boolean
     temperature: Float
     maxTokens: Int
     contextLength: Int
@@ -126,10 +131,11 @@ function visible(userId: string, row: dbSchema.AgentDefaults | null) {
  * @returns A `ResolvedAgentSettings` value.
  */
 function settings(row: dbSchema.AgentDefaults | null) {
-  const { config } = resolveAgent(row, {});
+  const { config, remoteAgent } = resolveAgent(row, {});
   return {
     baseUrl: config.baseUrl,
     model: config.model,
+    remoteAgent,
     temperature: config.temperature,
     maxTokens: config.maxTokens,
     contextLength: config.contextLength,

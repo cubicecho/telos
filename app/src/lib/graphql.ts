@@ -383,6 +383,7 @@ export const AgentFieldsFragment = graphql(`
     name
     baseUrl
     model
+    remoteAgent
     promptId
     temperature
     maxTokens
@@ -409,6 +410,7 @@ export const ResolvedAgentSettingsFieldsFragment = graphql(`
   fragment ResolvedAgentSettingsFields on ResolvedAgentSettings {
     baseUrl
     model
+    remoteAgent
     temperature
     maxTokens
     contextLength
@@ -427,6 +429,7 @@ export const AgentDefaultsFieldsFragment = graphql(`
     id
     baseUrl
     model
+    remoteAgent
     temperature
     maxTokens
     contextLength
@@ -565,6 +568,9 @@ export const AgentModelsDocument = graphql(`
     agentModels(baseUrl: $baseUrl, agentId: $agentId, apiKey: $apiKey) {
       id
       contextLength
+      name
+      description
+      remoteAgent
     }
   }
 `);

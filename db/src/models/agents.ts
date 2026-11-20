@@ -39,6 +39,11 @@ export const agents = pgTable(
     // (agent-defaults.ts); `0` and `""` are values, as the agent spec says.
     baseUrl: text('base_url'),
     model: text('model'),
+    // The model is a remote agent: it runs its own loop and sampling on its
+    // server (ai-router), and hands telos's tools back. Said by the model's
+    // entry in the endpoint's /models when it was picked, and null, as above,
+    // inherits the defaults' (`resolveRemoteAgent` in runner/src/spec.ts).
+    remoteAgent: boolean('remote_agent'),
     apiKey: text('api_key'),
     // What the agent is told its job is: one of the account's prompts. With
     // none, its runs are told only the account's and the project's layers.

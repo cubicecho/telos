@@ -1,0 +1,81 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "36b8d0e7-f0b5-43c6-8d20-cfe3388fcc29",
+  "prevIds": [
+    "2c26dd0c-2a8a-4072-b7ce-71f364a39669"
+  ],
+  "footprints": [
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "agent_defaults",
+        "remote_agent"
+      ],
+      "writes": [
+        "s|col|public.agent_defaults.remote_agent",
+        "n|col|public.agent_defaults.remote_agent",
+        "e|col|public.agent_defaults.remote_agent"
+      ],
+      "reads": [
+        "n|tbl|public.agent_defaults",
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "agents",
+        "remote_agent"
+      ],
+      "writes": [
+        "s|col|public.agents.remote_agent",
+        "n|col|public.agents.remote_agent",
+        "e|col|public.agents.remote_agent"
+      ],
+      "reads": [
+        "n|tbl|public.agents",
+        "n|sch|public"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "agent_defaults",
+        "name": "remote_agent",
+        "type": "boolean",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "agents",
+        "name": "remote_agent",
+        "type": "boolean",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    }
+  ]
+}

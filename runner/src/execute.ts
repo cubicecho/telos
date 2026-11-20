@@ -15,7 +15,7 @@ import { ArtifactLog, type DescribeTool, detectsFor, noteArtifact } from './arti
 import { ASK_PERSON, ASK_PERSON_DEFINITION, ASKED_REPLY, questionOf } from './ask.ts';
 import { ELICIT_CANCEL, ELICITED_REPLY, elicitationQuestion } from './elicit.ts';
 import { assignmentPrompt, readReply, systemPromptFor } from './prompts.ts';
-import { type ResolvedRunAgent, resolveAgent, unrunnable } from './spec.ts';
+import { type ResolvedRunAgent, remoteAgentConfig, resolveAgent, unrunnable } from './spec.ts';
 import type { Beat, Claim, RunEvent, RunPrompt, RunResult, RunUsage, Telos } from './telos.ts';
 import { openTools, TELOS_SERVER } from './tools.ts';
 
@@ -342,17 +342,17 @@ interface WorkOptions {
  *
  * @param claim The run.
  * @param pool Its tools.
+ * @param resolved The agent over its account's defaults.
  * @param options Its signal, and where what it does goes.
  * @returns The result to report.
  */
-async function work(
-  claim: Claim,
-  pool: McpPool,
-  { config }: ResolvedRunAgent,
-  options: WorkOptions,
-): Promise<RunResult> {
+async function work(claim: Claim, pool: McpPool, resolved: ResolvedRunAgent, options: WorkOptions): Promise<RunResult> {
   const { signal, log, feed, artifacts } = options;
   const { agent, assignment } = claim;
+  // A remote agent runs its own loop on its server: its sampling, and which of
+  // its tools it loads or picks first, are its own, so the catalog and the
+  // preselect below are left off for it.
+  const config = resolved.remoteAgent ? remoteAgentConfig(resolved.config) : resolved.config;
   const prompt = assignmentPrompt(assignment);
   const system = systemPromptFor(assignment, agent.prompt);
   feed.prompt({ system, user: prompt });
