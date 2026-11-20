@@ -1,13 +1,14 @@
 import {
   failedRun,
   type HookContext,
+  HookEvent,
   type HookNote,
   type HookRunner,
-  type LoopUsage,
   notify,
   PRESELECT_APPEND,
   type RunEventInput,
   runAgentLoop,
+  type UsageTotals,
 } from '@cubicecho/agent-core';
 import type { ElicitHandler, McpPool } from '@cubicecho/agent-mcp-pool';
 import { ArtifactLog, type DescribeTool, detectsFor, noteArtifact } from './artifacts.ts';
@@ -257,7 +258,7 @@ export async function execute(claim: Claim, options: ExecuteOptions): Promise<Ru
     if (pool)
       await notify(
         hooksOf(pool, log),
-        'sessionEnd',
+        HookEvent.SessionEnd,
         // A hook's status is ok, error or stopped; a run that asked a person
         // stopped short of its work, and says so in full in `vars.runStatus`.
         {
@@ -320,7 +321,7 @@ function hooksOf(pool: McpPool, log: (text: string) => void): HookRunner {
  * @param toolCalls How many calls it made.
  * @returns The usage fields of a result. The cache count only where some turn reported one.
  */
-const spentBy = (usage: LoopUsage, toolCalls: number) => ({
+const spentBy = (usage: UsageTotals, toolCalls: number) => ({
   toolCalls,
   promptTokens: usage.promptTokens,
   completionTokens: usage.completionTokens,
@@ -374,7 +375,7 @@ async function work(
   try {
     loop = await runAgentLoop({
       config,
-      system,
+      systemPrompt: system,
       messages: [{ role: 'user', content: prompt }],
       tools: pool.tools(),
       // The runner's own, offered in every mode and never catalogued or loaded.
@@ -429,8 +430,11 @@ async function work(
       signal,
       hooks: {
         run: hooksOf(pool, log),
-        // A todo's first run opens its session; every run after is another turn of it.
-        events: claim.opensSession ? ['sessionStart', 'beforeTurn'] : ['beforeTurn'],
+        // A todo's first run opens its session; every run after is another exchange
+        // of it. A run never compacts, so beforeCompact is not listed.
+        fire: claim.opensSession
+          ? [HookEvent.SessionStart, HookEvent.BeforeExchange, HookEvent.AfterExchange]
+          : [HookEvent.BeforeExchange, HookEvent.AfterExchange],
         context: { ...options.hookContext, prompt },
         onNote: (note) => feed.fromHook(note),
       },

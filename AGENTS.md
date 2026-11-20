@@ -596,8 +596,8 @@ The todo is the hooks' session and each run a turn of it: `claimRun` records
 the session in `todo_sessions` (one row per todo and agent, a server-only
 table) and says whether this run opens it (`opensSession`, true when no agent
 had worked the todo; asked of the sessions and not of `turn`, because
-retention prunes runs). That run fires `sessionStart` ahead of `beforeTurn`,
-and every run fires `afterTurn` and `sessionEnd`.
+retention prunes runs). That run fires `sessionStart` ahead of `beforeExchange`,
+and every run fires `afterExchange` and `sessionEnd`.
 
 **A deleted todo owes its agents' servers a `sessionDelete`, and the delete
 never waits for it.** `todo_sessions.todo_id` has no foreign key: the

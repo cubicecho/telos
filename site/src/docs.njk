@@ -127,7 +127,7 @@ description: Configuration, the AI switches, agents, lanes and runs, the MCP doo
         <thead><tr><th>Hook</th><th>Fires</th></tr></thead>
         <tbody>
           <tr><td><code>sessionStart</code></td><td>On the todo's first run.</td></tr>
-          <tr><td><code>beforeTurn</code>, <code>afterTurn</code>, <code>sessionEnd</code></td><td>On every run, each run being one turn of the todo.</td></tr>
+          <tr><td><code>beforeExchange</code>, <code>afterExchange</code>, <code>sessionEnd</code></td><td>On every run, each run being one exchange of the todo.</td></tr>
           <tr><td><code>sessionDelete</code></td><td>After the todo is deleted for good, so a memory server can forget it.</td></tr>
           <tr><td><code>beforeCompact</code></td><td>Never: a run does not compact its transcript.</td></tr>
         </tbody>

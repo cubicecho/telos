@@ -127,7 +127,7 @@ describe('McpServerManager', () => {
       callTimeoutMs: null,
       idleTimeoutMs: 0,
       hiddenTools: ['recall'],
-      hooks: [{ id: 'memory', on: 'beforeTurn', tool: 'recall' }],
+      hooks: [{ id: 'memory', on: 'beforeExchange', tool: 'recall' }],
     };
     const create = vi.fn(() => ({ data: { createMcpServer: { ...SERVER, ...values } } }));
     manager([

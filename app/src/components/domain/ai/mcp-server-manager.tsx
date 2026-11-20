@@ -453,7 +453,7 @@ export function McpServerFormDialog({
                 <View className="gap-1">
                   <field.TextAreaField
                     label="Hooks"
-                    placeholder='[{ "id": "memory", "on": "beforeTurn", "tool": "recall", "inject": true }]'
+                    placeholder='[{ "id": "memory", "on": "beforeExchange", "tool": "recall", "inject": true }]'
                     rows={4}
                   />
                   <Hint>A JSON list of calls the runner makes around a run. One it cannot use is said on the run.</Hint>
