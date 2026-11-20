@@ -35,6 +35,11 @@ export interface AgentLayer {
   reasoningReplay?: string | null;
   requestTimeoutSeconds?: number | null;
   maxRetries?: number | null;
+  /**
+   * Whether the layer's model is a remote agent. The agent spec has no such
+   * field, so `resolveRemoteAgent` layers it rather than `COLUMNS`.
+   */
+  remoteAgent?: boolean | null;
 }
 
 /** A layer with its key, which no spec carries and `resolveApiKey` applies afterwards. */
@@ -46,6 +51,8 @@ export interface KeyedLayer extends AgentLayer {
 export interface ResolvedRunAgent {
   /** What `runAgentLoop` takes, key included. */
   config: ResolvedAgent;
+  /** Whether its model is a remote agent, run through `remoteAgentConfig`. */
+  remoteAgent: boolean;
   /** Values the spec would not take, dropped: one line each, for the run to show. */
   warnings: string[];
 }
@@ -110,7 +117,30 @@ export function resolveAgent(defaults: KeyedLayer | null, agent: KeyedLayer): Re
     defaults ? { baseUrl: defaults.baseUrl ?? '', apiKey: defaults.apiKey ?? '' } : undefined,
     {},
   );
-  return { config, warnings };
+  return { config, remoteAgent: resolveRemoteAgent(defaults, agent), warnings };
+}
+
+/**
+ * Whether an agent's model is a remote agent: the say of the layer its model
+ * comes from. An agent that names a model goes by its own flag, else by its
+ * defaults'.
+ *
+ * @param defaults - The account's layer, or null where it has set none.
+ * @param agent - The agent's own.
+ * @returns The flag a run goes by.
+ *
+ * @remarks
+ * The flag describes a model, so it never crosses from one layer's model to
+ * another's: an agent with a model of its own and no flag (one saved before the
+ * flag existed) is not a remote agent because its defaults' model is.
+ *
+ * Here beside `resolveAgent` because agent-core's spec has no field for it,
+ * so this is the one place it is layered: the runner's and Settings' answers
+ * both come from it.
+ */
+export function resolveRemoteAgent(defaults: AgentLayer | null, agent: AgentLayer): boolean {
+  const hasOwnModel = Boolean(agent.model?.trim());
+  return hasOwnModel ? (agent.remoteAgent ?? false) : (defaults?.remoteAgent ?? false);
 }
 
 /**

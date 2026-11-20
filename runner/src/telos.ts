@@ -49,8 +49,8 @@ export interface ClaimedAgent {
   name: string;
   baseUrl: string | null;
   model: string | null;
-  /** Its model runs its own loop and sampling (`remoteAgentConfig` in spec.ts). Never inherited. */
-  remoteAgent: boolean;
+  /** Its model runs its own loop and sampling (`remoteAgentConfig` in spec.ts); null inherits. */
+  remoteAgent: boolean | null;
   apiKey: string | null;
   /** The body of the prompt the agent was given; null when it has none. */
   prompt: string | null;
@@ -219,7 +219,7 @@ const AGENT_FIELDS = `
   id name baseUrl model remoteAgent apiKey prompt temperature maxTokens contextLength
   maxToolIterations toolDiscovery toolSelectModel reasoningEffort reasoningReplay requestTimeoutSeconds maxRetries mcpServers mcpNotices
   defaults {
-    baseUrl model apiKey temperature maxTokens contextLength
+    baseUrl model remoteAgent apiKey temperature maxTokens contextLength
     maxToolIterations toolDiscovery toolSelectModel reasoningEffort reasoningReplay requestTimeoutSeconds maxRetries
   }
 `;

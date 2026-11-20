@@ -16,7 +16,15 @@ import { ChevronDown, Pencil, Plus, Trash2, UserRound } from '@/components/ui/ic
 import { LoadState } from '@/components/ui/load-failure';
 import { Menu, MenuContent, MenuItem, MenuTrigger } from '@/components/ui/menu';
 import { AGENT_STARTERS, type AgentStarter, draftFromStarter } from '@/lib/agent-starters';
-import { type AgentDraft, fromAgentDraft, type LayerDraft, layerHints, missingSetup, toAgentDraft } from '@/lib/agents';
+import {
+  type AgentDraft,
+  fromAgentDraft,
+  type LayerDraft,
+  layerHints,
+  missingSetup,
+  remoteModel,
+  toAgentDraft,
+} from '@/lib/agents';
 import { describeError } from '@/lib/errors';
 import {
   AgentDefaultsDocument,
@@ -37,6 +45,7 @@ import {
   numbersIn,
   REMOTE_AGENT_FIELDS,
   REMOTE_AGENT_HELP,
+  REMOTE_ITERATIONS_HELP,
   REPLAY_HELP,
   replayOptions,
 } from './agent-settings-fields';
@@ -46,6 +55,7 @@ import {
   EndpointStatus,
   FormGroupTitle,
   ModelField,
+  remoteAgentOfPick,
   useEndpointModels,
 } from './endpoint-fields';
 import { McpServerPicker } from './mcp-server-picker';
@@ -322,17 +332,19 @@ export function AgentFormDialog({
   /**
    * Fills the agent in from the entry of the model picked. A remote agent's
    * entry is its card: its context length, and its name when none is typed.
-   * Any other model, or one the list does not have, is not a remote agent.
+   * Any other model, or one the list does not have, is not a remote agent, and
+   * no model at all inherits the flag with the model.
    */
-  const pickModel = (model: EndpointModel | null) => {
-    const isRemote = model?.remoteAgent === true;
+  const pickModel = (model: EndpointModel | null, value: string) => {
+    const remoteAgent = remoteAgentOfPick(model, value);
     // Told on every keystroke of a typed model, so it writes only a change.
-    if (form.getFieldValue('remoteAgent') !== isRemote) {
-      form.setFieldValue('remoteAgent', isRemote);
+    if (form.getFieldValue('remoteAgent') !== remoteAgent) {
+      form.setFieldValue('remoteAgent', remoteAgent);
     }
     if (model === null) {
       return;
     }
+    const isRemote = remoteAgent === true;
     const keepsTypedLength = isRemote === false && form.getFieldValue('contextLength').trim() !== '';
     if (model.contextLength && keepsTypedLength === false) {
       form.setFieldValue('contextLength', String(model.contextLength));
@@ -370,14 +382,14 @@ export function AgentFormDialog({
           </>
         )}
         contentSlot={
-          // The body follows a remote agent's model, null for any other. One string, because
-          // the store compares a selection by identity: an object would redraw the whole body
-          // on every keystroke, and so would the model of an agent that is not remote.
-          <form.Subscribe selector={(state) => (state.values.remoteAgent ? (state.values.model ?? '') : null)}>
-            {(remoteModel) => {
-              const isRemote = remoteModel !== null;
+          // The body follows the model it runs while that is a remote agent, its own or
+          // inherited, and null for any other. One string, because the store compares a
+          // selection by identity: an object would redraw the whole body on every keystroke.
+          <form.Subscribe selector={(state) => remoteModel(state.values, inherited)}>
+            {(runsRemote) => {
+              const isRemote = runsRemote !== null;
               const isOwnedRemotely = (name: keyof LayerDraft) => isRemote && REMOTE_AGENT_FIELDS.has(name);
-              const card = endpoint.models?.find((entry) => entry.id === remoteModel);
+              const card = endpoint.models?.find((entry) => entry.id === runsRemote);
               return (
                 <Form className="gap-4">
                   <form.AppField name="name" validators={required('a name')}>
@@ -485,6 +497,7 @@ export function AgentFormDialog({
                     }
                   />
                   {numbers('tools', isOwnedRemotely)}
+                  {isRemote ? <Text className="-mt-2 text-foreground/60 text-xs">{REMOTE_ITERATIONS_HELP}</Text> : null}
                   <form.AppField name="toolDiscovery">
                     {(field) => (
                       <field.SelectField

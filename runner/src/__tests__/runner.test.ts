@@ -876,6 +876,55 @@ describe('a remote agent', () => {
     const [run] = await runsOf(todoId);
     expect(run.status).toBe('ok');
   });
+
+  /** What a run's first request to the model says, for a todo added now. */
+  async function firstRequest(): Promise<Record<string, unknown>> {
+    const bodies: Array<Record<string, unknown>> = [];
+    llm.script = (_messages, _tools, body) => {
+      bodies.push(body);
+      return { content: 'Done.' };
+    };
+    await board.addTodo('Sort it');
+    await cycle();
+    return bodies[0];
+  }
+
+  /** Makes the account's default model a remote agent, at the scripted endpoint. */
+  async function remoteDefault(): Promise<void> {
+    const remote = { baseUrl: llm.url, model: 'triage', remoteAgent: true, temperature: 0.2, maxTokens: 512 };
+    await db
+      .insert(dbSchema.agentDefaults)
+      .values({ userId: board.userId, ...remote })
+      .onConflictDoUpdate({ target: dbSchema.agentDefaults.userId, set: remote });
+  }
+
+  it('is what an agent runs that inherits a remote default', async () => {
+    await remoteDefault();
+    await db
+      .update(dbSchema.agents)
+      .set({ baseUrl: null, model: null, remoteAgent: null })
+      .where(eq(dbSchema.agents.id, board.agentId));
+
+    const body = await firstRequest();
+
+    expect(body.model).toBe('triage');
+    expect(body).not.toHaveProperty('temperature');
+    expect(body).not.toHaveProperty('max_tokens');
+    expect(body.agent_core).toMatchObject({ progress: true });
+  });
+
+  it('is not what an agent runs that picked a model of its own over a remote default', async () => {
+    await remoteDefault();
+    await db
+      .update(dbSchema.agents)
+      .set({ model: 'tiny', remoteAgent: false })
+      .where(eq(dbSchema.agents.id, board.agentId));
+
+    const body = await firstRequest();
+
+    expect(body).toMatchObject({ model: 'tiny', temperature: 0.2, max_tokens: 512 });
+    expect(body).not.toHaveProperty('agent_core');
+  });
 });
 
 describe('testing an MCP server', () => {

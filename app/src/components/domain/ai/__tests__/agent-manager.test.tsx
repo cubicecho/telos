@@ -49,6 +49,7 @@ const BUILT_IN = {
   __typename: 'ResolvedAgentSettings',
   baseUrl: '',
   model: '',
+  remoteAgent: false,
   temperature: 0.7,
   maxTokens: 0,
   contextLength: 0,
@@ -72,6 +73,7 @@ function defaults(resolved: Partial<typeof BUILT_IN> = {}) {
           id: 'u1',
           baseUrl: resolved.baseUrl || null,
           model: resolved.model || null,
+          remoteAgent: resolved.remoteAgent || null,
           temperature: null,
           maxTokens: null,
           contextLength: null,
@@ -169,7 +171,7 @@ function routerModels(agentId: string | null) {
 }
 
 /** The settings a remote agent runs itself, by their labels. */
-const REMOTE_OWNED_INPUTS = ['Temperature', 'Max tokens', 'Max tool iterations'];
+const REMOTE_OWNED_INPUTS = ['Temperature', 'Max tokens'];
 const REMOTE_OWNED_SELECTS = ['Reasoning effort', 'Send thinking back to the model', 'Tool discovery'];
 
 function agents(rows: unknown[]) {
@@ -392,6 +394,9 @@ describe('AgentManager', () => {
     for (const label of REMOTE_OWNED_SELECTS) expect(screen.getByRole('combobox', { name: label })).toBeDisabled();
     // A combobox's trigger is not a form control, so it says so in ARIA.
     expect(screen.getByRole('combobox', { name: 'Tool selection model' })).toHaveAttribute('aria-disabled', 'true');
+    // The cap still bounds the tools it hands back, so it stays, with what it means here.
+    expect(screen.getByLabelText('Max tool iterations')).toBeEnabled();
+    expect(screen.getByText(/^For a remote agent, this limits only/)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Create agent' }));
 
     await waitFor(() => expect(create).toHaveBeenCalled());
@@ -428,6 +433,40 @@ describe('AgentManager', () => {
 
     await waitFor(() => expect(update).toHaveBeenCalled());
     expect(update.mock.calls[0][0].set).toMatchObject({ model: 'qwen3:14b', remoteAgent: false });
+  });
+
+  it('inherits the flag again when the model is cleared back to the default', async () => {
+    const user = userEvent.setup();
+    const update = vi.fn((_variables: { set: Record<string, unknown> }) => ({ data: { updateAgent: AGENT } }));
+    manager([
+      agents([{ ...AGENT, baseUrl: ROUTER_URL, model: 'triage', remoteAgent: true }]),
+      routerModels('a1'),
+      { request: { query: UpdateAgentDocument }, variableMatcher: () => true, result: update },
+    ]);
+
+    await user.click(await screen.findByRole('button', { name: 'Edit Reviewer' }));
+    expect(await screen.findByText('Connected')).toBeInTheDocument();
+    await user.click(screen.getByRole('combobox', { name: 'Model' }));
+    await user.click(await screen.findByRole('option', { name: /^Inherit/ }));
+    expect(screen.getByLabelText('Temperature')).toBeEnabled();
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(update).toHaveBeenCalled());
+    expect(update.mock.calls[0][0].set).toMatchObject({ model: null, remoteAgent: null });
+  });
+
+  it('greys out what a remote default runs itself for an agent that inherits it', async () => {
+    const user = userEvent.setup();
+    manager(
+      [agents([{ ...AGENT, baseUrl: null, model: null, remoteAgent: null }]), routerModels('a1')],
+      defaults({ baseUrl: ROUTER_URL, model: 'triage', remoteAgent: true }),
+    );
+
+    await user.click(await screen.findByRole('button', { name: 'Edit Reviewer' }));
+    expect(await screen.findByText('Sorts new issues')).toBeInTheDocument();
+    expect(screen.getByText(/^This model is a remote agent/)).toBeInTheDocument();
+    for (const label of REMOTE_OWNED_INPUTS) expect(screen.getByLabelText(label)).toBeDisabled();
+    expect(screen.getByLabelText('Max tool iterations')).toBeEnabled();
   });
 
   it('opens a remote agent with what it runs itself greyed out, and says what it is', async () => {

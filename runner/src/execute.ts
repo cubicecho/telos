@@ -352,7 +352,7 @@ async function work(claim: Claim, pool: McpPool, resolved: ResolvedRunAgent, opt
   // A remote agent runs its own loop on its server: its sampling, and which of
   // its tools it loads or picks first, are its own, so the catalog and the
   // preselect below are left off for it.
-  const config = agent.remoteAgent ? remoteAgentConfig(resolved.config) : resolved.config;
+  const config = resolved.remoteAgent ? remoteAgentConfig(resolved.config) : resolved.config;
   const prompt = assignmentPrompt(assignment);
   const system = systemPromptFor(assignment, agent.prompt);
   feed.prompt({ system, user: prompt });

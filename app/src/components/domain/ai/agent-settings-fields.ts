@@ -6,7 +6,7 @@ import { type LayerDraft, numberRule } from '@/lib/agents';
 
 type NumberField = Exclude<
   keyof LayerDraft,
-  'baseUrl' | 'model' | 'toolDiscovery' | 'toolSelectModel' | 'reasoningEffort' | 'reasoningReplay'
+  'baseUrl' | 'model' | 'remoteAgent' | 'toolDiscovery' | 'toolSelectModel' | 'reasoningEffort' | 'reasoningReplay'
 >;
 
 /** Which group of a form a number sits in: with the model, the tools, or the requests. */
@@ -116,20 +116,22 @@ export const REPLAY_HELP =
 
 /**
  * The settings a remote agent decides on its own server: its sampling, its
- * thinking, and how it loads, picks and loops over its tools. A run of one
- * leaves them to it (`remoteAgentConfig` in the runner), so its form greys
- * them out. The iteration cap, which agent-core always takes, still bounds how
- * often a run answers the tools a remote agent hands back.
+ * thinking, and how it loads and picks its tools. A run of one leaves them to
+ * it (`remoteAgentConfig` in the runner), so both forms grey them out. The
+ * iteration cap is not among them: it still bounds a run's side of the loop.
  */
 export const REMOTE_AGENT_FIELDS: ReadonlySet<keyof LayerDraft> = new Set<keyof LayerDraft>([
   'temperature',
   'maxTokens',
-  'maxToolIterations',
   'toolDiscovery',
   'toolSelectModel',
   'reasoningEffort',
   'reasoningReplay',
 ]);
+
+/** What the iteration cap means for a remote agent, under the field. */
+export const REMOTE_ITERATIONS_HELP =
+  'For a remote agent, this limits only how many times it can hand telos’s own tools back in one run, not the loop it runs on its server.';
 
 export const REMOTE_AGENT_HELP =
   'This model is a remote agent: it runs its own loop on its server, so its sampling, thinking and tools are set there.';

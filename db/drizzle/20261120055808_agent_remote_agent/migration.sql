@@ -1,1 +1,0 @@
-ALTER TABLE "agents" ADD COLUMN "remote_agent" boolean DEFAULT false NOT NULL;

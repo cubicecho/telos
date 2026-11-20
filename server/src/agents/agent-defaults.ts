@@ -12,6 +12,7 @@ import { eq } from 'drizzle-orm';
 export const LAYER_FIELDS = [
   'baseUrl',
   'model',
+  'remoteAgent',
   'temperature',
   'maxTokens',
   'contextLength',

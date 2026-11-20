@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
 import { LoadState } from '@/components/ui/load-failure';
-import { fromLayerDraft, type LayerDraft, layerHints, toLayerDraft } from '@/lib/agents';
+import { fromLayerDraft, type LayerDraft, layerHints, remoteModel, toLayerDraft } from '@/lib/agents';
 import { describeError } from '@/lib/errors';
 import { AgentDefaultsDocument, SetAgentDefaultsApiKeyDocument, SetAgentDefaultsDocument } from '@/lib/graphql';
 import {
@@ -19,10 +19,21 @@ import {
   effortOptions,
   type NumberGroup,
   numbersIn,
+  REMOTE_AGENT_FIELDS,
+  REMOTE_AGENT_HELP,
+  REMOTE_ITERATIONS_HELP,
   REPLAY_HELP,
   replayOptions,
 } from './agent-settings-fields';
-import { BASE_URL_HELP, EndpointStatus, FormGroupTitle, ModelField, useEndpointModels } from './endpoint-fields';
+import {
+  BASE_URL_HELP,
+  type EndpointModel,
+  EndpointStatus,
+  FormGroupTitle,
+  ModelField,
+  remoteAgentOfPick,
+  useEndpointModels,
+} from './endpoint-fields';
 
 /** The form's values: the defaults, and a key typed for them, which is saved on its own. */
 type DefaultsFormValues = LayerDraft & { apiKey: string };
@@ -86,19 +97,40 @@ export function AgentDefaultsForm() {
   }
 
   const failure = error ?? keyState.error;
-  const numbers = (group: NumberGroup) => (
+  const numbers = (group: NumberGroup, isOwnedRemotely: (name: keyof LayerDraft) => boolean) => (
     <View className="flex-row flex-wrap gap-4">
       {numbersIn(group).map((spec) => (
         <View key={spec.name} className="min-w-[160px] flex-1">
           <form.AppField name={spec.name} validators={{ onChange: spec.rule }}>
             {(field) => (
-              <field.InputField label={spec.label} inputMode={spec.inputMode} placeholder={hints[spec.name]} />
+              <field.InputField
+                label={spec.label}
+                inputMode={spec.inputMode}
+                placeholder={hints[spec.name]}
+                disabled={isOwnedRemotely(spec.name)}
+              />
             )}
           </form.AppField>
         </View>
       ))}
     </View>
   );
+  /**
+   * Takes what the default model's entry says: whether it is a remote agent,
+   * null with no model, and its context length, which a remote agent's card
+   * states and any other only fills where none is typed.
+   */
+  const pickModel = (model: EndpointModel | null, value: string) => {
+    const remoteAgent = remoteAgentOfPick(model, value);
+    // Told on every keystroke of a typed model, so it writes only a change.
+    if (form.getFieldValue('remoteAgent') !== remoteAgent) {
+      form.setFieldValue('remoteAgent', remoteAgent);
+    }
+    const keepsTypedLength = remoteAgent !== true && form.getFieldValue('contextLength').trim() !== '';
+    if (model?.contextLength && keepsTypedLength === false) {
+      form.setFieldValue('contextLength', String(model.contextLength));
+    }
+  };
 
   return (
     <CardLayout
@@ -131,107 +163,132 @@ export function AgentDefaultsForm() {
               contentClassName="mt-2"
               contentSlot={
                 <form.AppForm>
-                  <Form className="gap-4">
-                    <FormGroupTitle title="Endpoint" description="Where agents run unless they name their own." />
-                    <form.AppField name="baseUrl" listeners={{ onBlur: () => askModels() }}>
-                      {(field) => (
-                        <field.InputField label="Base URL" type="url" placeholder="http://localhost:11434/v1" />
-                      )}
-                    </form.AppField>
-                    <Text className="-mt-2 text-foreground/60 text-xs">{BASE_URL_HELP}</Text>
-                    <form.AppField name="apiKey" listeners={{ onBlur: () => askModels() }}>
-                      {(field) => (
-                        <field.PasswordField
-                          label="API key"
-                          placeholder={
-                            defaults.hasApiKey
-                              ? 'A key is set: leave blank to keep it'
-                              : 'Optional. Local servers such as Ollama need none.'
-                          }
-                        />
-                      )}
-                    </form.AppField>
-                    <form.Subscribe selector={(state) => state.values.baseUrl}>
-                      {(baseUrl) => (
-                        <EndpointStatus
-                          endpoint={endpoint}
-                          canLoad={Boolean(baseUrl.trim())}
-                          onLoad={() => askModels(true)}
-                        />
-                      )}
-                    </form.Subscribe>
+                  {/* As the agent form's body: one string, the remote agent's model or null. */}
+                  <form.Subscribe selector={(state) => remoteModel(state.values, null)}>
+                    {(runsRemote) => {
+                      const isRemote = runsRemote !== null;
+                      const isOwnedRemotely = (name: keyof LayerDraft) => isRemote && REMOTE_AGENT_FIELDS.has(name);
+                      const card = endpoint.models?.find((entry) => entry.id === runsRemote);
+                      return (
+                        <Form className="gap-4">
+                          <FormGroupTitle title="Endpoint" description="Where agents run unless they name their own." />
+                          <form.AppField name="baseUrl" listeners={{ onBlur: () => askModels() }}>
+                            {(field) => (
+                              <field.InputField label="Base URL" type="url" placeholder="http://localhost:11434/v1" />
+                            )}
+                          </form.AppField>
+                          <Text className="-mt-2 text-foreground/60 text-xs">{BASE_URL_HELP}</Text>
+                          <form.AppField name="apiKey" listeners={{ onBlur: () => askModels() }}>
+                            {(field) => (
+                              <field.PasswordField
+                                label="API key"
+                                placeholder={
+                                  defaults.hasApiKey
+                                    ? 'A key is set: leave blank to keep it'
+                                    : 'Optional. Local servers such as Ollama need none.'
+                                }
+                              />
+                            )}
+                          </form.AppField>
+                          <form.Subscribe selector={(state) => state.values.baseUrl}>
+                            {(baseUrl) => (
+                              <EndpointStatus
+                                endpoint={endpoint}
+                                canLoad={Boolean(baseUrl.trim())}
+                                onLoad={() => askModels(true)}
+                              />
+                            )}
+                          </form.Subscribe>
 
-                    <FormGroupTitle title="Model" />
-                    <form.AppField name="model">
-                      {() => (
-                        <ModelField
-                          label="Model"
-                          models={endpoint.models}
-                          blankLabel="None"
-                          placeholder="qwen3:14b"
-                          onPick={(model) => {
-                            if (model?.contextLength && !form.getFieldValue('contextLength').trim()) {
-                              form.setFieldValue('contextLength', String(model.contextLength));
-                            }
-                          }}
-                        />
-                      )}
-                    </form.AppField>
-                    {numbers('model')}
-                    <form.AppField name="reasoningEffort">
-                      {(field) => (
-                        <field.SelectField
-                          label="Reasoning effort"
-                          options={effortOptions(hints.reasoningEffort, field.state.value)}
-                        />
-                      )}
-                    </form.AppField>
-                    <Text className="-mt-2 text-foreground/60 text-xs">{EFFORT_HELP}</Text>
-                    <form.AppField name="reasoningReplay">
-                      {(field) => (
-                        <field.SelectField
-                          label="Send thinking back to the model"
-                          options={replayOptions(hints.reasoningReplay)}
-                        />
-                      )}
-                    </form.AppField>
-                    <Text className="-mt-2 text-foreground/60 text-xs">{REPLAY_HELP}</Text>
+                          <FormGroupTitle title="Model" />
+                          <form.AppField name="model">
+                            {() => (
+                              <ModelField
+                                label="Model"
+                                models={endpoint.models}
+                                blankLabel="None"
+                                placeholder="qwen3:14b"
+                                onPick={pickModel}
+                              />
+                            )}
+                          </form.AppField>
+                          {card?.description ? (
+                            <Text className="-mt-2 text-foreground/60 text-xs">{card.description}</Text>
+                          ) : null}
+                          {isRemote ? (
+                            <Text className="-mt-2 text-foreground/60 text-xs">{REMOTE_AGENT_HELP}</Text>
+                          ) : null}
+                          {numbers('model', isOwnedRemotely)}
+                          <form.AppField name="reasoningEffort">
+                            {(field) => (
+                              <field.SelectField
+                                label="Reasoning effort"
+                                options={effortOptions(hints.reasoningEffort, field.state.value)}
+                                disabled={isOwnedRemotely('reasoningEffort')}
+                              />
+                            )}
+                          </form.AppField>
+                          <Text className="-mt-2 text-foreground/60 text-xs">{EFFORT_HELP}</Text>
+                          <form.AppField name="reasoningReplay">
+                            {(field) => (
+                              <field.SelectField
+                                label="Send thinking back to the model"
+                                options={replayOptions(hints.reasoningReplay)}
+                                disabled={isOwnedRemotely('reasoningReplay')}
+                              />
+                            )}
+                          </form.AppField>
+                          <Text className="-mt-2 text-foreground/60 text-xs">{REPLAY_HELP}</Text>
 
-                    <FormGroupTitle title="Tools" />
-                    {numbers('tools')}
-                    <form.AppField name="toolDiscovery">
-                      {(field) => (
-                        <field.SelectField label="Tool discovery" options={discoveryOptions(hints.toolDiscovery)} />
-                      )}
-                    </form.AppField>
-                    <Text className="-mt-2 text-foreground/60 text-xs">{DISCOVERY_HELP}</Text>
-                    <form.AppField name="toolSelectModel">
-                      {() => (
-                        <ModelField
-                          label="Tool selection model"
-                          models={endpoint.models}
-                          blankLabel="None"
-                          placeholder={hints.toolSelectModel}
-                        />
-                      )}
-                    </form.AppField>
+                          <FormGroupTitle
+                            title="Tools"
+                            description={isRemote ? 'A remote agent loads and picks from its tools itself.' : undefined}
+                          />
+                          {numbers('tools', isOwnedRemotely)}
+                          {isRemote ? (
+                            <Text className="-mt-2 text-foreground/60 text-xs">{REMOTE_ITERATIONS_HELP}</Text>
+                          ) : null}
+                          <form.AppField name="toolDiscovery">
+                            {(field) => (
+                              <field.SelectField
+                                label="Tool discovery"
+                                options={discoveryOptions(hints.toolDiscovery)}
+                                disabled={isOwnedRemotely('toolDiscovery')}
+                              />
+                            )}
+                          </form.AppField>
+                          <Text className="-mt-2 text-foreground/60 text-xs">{DISCOVERY_HELP}</Text>
+                          <form.AppField name="toolSelectModel">
+                            {() => (
+                              <ModelField
+                                label="Tool selection model"
+                                models={endpoint.models}
+                                blankLabel="None"
+                                placeholder={hints.toolSelectModel}
+                                disabled={isOwnedRemotely('toolSelectModel')}
+                              />
+                            )}
+                          </form.AppField>
 
-                    <FormGroupTitle title="Requests" />
-                    {numbers('requests')}
+                          <FormGroupTitle title="Requests" />
+                          {numbers('requests', isOwnedRemotely)}
 
-                    <View className="flex-row items-center justify-end gap-3">
-                      {failure ? (
-                        <Text className="flex-1 text-negative text-sm" aria-live="polite">
-                          {describeError(failure)}
-                        </Text>
-                      ) : saved ? (
-                        <Text className="flex-1 text-foreground/60 text-sm" aria-live="polite">
-                          Saved.
-                        </Text>
-                      ) : null}
-                      <form.SubmitButton isEdit editLabel="Save defaults" />
-                    </View>
-                  </Form>
+                          <View className="flex-row items-center justify-end gap-3">
+                            {failure ? (
+                              <Text className="flex-1 text-negative text-sm" aria-live="polite">
+                                {describeError(failure)}
+                              </Text>
+                            ) : saved ? (
+                              <Text className="flex-1 text-foreground/60 text-sm" aria-live="polite">
+                                Saved.
+                              </Text>
+                            ) : null}
+                            <form.SubmitButton isEdit editLabel="Save defaults" />
+                          </View>
+                        </Form>
+                      );
+                    }}
+                  </form.Subscribe>
                 </form.AppForm>
               }
             />

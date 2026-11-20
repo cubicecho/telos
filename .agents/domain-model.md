@@ -257,10 +257,13 @@ the site.
   of lanes: a lane is given an agent. Owner: `agents`, `server/src/agent-defaults.ts`.
 - **Remote agent:** a model that is a whole agent of its own, such as one of ai-router's:
   it runs its own loop and sampling on its server, and hands the tools it wants back to
-  the run. Picking one from an endpoint's list of models makes the agent a remote agent,
-  named from its card when the name is blank; its sampling, thinking and how it picks
-  its tools are then its server's, and are never inherited from the defaults.
-  Owner: `agents.remoteAgent`, `remoteAgentConfig` in `runner/src/spec.ts`.
+  the run. Picking one from an endpoint's list of models, for an agent or for the agent
+  defaults, makes that model a remote agent, and an agent that inherits the default model
+  inherits that too; an agent is named from its card when its name is blank. Its sampling,
+  thinking and how it picks its tools are then its server's. How many times it may hand
+  your tools back in one run is still yours to set.
+  Owner: `agents.remoteAgent`, `agent_defaults.remoteAgent`, `resolveRemoteAgent` and
+  `remoteAgentConfig` in `runner/src/spec.ts`.
 - **Prompt:** what one kind of agent is told to do, chosen by each agent. Every account
   starts with Planner, Reviewer and Worker, which a person may edit, delete or add to.
   A person's only.

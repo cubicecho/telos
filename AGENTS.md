@@ -502,7 +502,8 @@ it is written with `setAgentApiKey` and read only by the runner, in a claim.
 
 **An agent says only what is different about it.** `agent_defaults` (one row
 per account, a server-only table, `agents/agent-defaults-resolvers.ts`) is the layer
-under every agent the account has: endpoint, model, sampling, reasoning effort,
+under every agent the account has: endpoint, model, whether that model is a
+remote agent (below), sampling, reasoning effort,
 reasoning replay (agent-core's `reasoningReplay`, a check-constrained
 `all`/`tool-loop`/`none`), tool discovery, the tool-picking model, iterations,
 timeout and retries. A null on the agent
@@ -510,7 +511,13 @@ inherits the default, a null there agent-core's `RESOLVED_DEFAULTS`; zero and
 an empty string are values, never "inherit". The claim (`claimRun`,
 `claimDraft`) hands the runner the agent and its account's `defaults`, and
 `runner/src/spec.ts` resolves them with agent-core's `parseSpec` and
-`resolveAgentSpec`: do not write a second merge. The server imports that same
+`resolveAgentSpec`: do not write a second merge. The remote agent flag is the
+one layer field agent-core's spec has no place for, so `resolveRemoteAgent`
+beside `resolveAgent` layers it, with the model it describes: an agent that
+names a model goes by its own flag (null is false), and one that inherits the
+model inherits the default's flag. So an agent saved before the flag existed
+never becomes a remote agent because its default model is one. `resolveAgent`
+hands the flag back with the config. The server imports that same
 module (`@telos/runner/spec`) for what Settings shows a blank will be and for
 the model a run records. The default key is write-only, as an agent's is
 (`setAgentDefaultsApiKey`, `hasApiKey`), and goes through `resolveApiKey`: an
@@ -524,21 +531,26 @@ An endpoint such as ai-router serves whole agents as models, and its `/models`
 entry says so: agent-core's `probeEndpoint` reads `agent_core.kind` into
 `ModelInfo.remoteAgent`, and `agentModels` (`listModels`) hands that on as
 `AgentModel.remoteAgent`, with the card's `name` and `description`. Picking one
-in the agent form sets `agents.remote_agent`, takes the model and its context
-length from the card and its name too while the name is blank, shows the
-card's description under the model, and greys out what the remote agent
-decides itself (`REMOTE_AGENT_FIELDS` in `agent-settings-fields.ts`); picking
-any other model, or typing one the list does not have, clears it. The flag
-says what the agent's own model is, so it is the agent's alone: not in
-`agent_defaults`, `LAYER_FIELDS` or the spec layers, and an agent that
-inherits the default model is never one. The claim hands it to the runner,
-which resolves the layers as always and then runs them through
-`remoteAgentConfig` (`runner/src/spec.ts`): `remoteAgent: true`, no
-temperature, max tokens, reasoning effort or reasoning replay, since ai-router
-refuses a field its agent's policy did not allow and the agent's own sampling
-should win, and every tool sent at once with none picked first, which
-agent-core would set aside with a notice anyway. The iteration cap still
-bounds the tool calls it hands back.
+in the agent form or the defaults form sets that layer's `remote_agent`
+(`agents` and `agent_defaults` both have it, nullable, in `LAYER_FIELDS`),
+takes the context length from the card, and in the agent form its name too
+while the name is blank. Picking any other model, or typing one the list does
+not have, sets it false, and clearing the model sets it back to null, so the
+flag is inherited with the model (`remoteAgentOfPick` in `endpoint-fields.tsx`).
+Both forms show the card's description under the model, the agent form the
+inherited one's too, and grey out what the remote agent decides itself
+(`REMOTE_AGENT_FIELDS` in `agent-settings-fields.ts`) when the model they run,
+their own or inherited, is one (`remoteModel` in `lib/agents.ts`, which reads
+the draft by `resolveRemoteAgent`'s rule, and `ResolvedAgentSettings.remoteAgent`).
+The claim hands both layers' flags to the runner, which resolves the layers as
+always and, when the flag resolves on, runs them through `remoteAgentConfig`
+(`runner/src/spec.ts`): `remoteAgent: true`, no temperature, max tokens,
+reasoning effort or reasoning replay, since ai-router refuses a field its
+agent's policy did not allow and the agent's own sampling should win, and every
+tool sent at once with none picked first, which agent-core would set aside with
+a notice anyway. The iteration cap stays editable and is passed on: it limits
+only how many times the remote agent hands telos's tools back in one run, not
+the loop it runs on its server.
 
 **The runner never imports the server or the database.** Everything it knows
 comes from `runnerQueue` and `claimRun`, and everything it does goes back
