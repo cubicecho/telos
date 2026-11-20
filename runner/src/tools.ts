@@ -57,7 +57,7 @@ export function serverConfig(row: McpServerRow, onNotice?: (text: string) => voi
     // a hook that never runs is not mistaken for one that does.
     onNotice?.(
       `A hook on "${row.name || row.id}" is bound to ${NEVER_FIRED}, which telos never fires: ` +
-        'a run does not compact its transcript. Bind it to afterTurn or sessionEnd to have it run.',
+        'a run does not compact its transcript. Bind it to afterExchange or sessionEnd to have it run.',
     );
   }
   const base = {

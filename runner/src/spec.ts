@@ -11,7 +11,7 @@ import {
 // An agent as layered documents: the account's defaults under the agent, read
 // with agent-core's spec rules. Absent inherits and nothing else does, so a
 // stored `temperature: 0` is a temperature of zero and only a null passes the
-// question down. What no layer says is agent-core's `RESOLVED_DEFAULTS`.
+// question down. What no layer says is agent-core's `AGENT_DEFAULTS`.
 //
 // The server reads this too (`@telos/runner/spec`), so what Settings says an
 // agent will inherit and what a run is given are worked out by the same code.

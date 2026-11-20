@@ -31,7 +31,7 @@ describe('an artifact the loop collected', () => {
     link: { uri: '/work/plan.md', name: 'plan.md', title: 'The plan', mimeType: 'text/markdown' },
     callId: 'c1',
     tool: 'fs__edit_file',
-    step: 0,
+    turn: 0,
     count: 2,
     source: 'declared',
     action: 'updated',
@@ -57,7 +57,7 @@ describe('an artifact the loop collected', () => {
       link: { uri: 's3://b/k.png', name: 'k.png' },
       callId: 'c2',
       tool: 'up',
-      step: 1,
+      turn: 1,
       count: 1,
     };
     expect(draftOf(linked, describeTool)).toMatchObject({
@@ -117,7 +117,7 @@ describe('a note the agent left on its todo', () => {
     );
     log.note(null);
     log.fromLoop(
-      [{ link: { uri: 'a.md', name: 'a.md' }, callId: 'c1', tool: 'fs__write_file', step: 0, count: 1 }],
+      [{ link: { uri: 'a.md', name: 'a.md' }, callId: 'c1', tool: 'fs__write_file', turn: 0, count: 1 }],
       describeTool,
     );
     expect(log.list().map((draft) => draft.location)).toEqual(['a.md', `telos:note/${id}`]);

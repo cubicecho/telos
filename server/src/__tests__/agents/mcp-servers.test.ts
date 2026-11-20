@@ -172,7 +172,7 @@ describe('the registry', () => {
 describe("an agent's servers", () => {
   beforeEach(async () => {
     await addServer('zeta');
-    await addServer('alpha', { hooks: [{ id: 'recall', on: 'beforeTurn', tool: 'recall' }] });
+    await addServer('alpha', { hooks: [{ id: 'recall', on: 'beforeExchange', tool: 'recall' }] });
     await addServer('mid');
   });
 
@@ -186,7 +186,7 @@ describe("an agent's servers", () => {
         name: 'alpha',
         url: 'http://alpha.test/mcp',
         headers: { 'X-Key': 's3' },
-        hooks: [{ id: 'recall', on: 'beforeTurn', tool: 'recall' }],
+        hooks: [{ id: 'recall', on: 'beforeExchange', tool: 'recall' }],
       },
       { id: 'mid', name: 'mid', url: 'http://mid.test/mcp' },
       { id: 'zeta', name: 'zeta', url: 'http://zeta.test/mcp' },

@@ -292,7 +292,7 @@ which servers answer and the tools each offers. An agent that names a server
 you have since deleted carries on without it, and its runs say so. A server
 can carry hooks, for example
 a memory lookup injected before each turn. The todo is the hooks' session:
-`sessionStart` fires on its first run, `beforeTurn`, `afterTurn` and
+`sessionStart` fires on its first run, `beforeExchange`, `afterExchange` and
 `sessionEnd` on every run, and `sessionDelete` after the todo is deleted for
 good, so a memory server can forget what it filed. The delete does not wait
 for that: the runner tells the servers afterwards, tries a few times, and

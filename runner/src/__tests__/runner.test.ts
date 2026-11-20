@@ -518,7 +518,7 @@ describe('the runner', () => {
 
     await cycle();
 
-    expect(told[0]).toContain('No tool call in this run touched fs:///summary.md');
+    expect(told[0]).toContain('No tool call so far touched fs:///summary.md');
     expect(await db.select().from(dbSchema.artifacts).where(eq(dbSchema.artifacts.todoId, todoId))).toEqual([]);
   });
 
@@ -530,7 +530,7 @@ describe('the runner', () => {
         name: 'Desk',
         url: desk.url,
         hiddenTools: ['recall'],
-        hooks: [{ id: 'memory', on: 'beforeTurn', tool: 'recall', inject: true }],
+        hooks: [{ id: 'memory', on: 'beforeExchange', tool: 'recall', inject: true }],
       },
     ]);
     const todoId = await board.addTodo('Plan it');
@@ -597,7 +597,7 @@ describe('the runner', () => {
         hiddenTools: ['recall'],
         hooks: [
           { id: 'opening', on: 'sessionStart', tool: 'recall', inject: true },
-          { id: 'memory', on: 'beforeTurn', tool: 'recall', inject: true },
+          { id: 'memory', on: 'beforeExchange', tool: 'recall', inject: true },
         ],
       },
     ]);
@@ -616,9 +616,9 @@ describe('the runner', () => {
       (a: typeof dbSchema.runs.$inferSelect, b: typeof dbSchema.runs.$inferSelect) =>
         a.startedAt.getTime() - b.startedAt.getTime(),
     );
-    expect(hooksOf(first)).toEqual(expect.arrayContaining(['sessionStart', 'beforeTurn']));
+    expect(hooksOf(first)).toEqual(expect.arrayContaining(['sessionStart', 'beforeExchange']));
     expect(second.status).toBe('ok');
-    expect(hooksOf(second)).toContain('beforeTurn');
+    expect(hooksOf(second)).toContain('beforeExchange');
     expect(hooksOf(second)).not.toContain('sessionStart');
   });
 

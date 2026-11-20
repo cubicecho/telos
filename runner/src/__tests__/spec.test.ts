@@ -1,4 +1,4 @@
-import { NO_KEY, RESOLVED_DEFAULTS } from '@cubicecho/agent-core';
+import { AGENT_DEFAULTS, AGENT_SPEC, NO_KEY } from '@cubicecho/agent-core';
 import { describe, expect, it } from 'vitest';
 import { keyFor, resolveAgent, specLayer, unrunnable } from '../spec.ts';
 
@@ -30,7 +30,7 @@ describe('resolveAgent', () => {
       maxRetries: 2,
       toolDiscovery: 'ondemand',
       toolSelectModel: 'tiny',
-      maxToolIterations: RESOLVED_DEFAULTS.maxToolIterations,
+      maxToolIterations: AGENT_DEFAULTS.maxToolIterations,
     });
   });
 
@@ -60,10 +60,10 @@ describe('resolveAgent', () => {
   it('falls back to agent-core when nothing says anything', () => {
     const { config } = resolveAgent(null, { baseUrl: 'http://a/v1', model: 'm' });
     expect(config).toMatchObject({
-      temperature: RESOLVED_DEFAULTS.temperature,
-      maxTokens: RESOLVED_DEFAULTS.maxTokens,
-      maxRetries: RESOLVED_DEFAULTS.maxRetries,
-      toolDiscovery: RESOLVED_DEFAULTS.toolDiscovery,
+      temperature: AGENT_DEFAULTS.temperature,
+      maxTokens: AGENT_DEFAULTS.maxTokens,
+      maxRetries: AGENT_DEFAULTS.maxRetries,
+      toolDiscovery: AGENT_DEFAULTS.toolDiscovery,
     });
     expect(config.requestTimeoutSeconds).toBeUndefined();
     expect(config.apiKey).toBe(NO_KEY);
@@ -98,7 +98,7 @@ describe('resolveAgent', () => {
 describe('specLayer', () => {
   it('writes only what the row says', () => {
     expect(specLayer({ baseUrl: null, model: 'm', toolDiscovery: null })).toEqual({
-      spec: 'cubicecho.agent/1',
+      spec: AGENT_SPEC,
       model: { model: 'm' },
     });
   });
