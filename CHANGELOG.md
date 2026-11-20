@@ -1,3 +1,16 @@
+# [11.4.0](https://github.com/cubicecho/telos/compare/v11.3.2...v11.4.0) (2026-11-20)
+
+
+### Bug Fixes
+
+* **deps:** update to agent-core 7.1.0 ([b2740c9](https://github.com/cubicecho/telos/commit/b2740c916b5fbc9ce9434bd4a1f65c2c4f57fe58))
+
+
+### Features
+
+* **agents:** fill an agent from ai-router's model card ([f1fa17d](https://github.com/cubicecho/telos/commit/f1fa17dfe4c0671655ec52d02d28785c25e4fb8a))
+* **agents:** inherit the remote agent flag from the account's defaults ([46e0a95](https://github.com/cubicecho/telos/commit/46e0a954f23614d94dfcfbaff21a5d87cb9f2da1))
+
 ## [11.3.2](https://github.com/cubicecho/telos/compare/v11.3.1...v11.3.2) (2026-11-20)
 
 
